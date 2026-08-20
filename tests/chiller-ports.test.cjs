@@ -27,7 +27,7 @@ test('меш покупной позиции сохраняет группы с�
   assert.match(geo, /geo\.userData\.zoneMats=geo\.groups\.length>1/);
   // одна группа — зон нет, материал должен остаться одиночным
   assert.match(geo, /if\(geo\.groups\.length===1\)geo\.clearGroups\(\)/);
-  assert.match(geo, /geo\.userData\.zones=\(MS\.zones\|\|\[\]\)\.filter\(z=>z&&z\.tip\)/);
+  assert.match(geo, /geo\.userData\.zones=\(\(IZ&&IZ\.length\?IZ:MS\.zones\)\|\|\[\]\)\.filter\(z=>z&&z\.tip\)/);
   // у сборки с деталями цвета свои, зонных материалов там нет
   assert.match(geo, /geo\.userData\.zoneMats=false/);
 });
@@ -92,5 +92,5 @@ test('подписи держатся за деталями и не наезжа
 test('подписи пересобираются при выборе детали и при изменении сцены', () => {
   assert.match(page, /hideMnt\(\);selBtns\(\);buildParts\(\);portsRebuild\(\)/);
   assert.match(page, /portsPaint\(\);portsRebuild\(\);\s*\/\/ деталь ушла или приехала/);
-  assert.match(page, /portsSync\(\);\s*\n?\s*renderer\.render\(scene,camera\)/);
+  assert.match(page, /portsSync\(\);rotSync\(\);\s*\n?\s*renderer\.render\(scene,camera\)/);
 });

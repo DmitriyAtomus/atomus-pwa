@@ -12,7 +12,8 @@ const page = fs.readFileSync(path.join(root, 'chiller', 'project.html'), 'utf8')
 
 test('ПКМ по детали выделяет её и открывает меню в точке курсора', () => {
   assert.match(page, /cv\.addEventListener\('contextmenu'/);
-  assert.match(page, /const hit=pickItem\(e\);\s*\n\s*if\(!hit\)\{ctxClose\(\);return;\}/);
+  // правой кнопкой берётся и корпус — pickItem(e,true)
+  assert.match(page, /const hit=pickItem\(e,true\);[^\n]*\n\s*if\(!hit\)\{ctxClose\(\);return;\}/);
   assert.match(page, /select\(hit\);ctxOpen\(hit,e\.clientX,e\.clientY\);/);
 });
 
@@ -38,7 +39,9 @@ test('дублирование вынесено в функцию — её зо�
 });
 
 test('с телефона меню даёт долгое касание детали, а сдвиг его отменяет', () => {
-  assert.match(page, /if\(e\.pointerType==='touch'&&hit\)\{lpOff\(\);/);
+  // с телефона долгое касание берёт и корпус, поэтому цель ищется отдельно
+  assert.match(page, /const lph=e\.pointerType==='touch'\?\(hit\|\|pickItem\(e,true\)\):null;/);
+  assert.match(page, /if\(lph\)\{lpOff\(\);/);
   assert.match(page, /lpT=setTimeout\(\(\)=>\{lpT=null;mode=null;/);
   assert.match(page, /if\(lpT&&\(Math\.abs\(dx\)>3\|\|Math\.abs\(dy\)>3\)\)lpOff\(\);/);
 });
@@ -61,10 +64,11 @@ test('подсказка на сцене рассказывает про нов�
 });
 
 test('погашенная деталь узла не перехватывает клик — луч идёт сквозь неё', () => {
-  const a = page.indexOf('function pickItem(e)');
+  const a = page.indexOf('function pickItem(e,any)');
   const b = page.indexOf('function planePoint', a);
+  assert.ok(a > -1 && b > a, 'не нашёл pickItem');
   const pick = page.slice(a, b);
-  assert.match(pick, /const h=hits\.find\(x=>\{/);
+  assert.match(pick, /hits\.forEach\(x=>\{/);
   assert.match(pick, /const m=ms\[x\.face\?x\.face\.materialIndex:0\];/);
-  assert.match(pick, /return !m\|\|m\.visible!==false;/);
+  assert.match(pick, /if\(m&&m\.visible===false\)return;/);
 });
