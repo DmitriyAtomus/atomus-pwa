@@ -250,6 +250,44 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
 #mnt .o small{color:var(--faint);font-size:10.5px}
 #selbar button.on{color:var(--warn);border-color:#6b5a1a}
 
+/* ═══ точное позиционирование (v2.46.001) ═══
+   Кнопки дают только «90°» и «50 мм», а в цехе узел садится на отметку 1250
+   и разворачивается на 7°. Панель говорит числами: X/Y — центр детали в плане,
+   Z — отметка низа, углы — по трём осям, шаг ± выбирается тут же. */
+#pos{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);z-index:7;display:none;
+  flex-direction:column;gap:5px;background:rgba(8,20,36,.97);border:1px solid var(--line2);
+  border-radius:10px;padding:9px;width:322px;max-width:calc(100vw - 16px);
+  box-shadow:0 14px 34px rgba(0,0,0,.5)}
+#pos.on{display:flex}
+#pos .t{font-size:10.5px;color:var(--faint);padding:0 2px}
+#pos .t b{color:var(--ice);font-weight:600}
+#pos .t2{margin-top:3px;border-top:1px solid var(--line2);padding-top:7px}
+#pos .rw{display:flex;align-items:center;gap:5px}
+#pos .rw label{font-size:11px;color:var(--dim);width:62px;flex:0 0 62px}
+#pos .rw .u{font-size:10.5px;color:var(--faint);width:58px;flex:0 0 58px}
+#pos input{flex:1 1 auto;min-width:0;background:var(--panel2);border:1px solid var(--line2);
+  color:var(--ink);border-radius:6px;padding:5px 6px;font-family:var(--mono);font-size:12px;
+  text-align:right;-moz-appearance:textfield}
+#pos input::-webkit-outer-spin-button,#pos input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+#pos input:focus{outline:none;border-color:var(--ice2)}
+#pos input:disabled{opacity:.4}
+#pos .rw button{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);
+  border-radius:6px;width:28px;height:28px;flex:0 0 28px;font-size:13px;cursor:pointer;line-height:1}
+#pos .rw button:hover{border-color:var(--ice2);color:var(--ice)}
+#pos .rw button:disabled{opacity:.35;cursor:default}
+#pos .chips{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+#pos .chips span{font-size:10.5px;color:var(--faint);margin-right:2px}
+#pos .chips i{font-style:normal;font-size:11px;color:var(--dim);cursor:pointer;
+  border:1px solid var(--line2);border-radius:6px;padding:3px 7px;font-family:var(--mono)}
+#pos .chips i.on{color:var(--warn);border-color:#6b5a1a}
+#pos .chips i:hover{color:var(--ice)}
+#pos .ft{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:2px}
+#pos .ft .dim{font-size:10.5px;color:var(--faint);font-family:var(--mono)}
+#pos .ft .cl{font-size:11px;color:var(--dim);cursor:pointer;border:1px solid var(--line2);
+  border-radius:6px;padding:4px 9px}
+#pos .ft .cl:hover{color:var(--ice);border-color:var(--ice2)}
+#pos .warn{font-size:10.5px;color:#e8d49a;padding:0 2px}
+
 /* ═══ меню по правой кнопке на детали (v2.46.000) ═══
    ПКМ по фону — по-прежнему панорама; ПКМ по детали — её карточка и действия
    прямо под курсором, чтобы не ездить к нижней панели. */
@@ -286,6 +324,10 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
 #rpick .rr .t{min-width:0}
 #rpick .rr b{display:block;font-size:11.5px;color:var(--ice);font-weight:600}
 #rpick .rr small{display:block;font-size:10px;color:var(--faint)}
+/* v2.45.1005: в замене видно, какой вентиль стоит на штуцере сейчас */
+#rpick .rr.cur{background:rgba(232,212,154,.09);cursor:default}
+#rpick .rr.cur b{color:#e8d49a}
+#rpick .rr.cur small{color:#c9b784}
 #rpick .nt{padding:6px 8px 3px;font-size:10px;color:var(--faint);line-height:1.35;white-space:normal}
 #ctx{position:fixed;z-index:42;display:none;flex-direction:column;min-width:216px;max-width:280px;
   background:rgba(8,20,36,.97);border:1px solid var(--line2);border-radius:10px;padding:6px;
@@ -453,6 +495,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <div class="vb" id="bParts" style="display:none">Детали</div>
         <div class="vb" id="bPorts" title="Подписи патрубков: выкл · у выделенной · у всех">Патрубки</div>
         <div class="vb" id="bRl" title="Показывать свободные штуцеры ротолока">Ротолоки</div>
+        <div class="vb" id="bFrm" title="Корпус не ловит курсор — мышь берёт деталь за его панелью. Выключишь — корпус снова выделяется кликом">Корпус сквозной</div>
         <div class="vb hist off" id="bUndo" title="Отменять нечего">↶ Отменить</div>
         <div class="vb hist off" id="bRedo" title="Возвращать нечего">↷ Вернуть</div>
       </div>
@@ -461,7 +504,7 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <span><i style="background:#6cb4ec"></i>всасывание, выход</span>
         <span><i style="background:#d9b64a"></i>ППК</span>
         <span><i style="background:#6fd3a5"></i>уравнивание</span></div>
-      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>ПКМ по детали — меню · по фону — панорама · колесо — зум<br>PgUp/PgDn — выше/ниже · Del — убрать<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>золотая метка «+» на штуцере — свободный ротолок, жми и выбирай вентиль</div>
+      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>корпус сквозной — за панелью берётся деталь; сам корпус: ПКМ или строка спецификации<br>ПКМ по детали — меню · по фону — панорама · колесо — зум<br>PgUp/PgDn — выше/ниже · Del — убрать<br>G — точные координаты и углы (шаг 1 мм / 1°)<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>золотая метка «+» на штуцере — свободный ротолок, жми и выбирай вентиль</div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="swrap">
         <div id="schChips" class="sch-chips"></div>
@@ -488,6 +531,32 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <div class="o" data-m="free" data-f="cap">Просто надеть <small>· по проёму, без крепежа</small></div>
         <div class="o" data-m="off" id="mntOff" style="color:#f0a9a0">✕ Отсоединить</div>
       </div>
+      <div id="pos">
+        <div class="t">Точное место · <b id="posNm"></b></div>
+        <div class="rw"><label>X</label><button data-pn="x" data-k="-1" title="Влево на шаг">−</button>
+          <input id="pX" type="number" step="any" inputmode="decimal">
+          <button data-pn="x" data-k="1" title="Вправо на шаг">+</button><span class="u">мм · центр</span></div>
+        <div class="rw"><label>Y</label><button data-pn="y" data-k="-1">−</button>
+          <input id="pY" type="number" step="any" inputmode="decimal">
+          <button data-pn="y" data-k="1">+</button><span class="u">мм · центр</span></div>
+        <div class="rw"><label>Z</label><button data-pn="z" data-k="-1">−</button>
+          <input id="pZ" type="number" step="any" inputmode="decimal">
+          <button data-pn="z" data-k="1">+</button><span class="u">мм · отм. низа</span></div>
+        <div class="chips" id="posSteps"><span>шаг</span></div>
+        <div class="t t2">Повороты, градусы</div>
+        <div class="rw"><label>вокруг Z</label><button data-pt="z" data-k="-1">−</button>
+          <input id="pRZ" type="number" step="any" inputmode="decimal">
+          <button data-pt="z" data-k="1">+</button><span class="u">по вертикали</span></div>
+        <div class="rw"><label>вокруг Y</label><button data-pt="y" data-k="-1">−</button>
+          <input id="pRY" type="number" step="any" inputmode="decimal">
+          <button data-pt="y" data-k="1">+</button><span class="u">завал</span></div>
+        <div class="rw"><label>вокруг X</label><button data-pt="x" data-k="-1">−</button>
+          <input id="pRX" type="number" step="any" inputmode="decimal">
+          <button data-pt="x" data-k="1">+</button><span class="u">крен</span></div>
+        <div class="chips" id="posASteps"><span>шаг</span></div>
+        <div class="warn" id="posRot" style="display:none">Вентиль сидит на штуцере: место и наклон задаёт патрубок, крутить можно вокруг его оси.</div>
+        <div class="ft"><span class="dim" id="posDim"></span><span class="cl" id="posClose">Закрыть</span></div>
+      </div>
       <div id="rots"></div>
       <div id="ctx"></div>
       <div id="rpick"></div>
@@ -496,6 +565,8 @@ svg g.sn:hover .sg,svg g.sn:hover .sg2{stroke:#fff}
         <button id="bInfo" title="Описание позиции из базы">ⓘ Описание</button>
         <button id="bPin" title="Закрепить на этом месте (P)">📌 Закрепить</button>
         <button id="bLink" title="Поставить на дно или надеть на крышку корпуса">⛓ Соединить с корпусом</button>
+        <button id="bPos" title="Точные координаты и углы (G)">⌖ Координаты</button>
+        <button id="bSwap" style="display:none" title="Поставить на этот штуцер другой вентиль">⇄ Заменить вентиль</button>
         <button id="bRot" title="Повернуть вокруг вертикали (R)">⟳ 90°</button>
         <button id="bTilt" title="Завалить вперёд-назад, вокруг оси Y (T)">⤡ завал 90°</button>
         <button id="bRoll" title="Завалить вбок, вокруг оси X (Y)">⤾ крен 90°</button>
@@ -713,17 +784,30 @@ const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),
       floor=new THREE.Plane(new THREE.Vector3(0,0,1),0);
 function toNDC(e){const r=$('#cv').getBoundingClientRect();
   ndc.x=((e.clientX-r.left)/r.width)*2-1;ndc.y=-((e.clientY-r.top)/r.height)*2+1;}
-function pickItem(e){
+/* v2.45.1006: корпус «сквозной» для курсора — он охватывает всю сцену, и клик по любой
+   точке вида упирался в его панель — выделялся корпус, а не то, что внутри.
+   Теперь мышь ловит деталь за панелью, а сам корпус берётся правой кнопкой,
+   строкой спецификации или кликом, когда он уже выделен (чтобы двигать). */
+const FRM_KEY='atomus_chiller_framethru';
+let FRMTHRU=(()=>{try{return localStorage.getItem(FRM_KEY)!=='0';}catch(e){return true;}})();
+function pickItem(e,any){
   toNDC(e);ray.setFromCamera(ndc,camera);
   const hits=ray.intersectObjects(placed.map(p=>p.obj));
   /* v2.45.1002: погашённая деталь узла курсор не ловит — её и гасят затем,
      чтобы дотянуться до того, что за ней (луч сквозь невидимую панель) */
-  const h=hits.find(x=>{
+  const list=[];
+  hits.forEach(x=>{
     const ms=Array.isArray(x.object.material)?x.object.material:[x.object.material];
     const m=ms[x.face?x.face.materialIndex:0];
-    return !m||m.visible!==false;
+    if(m&&m.visible===false)return;
+    const p=placed.find(q=>q.obj===x.object);
+    if(p&&list.indexOf(p)<0)list.push(p);
   });
-  return h?placed.find(p=>p.obj===h.object):null;
+  if(any||!FRMTHRU)return list[0]||null;
+  const inner=list.find(p=>roleOf(p.d)!=='frame');
+  if(inner)return inner;
+  const fr=list[0];
+  return fr&&sel===fr?fr:null;      // под курсором только корпус: выделенный тащим, чужой пропускаем в панораму
 }
 /* v2.45.974: тащим деталь в плоскости её собственной отметки, а не по полу —
    иначе поднятый наверх конденсатор прыгал бы вниз при первом же перетаскивании */
@@ -746,11 +830,13 @@ function bindCtl(cv){
     cv.setPointerCapture(e.pointerId);last={x:e.clientX,y:e.clientY};
     if(e.button===2){mode='pan';rmb={x:e.clientX,y:e.clientY};return;}
     const hit=pickItem(e);
-    /* с телефона правой кнопки нет — то же меню даёт долгое касание детали */
-    if(e.pointerType==='touch'&&hit){lpOff();
+    /* с телефона правой кнопки нет — то же меню даёт долгое касание детали.
+       Корпус курсор не ловит, но меню по долгому касанию отдаёт */
+    const lph=e.pointerType==='touch'?(hit||pickItem(e,true)):null;
+    if(lph){lpOff();
       const x=e.clientX,y=e.clientY;
       lpT=setTimeout(()=>{lpT=null;mode=null;dragSnap=null;cv.classList.remove('drag');
-        select(hit);ctxOpen(hit,x,y);},550);}
+        select(lph);ctxOpen(lph,x,y);},550);}
     if(hit){select(hit);
       // закреплённую деталь мышью не сдвинуть — для того и закрепляли
       if(hit.pin){mode='orbit';toast('Деталь закреплена — сними закрепление, чтобы двигать');return;}
@@ -776,7 +862,7 @@ function bindCtl(cv){
       if(nx===sel.obj.position.x&&ny===sel.obj.position.y)return;
       if(dragSnap){pushHistRaw(dragSnap);dragSnap=null;}
       moveItem(sel,nx-sel.obj.position.x,ny-sel.obj.position.y,0);  // с ним едут и посаженные на него узлы
-      checkCollisions();save();
+      checkCollisions();save();posFill();
     }
   });
   const off=()=>{mode=null;dragSnap=null;lpOff();cv.classList.remove('drag');};
@@ -786,7 +872,7 @@ function bindCtl(cv){
     // правый «протяг» — это панорама, на него меню не вешаем
     if(rmb&&(Math.abs(e.clientX-rmb.x)>4||Math.abs(e.clientY-rmb.y)>4)){rmb=null;return;}
     rmb=null;
-    const hit=pickItem(e);
+    const hit=pickItem(e,true);           // правой кнопкой берётся и корпус
     if(!hit){ctxClose();return;}          // по фону — только панорама, меню не нужно
     select(hit);ctxOpen(hit,e.clientX,e.clientY);
   });
@@ -798,10 +884,20 @@ function bindCtl(cv){
   $('#bGrid').onclick=()=>{grid.visible=!grid.visible;
     $('#bGrid').classList.toggle('on',grid.visible);};
   $('#bGrid').classList.add('on');
+  $('#bFrm').onclick=()=>{
+    FRMTHRU=!FRMTHRU;
+    try{localStorage.setItem(FRM_KEY,FRMTHRU?'1':'0');}catch(e){}
+    $('#bFrm').classList.toggle('on',FRMTHRU);
+    toast(FRMTHRU?'Корпус сквозной — курсор берёт то, что внутри'
+                 :'Корпус ловит курсор, как обычная деталь');};
+  $('#bFrm').classList.toggle('on',FRMTHRU);
   addEventListener('keydown',e=>{
     // v2.45.994: в поле ввода буквы — это текст, а не команды сцены
     const t=e.target&&e.target.tagName;
     if(t==='INPUT'||t==='TEXTAREA'){
+      // v2.46.001: Esc из поля координат закрывает панель, а не чат
+      if(e.key==='Escape'&&e.target.closest&&e.target.closest('#pos')){
+        e.target.blur();posHide();return;}
       if(e.key==='Escape'&&ch.open&&!ch.full)closeChat();
       return;
     }
@@ -816,6 +912,7 @@ function bindCtl(cv){
       if($('#asg').classList.contains('on')){$('#asg').classList.remove('on');return;}
       if($('#chArt').classList.contains('open')){chatArtClose();return;}
       if(ch.open){closeChat();return;}
+      if(posOn()){posHide();return;}
       hideMnt();select(null);
     }
     if(e.key==='p'||e.key==='P'||e.key==='з'||e.key==='З')togglePin();
@@ -823,6 +920,7 @@ function bindCtl(cv){
     if(e.key==='r'||e.key==='R'||e.key==='к'||e.key==='К')rotSel();
     if(e.key==='t'||e.key==='T'||e.key==='е'||e.key==='Е')tiltSel();
     if(e.key==='y'||e.key==='Y'||e.key==='н'||e.key==='Н')rollSel();
+    if(e.key==='g'||e.key==='G'||e.key==='п'||e.key==='П')posToggle();
     if(e.key==='PageUp'){e.preventDefault();lift(50);}
     if(e.key==='PageDown'){e.preventDefault();lift(-50);}
     if(e.key==='Delete'||e.key==='Backspace')delSel();
@@ -1241,10 +1339,12 @@ function ctxItems(it){
   L.push({sep:1},
     {ic:'📌',t:pin?'Открепить':'Закрепить здесь',s:'P',go:togglePin});
   if(it.link&&it.link.mount==='rot')
-    L.push({ic:'⤫',t:'Снять с патрубка',s:'ротолок',go:()=>rotOff(it)});
+    L.push({ic:'⇄',t:'Заменить вентиль',s:'ротолок',go:()=>rotSwapAt(it)},
+           {ic:'⤫',t:'Снять с патрубка',s:'ротолок',go:()=>rotOff(it)});
   else L.push({ic:'⛓',t:lk?('Крепление · '+lk.t):'Соединить с корпусом',go:showMnt});
   L.push(
     {sep:1},
+    {ic:'⌖',t:'Точные координаты…',s:'G',go:()=>{select(it);posShow();}},
     {ic:'⟳',t:'Повернуть 90°',s:'R',go:rotSel},
     {ic:'⤡',t:'Завал 90°',s:'T',go:tiltSel},
     {ic:'⤾',t:'Крен 90°',s:'Y',go:rollSel},
@@ -1354,6 +1454,7 @@ $('#bLink').onclick=()=>{
   // вентиль на штуцере эта кнопка снимает, а не сажает на корпус
   if(sel&&sel.link&&sel.link.mount==='rot'){rotOff(sel);return;}
   $('#mnt').classList.contains('on')?hideMnt():showMnt();};
+$('#bSwap').onclick=()=>{if(sel)rotSwapAt(sel,$('#bSwap'));};
 $('#mnt').querySelectorAll('.o').forEach(o=>o.onclick=()=>{hideMnt();linkSel(o.dataset.m,o.dataset.f);});
 /* подписи кнопок под выделенную деталь */
 function selBtns(){
@@ -1368,6 +1469,7 @@ function selBtns(){
   $('#bLink').classList.toggle('on',rl||!!lk);
   $('#bLink').title=rl?'Вентиль сидит на штуцере ротолока — снять'
                      :'Поставить на дно или надеть на крышку корпуса';
+  $('#bSwap').style.display=rl?'':'none';   // v2.45.1005: поставил не тот — поменяй
 }
 function select(it){
   const prev=sel;
@@ -1378,6 +1480,7 @@ function select(it){
     showSelZ();}
   $('#selbar').classList.toggle('on',!!sel);
   hideMnt();selBtns();buildParts();portsRebuild();
+  sel?posFill():posHide();          // v2.46.001: панель координат — про выделенную деталь
   refreshSpecSel();
 }
 /* отметка низа выделенной детали — по ней и видно, что стоит на крыше */
@@ -1385,6 +1488,7 @@ function showSelZ(){
   if(!sel){$('#selZ').textContent='';return;}
   const b=new THREE.Box3().setFromObject(sel.obj);
   $('#selZ').textContent=(ROLE_NAME[roleOf(sel.d)]||'')+' · отм. '+Math.round(b.min.z)+' мм';
+  posFill();                        // v2.46.001: в панели координат те же числа
 }
 function lift(dz){
   if(!sel)return;
@@ -1690,35 +1794,46 @@ function rotToggle(){
   toast(ROTS?'Свободные штуцеры ротолока подсвечены'
             :'Подсветка свободных ротолоков выключена');
 }
-/* Список вентилей под эту резьбу: труба разная, резьба одна. */
-function rotPick(host,zi,x,y){
+/* Список вентилей под эту резьбу: труба разная, резьба одна.
+   cur — вентиль, который уже сидит на этом штуцере: тогда это не установка,
+   а замена (v2.45.1005). */
+function rotPick(host,zi,x,y,cur){
   const z=(host.zn||[])[zi];if(!z)return;
-  select(host);
+  select(cur||host);              // при замене выделенным остаётся сам вентиль
   const th=rotThread(z),cmp=t=>String(t||'').replace(/\s/g,'');
   const list=DATA.filter(d=>d.ready&&d.geom&&d.geom.rl&&cmp(d.geom.rl)===cmp(th))
     .sort((a,b)=>inchMm(a.geom.odf)-inchMm(b.geom.odf));
   const box=$('#rpick');
   box.innerHTML='<div class="hd"><b></b><span></span></div><div class="rl"></div>'+
     '<div class="nt"></div>';
-  box.querySelector('.hd b').textContent='Ротолок '+th;
-  box.querySelector('.hd span').textContent=z.name+' · '+host.d.brand+' '+host.d.name;
+  box.querySelector('.hd b').textContent=(cur?'Заменить вентиль · ротолок ':'Ротолок ')+th;
+  box.querySelector('.hd span').textContent=z.name+' · '+host.d.brand+' '+host.d.name+
+    (cur?' · сейчас '+cur.d.name:'');
   const rl=box.querySelector('.rl');
   if(!list.length){
     box.querySelector('.nt').textContent='В базе нет вентиля под эту резьбу — '+
       'напиши в чате, добавлю в базу 3D.';
   }else{
     list.forEach(d=>{
+      const now=!!(cur&&cur.d.id===d.id);
       const r=document.createElement('div');
-      r.className='rr';
+      r.className='rr'+(now?' cur':'');
       r.innerHTML='<img data-th="'+esc(GEOMS[d.g].f)+'"><div class="t"><b></b><small></small></div>';
       r.querySelector('b').textContent=d.name;
-      r.querySelector('small').textContent='труба '+d.geom.odf+' · Ø'+
+      r.querySelector('small').textContent=(now?'стоит сейчас · ':'')+'труба '+d.geom.odf+' · Ø'+
         String(Math.round(inchMm(d.geom.odf)*10)/10).replace('.',',')+' мм';
-      r.onclick=()=>{rotPickClose();rotAdd(host.uid,zi,d);};
+      r.onclick=()=>{
+        if(now){rotPickClose();toast('Этот вентиль на штуцере и стоит');return;}
+        rotPickClose();
+        cur?rotSwap(cur,d):rotAdd(host.uid,zi,d);
+      };
       rl.appendChild(r);
     });
-    box.querySelector('.nt').textContent='Вентиль сядет на штуцер накидной гайкой и '+
-      'дальше поедет вместе с аппаратом. Труба выходит уже из вентиля, под пайку.';
+    box.querySelector('.nt').textContent=cur
+      ?'Новый вентиль сядет на тот же штуцер, старый уйдёт со сцены и из спецификации. '+
+       'Крен вокруг оси штуцера сохранится. Ctrl+Z вернёт как было.'
+      :'Вентиль сядет на штуцер накидной гайкой и '+
+       'дальше поедет вместе с аппаратом. Труба выходит уже из вентиля, под пайку.';
   }
   box.classList.add('on');
   const w=box.offsetWidth,h=box.offsetHeight,M=8;
@@ -1783,6 +1898,55 @@ async function rotAdd(hostUid,zi,d){
   }finally{histEnd(h);}
   checkCollisions();showSelZ();refresh();save();
 }
+/* ═══ замена вентиля на штуцере (v2.45.1005) ═══
+   Поставил не тот типоразмер трубы — не надо снимать вентиль, искать его в
+   каталоге и сажать заново: тот же список под ту же резьбу открывается прямо
+   с сидящего вентиля, а место, крен и связь со штуцером переезжают на новый. */
+function rotSwapAt(it,btn){
+  if(!it||!it.link||it.link.mount!=='rot'){
+    toast('Заменить можно только вентиль, который сидит на штуцере');return;}
+  const host=placed.find(p=>p.uid===it.link.to);
+  if(!host){toast('Не нашёл аппарат, на штуцере которого сидит вентиль');return;}
+  select(it);
+  let x=innerWidth/2,y=innerHeight/2;
+  if(btn){const r=btn.getBoundingClientRect();x=r.left;y=r.top;}
+  else{                                   // из меню ПКМ — ведём от самого вентиля
+    const v=new THREE.Vector3();
+    new THREE.Box3().setFromObject(it.obj).getCenter(v).project(camera);
+    const cv=$('#cv');
+    x=(v.x*.5+.5)*(cv.clientWidth||innerWidth);
+    y=(-v.y*.5+.5)*(cv.clientHeight||innerHeight);
+  }
+  rotPick(host,it.link.zi,x,y,it);
+}
+/* Сначала сажаем новый и убеждаемся, что он сел, и только потом убираем
+   старый: не сел — на штуцере остаётся то, что стояло. */
+async function rotSwap(v,d){
+  if(!v||!v.link||v.link.mount!=='rot')return;
+  const host=placed.find(p=>p.uid===v.link.to);
+  if(!host)return;
+  const zi=v.link.zi,roll=v.link.roll||0,old=v.d,z=(host.zn||[])[zi];
+  const h=histBegin('замену вентиля на штуцере');
+  try{
+    const pos=host.obj.position;
+    const it=await addItem(d,{x:pos.x,y:pos.y,z:pos.z});
+    if(!it)return;
+    it.link={to:host.uid,mount:'rot',face:'port',zi:zi,roll:roll};
+    if(!rotMate(it)){                      // не сел — откатываем к прежнему
+      scene.remove(it.obj);placed.splice(placed.indexOf(it),1);
+      select(v);
+      toast('Вентиль не сел на штуцер — оставил прежний');
+      return;
+    }
+    if(v._pinBox){scene.remove(v._pinBox);v._pinBox=null;}
+    placed.forEach(p=>{if(p.link&&p.link.to===v.uid)p.link=null;});
+    scene.remove(v.obj);placed.splice(placed.indexOf(v),1);
+    select(it);
+    toast('На штуцере «'+(z?z.name:'')+'» '+host.d.name+': '+old.name+' → '+d.name+
+      ' · труба '+d.geom.odf);
+  }finally{histEnd(h);}
+  checkCollisions();showSelZ();refresh();save();
+}
 function rotOff(it){
   if(!it||!it.link||it.link.mount!=='rot')return;
   pushHist('снятие вентиля со штуцера');
@@ -1813,6 +1977,135 @@ function checkCollisions(){
   el.textContent=n?('⚠ пересекаются: '+n+' дет.'):'✓ пересечений нет';
   el.style.color=n?'#f0a9a0':'var(--ok)';
 }
+/* ═══ v2.46.001: точное позиционирование ═══
+   Кнопки ставят деталь «на 90° и на 50 мм», а по месту нужно и 7°, и отметка
+   ровно 1250. Панель работает числами: X/Y — центр детали в плане, Z — отметка
+   низа (та же, что в подписи выделения), углы — по трём осям. Шаг ± выбирается
+   рядом, от 1 мм и 1°. Всё идёт через те же moveItem/reseatLink, что и кнопки,
+   поэтому посаженные на корпус узлы едут следом, а история пишет один шаг. */
+const POS={step:10,ang:1};
+const D2R=d=>d*Math.PI/180, R2D=r=>r*180/Math.PI;
+const posN=v=>Math.round(v*10)/10;                       // до десятых, без хвостов
+const posDeg=r=>{const d=posN(R2D(r)%360);return d<0?posN(d+360):d;};
+const posOn=()=>$('#pos').classList.contains('on');
+const posEl=id=>$('#'+id);
+const posBox=()=>new THREE.Box3().setFromObject(sel.obj);
+const posCtr=()=>{const c=new THREE.Vector3();posBox().getCenter(c);return c;};
+const posRotLink=()=>!!(sel&&sel.link&&sel.link.mount==='rot');
+function posShow(){
+  if(!sel)return;
+  hideMnt();$('#pos').classList.add('on');$('#bPos').classList.add('on');posFill();
+}
+function posHide(){$('#pos').classList.remove('on');$('#bPos').classList.remove('on');}
+function posToggle(){posOn()?posHide():posShow();}
+/* Поля перерисовываем после каждого сдвига — кроме того, в котором сейчас печатают */
+function posFill(){
+  if(!posOn())return;
+  if(!sel){posHide();return;}
+  const rl=posRotLink();
+  posEl('posNm').textContent=sel.d.brand+' '+sel.d.name;
+  const b=posBox(),c=new THREE.Vector3();b.getCenter(c);
+  const set=(id,v,dis)=>{const el=posEl(id);el.disabled=!!dis;
+    if(document.activeElement!==el)el.value=v;};
+  set('pX',posN(c.x),rl);set('pY',posN(c.y),rl);set('pZ',posN(b.min.z),rl);
+  /* вентиль на штуцере крутится вокруг оси патрубка — это и есть его «вокруг Z» */
+  set('pRZ',rl?posDeg(sel.link.roll||0):posDeg(sel.obj.rotation.z),false);
+  set('pRY',posDeg(sel.obj.rotation.y),rl);
+  set('pRX',posDeg(sel.obj.rotation.x),rl);
+  posEl('posRot').style.display=rl?'block':'none';
+  const sz=new THREE.Vector3();b.getSize(sz);
+  posEl('posDim').textContent='габарит '+Math.round(sz.x)+' × '+Math.round(sz.y)+
+    ' × '+Math.round(sz.z)+' мм'+(sel.pin?' · закреплена':'');
+  posEl('pos').querySelectorAll('.rw button').forEach(btn=>{
+    btn.disabled=rl&&!(btn.dataset.pt==='z');});
+}
+/* общий хвост правки: пересчёт пересечений, подписей и сохранение */
+function posDone(){checkCollisions();showSelZ();refresh();save();posFill();}
+/* X/Y — центр детали, Z — отметка низа: двигаем на разницу, а не «в точку»,
+   чтобы вместе с деталью ехало посаженное на неё */
+function posMove(ax,val){
+  if(!sel||!isFinite(val))return;
+  if(posRotLink()){toast('Вентиль сидит на штуцере — сними с патрубка, чтобы двигать');posFill();return;}
+  const b=posBox(),c=new THREE.Vector3();b.getCenter(c);
+  const d=posN(val-(ax==='z'?b.min.z:c[ax]));
+  if(!d){posFill();return;}
+  if(sel.pin)toast('Деталь закреплена — сдвинул точным вводом');
+  pushHist('точное положение детали');
+  moveItem(sel,ax==='x'?d:0,ax==='y'?d:0,ax==='z'?d:0);
+  posDone();
+}
+/* Поворот на заданный угол. Завал и крен, как и кнопками, не роняют деталь под
+   пол: после поворота возвращаем низ на прежнюю отметку. */
+function posSpin(ax,deg){
+  if(!sel||!isFinite(deg))return;
+  if(posRotLink()){if(ax==='z')posRoll(deg);else posFill();return;}
+  const want=D2R(posN(deg));
+  if(Math.abs(want-sel.obj.rotation[ax])<1e-6){posFill();return;}
+  pushHist('поворот детали');
+  const z0=posBox().min.z;
+  sel.obj.rotation[ax]=want;
+  sel.obj.updateMatrixWorld(true);
+  if(ax!=='z'){
+    sel.obj.position.z+=z0-posBox().min.z;
+    sel.obj.updateMatrixWorld(true);
+  }
+  if(sel.link)reseatLink(sel);
+  if(sel._pinBox)sel._pinBox.update();
+  posDone();
+}
+/* Вентиль на штуцере: тот же угол, но вокруг оси патрубка — теперь не только 90° */
+function posRoll(deg){
+  if(!posRotLink()||!isFinite(deg))return;
+  const want=D2R(((posN(deg)%360)+360)%360);
+  if(Math.abs(want-(sel.link.roll||0))<1e-6){posFill();return;}
+  pushHist('поворот вентиля на штуцере');
+  sel.link.roll=want;
+  rotMate(sel);posDone();
+}
+function posNudge(ax,k){
+  if(!sel)return;
+  const b=posBox(),c=new THREE.Vector3();b.getCenter(c);
+  posMove(ax,(ax==='z'?b.min.z:c[ax])+k*POS.step);
+}
+function posTurn(ax,k){
+  if(!sel)return;
+  const cur=posRotLink()?posDeg(sel.link.roll||0):posDeg(sel.obj.rotation[ax]);
+  posSpin(ax,cur+k*POS.ang);
+}
+/* чипы шага: мм и градусы */
+function posChips(){
+  const mk=(host,vals,unit,get,set)=>{
+    host.querySelectorAll('i').forEach(i=>i.remove());
+    vals.forEach(v=>{
+      const el=document.createElement('i');
+      el.textContent=v+unit;
+      el.classList.toggle('on',get()===v);
+      el.onclick=()=>{set(v);posChips();};
+      host.appendChild(el);
+    });
+  };
+  mk($('#posSteps'),[1,5,10,50,100],' мм',()=>POS.step,v=>POS.step=v);
+  mk($('#posASteps'),[1,5,15,45,90],'°',()=>POS.ang,v=>POS.ang=v);
+}
+(function posBind(){
+  posChips();
+  $('#bPos').onclick=posToggle;
+  $('#posClose').onclick=posHide;
+  const F={pX:['m','x'],pY:['m','y'],pZ:['m','z'],pRZ:['t','z'],pRY:['t','y'],pRX:['t','x']};
+  Object.keys(F).forEach(id=>{
+    const el=posEl(id),[kind,ax]=F[id];
+    el.onchange=()=>{const v=parseFloat(String(el.value).replace(',','.'));
+      if(!isFinite(v)){posFill();return;}
+      kind==='m'?posMove(ax,v):posSpin(ax,v);};
+    // Enter с телефона — это «применил и убрал клавиатуру»
+    el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();el.blur();}};
+  });
+  $('#pos').querySelectorAll('.rw button').forEach(b=>{
+    const k=+b.dataset.k;
+    b.onclick=()=>b.dataset.pn?posNudge(b.dataset.pn,k):posTurn(b.dataset.pt,k);
+  });
+})();
+
 /* ═══ v2.45.995: поворот по всем трём осям ═══
    z — вокруг вертикали, y — завал вперёд-назад, x — крен вбок.
    Деталь после завала и крена опускаем низом на прежнюю отметку, чтобы она
