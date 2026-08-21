@@ -279,6 +279,90 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 .asg-grp{font-size:10px;letter-spacing:.5px;color:var(--faint);padding:6px 6px 0;font-weight:700}
 .asg-keys{padding:6px 14px;border-top:1px solid var(--line);font-size:10px;color:var(--faint);display:flex;gap:12px;flex-wrap:wrap}
 .asg-keys b{color:var(--dim);font-weight:600;background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:0 5px}
+/* v2.45.1025: каталог номенклатуры во весь экран */
+.ph #nomOpen{float:right;font-size:10px;font-weight:600;color:var(--ice);cursor:pointer;
+  border:1px solid var(--line2);border-radius:9px;padding:1px 8px;margin-top:-2px}
+.ph #nomOpen:hover{border-color:var(--ice2);background:rgba(27,159,216,.12)}
+#nom{position:fixed;inset:0;background:#061020;z-index:24;display:none;flex-direction:column}
+#nom.on{display:flex}
+.nom-top{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.nom-top b{font-size:14px;white-space:nowrap}
+.nom-top .x{margin-left:6px;color:var(--dim);cursor:pointer;font-size:16px;padding:2px 6px}
+.nom-q{flex:1;display:flex;align-items:center;gap:9px;background:var(--panel2);
+  border:1px solid var(--line2);border-radius:10px;padding:8px 13px;max-width:640px}
+.nom-q input{flex:1;background:none;border:none;outline:none;color:var(--ink);font-size:14px;min-width:80px}
+.nom-q kbd{font-size:9.5px;color:var(--faint);border:1px solid var(--line2);border-radius:4px;padding:1px 5px}
+.nom-vm{display:flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
+.nom-vm span{padding:5px 11px;font-size:11px;color:var(--dim);cursor:pointer;user-select:none}
+.nom-vm span.on{background:rgba(27,159,216,.16);color:var(--ice)}
+.nom-body{flex:1;display:flex;min-height:0}
+.nom-nav{width:220px;flex-shrink:0;border-right:1px solid var(--line);overflow-y:auto;padding:10px 8px;background:var(--panel)}
+.nom-nav .sr{display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--dim);user-select:none;white-space:nowrap}
+.nom-nav .sr:hover{background:var(--panel2)}
+.nom-nav .sr.on{color:var(--ice);background:rgba(27,159,216,.12)}
+.nom-nav .sr small{margin-left:auto;color:var(--faint);font-size:10px;padding-left:8px}
+.nom-nav .sr .tri{width:10px;font-size:9px;color:var(--faint);flex-shrink:0}
+.nom-nav .sb{margin:1px 0 3px 14px;border-left:1px solid var(--line2);padding-left:4px}
+.nom-nav .sb .sr{font-size:11px;padding:4px 8px}
+.nom-nav .sb .sr.on{color:#4FBF8B;background:rgba(79,191,139,.10)}
+.nom-mid{flex:1;display:flex;flex-direction:column;min-width:0}
+.nom-need{margin:10px 14px 0;padding:9px 12px;border:1px solid #5c4a1a;border-radius:11px;background:rgba(201,162,39,.05)}
+.nom-need>b{display:block;font-size:10.5px;letter-spacing:.4px;color:#C9A227;margin-bottom:7px}
+.nom-need .row{display:flex;gap:8px;overflow-x:auto}
+.nom-nc{flex:0 0 auto;display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line2);
+  border-radius:9px;padding:6px 10px;cursor:pointer;font-size:11.5px;white-space:nowrap}
+.nom-nc:hover{border-color:#C9A227}
+.nom-nc .tag3{font:700 9px 'Cascadia Mono',Consolas,monospace;color:#C9A227;border:1px solid #5c4a1a;border-radius:8px;padding:0 6px}
+.nom-nc .pl{color:#4FBF8B;font-weight:700}
+.nom-fl{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:10px 14px 0}
+.nom-fl b{font-size:9.5px;color:var(--faint);letter-spacing:.4px}
+.nom-fl span{font-size:11px;border:1px solid var(--line2);color:var(--dim);border-radius:11px;padding:3px 10px;cursor:pointer;user-select:none}
+.nom-fl span.on{background:rgba(201,162,39,.13);border-color:#5c4a1a;color:#C9A227}
+.nom-fl .cnt{margin-left:auto;font-size:11px;color:var(--faint)}
+.nom-grid{flex:1;overflow-y:auto;padding:12px 14px 90px;display:grid;gap:10px;
+  grid-template-columns:repeat(auto-fill,minmax(212px,1fr));align-content:start}
+.nom-grid.listv{display:flex;flex-direction:column;gap:7px}
+.ncard{background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:10px;position:relative}
+.ncard:hover{border-color:var(--ice2)}
+.ncard .ph2{height:96px;border-radius:8px;background:#0D1B30;border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;margin-bottom:8px;position:relative;overflow:hidden}
+.ncard .ph2 img{max-width:100%;max-height:100%;object-fit:contain}
+.ncard .ph2 .kw{position:absolute;right:6px;top:6px;font-size:10px;font-weight:700;color:var(--ice);
+  background:#12294a;border:1px solid var(--line2);border-radius:9px;padding:1px 7px}
+.ncard b{display:block;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ncard .br2{font-size:10.5px;color:var(--faint);margin:1px 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ncard .kd{font-size:10.5px;color:var(--dim);height:28px;overflow:hidden;line-height:1.35}
+.ncard .tgs2{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;min-height:16px;max-height:34px;overflow:hidden}
+.ncard .tgs2 i{font-style:normal;font-size:9px;color:var(--dim);border:1px solid var(--line2);border-radius:8px;padding:0 5px}
+.ncard .act{display:flex;gap:6px;margin-top:8px;align-items:center}
+.ncard .addc{flex:1;text-align:center;font-size:11px;color:#4FBF8B;border:1px solid #2c6b4d;border-radius:8px;padding:4px;font-weight:600;cursor:pointer}
+.ncard .addc:hover{background:rgba(79,191,139,.12)}
+.ncard .infc,.ncard .cmpc{font-size:12px;color:var(--dim);border:1px solid var(--line2);border-radius:8px;padding:3px 9px;cursor:pointer;user-select:none}
+.ncard .cmpc.on{color:#C9A227;border-color:#5c4a1a;background:rgba(201,162,39,.12)}
+.ncard.rowv{display:flex;gap:11px;align-items:center}
+.ncard.rowv .ph2{height:56px;width:76px;flex:none;margin:0}
+.ncard.rowv .mid2{flex:1;min-width:0}
+.ncard.rowv .act{margin:0}
+.nom-more{grid-column:1/-1;text-align:center;font-size:11.5px;color:var(--ice);border:1px dashed var(--line2);
+  border-radius:9px;padding:9px;cursor:pointer}
+.nom-cmpbar{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:26;display:none;
+  background:var(--panel);border:1px solid #5c4a1a;border-radius:12px;padding:8px 14px;
+  box-shadow:0 16px 44px rgba(0,0,0,.55);font-size:12px;align-items:center;gap:12px}
+.nom-cmpbar.on{display:flex}
+.nom-cmpbar .go{color:#C9A227;font-weight:700;cursor:pointer}
+.nom-cmpbar .cl{color:var(--faint);cursor:pointer}
+#nomCmpM{position:fixed;inset:0;background:rgba(3,8,16,.75);z-index:27;display:none;align-items:center;justify-content:center}
+#nomCmpM.on{display:flex}
+.nom-cmpcard{width:min(780px,94vw);max-height:84vh;overflow:auto;background:var(--panel);
+  border:1px solid var(--line2);border-radius:14px;padding:16px 18px}
+.nom-cmpcard h3{margin:0 0 12px;font-size:14px}
+.nom-cmpcard table{width:100%;border-collapse:collapse;font-size:12px}
+.nom-cmpcard th,.nom-cmpcard td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.nom-cmpcard th{color:var(--ice);font-size:12.5px}
+.nom-cmpcard td:first-child{color:var(--faint);font-size:11px;width:140px}
+.nom-cmpcard .best{color:#4FBF8B;font-weight:600}
+.nom-cmpcard .add2{margin-top:6px;display:inline-block;font-size:11px;color:#4FBF8B;border:1px solid #2c6b4d;border-radius:8px;padding:3px 12px;cursor:pointer}
+.nom-note{border-top:1px solid var(--line);background:var(--panel);padding:6px 16px;font-size:10.5px;color:var(--faint);text-align:center}
 .asg-list{flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:6px}
 .asg-unset{margin:0 8px 10px;padding:9px;border:1px solid #6b3a34;color:#f0a9a0;border-radius:8px;
   text-align:center;cursor:pointer;font-size:12.5px}
@@ -625,7 +709,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 
   <div id="mid">
     <div class="col">
-      <div class="ph">База 3D <span class="m" id="catCnt"></span></div>
+      <div class="ph">База 3D <span class="m" id="catCnt"></span><span id="nomOpen" title="Каталог во весь экран · Ctrl+K">⛶ каталог</span></div>
       <div class="search" id="qBox"><span style="color:var(--faint)">⌕</span><input id="q"
         placeholder="название, артикул, R404A, 1/2&quot;…" autocomplete="off"><span class="qx" id="qClr" title="Очистить · Esc">✕</span></div>
       <div class="chips" id="secs"></div>
@@ -808,6 +892,30 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
   <div class="asg-list" id="asgList"></div>
   <div class="asg-keys"><span><b>Enter</b> — назначить верхнюю</span><span><b>←</b> <b>→</b> — соседний узел</span><span><b>Tab</b> — следующий неназначенный</span><span><b>Esc</b> — закрыть</span></div>
 </div></div>
+<div id="nom">
+  <div class="nom-top">
+    <b>База 3D · каталог</b>
+    <div class="nom-q"><span style="color:var(--faint)">⌕</span>
+      <input id="nomQ" placeholder="компрессор 7 квт, ТРВ 3/8, фильтр пайка… — печатай как думаешь" autocomplete="off"><kbd>Ctrl K</kbd></div>
+    <div class="nom-vm"><span id="nomVmG" class="on">⊞ плитки</span><span id="nomVmL">☰ список</span></div>
+    <span class="x" id="nomX" title="Закрыть · Esc">✕</span>
+  </div>
+  <div class="nom-body">
+    <div class="nom-nav" id="nomNav"></div>
+    <div class="nom-mid">
+      <div class="nom-need" id="nomNeed" style="display:none">
+        <b>⚠ ПО СХЕМЕ ПРОЕКТА НЕ ХВАТАЕТ В СЦЕНЕ — поставить одним кликом</b>
+        <div class="row" id="nomNeedRow"></div>
+      </div>
+      <div class="nom-fl" id="nomFl"></div>
+      <div class="nom-grid" id="nomGrid"></div>
+    </div>
+  </div>
+  <div class="nom-note">дерево раздел → подраздел · поиск словами по всей базе · «⚖» на 2–3 карточках — сравнение ·
+    Enter — поставить верхнюю · Esc — закрыть</div>
+</div>
+<div class="nom-cmpbar" id="nomCmpBar"><span id="nomCmpTxt"></span><span class="go" id="nomCmpGo">⚖ Сравнить</span><span class="cl" id="nomCmpCl">сбросить</span></div>
+<div id="nomCmpM"><div class="nom-cmpcard"><h3>Сравнение позиций</h3><div id="nomCmpT"></div></div></div>
 <div id="flt"><div class="flt-card">
   <div class="pov-h">⌗ Подбор фильтра-осушителя
     <span class="sub">Ридан / Danfoss</span><span class="x" id="fltX">✕</span></div>
@@ -4207,6 +4315,179 @@ addEventListener('keydown',e=>{
   e.preventDefault();$('#q').focus();$('#q').select();
 });
 
+
+/* ═══ каталог номенклатуры во весь экран (v2.45.1025) ═══
+   Левая колонка хороша для быстрых вставок, но на 800+ позиций тесна:
+   характеристики не сравнить, превью мелкие. Кнопка «⛶ каталог» (или Ctrl+K)
+   раскрывает базу на весь экран: дерево раздел → подраздел, крупные карточки,
+   фильтры бренда и мощности, сравнение до трёх позиций бок-о-бок и жёлтая
+   полка «по схеме назначено, а в сцене не стоит» — ставится одним кликом. */
+let nomSt={sec:null,sub:null,open:null,brand:null,pow:null,view:'grid',lim:60,cmp:[]};
+function nomNeedList(data,schema,placedArr,schNodes){
+  // назначено узлу схемы, позиция готова, но в сцене её нет
+  const out=[];
+  schNodes.forEach(n=>{
+    const a=schema[n.k];
+    if(!a||!a.id)return;
+    const d=data.find(x=>x.id===a.id&&x.ready);
+    if(!d)return;
+    if(placedArr.some(pp=>pp.id===d.id))return;
+    out.push({tag:n.t,d:d});
+  });
+  return out;
+}
+function nomOpenCat(){$('#nom').classList.add('on');nomSt.lim=60;drawNom();setTimeout(()=>$('#nomQ').focus(),40);}
+function nomCloseCat(){$('#nom').classList.remove('on');$('#nomCmpM').classList.remove('on');}
+function nomMatch(d){
+  const q=($('#nomQ').value||'').trim().toLowerCase();
+  if(q)return q.split(/\s+/).every(t=>hay(d).includes(t));  // поиск словами — по всей базе
+  if(nomSt.sec&&d.section!==nomSt.sec)return false;
+  if(nomSt.sub&&d.sub!==nomSt.sub)return false;
+  if(nomSt.brand&&(d.brand||'')!==nomSt.brand)return false;
+  if(nomSt.pow){const[a,b]=nomSt.pow.split('-').map(Number);const kw=asgKw(d);if(!(kw>=a&&kw<b))return false;}
+  return true;
+}
+async function nomPut(d,tag){
+  const ok=await addItem(d);
+  if(ok!==false)toast('В сцену: '+d.name+(tag?' → на место '+tag:''));
+  drawNom();
+}
+function nomCard(d){
+  const kwTag=(d.tags||[]).find(t=>/квт/i.test(t));
+  const tags=(d.tags||[]).filter(t=>t!==kwTag).slice(0,4);
+  const inCmp=nomSt.cmp.includes(d.id);
+  const ph='<div class="ph2"><img loading="lazy" data-th="'+esc(GEOMS[d.g].f)+'">'
+    +(kwTag?'<span class="kw">'+esc(kwTag)+'</span>':'')+'</div>';
+  const acts='<div class="act"><span class="addc" data-add="'+esc(d.id)+'">+ в сцену</span>'
+    +'<span class="infc" data-inf="'+esc(d.id)+'" title="Описание позиции">ⓘ</span>'
+    +'<span class="cmpc'+(inCmp?' on':'')+'" data-cmp="'+esc(d.id)+'" title="В сравнение">⚖</span></div>';
+  const tgs=tags.length?'<span class="tgs2">'+tags.map(t=>'<i>'+esc(t)+'</i>').join('')+'</span>':'';
+  if(nomSt.view==='list')
+    return '<div class="ncard rowv">'+ph+'<div class="mid2"><b>'+esc(d.name)+'</b>'
+      +'<div class="br2">'+esc(d.brand||'')+' · '+esc(d.kind||'')+'</div>'+tgs+'</div>'+acts+'</div>';
+  return '<div class="ncard">'+ph+'<b>'+esc(d.name)+'</b>'
+    +'<div class="br2">'+esc(d.brand||'')+' · '+esc(SECNAME[d.section]||'')+(d.sub&&SECNAME[d.section+'/'+d.sub]?' · '+esc(SECNAME[d.section+'/'+d.sub]):'')+'</div>'
+    +'<div class="kd">'+esc(d.kind||'')+'</div>'+tgs+acts+'</div>';
+}
+function drawNom(){
+  if(!$('#nom').classList.contains('on'))return;
+  const cnt=(sec,sub)=>DATA.filter(d=>d.ready&&(!sec||d.section===sec)&&(!sub||d.sub===sub)).length;
+  // дерево
+  let h='<div class="sr'+(!nomSt.sec?' on':'')+'" data-s=""><i class="tri">▪</i>Все разделы<small>'+cnt()+'</small></div>';
+  SECTIONS.forEach(sc=>{
+    const subs=sc[2]||[];
+    h+='<div class="sr'+(nomSt.sec===sc[0]&&!nomSt.sub?' on':'')+'" data-s="'+esc(sc[0])+'">'
+      +'<i class="tri">'+(subs.length?(nomSt.open===sc[0]?'▾':'▸'):'·')+'</i>'+esc(sc[1])+'<small>'+cnt(sc[0])+'</small></div>';
+    if(nomSt.open===sc[0]&&subs.length)
+      h+='<div class="sb">'+subs.map(b=>'<div class="sr'+(nomSt.sub===b[0]?' on':'')+'" data-s="'+esc(sc[0])+'" data-b="'+esc(b[0])+'">'
+        +esc(b[1])+'<small>'+cnt(sc[0],b[0])+'</small></div>').join('')+'</div>';
+  });
+  $('#nomNav').innerHTML=h;
+  $('#nomNav').querySelectorAll('.sr').forEach(el=>el.onclick=()=>{
+    const sec=el.dataset.s||null,sub=el.dataset.b||null;
+    if(sub){nomSt.sec=sec;nomSt.sub=nomSt.sub===sub?null:sub;}
+    else if(!sec){nomSt.sec=null;nomSt.sub=null;nomSt.open=null;}
+    else{nomSt.open=(nomSt.open===sec&&nomSt.sec===sec&&!nomSt.sub)?null:sec;nomSt.sec=sec;nomSt.sub=null;}
+    nomSt.brand=null;nomSt.pow=null;nomSt.lim=60;drawNom();
+  });
+  // полка «не хватает по схеме»
+  const need=nomNeedList(DATA,schemaData,placed,SCH_NODES);
+  $('#nomNeed').style.display=need.length?'block':'none';
+  $('#nomNeedRow').innerHTML=need.map((n,i)=>'<div class="nom-nc" data-need="'+i+'">'
+    +'<span class="tag3">'+esc(n.tag)+'</span>'+esc((n.d.brand?n.d.brand+' ':'')+n.d.name)
+    +'<span class="pl">+ поставить</span></div>').join('');
+  $('#nomNeedRow').querySelectorAll('.nom-nc').forEach(el=>el.onclick=()=>{
+    const n=need[+el.dataset.need];nomPut(n.d,n.tag);});
+  // фильтры
+  const pool=DATA.filter(d=>d.ready&&(!nomSt.sec||d.section===nomSt.sec)&&(!nomSt.sub||d.sub===nomSt.sub));
+  const bc={};pool.forEach(d=>{if(d.brand)bc[d.brand]=(bc[d.brand]||0)+1;});
+  const brands=Object.keys(bc).sort((a,b)=>bc[b]-bc[a]).slice(0,7);
+  const list=DATA.filter(d=>d.ready).filter(nomMatch);
+  let fl='';
+  if(brands.length>1)fl+='<b>БРЕНД</b>'+brands.map(b=>'<span class="'+(nomSt.brand===b?'on':'')+'" data-f="b:'+esc(b)+'">'+esc(b)+' '+bc[b]+'</span>').join('');
+  if(pool.filter(d=>asgKw(d)>0).length>=3)
+    fl+='<b style="margin-left:8px">МОЩНОСТЬ</b>'+[['до 5','0-5'],['5–10','5-10'],['10–20','10-20'],['20+','20-999']]
+      .map(([nm,r])=>'<span class="'+(nomSt.pow===r?'on':'')+'" data-f="p:'+r+'">'+nm+' кВт</span>').join('');
+  fl+='<span class="cnt">'+list.length+' из '+DATA.filter(d=>d.ready).length+'</span>';
+  $('#nomFl').innerHTML=fl;
+  $('#nomFl').querySelectorAll('span[data-f]').forEach(el=>el.onclick=()=>{
+    const m=/^(b|p):(.+)$/.exec(el.dataset.f);
+    if(m[1]==='b')nomSt.brand=nomSt.brand===m[2]?null:m[2];else nomSt.pow=nomSt.pow===m[2]?null:m[2];
+    nomSt.lim=60;drawNom();});
+  // сетка
+  const g=$('#nomGrid');
+  g.className='nom-grid'+(nomSt.view==='list'?' listv':'');
+  const shown=list.slice(0,nomSt.lim);
+  g.innerHTML=shown.map(nomCard).join('')
+    +(list.length>nomSt.lim?'<div class="nom-more" id="nomMore">показать ещё '+Math.min(60,list.length-nomSt.lim)+' из '+(list.length-nomSt.lim)+'</div>':'')
+    ||'<div style="color:var(--faint);padding:30px;text-align:center;grid-column:1/-1">Пусто — сбрось фильтры или измени запрос</div>';
+  const more=document.getElementById('nomMore');
+  if(more)more.onclick=()=>{nomSt.lim+=60;drawNom();};
+  g.querySelectorAll('[data-add]').forEach(el=>el.onclick=()=>{
+    const d=DATA.find(x=>x.id===el.dataset.add);if(d)nomPut(d);});
+  g.querySelectorAll('[data-inf]').forEach(el=>el.onclick=()=>{
+    const d=DATA.find(x=>x.id===el.dataset.inf);
+    if(d)openDesc(d,[{t:'+ Добавить в сцену',pri:true,go:()=>nomPut(d)}]);});
+  g.querySelectorAll('[data-cmp]').forEach(el=>el.onclick=()=>{
+    const id=el.dataset.cmp;
+    if(nomSt.cmp.includes(id))nomSt.cmp=nomSt.cmp.filter(x=>x!==id);
+    else{if(nomSt.cmp.length>=3){toast('Сравнение: максимум 3 позиции');return;}nomSt.cmp.push(id);}
+    drawNom();});
+  // панель сравнения
+  $('#nomCmpBar').classList.toggle('on',nomSt.cmp.length>=1&&$('#nom').classList.contains('on'));
+  $('#nomCmpTxt').textContent='Выбрано: '+nomSt.cmp.map(id=>{const d=DATA.find(x=>x.id===id);return d?d.name:id;}).join(' · ');
+  $('#nomQ').placeholder='поиск в базе словами: «компрессор 7 квт», «трв 3/8», «фильтр пайка»…';
+  fillThumbsIn('#nomGrid');
+}
+function nomCompare(){
+  const ds=nomSt.cmp.map(id=>DATA.find(x=>x.id===id)).filter(Boolean);
+  if(ds.length<2){toast('Отметь «⚖» хотя бы на двух позициях');return;}
+  const best=Math.max.apply(null,ds.map(d=>asgKw(d)));
+  const rows=[
+    ['Бренд',ds.map(d=>esc(d.brand||'—'))],
+    ['Мощность',ds.map(d=>{const kw=asgKw(d);return kw?String(kw).replace('.',',')+' кВт':'—';})],
+    ['Описание',ds.map(d=>esc(d.kind||'—'))],
+    ['Характеристики',ds.map(d=>esc(tagLine(d)||'—'))],
+    ['Раздел',ds.map(d=>esc((SECNAME[d.section]||'')+(d.sub&&SECNAME[d.section+'/'+d.sub]?' · '+SECNAME[d.section+'/'+d.sub]:'')))],
+  ];
+  let t='<table><tr><td></td>'+ds.map(d=>'<th>'+esc(d.name)+'<br><span class="add2" data-a2="'+esc(d.id)+'">+ в сцену</span></th>').join('')+'</tr>';
+  rows.forEach(([nm,vals])=>{
+    t+='<tr><td>'+nm+'</td>'+vals.map((v,i)=>'<td class="'+(nm==='Мощность'&&best>0&&asgKw(ds[i])===best?'best':'')+'">'+v+'</td>').join('')+'</tr>';
+  });
+  $('#nomCmpT').innerHTML=t+'</table>';
+  $('#nomCmpM').classList.add('on');
+  $('#nomCmpT').querySelectorAll('[data-a2]').forEach(el=>el.onclick=()=>{
+    const d=DATA.find(x=>x.id===el.dataset.a2);
+    $('#nomCmpM').classList.remove('on');nomSt.cmp=[];
+    if(d)nomPut(d);});
+}
+$('#nomOpen').onclick=nomOpenCat;
+$('#nomX').onclick=nomCloseCat;
+$('#nomQ').addEventListener('input',()=>{nomSt.lim=60;drawNom();});
+$('#nomVmG').onclick=()=>{nomSt.view='grid';$('#nomVmG').classList.add('on');$('#nomVmL').classList.remove('on');drawNom();};
+$('#nomVmL').onclick=()=>{nomSt.view='list';$('#nomVmL').classList.add('on');$('#nomVmG').classList.remove('on');drawNom();};
+$('#nomCmpCl').onclick=()=>{nomSt.cmp=[];drawNom();};
+$('#nomCmpGo').onclick=nomCompare;
+$('#nomCmpM').onclick=e=>{if(e.target.id==='nomCmpM')$('#nomCmpM').classList.remove('on');};
+document.addEventListener('keydown',(e)=>{   // клавиши каталога — на захвате, чтобы не дёргать сцену
+  const on=$('#nom').classList.contains('on');
+  if((e.ctrlKey||e.metaKey)&&['k','K','л','Л'].indexOf(e.key)>=0){
+    e.preventDefault();e.stopPropagation();
+    if(on)$('#nomQ').focus();else nomOpenCat();
+    return;
+  }
+  if(!on)return;
+  if(e.key==='Escape'){
+    if($('#nomCmpM').classList.contains('on'))$('#nomCmpM').classList.remove('on');
+    else nomCloseCat();
+    e.preventDefault();
+  }else if(e.key==='Enter'&&e.target===$('#nomQ')){
+    const first=$('#nomGrid').querySelector('[data-add]');
+    if(first)first.click();
+    e.preventDefault();
+  }
+  e.stopPropagation();   // хоткеи сцены (Del, P, G, стрелки) не работают под оверлеем
+},true);
 
 /* ═══ во весь экран (v2.45.994) ═══
    Компоновку смотрят в iframe раздела CRM, он отдан с allow="fullscreen", —
