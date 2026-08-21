@@ -118,8 +118,15 @@ header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px
   padding:5px 10px;font-size:11.5px;cursor:pointer}
 #selbar button:hover{border-color:var(--ice2)}
 #selbar button.del{color:#f0a9a0;border-color:#6b3a34}
+/* памятка по управлению свёрнута в строчку: восемь строк поверх машины
+   читались как часть сцены и спорили с подписями патрубков */
 #hint{position:absolute;right:12px;top:10px;z-index:3;font-size:11px;color:var(--faint);
   background:rgba(6,16,32,.7);padding:4px 10px;border-radius:7px;max-width:280px;text-align:right}
+#hint b{display:block;cursor:pointer;color:var(--dim);font-weight:600;user-select:none}
+#hint b:hover{color:var(--ice2)}
+#hint .hb{margin-top:4px;line-height:1.5}
+#hint.min{background:rgba(6,16,32,.42);padding:3px 8px}
+#hint.min .hb{display:none}
 #empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;pointer-events:none}
 #empty .in{text-align:center;color:var(--dim);font-size:13px;line-height:1.6;background:rgba(6,16,32,.6);
   padding:18px 26px;border-radius:12px;border:1px dashed var(--line2)}
@@ -753,7 +760,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
         <span><i style="background:#6cb4ec"></i>всасывание, выход</span>
         <span><i style="background:#d9b64a"></i>ППК</span>
         <span><i style="background:#6fd3a5"></i>уравнивание</span></div>
-      <div id="hint">ЛКМ по полу — вращение · деталь — тащи мышью<br>корпус сквозной — за панелью берётся деталь; по пустой панели — сам корпус (тащится вторым нажатием)<br>ПКМ по детали — меню · по фону — панорама · колесо — зум<br>PgUp/PgDn — выше/ниже · Del — убрать<br>G — точные координаты и углы (шаг 1 мм / 1°)<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>метка «+» на патрубке — свободное присоединение: жми и выбирай, что поставить</div>
+      <div id="hint" class="min"><b>? как управлять</b><div class="hb">ЛКМ по полу — вращение · деталь — тащи мышью<br>корпус сквозной — за панелью берётся деталь; по пустой панели — сам корпус (тащится вторым нажатием)<br>ПКМ по детали — меню · по фону — панорама · колесо — зум<br>PgUp/PgDn — выше/ниже · Del — убрать<br>G — точные координаты и углы (шаг 1 мм / 1°)<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>метка «+» на патрубке — свободное присоединение: жми и выбирай, что поставить</div></div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="swrap">
         <div id="schChips" class="sch-chips"></div>
@@ -2063,6 +2070,17 @@ $('#pAll').onclick=()=>{
   sel.off=[];applyOff(sel);buildParts();save();
 };
 $('#bPorts').onclick=portsToggle;
+/* памятка по управлению открывается по клику и запоминает своё состояние */
+const HINT_KEY='atomus_chiller_hint';
+(function(){
+  const h=$('#hint');if(!h)return;
+  let open=false;try{open=localStorage.getItem(HINT_KEY)==='1';}catch(e){}
+  h.classList.toggle('min',!open);
+  h.querySelector('b').onclick=()=>{
+    const min=h.classList.toggle('min');
+    try{localStorage.setItem(HINT_KEY,min?'0':'1');}catch(e){}
+  };
+})();
 $('#bParts').onclick=()=>{
   const on=!$('#partsBox').classList.contains('on');
   $('#partsBox').classList.toggle('on',on);$('#bParts').classList.toggle('on',on);
@@ -2335,12 +2353,32 @@ function portLines(){
   portLine.frustumCulled=false;
   portLine.renderOrder=9;portGrp.add(portLine);
 }
+/* v2.46.011: имя патрубка бывает пустым по смыслу — «ПАЙКА 1/2" ODF»,
+   «ПОД СВАРКУ Ø40», «ТРУБА Ø20», «НАКИДНАЯ ГАЙКА G1». Это способ соединения,
+   а не то, что по патрубку течёт: два десятка таких подписей закрывали машину
+   и ничего про неё не говорили. В режиме «у всех» оставляем только те, что
+   называют среду или место («НАГНЕТАНИЕ», «ВХОД», «ВЫХОД ЖИДКОСТИ»); у
+   выделенной детали по-прежнему видно все её патрубки со всеми размерами. */
+const PORT_MUTE=/^(пайка|под пайку|ротолок|резьба|фланец|патрубок|штуцер|отбортовка|порт|труба|трубка|муфта|раструб|ниппель|гайка|накидная гайка|под сварку|сварка|конец|торец|присоединение)( внутренняя| наружная| внутренний| наружный)?$/;
+function portDumb(z){
+  if(ZONE_CSS[z.kind])return false;            // среда известна — подпись по делу
+  const s=String(z.name||'').toLowerCase().split(/[\s,]+/)
+    .filter(w=>/^[а-яё]{2,}$/.test(w)).join(' ');
+  return !s||PORT_MUTE.test(s);
+}
+/* патрубок занят: на нём уже стоит деталь или деталь сама им сидит.
+   Подписывать стык, который уже собран, незачем — там всё видно глазом. */
+function portBusy(it,i){
+  if(it.link&&it.link.mount==='rot'&&it.link.pzi===i)return true;
+  return placed.some(p=>p.link&&p.link.mount==='rot'&&p.link.to===it.uid&&p.link.zi===i);
+}
 function portsRebuild(){
   portsClear();
   if(!PORTS)return;
   const list=PORTS===2?placed:(sel?[sel]:[]);
+  const keep=(it,z,i)=>it===sel||PORTS===1||(!portDumb(z)&&!portBusy(it,i));
   let zones=0;
-  list.forEach(it=>zones+=(it.zn||[]).length);
+  list.forEach(it=>(it.zn||[]).forEach((z,i)=>{if(keep(it,z,i))zones++;}));
   // много деталей — оставляем только газовые линии, иначе сцена в подписях
   const only=(PORTS===2&&zones>60);
   list.forEach(it=>{
@@ -2351,26 +2389,30 @@ function portsRebuild(){
     const one=zs.length===2&&roleOf(it.d)==='pipe'&&
               portText(zs[0],it===sel)===portText(zs[1],it===sel);
     if(one){
+      if(!keep(it,zs[0],0))return;
       const z=zs[0],col=ZONE_CSS[z.kind]||'#8FD3F4';
-      const rec=portTex(portText(z,it===sel),col);
+      const txt=portText(z,it===sel);
+      const rec=portTex(txt,col);
       const spr=mkSprite(rec);spr.center.set(.5,-.28);
       const dot=mkSprite(portDotTex(col));
       portGrp.add(spr);portGrp.add(dot);
       portTags.push({it:it,loc:new THREE.Vector3(
         (zs[0].tip[0]+zs[1].tip[0])/2,(zs[0].tip[1]+zs[1].tip[1])/2,
         (zs[0].tip[2]+zs[1].tip[2])/2),
-        spr:spr,dot:dot,w2h:rec.w2h,kind:z.kind});
+        spr:spr,dot:dot,w2h:rec.w2h,kind:z.kind,txt:txt});
       return;
     }
-    zs.forEach(z=>{
+    zs.forEach((z,zi)=>{
+      if(!keep(it,z,zi))return;
       if(only&&z.kind!=='dis'&&z.kind!=='suc')return;
       const col=ZONE_CSS[z.kind]||'#8FD3F4';
-      const rec=portTex(portText(z,it===sel),col);
+      const txt=portText(z,it===sel);
+      const rec=portTex(txt,col);
       const spr=mkSprite(rec);spr.center.set(.5,-.28);
       const dot=mkSprite(portDotTex(col));
       portGrp.add(spr);portGrp.add(dot);
       portTags.push({it:it,loc:new THREE.Vector3(z.tip[0],z.tip[1],z.tip[2]),
-        spr:spr,dot:dot,w2h:rec.w2h,kind:z.kind});
+        spr:spr,dot:dot,w2h:rec.w2h,kind:z.kind,txt:txt});
     });
   });
   if(portTags.length)portLines();
@@ -2431,8 +2473,15 @@ function portsSync(){
   }).filter(p=>p.vis).sort((a,b)=>a.y-b.y);
   const up=_pu.set(0,1,0).applyQuaternion(camera.quaternion);
   const lp=portLine&&portLine.geometry.attributes.position;
+  /* одна и та же надпись рядом («ПОД СВАРКУ» на обоих концах фитинга, «ТРУБА
+     Ø20» у сходящихся труб) ничего не добавляет — вторую гасим */
+  const seenTxt=[];
   scr.forEach(p=>{
     const t=portTags[p.i];
+    if(t.txt&&seenTxt.some(q=>q.t===t.txt&&Math.abs(q.x-p.x)<120&&Math.abs(q.y-p.y)<90)){
+      p.dup=true;return;
+    }
+    if(t.txt)seenTxt.push({t:t.txt,x:p.x,y:p.y});
     let c=.28;
     for(let k=0;k<9;k++){
       const y=p.y-c*PORT_PX,x0=p.x-p.w/2,x1=p.x+p.w/2;
@@ -2449,7 +2498,7 @@ function portsSync(){
       lp.setXYZ(p.i*2+1,q.x+up.x*c*hw*.82,q.y+up.y*c*hw*.82,q.z+up.z*c*hw*.82);
     }
   });
-  const shown=new Set(scr.map(p=>p.i));
+  const shown=new Set(scr.filter(p=>!p.dup).map(p=>p.i));
   portTags.forEach((t,i)=>{
     if(shown.has(i))return;
     t.spr.visible=false;t.dot.visible=false;
@@ -2481,7 +2530,7 @@ function portsToggle(){
   portsBtn();portsOn();
   toast(PORTS===0?'Патрубки не подписаны'
        :PORTS===1?'Патрубки выделенной детали подписаны'
-       :'Патрубки подписаны у всех деталей сцены');
+       :'Патрубки подписаны у всех деталей — только среды и входы');
 }
 /* ═══ присоединения: свободный патрубок зовёт свою ответную часть ═══
    (ротолок — v2.45.1004, любое присоединение — v2.46.002)
