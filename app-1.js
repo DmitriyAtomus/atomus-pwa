@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.1027";
+const APP_VERSION = "v2.45.1029";
 const APP_VERSION_DATE = "21.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1436,6 +1436,19 @@ function renderProfile() {
   const devFab = document.getElementById('devchat-fab');
   if (devFab) devFab.style.display = isDirector ? '' : 'none';
 
+  // «Идеи» — чат с Клодом для всех сотрудников. Выездным монтажникам пункт не
+  // показываем: бэкенд им закрыт даже с паролем, кнопка только путала бы.
+  const navIdeas = document.getElementById('sb-ideas');
+  if (navIdeas) {
+    const roles = state.user.roles || [];
+    const onlyInstaller = roles.length > 0 && roles.every(r => r === 'installer');
+    navIdeas.style.display = onlyInstaller ? 'none' : '';
+  }
+  // Директору — счётчик ТЗ, которые ждут его решения
+  if (isDirector && typeof ideasRefreshBadge === 'function') {
+    try { ideasRefreshBadge(); } catch (_) {}
+  }
+
   // Прямой эфир окна CRM на офисном ТВ — только директору и не на самом ТВ.
   const tvCastBtn = document.getElementById('tv-cast-top-btn');
   const canCastTv = !!(state.user.roles && state.user.roles.includes('director') && !window._tvMode);
@@ -1878,6 +1891,8 @@ function runScreenLoader(screenName) {
   // v2.45.788: карточки предприятия (реквизиты юрлиц)
   if (screenName === 'supply-company-cards') loadCompanyCards();
   if (screenName === 'supply-catalog')      loadSupplyCatalog();
+  // Идеи: чат сотрудника с Клодом (только чтение, ТЗ уходит директору)
+  if (screenName === 'ideas')               loadIdeas();
   // Помощь
   if (screenName === 'help-knowledge')      loadHelpKnowledge();
   if (screenName === 'help-faq')            loadHelpFaq();
@@ -2506,6 +2521,11 @@ function _devChatRender(msg) {
   const res = _devChatResultCard(msg);
   if (res) bubble.insertBefore(res, bubble.querySelector('.dchat-meta'));
 
+  // ТЗ от сотрудника: сообщение без статуса, агент его не берёт. Кнопки —
+  // единственный способ превратить предложение в задачу.
+  const idea = _devChatIdeaCard(msg);
+  if (idea) bubble.insertBefore(idea, bubble.querySelector('.dchat-meta'));
+
   (msg.files || []).forEach(function (f) {
     if ((f.content_type || '').indexOf('image/') === 0) {
       const img = document.createElement('img');
@@ -2529,6 +2549,28 @@ function _devChatRender(msg) {
 
   wrap.appendChild(bubble);
   return wrap;
+}
+
+// ТЗ, которое сотрудник собрал с Клодом в разделе «Идеи». Приезжает в ленту
+// автором `idea` и БЕЗ статуса: очередь агента берёт только сообщения автора
+// `user` со статусом `new`, поэтому само по себе оно ничего не запускает.
+// «Внедрить» ставит задачу, «Не сейчас» пишет автору причину.
+function _devChatIdeaCard(msg) {
+  const idea = msg.meta && msg.meta.idea;
+  if (!idea || !idea.id) return null;
+  const box = document.createElement('div');
+  box.className = 'dchat-idea';
+  box.setAttribute('data-idea-card', idea.id);
+  box.innerHTML =
+    '<div class="di-who"><i class="ti ti-bulb"></i>' +
+      escapeHtml(idea.author || 'сотрудник') + ' предлагает</div>' +
+    '<div class="di-act">' +
+      '<button type="button" class="ok" onclick="ideaImplement(' + Number(idea.id) + ')">' +
+        '<i class="ti ti-rocket"></i>Внедрить</button>' +
+      '<button type="button" onclick="ideaDecline(' + Number(idea.id) + ')">' +
+        '<i class="ti ti-clock-pause"></i>Не сейчас</button>' +
+    '</div>';
+  return box;
 }
 
 // Итог работы Клавы: список тронутых файлов с +/− и кнопки «Открыть PR» и
