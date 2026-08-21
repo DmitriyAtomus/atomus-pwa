@@ -24847,6 +24847,14 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
 .ich-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ich-row.is-mine .ich-file { background: rgba(255,255,255,.18); color: #fff; }
 
+/* ---- макет до ТЗ ---- */
+/* Чип «макет» в списке идей: видно, что идея стоит на согласовании картинки. */
+.ich-chip.is-mockup { background: #FEF3C7; color: #92400E; }
+/* Обход для идей без экрана — намеренно неброский: это не главный путь. */
+.ich-skip { border: 0; background: none; cursor: pointer; padding: 4px 2px;
+  font: inherit; font-size: 12px; color: var(--text-light); text-decoration: underline; }
+.ich-skip:hover { color: var(--text-mid); }
+
 /* Что уже прицеплено — полоска над строкой ввода: видно, что уедет, и можно снять */
 .ich-picked { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .ich-pick { position: relative; display: inline-flex; align-items: center; gap: 6px;
