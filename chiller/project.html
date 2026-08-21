@@ -103,6 +103,23 @@ header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px
   align-items:center;font-size:10.5px;color:var(--dim);background:rgba(6,16,32,.8);
   border:1px solid var(--line2);border-radius:8px;padding:5px 9px;pointer-events:none}
 #plegend.on{display:flex}
+/* v2.46.026: «не входит» — плашка поверх сцены. Пока деталь не лезет
+   в корпус, про это написано прямым текстом, а не только серой строкой
+   в подвале: аппарат подобрали, конденсатор упёрся в стойку — и это видно
+   сразу, не открывая ведомость. */
+#nofit{position:absolute;left:50%;top:44px;transform:translateX(-50%);z-index:5;display:none;
+  align-items:center;gap:8px;max-width:min(620px,86%);padding:7px 13px;border-radius:9px;
+  background:rgba(58,14,12,.92);border:1px solid #8d3a30;color:#ffd9d2;font-size:12.5px;
+  cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+#nofit.on{display:flex}
+/* плашка встаёт вторым рядом под кнопками вида — легенда патрубков уходит ниже,
+   иначе они лежат друг на друге */
+#vwrap.nofit #plegend{top:88px}
+#nofit b{color:#fff;font-weight:700;white-space:nowrap}
+#nofit span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#nofit i{font-style:normal;color:#ffb3a6;white-space:nowrap}
+@media(max-width:760px){#nofit{top:auto;bottom:56px;font-size:12px;max-width:94%}
+  #nofit span{white-space:normal}}
 #plegend b{color:var(--faint);font-weight:600}
 #plegend span{display:flex;align-items:center;gap:4px;white-space:nowrap}
 #plegend i{width:8px;height:8px;border-radius:50%;display:inline-block}
@@ -806,6 +823,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
         <div class="vb hist off" id="bUndo" title="Отменять нечего">↶ Отменить</div>
         <div class="vb hist off" id="bRedo" title="Возвращать нечего">↷ Вернуть</div>
       </div>
+      <div id="nofit" title="Нажми — выделю деталь и покажу, во что упёрлась"></div>
       <div id="plegend"><b>Патрубки:</b>
         <span><i style="background:#e8705f"></i>нагнетание, вход газа</span>
         <span><i style="background:#6cb4ec"></i>всасывание, выход</span>
@@ -2112,7 +2130,7 @@ function roofSel(){
   /* v2.46.015: упор считаем уже после посадки — так видно сразу, входит
      аппарат в этот корпус или упирается в стойки и обшивку */
   const hn=hitNames(sel.uid);
-  if(hn)msg.push('⚠ упирается в '+hn+' — в этот корпус аппарат внутрь не входит');
+  if(hn)msg.push('⚠ не входит в этот корпус — упирается в '+hn);
   toast(msg.join(' · '));
 }
 /* Найти корпус, к которому сажаем: сначала тот, над которым деталь стоит,
@@ -3038,6 +3056,56 @@ function checkHits(){
   });
 }
 const hitNames=uid=>[...(hitWho.get(uid)||[])].slice(0,3).join(', ');
+/* ═══ v2.46.026: «не входит» — прямым текстом ═══
+   Про упор до сих пор говорили только серая строка подвала («упор в корпус:
+   1 дет.») и тост в момент посадки: тост уезжает, строку не читают, и машина
+   на экране выглядит собранной, хотя конденсатор в этот корпус не лезет.
+   Теперь, пока деталь не входит, над сценой висит красная плашка: что за
+   деталь, во что упёрлась и на сколько миллиметров больше полости. */
+const FIT_TOL=6;                                   // мм: впритык — ещё влезает
+const FIT_AX={x:'длиннее',y:'глубже',z:'выше'};
+/* почему деталь не входит в корпус; null — входит */
+function fitWhy(it){
+  const r=roleOf(it.d);
+  if(HIT_SKIP.has(r)||isPipeSeg(it))return null;
+  const why=[];
+  /* габарит против полости: аппарат просто больше корпуса — это видно
+     и без упора, ещё до того, как его подвинут по месту */
+  const z=siteIn(),sz=new THREE.Box3().setFromObject(it.obj).getSize(new THREE.Vector3());
+  ['x','y','z'].forEach(a=>{
+    /* конденсатор лежит под крышкой, его высота меряется от дна полости
+       некорректно — по высоте судим только про то, что стоит на полу */
+    if(a==='z'&&!INSIDE.has(r))return;
+    const over=Math.round(sz[a]-(z.max[a]-z.min[a]));
+    if(over>FIT_TOL)why.push(FIT_AX[a]+' полости на '+over+' мм');
+  });
+  const hn=hitNames(it.uid);
+  if(hn)why.push('упирается в '+hn);
+  return why.length?why.join(', '):null;
+}
+/* список деталей, которые не входят; конденсатор — первым: по нему и решают,
+   тот ли взяли корпус */
+function fitFails(){
+  if(!placed.some(p=>roleOf(p.d)==='frame'))return [];
+  const out=[];
+  placed.forEach(p=>{const w=fitWhy(p);if(w)out.push({it:p,why:w});});
+  return out.sort((a,b)=>(roleOf(b.it.d)==='cond'?1:0)-(roleOf(a.it.d)==='cond'?1:0));
+}
+const fitName=it=>(ROLE_NAME[roleOf(it.d)]||'деталь').replace(/^./,c=>c.toUpperCase())+
+  ' '+it.d.brand+' '+it.d.name;
+/* плашка над сценой */
+function nofitShow(){
+  const el=$('#nofit');if(!el)return;
+  const bad=fitFails();
+  $('#vwrap').classList.toggle('nofit',!!bad.length);
+  if(!bad.length){el.classList.remove('on');el.innerHTML='';el.onclick=null;return;}
+  const f=bad[0];
+  el.innerHTML='<b>Не входит</b><span></span>'+(bad.length>1?'<i></i>':'');
+  el.querySelector('span').textContent=fitName(f.it)+' — '+f.why;
+  if(bad.length>1)el.querySelector('i').textContent='и ещё '+(bad.length-1)+' '+plural(bad.length-1);
+  el.classList.add('on');
+  el.onclick=()=>{select(f.it);toast(fitName(f.it)+' не входит: '+f.why);};
+}
 /* ═══ патрубки: где всас, где нагнетание ═══
    Меш покупной позиции приходит из базы 3D уже размеченным: треугольники
    разложены по средам (нагнетание, всасывание, ППК, уравнивание), а к ним
@@ -3898,13 +3966,13 @@ function checkCollisions(){
         collSet.add(chk[i].uid);collSet.add(chk[j].uid);}
   placed.forEach(applyTint);
   const el=$('#fColl');
-  if(!placed.length){el.textContent='';el.onclick=null;el.style.cursor='';el.title='';return;}
+  if(!placed.length){el.textContent='';el.onclick=null;el.style.cursor='';el.title='';nofitShow();return;}
   const n=collSet.size-pipeBad.size,o=outSet.size,h=hitSet.size;
   const txt=[];
   if(n>0)txt.push('⚠ пересекаются: '+n+' дет.');
   if(pipeBad.size)txt.push('⚠ труба: '+[...pipeBad.values()][0]+
     (pipeBad.size>1?(' и ещё '+(pipeBad.size-1)):''));
-  if(h)txt.push('⚠ упор в корпус: '+h+' дет.');
+  if(h)txt.push('⚠ не входит: '+h+' дет. — упор в корпус');
   if(o)txt.push('⚠ вне корпуса: '+o+' дет.');
   el.textContent=txt.length?txt.join(' · '):'✓ пересечений нет, всё в корпусе';
   el.style.color=(n>0||h||pipeBad.size)?'#f0a9a0':(o?'#e8c85a':'var(--ok)');
@@ -3912,6 +3980,7 @@ function checkCollisions(){
   el.style.cursor=(o||h)?'pointer':'';
   el.title=(o||h)?'Нажми — уберу детали внутрь корпуса и поставлю на дно':'';
   el.onclick=(o||h)?fitAllInside:null;
+  nofitShow();
 }
 /* вернуть внутрь всё, что торчит наружу */
 function fitAllInside(){
