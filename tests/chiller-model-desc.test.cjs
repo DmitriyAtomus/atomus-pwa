@@ -89,7 +89,7 @@ test('строка списка базы открывается с описан�
   assert.match(row, /class="k tg'\+\(filt\?' full':''\)\+'">'\+esc\(tagLine\(d\)\)/);  // характеристики
   assert.match(row, /class="info" title="Описание позиции">ⓘ/);
   // один и тот же ряд и в подборе на схеме, и в базе компоновки
-  assert.match(page, /\$\('#asgList'\)\.innerHTML=list\.map\(d=>catRow\(d,'→'\)\)/);
+  assert.match(page, /rest\.map\(d=>catRow\(d,'→'\)\)/);
   assert.match(page, /\$\('#cat'\)\.innerHTML=list\.slice\(0,80\)\.map\(d=>catRow\(d,'\+'\)\)/);
 });
 
@@ -127,7 +127,7 @@ test('поиск по базе ищет и по характеристикам �
     name: 'YH69T1-100', brand: 'Invotech', kind: 'Спиральный, A/C и чиллеры', tags: ['R407C'] });
   assert.ok(ctx.hay(comp).includes('компрессор'), 'подбор компрессора не найдёт ни одной модели');
   assert.match(page, /SECTIONS=ix\.sections;secNames\(\)/);
-  assert.match(page, /\.filter\(d=>!q\|\|hay\(d\)\.includes\(q\)\)/);   // подбор на схеме
+  assert.match(page, /if\(q&&!hay\(d\)\.includes\(q\)\)return false;/);   // подбор на схеме ищет по hay
   assert.match(page, /\.filter\(d=>!fQ\|\|hay\(d\)\.includes\(fQ\)\)/); // база компоновки
 });
 

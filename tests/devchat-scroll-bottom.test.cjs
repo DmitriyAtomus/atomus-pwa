@@ -34,7 +34,7 @@ test('первая отрисовка переписки прыгает в ко�
   const fn = app.slice(app.indexOf('async function _devChatTickInner'));
   assert.match(fn.slice(0, 2000), /const first = _devChatSince === 0;/,
     'не отличаем «открыли чат» от «пришло новое сообщение»');
-  assert.match(fn.slice(0, 3200), /if \(msgs\.length && first\) _devChatStickBottom\(2500\);/);
+  assert.match(fn.slice(0, 3200), /if \(msgs\.length && first\) \{ _devChatStickBottom\(2500\); _devChatSettleEnd\(feed\); \}/);
   assert.match(fn.slice(0, 3200), /else if \(msgs\.length && nearBottom\) _devChatStickBottom\(900\);/);
 });
 

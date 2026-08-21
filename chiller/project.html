@@ -194,8 +194,57 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 /* модалка назначения модели узлу */
 #asg{position:fixed;inset:0;background:rgba(3,8,16,.72);z-index:21;display:none;align-items:center;justify-content:center}
 #asg.on{display:flex}
-.asg-card{width:min(460px,92vw);max-height:78vh;display:flex;flex-direction:column;background:var(--panel);
+.asg-card{width:min(560px,94vw);max-height:88vh;display:flex;flex-direction:column;background:var(--panel);
   border:1px solid var(--line2);border-radius:14px;overflow:hidden}
+/* v2.45.1018: подбор — конвейер по узлам схемы */
+.asg-hd{gap:8px}
+.asg-ttl{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.asg-prog{margin-left:auto;font-size:11px;color:var(--dim);white-space:nowrap}
+.asg-prog b{color:#4FBF8B}
+.anav{flex:none;width:26px;height:26px;border:1px solid var(--line2);border-radius:8px;display:flex;
+  align-items:center;justify-content:center;cursor:pointer;color:var(--dim);font-size:13px;user-select:none}
+.anav:hover{border-color:var(--ice2);color:var(--ice)}
+.anav.jump{width:auto;padding:0 9px;font-size:11px;color:#C9A227;border-color:#5c4a1a}
+.anav.jump:hover{color:#ffd75e}
+.asg-strip{display:flex;gap:5px;overflow-x:auto;padding:8px 12px;border-bottom:1px solid var(--line);scrollbar-width:thin}
+.asg-strip .nd{flex:none;font:700 10px 'Cascadia Mono',Consolas,monospace;border-radius:9px;padding:3px 8px;cursor:pointer;
+  border:1px solid #5c4a1a;color:#C9A227;display:flex;align-items:center;gap:4px;user-select:none}
+.asg-strip .nd i{font-style:normal;font-size:8px}
+.asg-strip .nd.done{border-color:#22513c;color:#4FBF8B}
+.asg-strip .nd.cur{background:rgba(27,159,216,.18);border-color:var(--ice2);color:var(--ice);box-shadow:0 0 0 1px var(--ice2)}
+.asg-fit{margin:9px 12px 0;padding:8px 11px;border:1px solid #22513c;border-radius:11px;background:rgba(79,191,139,.05)}
+.asg-fit>b{display:block;font-size:10.5px;letter-spacing:.4px;color:#4FBF8B;margin-bottom:7px;font-weight:700}
+.asg-fit .row{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.asg-fit .fc{flex:0 0 172px;background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:7px 10px;cursor:pointer}
+.asg-fit .fc:hover{border-color:#4FBF8B}
+.asg-fit .fc b{display:block;font-size:12px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.asg-fit .fc span{font-size:10.5px;color:var(--faint);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.asg-fit .fc .why{color:#4FBF8B;font-size:10.5px;margin-top:2px}
+.asg-crumbs{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:9px 14px 0;font-size:11.5px;position:relative}
+.asg-crumbs .cr{color:var(--ice);cursor:pointer;border-bottom:1px dashed rgba(143,211,244,.5);padding-bottom:1px;user-select:none}
+.asg-crumbs .cr:hover{color:#fff}
+.asg-crumbs .sep{color:var(--faint)}
+.asg-crumbs .home{color:var(--faint)}
+.asg-crumbs .rst{margin-left:auto;font-size:10px;color:#C9A227;cursor:pointer;border:1px solid #5c4a1a;border-radius:9px;padding:1px 8px}
+.asg-crumbs .rst:hover{color:#ffd75e}
+.asg-dd{position:absolute;top:100%;left:0;margin-top:4px;background:var(--panel2);border:1px solid var(--line2);
+  border-radius:10px;box-shadow:0 16px 40px rgba(0,0,0,.5);z-index:9;min-width:200px;max-height:44vh;overflow-y:auto;padding:4px;display:none}
+.asg-dd.on{display:block}
+.asg-dd div{padding:6px 10px;border-radius:7px;cursor:pointer;font-size:12px;display:flex;gap:8px}
+.asg-dd div small{margin-left:auto;color:var(--faint)}
+.asg-dd div:hover{background:rgba(27,159,216,.14)}
+.asg-dd div.sel{color:var(--ice)}
+.asg-dd div.rec small::after{content:' · для узла';color:#C9A227}
+.asg-fl{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 14px 0}
+.asg-fl b{font-size:9.5px;color:var(--faint);font-weight:600;letter-spacing:.4px}
+.asg-fl span{font-size:10.5px;border:1px solid var(--line2);color:var(--dim);border-radius:10px;padding:2px 8px;cursor:pointer}
+.asg-fl span.on{background:rgba(201,162,39,.13);border-color:#5c4a1a;color:#C9A227}
+.asg-sort,.asg-scope{font-size:10px;color:var(--faint);white-space:nowrap;cursor:pointer}
+.asg-sort b{color:#C9A227;font-weight:600}
+.asg-scope u,.asg-sort u{color:var(--ice);text-decoration:none;border-bottom:1px dashed var(--ice)}
+.asg-grp{font-size:10px;letter-spacing:.5px;color:var(--faint);padding:6px 6px 0;font-weight:700}
+.asg-keys{padding:6px 14px;border-top:1px solid var(--line);font-size:10px;color:var(--faint);display:flex;gap:12px;flex-wrap:wrap}
+.asg-keys b{color:var(--dim);font-weight:600;background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:0 5px}
 .asg-list{flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:6px}
 .asg-unset{margin:0 8px 10px;padding:9px;border:1px solid #6b3a34;color:#f0a9a0;border-radius:8px;
   text-align:center;cursor:pointer;font-size:12.5px}
@@ -698,11 +747,23 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
   <div class="pov-new" id="povNew">+ Новый проект</div>
 </div></div>
 <div id="asg"><div class="asg-card">
-  <div class="pov-h" id="asgTitle">Назначить модель <span class="x" id="asgX">✕</span></div>
+  <div class="pov-h asg-hd">
+    <span class="anav" id="asgPrev" title="предыдущий узел">‹</span>
+    <span class="anav" id="asgNext" title="следующий узел">›</span>
+    <span class="asg-ttl" id="asgTitle">Назначить модель</span>
+    <span class="asg-prog" id="asgProg"></span>
+    <span class="anav jump" id="asgJump" title="к первому неназначенному">⇥</span>
+    <span class="x" id="asgX">✕</span>
+  </div>
+  <div class="asg-strip" id="asgStrip"></div>
   <div class="asg-sub" id="asgSub"></div>
-  <div class="search" style="margin:10px 10px 6px"><span style="color:var(--faint)">⌕</span><input id="asgQ" placeholder="поиск по базе…"></div>
+  <div class="asg-fit" id="asgFit" style="display:none"><b id="asgFitT"></b><div class="row" id="asgFitRow"></div></div>
+  <div class="asg-crumbs" id="asgCrumbs"></div>
+  <div class="asg-fl" id="asgFl" style="display:none"></div>
+  <div class="search" style="margin:8px 10px 4px"><span style="color:var(--faint)">⌕</span><input id="asgQ" placeholder="поиск по базе…"><span class="asg-sort" id="asgSort"></span><span class="asg-scope" id="asgScope"></span></div>
   <div class="asg-unset" id="asgUnset" style="display:none">✕ Убрать назначение</div>
   <div class="asg-list" id="asgList"></div>
+  <div class="asg-keys"><span><b>Enter</b> — назначить верхнюю</span><span><b>←</b> <b>→</b> — соседний узел</span><span><b>Tab</b> — следующий неназначенный</span><span><b>Esc</b> — закрыть</span></div>
 </div></div>
 <div id="flt"><div class="flt-card">
   <div class="pov-h">⌗ Подбор фильтра-осушителя
@@ -2895,54 +2956,54 @@ const SCH_NODES=[
  /* Схема — заводской лист (v2.45.1017): арт листа статичный (SCH_SHEET),
     живут только бирки позиций. px,py — пилюля; nx,ny,na,mx — строка модели;
     off — слот на полке «вне листа 7 кВт» (зимний комплект и защита). */
- {k:'KM1', t:'КМ1', n:'Компрессор', hint:'компрессор', grp:'comp', px:834,py:519, nx:846,ny:538,na:'middle',mx:12,
+ {k:'KM1', t:'КМ1', n:'Компрессор', hint:'компрессор', cat:['компрессор','спираль'], grp:'comp', px:834,py:519, nx:846,ny:538,na:'middle',mx:12,
   d:'Сжимает пары фреона — сердце машины. От него считается вся холодопроизводительность.'},
- {k:'EK1', t:'ЕК1', n:'Нагреватель картера', hint:'нагреватель', grp:'el', off:0, mx:20,
+ {k:'EK1', t:'ЕК1', n:'Нагреватель картера', hint:'нагреватель', cat:['электро|обвязк','тэн|нагрев|картер'], grp:'el', off:0, mx:20,
   d:'Греет масло компрессора на стоянке, чтобы фреон не растворялся в масле и не было гидроудара при пуске.'},
- {k:'KO1', t:'КО1', n:'Обратный клапан', hint:'обратный', grp:'arm', off:1, mx:20,
+ {k:'KO1', t:'КО1', n:'Обратный клапан', hint:'обратный', cat:['арматур|клапан','обратн'], grp:'arm', off:1, mx:20,
   d:'Не даёт горячему газу пойти назад в компрессор после остановки.'},
- {k:'AVO1',t:'АВО1',n:'Конденсатор', hint:'конденсатор', grp:'to', px:752.8,py:174, nx:767,ny:193,na:'middle',mx:16,
+ {k:'AVO1',t:'АВО1',n:'Конденсатор', hint:'конденсатор', cat:['теплообмен','конденсатор'], grp:'to', px:752.8,py:174, nx:767,ny:193,na:'middle',mx:16,
   d:'Горячий газ отдаёт тепло воздуху и превращается в жидкость.'},
- {k:'M1',  t:'М1',  n:'Вентилятор', hint:'вентилятор', grp:'el', px:656,py:96, nx:665.6,ny:115,na:'middle',mx:14,
+ {k:'M1',  t:'М1',  n:'Вентилятор', hint:'вентилятор', cat:['электро','вентилятор'], grp:'el', px:656,py:96, nx:665.6,ny:115,na:'middle',mx:14,
   lead:[675.5,101.5,733,106],
   d:'Продувает конденсатор. Обороты — по давлению конденсации.'},
- {k:'RD3', t:'РД3', n:'Реле давл. (вент.)', hint:'реле давления', grp:'auto', px:748,py:238, nx:760,ny:258,na:'middle',mx:13,
+ {k:'RD3', t:'РД3', n:'Реле давл. (вент.)', hint:'реле давления', cat:['автоматик','реле давлен'], grp:'auto', px:748,py:238, nx:760,ny:258,na:'middle',mx:13,
   d:'Включает вентилятор, когда давление конденсации растёт.'},
- {k:'KD1', t:'КД1', n:'Клапан NRD', hint:'nrd', grp:'arm', off:2, mx:20,
+ {k:'KD1', t:'КД1', n:'Клапан NRD', hint:'nrd', cat:['арматур','регулятор|nrd'], grp:'arm', off:2, mx:20,
   d:'Держит давление конденсации зимой — без него машина «раскисает» в холода.'},
- {k:'KR1', t:'КР1', n:'Регулятор KVR', hint:'kvr', grp:'arm', off:3, mx:20,
+ {k:'KR1', t:'КР1', n:'Регулятор KVR', hint:'kvr', cat:['арматур','регулятор|kvr'], grp:'arm', off:3, mx:20,
   d:'Поддерживает минимальное давление в ресивере при низкой уличной температуре.'},
- {k:'RS1', t:'РС1', n:'Ресивер', hint:'ресивер', grp:'app', px:614.2,py:258, nx:626,ny:277,na:'middle',mx:14,
+ {k:'RS1', t:'РС1', n:'Ресивер', hint:'ресивер', cat:['аппарат','ресивер'], grp:'app', px:614.2,py:258, nx:626,ny:277,na:'middle',mx:14,
   d:'Запас жидкого фреона; сглаживает колебания заправки.'},
- {k:'MN2', t:'МН2', n:'Манометр ВД', hint:'манометр', grp:'auto', px:858,py:424, nx:884,ny:455,na:'end',mx:12,
+ {k:'MN2', t:'МН2', n:'Манометр ВД', hint:'манометр', cat:['автоматик','манометр'], grp:'auto', px:858,py:424, nx:884,ny:455,na:'end',mx:12,
   d:'Показывает давление нагнетания (высокая сторона).'},
- {k:'RD2', t:'РД2', n:'Реле давления ВД', hint:'реле давления', grp:'auto', px:748,py:304, nx:760,ny:324,na:'middle',mx:13,
+ {k:'RD2', t:'РД2', n:'Реле давления ВД', hint:'реле давления', cat:['автоматик','реле давлен'], grp:'auto', px:748,py:304, nx:760,ny:324,na:'middle',mx:13,
   d:'Защита: давление нагнетания выросло — аварийный стоп.'},
- {k:'VN1', t:'ВН1', n:'Запорный клапан', hint:'запорный', grp:'arm', off:4, mx:20,
+ {k:'VN1', t:'ВН1', n:'Запорный клапан', hint:'запорный', cat:['арматур','запорн|вентил'], grp:'arm', off:4, mx:20,
   d:'Перекрыть жидкостную линию на время сервиса.'},
- {k:'F1',  t:'Ф1',  n:'Фильтр-осушитель', hint:'фильтр', grp:'arm', px:626,py:358, nx:636,ny:384,na:'middle',mx:12,
+ {k:'F1',  t:'Ф1',  n:'Фильтр-осушитель', hint:'фильтр', cat:['аппарат|арматур','фильтр'], grp:'arm', px:626,py:358, nx:636,ny:384,na:'middle',mx:12,
   d:'Ловит влагу и грязь из фреона — защита ТРВ и компрессора.'},
- {k:'SI1', t:'СИ1', n:'Смотровое стекло', hint:'стекло', grp:'arm', px:545,py:356, nx:557,ny:384,na:'middle',mx:12,
+ {k:'SI1', t:'СИ1', n:'Смотровое стекло', hint:'стекло', cat:['арматур|аппарат','стекл|смотров'], grp:'arm', px:545,py:356, nx:557,ny:384,na:'middle',mx:12,
   d:'Индикатор влаги и недозаправки: пузыри — мало фреона.'},
- {k:'UA1', t:'УА1', n:'Соленоид жидк.', hint:'соленоид', grp:'arm', px:482,py:305, nx:494,ny:300,na:'middle',mx:12,
+ {k:'UA1', t:'УА1', n:'Соленоид жидк.', hint:'соленоид', cat:['арматур','соленоид'], grp:'arm', px:482,py:305, nx:494,ny:300,na:'middle',mx:12,
   d:'Отсекает жидкий фреон при остановке — испаритель не заливает.'},
- {k:'TRV1',t:'ТРВ1',n:'ТРВ', hint:'трв', grp:'arm', px:444,py:332, nx:458,ny:355,na:'middle',mx:12,
+ {k:'TRV1',t:'ТРВ1',n:'ТРВ', hint:'трв', cat:['арматур','трв|терморегулирующ'], grp:'arm', px:444,py:332, nx:458,ny:355,na:'middle',mx:12,
   d:'Дросселирует жидкость и впрыскивает её в испаритель ровно столько, сколько испарится.'},
- {k:'I1',  t:'И1',  n:'Испаритель ПТО', hint:'теплообменник', grp:'to', px:346,py:296, nx:355,ny:315,na:'middle',mx:12,
+ {k:'I1',  t:'И1',  n:'Испаритель ПТО', hint:'теплообменник', cat:['теплообмен','испарител|пластинчат|пто'], grp:'to', px:346,py:296, nx:355,ny:315,na:'middle',mx:12,
   d:'Фреон кипит и забирает тепло у воды — здесь и рождается холод.'},
- {k:'OZH1',t:'ОЖ1', n:'Отделитель жидк.', hint:'отделитель', grp:'app', px:354.2,py:508, nx:366,ny:527,na:'middle',mx:12,
+ {k:'OZH1',t:'ОЖ1', n:'Отделитель жидк.', hint:'отделитель', cat:['аппарат','отделител'], grp:'app', px:354.2,py:508, nx:366,ny:527,na:'middle',mx:12,
   d:'Не пускает жидкий фреон в компрессор — защита от гидроудара.'},
- {k:'UA2', t:'УА2', n:'Соленоид байпаса', hint:'соленоид', grp:'arm', px:352,py:364, nx:364,ny:383,na:'middle',mx:12,
+ {k:'UA2', t:'УА2', n:'Соленоид байпаса', hint:'соленоид', cat:['арматур','соленоид'], grp:'arm', px:352,py:364, nx:364,ny:383,na:'middle',mx:12,
   d:'Пускает горячий газ в обход — разгрузка при пуске и оттайка.'},
- {k:'KO2', t:'КО2', n:'Обратный клапан', hint:'обратный', grp:'arm', off:5, mx:20,
+ {k:'KO2', t:'КО2', n:'Обратный клапан', hint:'обратный', cat:['арматур|клапан','обратн'], grp:'arm', off:5, mx:20,
   d:'Держит направление потока в линии байпаса.'},
- {k:'RD1', t:'РД1', n:'Реле давления НД', hint:'реле давления', grp:'auto', px:452,py:464, nx:464,ny:483,na:'middle',mx:12,
+ {k:'RD1', t:'РД1', n:'Реле давления НД', hint:'реле давления', cat:['автоматик','реле давлен'], grp:'auto', px:452,py:464, nx:464,ny:483,na:'middle',mx:12,
   d:'Защита: давление всаса упало — машина останавливается.'},
- {k:'MN1', t:'МН1', n:'Манометр НД', hint:'манометр', grp:'auto', px:650,py:440, nx:662,ny:459,na:'middle',mx:12,
+ {k:'MN1', t:'МН1', n:'Манометр НД', hint:'манометр', cat:['автоматик','манометр'], grp:'auto', px:650,py:440, nx:662,ny:459,na:'middle',mx:12,
   d:'Показывает давление всаса (низкая сторона).'},
- {k:'N1',  t:'Н1',  n:'Насос', hint:'насос', grp:'pump', px:168.4,py:448, nx:178,ny:467,na:'middle',mx:13,
+ {k:'N1',  t:'Н1',  n:'Насос', hint:'насос', cat:['насос',null], grp:'pump', px:168.4,py:448, nx:178,ny:467,na:'middle',mx:13,
   d:'Гонит воду или гликоль через испаритель к потребителю.'},
- {k:'RP1', t:'РП1', n:'Реле потока', hint:'реле потока', grp:'auto', px:220,py:200, nx:232,ny:219,na:'middle',mx:13,
+ {k:'RP1', t:'РП1', n:'Реле потока', hint:'реле потока', cat:['автоматик','проток|реле поток'], grp:'auto', px:220,py:200, nx:232,ny:219,na:'middle',mx:13,
   d:'Нет протока воды — стоп машина, иначе испаритель замёрзнет.'},
 ];
 const SCH_DESC={
@@ -3462,32 +3523,196 @@ function bindInfo(box,acts){
 }
 
 let asgKey=null;
+/* ═══ подбор модели — конвейер по узлам (v2.45.1018) ═══
+   Раньше модалка была плоским поиском по всей базе: для И1 запрос
+   «теплообменник» тянул и конденсаторы. Теперь узел знает свою категорию
+   (cat — паттерны имени раздела/подраздела: id-шники пакета базы могут
+   меняться, русские имена стабильны), сверху полка «подходит сюда», лента
+   всех узлов со статусами, и после назначения окно само идёт к следующему
+   неназначенному — вся схема закрывается одной серией кликов. */
+let asgSt={sec:null,sub:null,brand:null,pow:null,all:false,sort:'fit'};
+function asgResolveCat(nd){
+  const cat=nd.cat;
+  if(!cat||!SECTIONS||!SECTIONS.length)return {sec:null,sub:null};
+  const has=(name,pat)=>pat.split('|').some(pp=>String(name).toLowerCase().includes(pp));
+  let secOnly=null;
+  for(const sc of SECTIONS){
+    if(!has(sc[1],cat[0]))continue;
+    if(cat[1])for(const b of (sc[2]||[]))if(has(b[1],cat[1]))return {sec:sc[0],sub:b[0]};
+    if(!secOnly)secOnly={sec:sc[0],sub:null};
+  }
+  return secOnly||{sec:null,sub:null};
+}
+function asgKw(d){ // мощность из тегов: «10,2 кВт»
+  for(const t of (d.tags||[])){
+    const m=/([\d]+[.,]?[\d]*)\s*квт/i.exec(t);
+    if(m)return parseFloat(m[1].replace(',','.'));
+  }
+  return 0;
+}
+function asgSecName(id){const sc=SECTIONS.find(x=>x[0]===id);return sc?sc[1]:'Все разделы';}
+function asgSubName(sec,id){
+  const sc=SECTIONS.find(x=>x[0]===sec);
+  const b=sc&&(sc[2]||[]).find(x=>x[0]===id);
+  return b?b[1]:'';
+}
+function asgCnt(sec,sub){return DATA.filter(d=>d.ready&&(!sec||d.section===sec)&&(!sub||d.sub===sub)).length;}
+function asgUsedIds(){ // уже в проекте: назначено другим узлам или стоит в сцене
+  const ids=new Set();
+  SCH_NODES.forEach(n=>{const a=schemaData[n.k];if(a&&a.id&&n.k!==asgKey)ids.add(a.id);});
+  (typeof placed!=='undefined'?placed:[]).forEach(pp=>{if(pp.id)ids.add(pp.id);});
+  return ids;
+}
+function asgNextUn(){
+  const i=SCH_NODES.findIndex(n=>n.k===asgKey);
+  for(let d2=1;d2<=SCH_NODES.length;d2++){
+    const n=SCH_NODES[(i+d2)%SCH_NODES.length];
+    if(!schemaData[n.k])return n.k;
+  }
+  return null;
+}
+function asgGoto(step){
+  const i=SCH_NODES.findIndex(n=>n.k===asgKey);
+  openAssign(SCH_NODES[(i+step+SCH_NODES.length)%SCH_NODES.length].k);
+}
 function openAssign(key){
   asgKey=key;
   const nd=SCH_NODES.find(n=>n.k===key);
-  $('#asgTitle').innerHTML=esc(nd.t+' · '+nd.n)+' <span class="x" id="asgX">✕</span>';
-  $('#asgTitle').querySelector('#asgX').onclick=()=>$('#asg').classList.remove('on');
+  const cat=asgResolveCat(nd);
+  asgSt={sec:cat.sec,sub:cat.sub,brand:null,pow:null,all:false,sort:'fit'};
+  $('#asgTitle').textContent=nd.t+' · '+nd.n;
+  // если категория не разрешилась (нет раздела в базе) — старый добрый hint
+  $('#asgQ').value=cat.sec?'':(nd.hint||'');
   $('#asgSub').textContent=SCH_DESC[key]||'';
-  $('#asgQ').value=nd.hint||'';
   $('#asgUnset').style.display=schemaData[key]?'block':'none';
   $('#asgUnset').onclick=()=>{pushHist('снятие назначения на схеме');delete schemaData[key];$('#asg').classList.remove('on');renderSchema();save();};
+  drawAsgHead();
   drawAsgList();
   $('#asg').classList.add('on');
-  setTimeout(()=>$('#asgQ').focus(),50);
+  setTimeout(()=>{const c=document.querySelector('#asgStrip .nd.cur');
+    if(c&&c.scrollIntoView)c.scrollIntoView({inline:'center',block:'nearest'});},20);
+}
+function drawAsgHead(){
+  const done=SCH_NODES.filter(n=>schemaData[n.k]).length;
+  $('#asgProg').innerHTML='<b>'+done+'</b> из '+SCH_NODES.length;
+  $('#asgStrip').innerHTML=SCH_NODES.map(n=>
+    '<span class="nd'+(schemaData[n.k]?' done':'')+(n.k===asgKey?' cur':'')+'" data-k="'+n.k+'">'
+    +'<i>'+(schemaData[n.k]?'●':'○')+'</i>'+esc(n.t)+'</span>').join('');
+  document.querySelectorAll('#asgStrip .nd').forEach(el=>el.onclick=()=>openAssign(el.dataset.k));
 }
 function assignTo(d){
   pushHist('назначение модели на схеме');
   schemaData[asgKey]={id:d.id,name:(d.brand?d.brand+' ':'')+d.name};
-  $('#asg').classList.remove('on');
   renderSchema();save();
-  toast('Назначено: '+d.name+' → '+SCH_NODES.find(n=>n.k===asgKey).t);
+  const cur=SCH_NODES.find(n=>n.k===asgKey);
+  const next=asgNextUn();
+  toast('Назначено: '+d.name+' → '+cur.t+(next?' · дальше: '+SCH_NODES.find(n=>n.k===next).t:' · все узлы назначены'));
+  if(next)openAssign(next);
+  else $('#asg').classList.remove('on');
 }
 function drawAsgList(){
   const q=($('#asgQ').value||'').trim().toLowerCase();
-  const list=DATA.filter(d=>d.ready).filter(d=>!q||hay(d).includes(q)).slice(0,40);
-  $('#asgList').innerHTML=list.map(d=>catRow(d,'→')).join('')||
-    '<div class="pov-empty">По этому запросу в базе ничего нет.<br>'+
-    'Очисти поиск — покажу всю базу, или добавь позицию в базу 3D.</div>';
+  const nd=SCH_NODES.find(n=>n.k===asgKey)||{};
+  const rec=asgResolveCat(nd);
+  const S=asgSt;
+  const inCat=d=>{
+    if(S.sec&&d.section!==S.sec)return false;
+    if(S.sub&&d.sub!==S.sub)return false;
+    if(S.brand&&(d.brand||'')!==S.brand)return false;
+    if(S.pow){const[a,b]=S.pow.split('-').map(Number);const kw=asgKw(d);if(!(kw>=a&&kw<b))return false;}
+    return true;
+  };
+  // фильтр: поиск внутри категории, «вся база» снимает категорию
+  const list=DATA.filter(d=>d.ready).filter(d=>{
+    if(q&&!hay(d).includes(q))return false;
+    if(q&&S.all)return true;
+    return inCat(d);
+  });
+  // полка «подходит сюда» — категория узла, ближе к листу 7 кВт
+  const used=asgUsedIds();
+  const recList=rec.sec?DATA.filter(d=>d.ready&&d.section===rec.sec&&(!rec.sub||d.sub===rec.sub)):[];
+  const hasKw=recList.some(d=>asgKw(d)>0);
+  const fits=recList.slice().sort((a,b)=>
+    (used.has(b.id)?1:0)-(used.has(a.id)?1:0)||
+    (hasKw?Math.abs(asgKw(a)-7)-Math.abs(asgKw(b)-7):0)).slice(0,3);
+  $('#asgFit').style.display=fits.length?'block':'none';
+  if(fits.length){
+    $('#asgFitT').textContent='✓ Подходит сюда — '+(rec.sub?asgSubName(rec.sec,rec.sub):asgSecName(rec.sec)).toLowerCase()+(hasKw?' · под лист 7 кВт':'');
+    $('#asgFitRow').innerHTML=fits.map(d=>{
+      const kw=asgKw(d);
+      return '<div class="fc" data-id="'+esc(d.id)+'"><b>'+esc((d.brand?d.brand+' ':'')+d.name)+'</b>'
+        +'<span>'+esc(tagLine(d)||d.kind||'')+'</span>'
+        +'<div class="why">'+(used.has(d.id)?'уже в проекте':(kw&&Math.abs(kw-7)<3.5?'≈ лист 7 кВт':'типовая для узла'))+'</div></div>';
+    }).join('');
+    document.querySelectorAll('#asgFitRow .fc').forEach(el=>el.onclick=()=>{
+      const d=DATA.find(x=>x.id===el.dataset.id);if(d)assignTo(d);});
+  }
+  // крошки: База 3D ▸ Раздел ▾ ▸ Подраздел ▾  (+ возврат к категории узла)
+  let cr='<span class="home">База 3D</span><span class="sep">▸</span>'
+    +'<span class="cr" data-dd="sec">'+esc(asgSecName(S.sec))+' ▾</span>';
+  const subsHere=S.sec?((SECTIONS.find(x=>x[0]===S.sec)||[])[2]||[]):[];
+  if(subsHere.length)cr+='<span class="sep">▸</span><span class="cr" data-dd="sub">'
+    +esc(S.sub?asgSubName(S.sec,S.sub):'все подразделы')+' ▾</span>';
+  if(rec.sec&&(S.sec!==rec.sec||S.sub!==rec.sub))cr+='<span class="rst" id="asgRst">↺ категория узла</span>';
+  cr+='<div class="asg-dd" id="asgDd"></div>';
+  $('#asgCrumbs').innerHTML=cr;
+  const dd=$('#asgDd');
+  document.querySelectorAll('#asgCrumbs .cr').forEach(el=>el.onclick=(e)=>{
+    e.stopPropagation();
+    const kind=el.dataset.dd;
+    let items;
+    if(kind==='sec')items=[['','Все разделы',asgCnt(null),!S.sec,false]]
+      .concat(SECTIONS.map(sc=>[sc[0],sc[1],asgCnt(sc[0]),S.sec===sc[0],sc[0]===rec.sec]));
+    else items=[['','Все подразделы',asgCnt(S.sec),!S.sub,false]]
+      .concat(subsHere.map(b=>[b[0],b[1],asgCnt(S.sec,b[0]),S.sub===b[0],S.sec===rec.sec&&b[0]===rec.sub]));
+    dd.innerHTML=items.map(([id,nm,n2,sel,isrec])=>
+      '<div class="'+(sel?'sel ':'')+(isrec?'rec':'')+'" data-id="'+esc(id)+'">'+esc(nm)+'<small>'+n2+'</small></div>').join('');
+    dd.classList.add('on');
+    dd.style.left=Math.min(el.offsetLeft,120)+'px';
+    dd.querySelectorAll('div').forEach(o=>o.onclick=(ev)=>{
+      ev.stopPropagation();
+      if(kind==='sec'){S.sec=o.dataset.id||null;S.sub=null;}else S.sub=o.dataset.id||null;
+      S.brand=null;S.pow=null;dd.classList.remove('on');drawAsgList();
+    });
+  });
+  const rstEl=document.getElementById('asgRst');
+  if(rstEl)rstEl.onclick=()=>{S.sec=rec.sec;S.sub=rec.sub;S.brand=null;S.pow=null;drawAsgList();};
+  // фильтры: бренды текущей выборки + мощность, если есть у позиций
+  const pool=DATA.filter(d=>d.ready&&(!S.sec||d.section===S.sec)&&(!S.sub||d.sub===S.sub));
+  const bc={};pool.forEach(d=>{if(d.brand)bc[d.brand]=(bc[d.brand]||0)+1;});
+  const brands=Object.keys(bc).sort((a,b)=>bc[b]-bc[a]).slice(0,6);
+  const kwN=pool.filter(d=>asgKw(d)>0).length;
+  let fl='';
+  if(brands.length>1)fl+='<b>БРЕНД</b>'+brands.map(b=>'<span class="'+(S.brand===b?'on':'')+'" data-f="b:'+esc(b)+'">'+esc(b)+'</span>').join('');
+  if(kwN>=3)fl+='<b style="margin-left:6px">МОЩНОСТЬ</b>'+[['до 5','0-5'],['5–10','5-10'],['10–20','10-20'],['20+','20-999']]
+    .map(([nm,r])=>'<span class="'+(S.pow===r?'on':'')+'" data-f="p:'+r+'">'+nm+' кВт</span>').join('');
+  $('#asgFl').innerHTML=fl;$('#asgFl').style.display=fl?'flex':'none';
+  document.querySelectorAll('#asgFl span').forEach(el=>el.onclick=()=>{
+    const m=/^(b|p):(.+)$/.exec(el.dataset.f);
+    if(m[1]==='b')S.brand=S.brand===m[2]?null:m[2];else S.pow=S.pow===m[2]?null:m[2];
+    drawAsgList();});
+  // поиск, сортировка, охват
+  $('#asgQ').placeholder='поиск в «'+(S.sub?asgSubName(S.sec,S.sub):asgSecName(S.sec))+'»…';
+  $('#asgSort').innerHTML=kwN>=2?('⇅ '+(S.sort==='fit'?'<b>под 7 кВт</b> / имя':'под 7 кВт / <b>имя</b>')):'';
+  $('#asgSort').onclick=()=>{S.sort=S.sort==='fit'?'name':'fit';drawAsgList();};
+  $('#asgScope').innerHTML=S.sec?(S.all?'вся база · <u>категория</u>':'<u>вся база</u>'):'';
+  $('#asgScope').onclick=()=>{S.all=!S.all;drawAsgList();};
+  // список: «уже в проекте» отдельной группой, сорт по мощности к листу
+  const sorted=list.slice().sort((a,b)=>{
+    if(S.sort==='fit'&&kwN>=2){
+      const ka=asgKw(a),kb=asgKw(b);
+      if(ka>0||kb>0)return (ka>0?Math.abs(ka-7):99)-(kb>0?Math.abs(kb-7):99);
+    }
+    return String(a.name).localeCompare(String(b.name),'ru');
+  }).slice(0,60);
+  const mine=sorted.filter(d=>used.has(d.id)),rest=sorted.filter(d=>!used.has(d.id));
+  let h='';
+  if(mine.length)h+='<div class="asg-grp">УЖЕ В ПРОЕКТЕ</div>'+mine.map(d=>catRow(d,'→')).join('')
+    +(rest.length?'<div class="asg-grp">'+(S.sub||S.sec?'ВСЯ КАТЕГОРИЯ':'ВСЯ БАЗА')+'</div>':'');
+  h+=rest.map(d=>catRow(d,'→')).join('');
+  $('#asgList').innerHTML=h||
+    '<div class="pov-empty">По этим фильтрам в базе ничего нет.<br>'+
+    'Сбрось фильтры, включи «вся база» — или добавь позицию в базу 3D.</div>';
   $('#asgList').querySelectorAll('.ci').forEach(el=>el.onclick=()=>{
     const d=DATA.find(x=>x.id===el.dataset.id);
     if(d)assignTo(d);
@@ -3496,6 +3721,21 @@ function drawAsgList(){
   fillThumbsIn('#asgList');
 }
 $('#asgQ')&&$('#asgQ').addEventListener('input',drawAsgList);
+$('#asgX').onclick=()=>$('#asg').classList.remove('on');
+$('#asgPrev').onclick=()=>asgGoto(-1);
+$('#asgNext').onclick=()=>asgGoto(1);
+$('#asgJump').onclick=()=>{const k=asgNextUn();if(k)openAssign(k);};
+document.addEventListener('click',()=>{const dd=document.getElementById('asgDd');if(dd)dd.classList.remove('on');});
+document.addEventListener('keydown',(e)=>{  // клавиатура конвейера
+  if(!$('#asg').classList.contains('on'))return;
+  const inInput=e.target&&e.target.tagName==='INPUT';
+  if(e.key==='Escape'){$('#asg').classList.remove('on');e.preventDefault();return;}
+  if(inInput&&e.key!=='Enter'&&e.key!=='Tab')return;
+  if(e.key==='ArrowLeft'){asgGoto(-1);e.preventDefault();}
+  else if(e.key==='ArrowRight'){asgGoto(1);e.preventDefault();}
+  else if(e.key==='Tab'){const k=asgNextUn();if(k)openAssign(k);e.preventDefault();}
+  else if(e.key==='Enter'){const first=document.querySelector('#asgList .ci');if(first)first.click();e.preventDefault();}
+});
 
 /* переключение вкладок Компоновка/Схема */
 function setMode(m){
