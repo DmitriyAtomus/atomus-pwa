@@ -528,6 +528,12 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 .rotb.pto i{background:transparent;color:var(--cc);border:1px solid var(--cc)}
 @keyframes rotpulse{0%,100%{box-shadow:0 0 0 4px rgba(255,255,255,.07)}
   50%{box-shadow:0 0 0 9px rgba(255,255,255,.03)}}
+/* выноска метки «+»: метка ушла с патрубка, чтобы не лечь на соседнюю —
+   без нитки к точке непонятно, на какой штуцер она зовёт */
+.rotl{--cc:#C9A227;position:absolute;height:0;border-top:1px dashed var(--cc);
+  opacity:.5;transform-origin:0 0;pointer-events:none;display:none}
+.rotl::before{content:'';position:absolute;left:-3px;top:-3px;width:6px;height:6px;
+  border-radius:50%;background:var(--cc)}
 @media(max-width:900px){.rotb span{display:none}}   /* на телефоне остаётся имя патрубка */
 #rpick{position:fixed;z-index:43;display:none;flex-direction:column;width:274px;max-width:calc(100vw - 16px);
   max-height:70vh;background:rgba(8,20,36,.97);border:1px solid var(--line2);border-radius:10px;padding:6px;
@@ -1179,7 +1185,7 @@ function tick(){
                       target.y+dist*Math.sin(phi)*Math.sin(theta),
                       target.z+dist*Math.cos(phi));
   camera.lookAt(target);
-  portsSync();rotSync();
+  tagReset();portsSync();rotSync();
   renderer.render(scene,camera);
 }
 
@@ -3046,6 +3052,26 @@ const portGrp=new THREE.Group();
 let portTags=[],portLine=null;         // {it,loc,spr,dot,w2h} + выноски
 const PORT_TEX=new Map();
 const PORT_PX=17;                      // экранная высота подписи, пикселей
+/* ═══ разведение меток: одна общая карта занятого экрана ═══
+   В сцене две породы меток: подписи патрубков (спрайты в 3D) и метки
+   свободных присоединений «+» (html поверх канваса). Каждая разъезжалась
+   сама по себе — подпись знала только про подписи, «+» вообще ни про кого, —
+   и на кучном узле вроде компрессора четыре надписи ложились одна на другую:
+   читалось «НАГ…ВСА…». Теперь обе складывают занятые прямоугольники экрана в
+   один список TAGBOX: он чистится раз в кадр, первыми место берут подписи
+   патрубков, метки «+» встают в оставшееся. */
+let TAGBOX=[];
+function tagReset(){TAGBOX.length=0;}
+function tagRect(cx,cy,w,h){return {x0:cx-w/2,x1:cx+w/2,y0:cy-h/2,y1:cy+h/2};}
+function tagHit(r,pad){const p=pad===undefined?4:pad;
+  return TAGBOX.some(b=>r.x0<b.x1+p&&r.x1>b.x0-p&&r.y0<b.y1+p&&r.y1>b.y0-p);}
+function tagPush(r){TAGBOX.push(r);}
+/* лесенка смещений подписи от своей точки, в высотах подписи: сначала своё
+   место, потом ступенька вверх, ступенька вниз, ещё выше, ещё ниже. Раньше
+   подпись умела только подниматься — на девятой ступеньке она улетала под
+   потолок сцены, а место под точкой пустовало. */
+const PORT_LADDER=(()=>{const a=[.28];
+  for(let k=1;k<=7;k++){a.push(.28+1.2*k,.28-1.2*k);}return a;})();
 function portTex(text,col){
   const k=col+'|'+text;
   if(PORT_TEX.has(k))return PORT_TEX.get(k);
@@ -3231,7 +3257,6 @@ function portsSync(){
   scene.updateMatrixWorld(true);      // деталь тащат мышью — берём свежее место
   const cv=$('#cv'),W=cv.clientWidth||1280,H=cv.clientHeight||720;
   const hw=2*dist*Math.tan(camera.fov*Math.PI/360)*PORT_PX/H;
-  const box=[];
   const scr=portTags.map((t,i)=>{
     _pv.copy(t.loc).applyMatrix4(t.it.obj.matrixWorld);
     t.spr.position.copy(_pv);t.dot.position.copy(_pv);
@@ -3251,13 +3276,19 @@ function portsSync(){
       p.dup=true;return;
     }
     if(t.txt)seenTxt.push({t:t.txt,x:p.x,y:p.y});
-    let c=.28;
-    for(let k=0;k<9;k++){
-      const y=p.y-c*PORT_PX,x0=p.x-p.w/2,x1=p.x+p.w/2;
-      const hit=box.some(b=>x0<b.x1+4&&x1>b.x0-4&&
-        y<b.y+PORT_PX+2&&y>b.y-PORT_PX-2);
-      if(!hit){box.push({x0:x0,x1:x1,y:y});break;}
-      c+=1.2;
+    let c=null;
+    for(const cc of PORT_LADDER){
+      const r=tagRect(p.x,p.y-cc*PORT_PX,p.w,PORT_PX);
+      if(tagHit(r))continue;
+      tagPush(r);c=cc;break;
+    }
+    if(c===null){
+      /* свободного места на экране не осталось: у выделенной детали подпись
+         важнее чистоты — ставим её на верхнюю ступеньку, у остальных гасим,
+         иначе вместо сцены каша из надписей */
+      if(t.it!==sel){p.dup=true;return;}
+      c=PORT_LADDER[PORT_LADDER.length-2];
+      tagPush(tagRect(p.x,p.y-c*PORT_PX,p.w,PORT_PX));
     }
     t.spr.center.set(.5,-c);
     t.spr.visible=true;t.dot.visible=true;
@@ -3489,8 +3520,10 @@ function rotRebuild(){
     el.onclick=ev=>{ev.stopPropagation();
       if(pullOn())pullPick(f.it,f.zi);
       else rotPick(f.it,f.zi,ev.clientX,ev.clientY);};
-    box.appendChild(el);
-    rotBadges.push({el:el,it:f.it,loc:rotSeatLocal(f.z)});
+    const ln=document.createElement('div');
+    ln.className='rotl';ln.style.setProperty('--cc',zc||col[0]);
+    box.appendChild(ln);box.appendChild(el);
+    rotBadges.push({el:el,ln:ln,it:f.it,loc:rotSeatLocal(f.z),w:0,h:0});
   });
 }
 /* Что написать на метке. Имя патрубка с завода бывает говорящим
@@ -3507,17 +3540,54 @@ function portWord(z){
   if(!s||PORT_DUMB.test(s))return ZONE_SHORT[z.kind]||s||'патрубок';
   return s;
 }
-/* метка держится на патрубке: деталь тащат или крутят — метка едет за ней */
+/* Метка держится на патрубке: деталь тащат или крутят — метка едет за ней.
+   Метки широкие («нагнетание · резьба G1»), а патрубки на аппарате стоят в
+   ладонь друг от друга: раньше на компрессоре три «+» ложились стопкой, и
+   мышь попадала всегда в верхнюю. Теперь метка сперва просится на своё место,
+   а занято — уходит выше, ниже или вбок, и тянет к патрубку выноску. Ближние
+   к камере метки выбирают место первыми: у них патрубок виден, а дальние и
+   так наполовину за металлом. */
 const _rb=new THREE.Vector3();
 function rotSync(){
   if(!rotBadges.length)return;
   const cv=$('#cv'),W=cv.clientWidth||1280,H=cv.clientHeight||720;
+  const vis=[];
   rotBadges.forEach(b=>{
     _rb.copy(b.loc).applyMatrix4(b.it.obj.matrixWorld).project(camera);
-    if(_rb.z>=1){b.el.style.display='none';return;}
+    if(_rb.z>=1){b.el.style.display='none';b.ln.style.display='none';return;}
+    /* размер метки меряем один раз на перестроение, а не каждый кадр:
+       чтение offsetWidth заставляет браузер считать раскладку заново */
+    if(!b.w){b.w=b.el.offsetWidth||130;b.h=b.el.offsetHeight||26;}
+    vis.push({b:b,z:_rb.z,x:(_rb.x*.5+.5)*W,y:(-_rb.y*.5+.5)*H});
+  });
+  vis.sort((a,c)=>a.z-c.z);
+  vis.forEach(v=>{
+    const b=v.b,sy=b.h+6,sx=b.w*.55+16;
+    let ox=0,oy=0,free=false;
+    for(let k=0;k<=6&&!free;k++){
+      const cand=k?[[0,-k*sy],[0,k*sy],[sx,-(k-1)*sy],[-sx,-(k-1)*sy]]:[[0,0]];
+      for(const c of cand){
+        const cx=v.x+c[0],cy=v.y+c[1];
+        // за край канваса метку не выгоняем: там её обрежет #rots
+        if(cx<b.w/2-24||cx>W-b.w/2+24||cy<b.h/2||cy>H-b.h/2)continue;
+        const r=tagRect(cx,cy,b.w,b.h);
+        if(tagHit(r,5))continue;
+        tagPush(r);ox=c[0];oy=c[1];free=true;break;
+      }
+    }
+    // свободного места нет — метку всё равно показываем: по ней ставят деталь
+    if(!free)tagPush(tagRect(v.x,v.y,b.w,b.h));
     b.el.style.display='flex';
-    b.el.style.left=((_rb.x*.5+.5)*W).toFixed(1)+'px';
-    b.el.style.top =((-_rb.y*.5+.5)*H).toFixed(1)+'px';
+    b.el.style.left=(v.x+ox).toFixed(1)+'px';
+    b.el.style.top =(v.y+oy).toFixed(1)+'px';
+    const L=Math.hypot(ox,oy);
+    if(L>8){
+      b.ln.style.display='block';
+      b.ln.style.left=v.x.toFixed(1)+'px';
+      b.ln.style.top =v.y.toFixed(1)+'px';
+      b.ln.style.width=L.toFixed(1)+'px';
+      b.ln.style.transform='rotate('+Math.atan2(oy,ox).toFixed(4)+'rad)';
+    }else b.ln.style.display='none';
   });
 }
 function rotBtn(){
@@ -3604,7 +3674,8 @@ const rotPickOn=()=>$('#rpick').classList.contains('on');
 addEventListener('pointerdown',e=>{
   if(rotPickOn()&&!e.target.closest('#rpick')&&!e.target.closest('.rotb'))rotPickClose();},true);
 addEventListener('wheel',()=>rotPickClose(),true);
-addEventListener('resize',()=>rotPickClose());
+addEventListener('resize',()=>{rotPickClose();
+  rotBadges.forEach(b=>{b.w=0;});});   // узкий экран прячет размер — метка меняет ширину
 /* Посадить деталь: её ось ложится на ось патрубка, плоскость прилегания на
    плоскость прилегания. Верх детали (шток вентиля, стекло, катушку) разворачи-
    ваем вверх, насколько позволяет ось патрубка, — так и ставят в цехе. */
