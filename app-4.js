@@ -1714,7 +1714,7 @@ function renderHelpKnowledge() {
   html += '<div onclick="openIdeasModal()" style="cursor:pointer;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#EEF2FF,#F5F3FF);border:1px solid #C7D2FE;border-radius:14px;padding:14px 16px;margin-bottom:16px;">' +
       '<div style="font-size:26px;">💡</div>' +
       '<div style="flex:1;"><div style="font-weight:700;font-size:15px;">Идеи и доработки</div>' +
-        '<div style="font-size:12.5px;color:var(--text-light);">Расскажите Клоду, что улучшить в программе — он уточнит детали, оформит ТЗ и передаст директору.</div></div>' +
+        '<div style="font-size:12.5px;color:var(--text-light);">Расскажите Клаве, что улучшить в программе — она уточнит детали, оформит ТЗ и передаст директору.</div></div>' +
       '<i class="ti ti-chevron-right" style="color:var(--brand);"></i>' +
     '</div>';
   HELP_CATEGORIES.forEach(cat => {
@@ -1739,11 +1739,13 @@ function renderHelpCard(a) {
     '</div>';
 }
 
-// ============ Идеи: чат сотрудника с Клодом ============
-// Раздел для всех сотрудников. Клод здесь работает ТОЛЬКО на чтение: смотрит
+// ============ Идеи: чат сотрудника с Клавой ============
+// Раздел для всех сотрудников. Собеседник — Клава (та же, что говорит с цехом
+// через ТВ); «Клод» остаётся именем агента-разработчика в ленте директора.
+// Клава здесь работает ТОЛЬКО на чтение: смотрит
 // склад, производство и карту разделов, но договоры, суммы и зарплаты ему
 // закрыты (границы стоят на бэкенде, atomus/idea_agent.py). Вместе с человеком
-// он доводит идею до ТЗ; готовое ТЗ уезжает директору в ленту разработки
+// она доводит идею до ТЗ; готовое ТЗ уезжает директору в ленту разработки
 // ПРЕДЛОЖЕНИЕМ — правка кода начинается только с его кнопки «Внедрить».
 // Вход в раздел — по паролю, который выдаёт директор.
 
@@ -1783,7 +1785,7 @@ function _ideasRenderLock(st) {
     '<div class="ich-lock">' +
       '<div class="ich-lock-ico"><i class="ti ti-lock"></i></div>' +
       '<h3>Чат идей — под паролем</h3>' +
-      '<p>Здесь можно рассказать Клоду, что улучшить в программе: он уточнит детали, ' +
+      '<p>Здесь можно рассказать Клаве, что улучшить в программе: она уточнит детали, ' +
         'оформит ТЗ и передаст директору. Пароль выдаёт директор.</p>' +
       (st.has_password
         ? '<div class="ich-lock-form">' +
@@ -1830,7 +1832,7 @@ function _ideasRenderShell() {
             'oninput="ideasGrow(this)" onkeydown="ideasKey(event)"></textarea>' +
           '<button class="ich-send" onclick="ideaSend()" title="Отправить (Enter)"><i class="ti ti-arrow-up"></i></button>' +
         '</div>' +
-        '<div class="ich-hint">Клод только смотрит: код не правит, договоры и суммы не показывает. ' +
+        '<div class="ich-hint">Клава только смотрит: код не правит, договоры и суммы не показывает. ' +
           'Готовое ТЗ уходит директору — внедрять или нет, решает он.</div>' +
       '</div>' +
     '</div>';
@@ -1889,7 +1891,7 @@ function ideasNew() {
     '<div class="ich-hello">' +
       '<div class="ich-ava"><i class="ti ti-sparkles"></i></div>' +
       '<div><b>Привет' + (state._ideas.name ? ', ' + escapeHtml(state._ideas.name) : '') + '!</b><br>' +
-      'Расскажите, что в программе мешает или чего не хватает. Я уточню детали, ' +
+      'Я Клава. Расскажите, что в программе мешает или чего не хватает. Я уточню детали, ' +
       'посмотрю, как устроено сейчас, и вместе оформим ТЗ для директора.</div>' +
     '</div>';
   if (acts) acts.innerHTML = '';
