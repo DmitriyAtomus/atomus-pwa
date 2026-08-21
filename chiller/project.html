@@ -547,7 +547,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 #rpick .rr small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden;font-size:10px;color:var(--faint);line-height:1.3}
 /* v2.45.1005: в замене видно, какая деталь стоит на патрубке сейчас */
-/* v2.46.021: деталь в этот отрезок не влезает — строка гаснет и сама
+/* v2.46.023: деталь в этот отрезок не влезает — строка гаснет и сама
    пишет, сколько трубы не хватает */
 #rpick .rr.no{opacity:.55;cursor:default}
 #rpick .rr.no small{color:#f0a9a0}
@@ -1187,7 +1187,7 @@ function toNDC(e){const r=$('#cv').getBoundingClientRect();
    строкой спецификации или кликом, когда он уже выделен (чтобы двигать). */
 const FRM_KEY='atomus_chiller_framethru';
 let FRMTHRU=(()=>{try{return localStorage.getItem(FRM_KEY)!=='0';}catch(e){return true;}})();
-/* v2.46.021: где именно луч попал в деталь — по этой точке врезают арматуру
+/* v2.46.023: где именно луч попал в деталь — по этой точке врезают арматуру
    в трубу: ткнул в место разрыва, а не «где-то посередине отрезка» */
 let pickPt=null;
 function pickItem(e,any){
@@ -3302,7 +3302,7 @@ function rotMate(v){
   host.obj.updateMatrixWorld(true);
   const A=new THREE.Vector3(z.dir[0],z.dir[1],z.dir[2])
     .applyQuaternion(host.obj.quaternion).normalize();        // ось штуцера, наружу
-  /* v2.46.021: у растянутого отрезка трубы отметка прилегания едет вместе с
+  /* v2.46.023: у растянутого отрезка трубы отметка прилегания едет вместе с
      масштабом — считаем её в системе координат детали и переводим в сцену
      целиком, иначе врезанная арматура садится не на торец, а внутрь участка */
   const P=rotSeatLocal(z).applyMatrix4(host.obj.matrixWorld);
@@ -3646,7 +3646,7 @@ function pipeSetSel(L){
   setPipeLen(sel,L);posDone();
 }
 
-/* ═══ v2.46.021: врезка арматуры в разрыв трубы ═══
+/* ═══ v2.46.023: врезка арматуры в разрыв трубы ═══
    Вентиль, фильтр-осушитель, смотровое стекло, обратный клапан, муфта стоят
    не на конце линии, а в её разрыве: трубу режут, концы заводят в арматуру с
    двух сторон. Раньше в сцене это делалось руками — отрезок укорачивали
@@ -4227,7 +4227,7 @@ async function histApply(snapshot){
       p.obj.rotation.set(it.k||0,it.t||0,it.r||0);
       p.obj.updateMatrixWorld(true);
       p.pin=!!it.pin;
-      /* v2.46.021: pzi — номер патрубка, которым деталь сидит; без него после
+      /* v2.46.023: pzi — номер патрубка, которым деталь сидит; без него после
          отмены цепочка «труба → арматура → труба» садиться перестаёт */
       p.link=it.link?{to:it.link.to,mount:it.link.mount,face:it.link.face||'pan',
                       zi:it.link.zi,pzi:it.link.pzi,roll:it.link.roll}:null;
