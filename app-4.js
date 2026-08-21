@@ -1714,7 +1714,7 @@ function renderHelpKnowledge() {
   html += '<div onclick="openIdeasModal()" style="cursor:pointer;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#EEF2FF,#F5F3FF);border:1px solid #C7D2FE;border-radius:14px;padding:14px 16px;margin-bottom:16px;">' +
       '<div style="font-size:26px;">💡</div>' +
       '<div style="flex:1;"><div style="font-weight:700;font-size:15px;">Идеи и доработки</div>' +
-        '<div style="font-size:12.5px;color:var(--text-light);">Расскажи ИИ, что улучшить в программе — он уточнит детали и оформит заявку разработчику.</div></div>' +
+        '<div style="font-size:12.5px;color:var(--text-light);">Расскажите Клоду, что улучшить в программе — он уточнит детали, оформит ТЗ и передаст директору.</div></div>' +
       '<i class="ti ti-chevron-right" style="color:var(--brand);"></i>' +
     '</div>';
   HELP_CATEGORIES.forEach(cat => {
@@ -1739,60 +1739,291 @@ function renderHelpCard(a) {
     '</div>';
 }
 
-// ============ Идеи / доработки (ИИ-ассистент) ============
+// ============ Идеи: чат сотрудника с Клодом ============
+// Раздел для всех сотрудников. Клод здесь работает ТОЛЬКО на чтение: смотрит
+// склад, производство и карту разделов, но договоры, суммы и зарплаты ему
+// закрыты (границы стоят на бэкенде, atomus/idea_agent.py). Вместе с человеком
+// он доводит идею до ТЗ; готовое ТЗ уезжает директору в ленту разработки
+// ПРЕДЛОЖЕНИЕМ — правка кода начинается только с его кнопки «Внедрить».
+// Вход в раздел — по паролю, который выдаёт директор.
 
-function openIdeasModal() {
-  let m = document.getElementById('ideas-modal');
-  if (!m) {
-    m = document.createElement('div');
-    m.id = 'ideas-modal';
-    m.className = 'modal-overlay';
-    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
-    document.body.appendChild(m);
+const IDEA_STATUS = {
+  open:     { label: 'черновик',   cls: 'is-open' },
+  ready:    { label: 'ТЗ готово',  cls: 'is-ready' },
+  sent:     { label: 'у директора', cls: 'is-sent' },
+  taken:    { label: 'в работе',   cls: 'is-taken' },
+  declined: { label: 'отложено',   cls: 'is-declined' },
+  done:     { label: 'сделано',    cls: 'is-done' },
+};
+
+// Старая точка входа из «Помощи» — теперь ведёт в раздел, а не в модалку.
+function openIdeasModal() { selectSidebarItem('ideas'); }
+
+async function loadIdeas() {
+  const body = document.getElementById('ideas-body');
+  if (!body) return;
+  state._ideas = state._ideas || {};
+  let st;
+  try { st = await apiGet('/api/ideas/state'); } catch (e) {
+    body.innerHTML = '<div class="empty-block"><i class="ti ti-cloud-off"></i>Нет связи с сервером</div>';
+    return;
   }
-  m.innerHTML =
-    '<div class="modal" onclick="event.stopPropagation()" style="max-width:560px;width:100%;display:flex;flex-direction:column;max-height:88vh;">' +
-      '<div class="modal-header"><h3>💡 Идеи и доработки</h3>' +
-        '<button class="modal-close" onclick="document.getElementById(\'ideas-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
-      '<div style="display:flex;gap:8px;padding:10px 16px 0;">' +
-        '<button class="btn btn-primary btn-small" onclick="ideasShowNew()"><i class="ti ti-bulb"></i> Предложить</button>' +
-        '<button class="btn btn-secondary btn-small" onclick="ideasShowList()"><i class="ti ti-list"></i> Заявки</button>' +
+  state._ideas.isDir = !!st.is_director;
+  state._ideas.name = st.name || '';
+  const keyBtn = document.getElementById('ideas-key-btn');
+  if (keyBtn) keyBtn.style.display = st.is_director ? '' : 'none';
+  if (!st.unlocked) { _ideasRenderLock(st); return; }
+  _ideasRenderShell();
+  await ideasLoadList();
+}
+
+function _ideasRenderLock(st) {
+  const body = document.getElementById('ideas-body');
+  body.innerHTML =
+    '<div class="ich-lock">' +
+      '<div class="ich-lock-ico"><i class="ti ti-lock"></i></div>' +
+      '<h3>Чат идей — под паролем</h3>' +
+      '<p>Здесь можно рассказать Клоду, что улучшить в программе: он уточнит детали, ' +
+        'оформит ТЗ и передаст директору. Пароль выдаёт директор.</p>' +
+      (st.has_password
+        ? '<div class="ich-lock-form">' +
+            '<input type="password" id="idea-pass" class="form-input" placeholder="Пароль" ' +
+              'autocomplete="off" onkeydown="if(event.key===\'Enter\')ideasUnlock()">' +
+            '<button class="btn btn-primary" onclick="ideasUnlock()"><i class="ti ti-login"></i> Войти</button>' +
+          '</div>' +
+          '<div class="ich-lock-err" id="idea-pass-err"></div>'
+        : '<div class="ich-lock-err">' + (st.is_director
+            ? 'Пароль ещё не задан. Нажмите ключ в шапке и задайте его — потом выдайте сотрудникам.'
+            : 'Директор ещё не задал пароль. Попросите его открыть доступ.') + '</div>') +
+    '</div>';
+  const inp = document.getElementById('idea-pass');
+  if (inp) inp.focus();
+}
+
+async function ideasUnlock() {
+  const inp = document.getElementById('idea-pass');
+  const err = document.getElementById('idea-pass-err');
+  if (!inp) return;
+  const password = (inp.value || '').trim();
+  if (!password) { inp.focus(); return; }
+  const r = await apiPost('/api/ideas/unlock', { password });
+  if (r.ok && r.data && r.data.ok) { inp.value = ''; loadIdeas(); return; }
+  if (err) err.textContent = (r.data && r.data.message) || 'Пароль не подходит';
+  inp.value = '';
+  inp.focus();
+}
+
+function _ideasRenderShell() {
+  const body = document.getElementById('ideas-body');
+  if (document.getElementById('ideas-feed')) return;   // уже собрано
+  body.innerHTML =
+    '<div class="ich" id="ideas-wrap">' +
+      '<aside class="ich-list" id="ideas-list">' +
+        '<button class="ich-new" onclick="ideasNew()"><i class="ti ti-plus"></i>Новая идея</button>' +
+        '<div class="ich-items" id="ideas-items"><div class="loading-block">Загружаем…</div></div>' +
+      '</aside>' +
+      '<div class="ich-main">' +
+        '<div class="ich-feed" id="ideas-feed"></div>' +
+        '<div class="ich-actions" id="ideas-actions"></div>' +
+        '<div class="ich-composer">' +
+          '<textarea id="idea-input" class="ich-input" rows="1" placeholder="Что улучшить в программе?" ' +
+            'oninput="ideasGrow(this)" onkeydown="ideasKey(event)"></textarea>' +
+          '<button class="ich-send" onclick="ideaSend()" title="Отправить (Enter)"><i class="ti ti-arrow-up"></i></button>' +
+        '</div>' +
+        '<div class="ich-hint">Клод только смотрит: код не правит, договоры и суммы не показывает. ' +
+          'Готовое ТЗ уходит директору — внедрять или нет, решает он.</div>' +
       '</div>' +
-      '<div id="ideas-body" style="flex:1;overflow-y:auto;padding:14px 16px;"></div>' +
-      '<div id="ideas-foot" style="padding:12px 16px;border-top:1px solid var(--border);"></div>' +
-    '</div>';
-  m.classList.add('visible');
-  ideasShowNew();
-}
-
-function ideasShowNew() {
-  state.ideaThreadId = null;
-  const body = document.getElementById('ideas-body');
-  const foot = document.getElementById('ideas-foot');
-  if (!body || !foot) return;
-  body.innerHTML = '<div id="ideas-chat" style="display:flex;flex-direction:column;gap:8px;">' +
-      '<div style="background:#F1F5F9;border-radius:10px;padding:8px 11px;font-size:13.5px;">Привет! Опиши, что хочешь улучшить или добавить в программе — я задам пару уточняющих вопросов и оформлю заявку разработчику.</div>' +
-    '</div>';
-  foot.innerHTML =
-    '<textarea id="idea-input" class="form-input" rows="2" placeholder="Напиши идею…" style="margin-bottom:8px;"></textarea>' +
-    '<div style="display:flex;gap:8px;">' +
-      '<button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="ideaSend()"><i class="ti ti-send"></i> Отправить</button>' +
-      '<button class="btn btn-secondary" id="idea-compile-btn" style="display:none;" onclick="ideaCompile()"><i class="ti ti-file-check"></i> Сформировать ТЗ</button>' +
     '</div>';
 }
 
-function _ideaAddMsg(role, text) {
-  const chat = document.getElementById('ideas-chat');
-  if (!chat) return null;
+function ideasToggleList() {
+  const wrap = document.getElementById('ideas-wrap');
+  if (wrap) wrap.classList.toggle('list-open');
+}
+
+async function ideasLoadList() {
+  let d;
+  try { d = await apiGet('/api/ideas'); } catch (e) { d = null; }
+  const items = document.getElementById('ideas-items');
+  if (!items) return;
+  const list = (d && d.ideas) || [];
+  state._ideas.list = list;
+  if (!list.length) {
+    items.innerHTML = '<div class="ich-empty">Пока пусто. Нажмите «Новая идея».</div>';
+    ideasNew();
+    return;
+  }
+  items.innerHTML = list.map(function (it) {
+    const st = IDEA_STATUS[it.status] || IDEA_STATUS.open;
+    const mine = !state._ideas.isDir || !it.author_name;
+    return '<button class="ich-item' + (it.id === state._ideas.current ? ' active' : '') +
+      '" onclick="ideasOpen(' + it.id + ')">' +
+      '<div class="ich-it-top"><span class="ich-it-title">' + escapeHtml(it.title || 'Идея') + '</span>' +
+        '<span class="ich-chip ' + st.cls + '">' + st.label + '</span></div>' +
+      '<div class="ich-it-sub">' + (mine ? '' : escapeHtml(it.author_name) + ' · ') +
+        escapeHtml(_ideasWhen(it.updated_at)) + '</div>' +
+      '</button>';
+  }).join('');
+  if (state._ideas.current) ideasOpen(state._ideas.current);
+  else ideasOpen(list[0].id);
+}
+
+function _ideasWhen(raw) {
+  if (!raw) return '';
+  const d = new Date(String(raw).replace(' ', 'T') + (String(raw).endsWith('Z') ? '' : 'Z'));
+  if (isNaN(d.getTime())) return String(raw).slice(0, 16);
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  return sameDay
+    ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+}
+
+function ideasNew() {
+  state._ideas = state._ideas || {};
+  state._ideas.current = null;
+  const feed = document.getElementById('ideas-feed');
+  const acts = document.getElementById('ideas-actions');
+  if (!feed) { _ideasRenderShell(); return ideasNew(); }
+  feed.innerHTML =
+    '<div class="ich-hello">' +
+      '<div class="ich-ava"><i class="ti ti-sparkles"></i></div>' +
+      '<div><b>Привет' + (state._ideas.name ? ', ' + escapeHtml(state._ideas.name) : '') + '!</b><br>' +
+      'Расскажите, что в программе мешает или чего не хватает. Я уточню детали, ' +
+      'посмотрю, как устроено сейчас, и вместе оформим ТЗ для директора.</div>' +
+    '</div>';
+  if (acts) acts.innerHTML = '';
+  document.querySelectorAll('.ich-item.active').forEach(function (el) { el.classList.remove('active'); });
+  const inp = document.getElementById('idea-input');
+  if (inp) { inp.value = ''; inp.focus(); }
+  const wrap = document.getElementById('ideas-wrap');
+  if (wrap) wrap.classList.remove('list-open');
+}
+
+async function ideasOpen(id) {
+  state._ideas = state._ideas || {};
+  state._ideas.current = id;
+  const feed = document.getElementById('ideas-feed');
+  if (!feed) return;
+  document.querySelectorAll('.ich-item').forEach(function (el) { el.classList.remove('active'); });
+  const wrap = document.getElementById('ideas-wrap');
+  if (wrap) wrap.classList.remove('list-open');
+  feed.innerHTML = '<div class="loading-block">Загружаем переписку…</div>';
+  let d;
+  try { d = await apiGet('/api/ideas/' + id); } catch (e) {
+    feed.innerHTML = '<div class="empty-block"><i class="ti ti-cloud-off"></i>Не удалось открыть</div>';
+    return;
+  }
+  const th = (d && d.thread) || {};
+  state._ideas.thread = th;
+  feed.innerHTML = '';
+  (th.messages || []).forEach(function (m) { _ideaAddMsg(m.role, m.text, m.created_at); });
+  if (th.spec_text) _ideaAddSpec(th.spec_text);
+  _ideasRenderActions(th);
+  _ideasScroll();
+  ideasLoadListSilent();
+}
+
+// Обновить только список (не трогая открытую переписку) — после отправки.
+async function ideasLoadListSilent() {
+  let d;
+  try { d = await apiGet('/api/ideas'); } catch (e) { return; }
+  state._ideas.list = (d && d.ideas) || [];
+  const items = document.getElementById('ideas-items');
+  if (!items || !state._ideas.list.length) return;
+  items.innerHTML = state._ideas.list.map(function (it) {
+    const st = IDEA_STATUS[it.status] || IDEA_STATUS.open;
+    const who = (state._ideas.isDir && it.author_name) ? escapeHtml(it.author_name) + ' · ' : '';
+    return '<button class="ich-item' + (it.id === state._ideas.current ? ' active' : '') +
+      '" onclick="ideasOpen(' + it.id + ')">' +
+      '<div class="ich-it-top"><span class="ich-it-title">' + escapeHtml(it.title || 'Идея') + '</span>' +
+        '<span class="ich-chip ' + st.cls + '">' + st.label + '</span></div>' +
+      '<div class="ich-it-sub">' + who + escapeHtml(_ideasWhen(it.updated_at)) + '</div>' +
+      '</button>';
+  }).join('');
+}
+
+function _ideasRenderActions(th) {
+  const acts = document.getElementById('ideas-actions');
+  if (!acts) return;
+  const status = th.status || 'open';
+  let h = '';
+  if (status === 'open' || status === 'ready') {
+    h += '<button class="btn btn-secondary btn-small" onclick="ideaCompile()">' +
+         '<i class="ti ti-file-check"></i> ' + (th.spec_text ? 'Пересобрать ТЗ' : 'Сформировать ТЗ') + '</button>';
+  }
+  if (th.spec_text && (status === 'open' || status === 'ready')) {
+    h += '<button class="btn btn-primary btn-small" onclick="ideaSubmit()">' +
+         '<i class="ti ti-send"></i> Отправить директору</button>';
+  }
+  if (status === 'sent') {
+    h += '<span class="ich-note"><i class="ti ti-clock"></i> ТЗ у директора — ждём решения</span>';
+    if (state._ideas.isDir) {
+      h += '<button class="btn btn-primary btn-small" onclick="ideaImplement(' + th.id + ')">' +
+           '<i class="ti ti-rocket"></i> Внедрить</button>' +
+           '<button class="btn btn-secondary btn-small" onclick="ideaDecline(' + th.id + ')">' +
+           '<i class="ti ti-clock-pause"></i> Не сейчас</button>';
+    }
+  }
+  if (status === 'taken') h += '<span class="ich-note"><i class="ti ti-rocket"></i> Взято в работу</span>';
+  if (status === 'declined') h += '<span class="ich-note"><i class="ti ti-clock-pause"></i> Отложено' +
+    (th.note ? ': ' + escapeHtml(th.note) : '') + '</span>';
+  if (status === 'done') h += '<span class="ich-note"><i class="ti ti-check"></i> Сделано</span>';
+  acts.innerHTML = h;
+}
+
+function _ideaFormat(text) {
+  // разметку ответов уже умеет лента Клавы — не плодим второй форматтер
+  if (typeof _devChatFormat === 'function') return _devChatFormat(text);
+  return escapeHtml(String(text || '')).replace(/\n/g, '<br>');
+}
+
+function _ideaAddMsg(role, text, when) {
+  const feed = document.getElementById('ideas-feed');
+  if (!feed) return null;
   const mine = role === 'user';
-  const div = document.createElement('div');
-  div.style.cssText = 'border-radius:10px;padding:8px 11px;font-size:13.5px;white-space:pre-wrap;word-break:break-word;' +
-    (mine ? 'background:var(--brand,#2563eb);color:#fff;align-self:flex-end;max-width:88%;' : 'background:#F1F5F9;max-width:92%;');
-  div.textContent = text;
-  chat.appendChild(div);
-  const body = document.getElementById('ideas-body');
-  if (body) body.scrollTop = body.scrollHeight;
-  return div;
+  const row = document.createElement('div');
+  row.className = 'ich-row' + (mine ? ' is-mine' : '');
+  if (!mine) {
+    const ava = document.createElement('div');
+    ava.className = 'ich-ava';
+    ava.innerHTML = '<i class="ti ti-sparkles"></i>';
+    row.appendChild(ava);
+  }
+  const bubble = document.createElement('div');
+  bubble.className = 'ich-bubble';
+  bubble.innerHTML = '<div class="ich-text">' + _ideaFormat(text) + '</div>' +
+    (when ? '<div class="ich-time">' + escapeHtml(_ideasWhen(when)) + '</div>' : '');
+  row.appendChild(bubble);
+  feed.appendChild(row);
+  _ideasScroll();
+  return bubble.querySelector('.ich-text');
+}
+
+function _ideaAddSpec(spec) {
+  const feed = document.getElementById('ideas-feed');
+  if (!feed) return;
+  const box = document.createElement('div');
+  box.className = 'ich-spec';
+  box.innerHTML =
+    '<div class="ich-spec-hd"><i class="ti ti-file-text"></i> Техническое задание</div>' +
+    '<div class="ich-spec-body">' + _ideaFormat(spec) + '</div>';
+  feed.appendChild(box);
+  _ideasScroll();
+}
+
+function _ideasScroll() {
+  const feed = document.getElementById('ideas-feed');
+  if (feed) feed.scrollTop = feed.scrollHeight;
+}
+
+function ideasGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+}
+
+function ideasKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ideaSend(); }
 }
 
 async function ideaSend() {
@@ -1801,91 +2032,163 @@ async function ideaSend() {
   const text = (inp.value || '').trim();
   if (!text) return;
   inp.value = '';
+  ideasGrow(inp);
   _ideaAddMsg('user', text);
-  const ph = _ideaAddMsg('assistant', '…');
+  const ph = _ideaAddMsg('assistant', 'думаю…');
   try {
     let d;
-    if (!state.ideaThreadId) {
+    if (!state._ideas.current) {
       const r = await apiPost('/api/ideas', { text });
       d = (r && r.data) || {};
-      if (d.thread_id) state.ideaThreadId = d.thread_id;
+      if (!r.ok) { if (ph) ph.textContent = d.message || 'Не отправилось'; return; }
+      if (d.thread_id) state._ideas.current = d.thread_id;
     } else {
-      const r = await apiPost('/api/ideas/' + state.ideaThreadId + '/message', { text });
+      const r = await apiPost('/api/ideas/' + state._ideas.current + '/message', { text });
       d = (r && r.data) || {};
+      if (!r.ok) { if (ph) ph.textContent = d.message || 'Не отправилось'; return; }
     }
-    if (ph) ph.textContent = d.reply || 'Принял.';
-    const cb = document.getElementById('idea-compile-btn');
-    if (cb && state.ideaThreadId) cb.style.display = '';
+    if (ph) ph.innerHTML = _ideaFormat(d.reply || 'Принял.');
+    _ideasScroll();
+    const th = state._ideas.thread || {};
+    _ideasRenderActions({ id: state._ideas.current, status: th.status || 'open',
+                          spec_text: th.spec_text });
+    ideasLoadListSilent();
   } catch (e) {
     if (ph) ph.textContent = 'Ошибка связи';
   }
 }
 
 async function ideaCompile() {
-  if (!state.ideaThreadId) { showToast('Сначала опиши идею', 'error'); return; }
+  const id = state._ideas.current;
+  if (!id) { showToast('Сначала опишите идею', 'error'); return; }
   showToast('Собираю ТЗ…', 'info');
-  try {
-    const r = await apiPost('/api/ideas/' + state.ideaThreadId + '/compile', {});
-    const d = (r && r.data) || {};
-    if (!r.ok || !d.ok) { showToast((d && d.message) || 'Не удалось собрать ТЗ', 'error'); return; }
-    _ideaAddMsg('assistant', 'Готово! Заявка оформлена и передана разработчику. Спасибо 🙌');
-    if (d.spec) _ideaAddMsg('assistant', d.spec);
-    const cb = document.getElementById('idea-compile-btn');
-    if (cb) cb.style.display = 'none';
-    showToast('ТЗ сохранено', 'success');
-  } catch (e) { showToast('Ошибка', 'error'); }
-}
-
-async function ideasShowList() {
-  const body = document.getElementById('ideas-body');
-  const foot = document.getElementById('ideas-foot');
-  if (!body) return;
-  if (foot) foot.innerHTML = '';
-  body.innerHTML = '<div style="color:var(--text-light);font-size:13px;">Загружаем…</div>';
-  let d;
-  try { d = await apiGet('/api/ideas'); } catch (e) { body.innerHTML = '<div style="color:var(--text-light);">Не удалось загрузить</div>'; return; }
-  const ideas = (d && d.ideas) || [];
-  const isDir = !!(d && d.is_director);
-  state._ideasCache = ideas;
-  if (!ideas.length) { body.innerHTML = '<div style="color:var(--text-light);font-size:13px;">Заявок пока нет. Нажми «Предложить» и опиши идею.</div>'; return; }
-  let h = '';
-  if (isDir) {
-    const ready = ideas.filter(x => x.status === 'ready' && x.spec_text);
-    if (ready.length) h += '<button class="btn btn-secondary btn-small" style="margin-bottom:10px;" onclick="ideasCopyAll()"><i class="ti ti-copy"></i> Скопировать все новые ТЗ (' + ready.length + ')</button>';
-  }
-  const stRu = { open: 'в работе с ИИ', ready: 'ТЗ готово', taken: 'взято в работу', done: 'сделано' };
-  ideas.forEach(it => {
-    h += '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">' +
-      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">' +
-        '<div style="font-weight:600;font-size:13.5px;">' + escapeHtml(it.title || 'Идея') + '</div>' +
-        '<span style="font-size:11px;color:var(--text-light);white-space:nowrap;">' + escapeHtml(stRu[it.status] || it.status) + '</span>' +
-      '</div>' +
-      '<div style="font-size:11.5px;color:var(--text-light);">' + escapeHtml(it.author_name || '') + '</div>' +
-      (it.spec_text
-        ? '<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:12.5px;color:var(--brand);">Показать ТЗ</summary>' +
-            '<pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;background:#F8FAFC;border-radius:8px;padding:8px;margin-top:6px;">' + escapeHtml(it.spec_text) + '</pre>' +
-            '<button class="btn btn-secondary btn-small" style="margin-top:6px;" onclick="ideaCopySpec(' + it.id + ')"><i class="ti ti-copy"></i> Скопировать ТЗ</button>' +
-          '</details>'
-        : '') +
-    '</div>';
+  const r = await apiPost('/api/ideas/' + id + '/compile', {});
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не удалось собрать ТЗ', 'error'); return; }
+  state._ideas.thread = Object.assign(state._ideas.thread || {}, {
+    id: id, status: 'ready', spec_text: d.spec,
   });
-  body.innerHTML = h;
+  _ideaAddSpec(d.spec || '');
+  _ideasRenderActions(state._ideas.thread);
+  ideasLoadListSilent();
+  showToast('ТЗ готово — проверьте и отправьте директору', 'success');
 }
 
-function _ideaClipboard(txt) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(txt).then(() => showToast('Скопировано')).catch(() => showToast('Скопируйте вручную'));
-  } else { showToast('Скопируйте вручную'); }
+async function ideaSubmit() {
+  const id = state._ideas.current;
+  if (!id) return;
+  const r = await apiPost('/api/ideas/' + id + '/submit', {});
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не ушло', 'error'); return; }
+  state._ideas.thread = Object.assign(state._ideas.thread || {}, { status: 'sent' });
+  _ideasRenderActions(state._ideas.thread);
+  ideasLoadListSilent();
+  showToast('ТЗ у директора', 'success');
 }
-function ideaCopySpec(id) {
-  const it = (state._ideasCache || []).find(x => x.id === id);
-  if (it && it.spec_text) _ideaClipboard(it.spec_text);
+
+// ============ Решение директора ============
+// Эти две функции зовёт и раздел «Идеи», и карточка ТЗ в ленте разработки.
+
+async function ideaImplement(id, comment) {
+  const note = comment !== undefined ? comment
+    : prompt('Правка к ТЗ перед внедрением (можно пусто):', '');
+  if (note === null) return;
+  const r = await apiPost('/api/ideas/' + id + '/implement', { comment: note || '' });
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не получилось', 'error'); return; }
+  showToast('Задача в ленте разработки', 'success');
+  if (state._ideas && state._ideas.current === id) ideasOpen(id);
+  const card = document.querySelector('[data-idea-card="' + id + '"]');
+  if (card) card.innerHTML = '<span class="ich-note"><i class="ti ti-rocket"></i> Внедряем — задача в очереди</span>';
 }
-function ideasCopyAll() {
-  const ready = (state._ideasCache || []).filter(x => x.status === 'ready' && x.spec_text);
-  if (!ready.length) { showToast('Нет готовых ТЗ', 'info'); return; }
-  const txt = ready.map((x, i) => '### Идея ' + (i + 1) + ' — ' + (x.title || '') + ' (автор: ' + (x.author_name || '') + ')\n' + x.spec_text).join('\n\n---\n\n');
-  _ideaClipboard(txt);
+
+async function ideaDecline(id) {
+  const note = prompt('Почему не сейчас? (увидит автор идеи)', '');
+  if (note === null) return;
+  const r = await apiPost('/api/ideas/' + id + '/decline', { note: note || '' });
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не получилось', 'error'); return; }
+  showToast('Автору написали', 'success');
+  if (state._ideas && state._ideas.current === id) ideasOpen(id);
+  const card = document.querySelector('[data-idea-card="' + id + '"]');
+  if (card) card.innerHTML = '<span class="ich-note"><i class="ti ti-clock-pause"></i> Отложено</span>';
+}
+
+// ============ Пароль и доступ (директор) ============
+
+async function ideasAdminDialog() {
+  let d;
+  try { d = await apiGet('/api/ideas/access'); } catch (e) { showToast('Только директору', 'error'); return; }
+  let m = document.getElementById('ideas-admin-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'ideas-admin-modal';
+    m.className = 'modal-overlay';
+    m.onclick = function (e) { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  const users = (d && d.users) || [];
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;width:100%;">' +
+      '<div class="modal-header"><h3><i class="ti ti-key"></i> Доступ к чату идей</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'ideas-admin-modal\').classList.remove(\'visible\')">' +
+        '<i class="ti ti-x"></i></button></div>' +
+      '<div style="padding:14px 16px;">' +
+        '<label class="form-label">Пароль (его вы выдаёте сотрудникам)</label>' +
+        // значение ставим кодом ниже, а не в разметке: escapeHtml не трогает
+        // кавычки, и пароль с кавычкой сломал бы атрибут
+        '<input type="text" id="idea-admin-pass" class="form-input" placeholder="например, атом-идеи">' +
+        '<label style="display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px;">' +
+          '<input type="checkbox" id="idea-admin-reset"> Выгнать всех, кто вошёл по старому паролю' +
+        '</label>' +
+        '<button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="ideasSavePassword()">' +
+          '<i class="ti ti-check"></i> Сохранить</button>' +
+        '<div class="form-label" style="margin-top:16px;">Уже вошли (' + users.length + ')</div>' +
+        (users.length
+          ? '<div class="ich-access">' + users.map(function (u) {
+              return '<div class="ich-acc-row"><span>' + escapeHtml(u.name || ('чат ' + u.chat_id)) + '</span>' +
+                '<button class="btn btn-secondary btn-small" onclick="ideasRevoke(' + u.chat_id + ')">' +
+                '<i class="ti ti-user-off"></i> Убрать</button></div>';
+            }).join('') + '</div>'
+          : '<div style="font-size:13px;color:var(--text-light);">Пока никто.</div>') +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-top:12px;">' +
+          'Выездным монтажникам раздел закрыт всегда, даже с паролем.</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  const pass = document.getElementById('idea-admin-pass');
+  if (pass) pass.value = (d && d.password) || '';
+}
+
+async function ideasSavePassword() {
+  const inp = document.getElementById('idea-admin-pass');
+  const reset = document.getElementById('idea-admin-reset');
+  if (!inp) return;
+  const password = (inp.value || '').trim();
+  if (password.length < 4) { showToast('Пароль — минимум 4 знака', 'error'); return; }
+  const r = await apiPost('/api/ideas/access', { password: password, reset: !!(reset && reset.checked) });
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не сохранилось', 'error'); return; }
+  showToast('Пароль сохранён', 'success');
+  const m = document.getElementById('ideas-admin-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function ideasRevoke(chatId) {
+  try { await apiDelete('/api/ideas/access/' + chatId); } catch (e) { showToast('Не получилось', 'error'); return; }
+  showToast('Доступ убран', 'success');
+  ideasAdminDialog();
+}
+
+// Счётчик на пункте меню: сколько ТЗ ждут решения директора.
+async function ideasRefreshBadge() {
+  const badge = document.getElementById('ideas-badge');
+  if (!badge) return;
+  let d;
+  try { d = await apiGet('/api/ideas?status=sent'); } catch (e) { return; }
+  const n = ((d && d.ideas) || []).length;
+  badge.textContent = n ? String(n) : '';
+  badge.style.display = n ? '' : 'none';
 }
 
 function openHelpArticle(articleId) {

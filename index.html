@@ -263,6 +263,12 @@
         </a>
         <!-- v2.45.39: пункт «Калькулятор холода» убран с главного сайдбара
              (остался в Продажах). -->
+        <!-- Идеи: чат сотрудника с Клодом. Виден всем — вход по паролю от директора,
+             монтажникам закрыто на бэкенде. Клод здесь только смотрит. -->
+        <button class="nav-item" id="sb-ideas" data-nav="ideas" onclick="selectSidebarItem('ideas')">
+          <i class="ti ti-bulb"></i><span>Идеи</span>
+          <span class="nav-badge" id="ideas-badge" style="display:none;"></span>
+        </button>
         <!-- Чат с Клавой: задачи уходят агенту на сервер .30. Личный, показ в app-1.js. -->
         <button class="nav-item" id="sb-devchat" data-nav="devchat" onclick="selectSidebarItem('devchat')" style="display:none;">
           <i class="ti ti-message-code"></i><span>Клава</span>
@@ -903,6 +909,33 @@
               По распознаванию лиц (камера обходит офис ~каждую минуту, следит за дверью). Точность зависит от того, кто внесён в базу.
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- ============ ИДЕИ: ЧАТ СОТРУДНИКА С КЛОДОМ ============ -->
+      <!-- Клод здесь только СМОТРИТ: код не правит, договоры и суммы не видит.
+           Вместе с сотрудником доводит идею до ТЗ, готовое ТЗ уезжает директору
+           в ленту разработки предложением — внедрять или нет, решает он. -->
+      <div class="screen" data-screen="ideas" data-section="home">
+        <div class="page-header">
+          <div class="page-header-title">
+            <button class="back-btn" onclick="selectSidebarItem('home-dashboard')" title="Назад"><i class="ti ti-arrow-left"></i></button>
+            <button class="back-btn ich-list-btn" onclick="ideasToggleList()" title="Мои идеи" aria-label="Мои идеи">
+              <i class="ti ti-messages"></i>
+            </button>
+            <div>
+              <h1>Идеи</h1>
+              <div class="page-subtitle">Что улучшить в программе — расскажите Клоду</div>
+            </div>
+          </div>
+          <div class="ich-hd-right">
+            <button class="icon-btn" id="ideas-key-btn" onclick="ideasAdminDialog()"
+                    style="display:none;" title="Пароль и доступ"><i class="ti ti-key"></i></button>
+            <button class="icon-btn" onclick="loadIdeas()" title="Обновить"><i class="ti ti-refresh"></i></button>
+          </div>
+        </div>
+        <div class="content-inner" id="ideas-body">
+          <div class="loading-block">Загружаем…</div>
         </div>
       </div>
 
