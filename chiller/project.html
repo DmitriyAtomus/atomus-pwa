@@ -78,6 +78,13 @@ header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px
 .ci .k.tg{color:var(--faint)}
 .ci .k.one{-webkit-line-clamp:1}
 .ci .k.tg.full{-webkit-line-clamp:7}
+/* v2.45.1024: мощность бейджем, теги чипами */
+.ci .meta{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--faint);margin-top:1px;min-width:0}
+.ci .meta .kwb{font-style:normal;font-weight:600;font-size:9.5px;color:var(--ice);
+  background:#12294a;border:1px solid var(--line2);border-radius:8px;padding:0 6px;white-space:nowrap}
+.ci .tgs{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
+.ci .tgs i{font-style:normal;font-size:9px;color:var(--dim);border:1px solid var(--line2);
+  border-radius:8px;padding:0 5px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .ci .info{margin-left:auto;flex-shrink:0;color:var(--dim);font-size:13px;padding:2px 5px;border-radius:6px}
 .ci .info:hover{color:var(--ice);background:#12294a}
 .note{padding:8px 12px;font-size:10.5px;color:var(--faint);border-top:1px solid var(--line);line-height:1.5}
@@ -3568,17 +3575,20 @@ $('#mdz').onclick=e=>{if(e.target.id==='mdz')closeDesc();};
 $('#bInfo').onclick=()=>sel&&openDesc(sel.d);
 /* строка списка базы: артикул, бренд, заводское описание и характеристики */
 function catRow(d,add,tk){
-  /* у фильтра заводское описание длинное и почти целиком повторяет теги, а
-     киловатты по хладагентам из-за него не влезали — режем описание в одну
-     строку, а подпись с киловаттами показываем целиком */
+  /* v2.45.1024: характеристики читаемо — мощность голубым бейджем у бренда,
+     остальные теги чипами, LOD ушёл в карточку ⓘ. У фильтра заводское
+     описание длинное и повторяет теги — режем его в одну строку, а теги
+     показываем целиком */
   const filt=!!(d.pick&&d.pick.k==='filt');
   const kind=filt?String(d.kind||'').split(',')[0]:d.kind;
+  const kwTag=(d.tags||[]).find(t=>/квт/i.test(t));
+  const tags=(d.tags||[]).filter(t=>t!==kwTag).slice(0,filt?9:4);
   return '<div class="ci" data-id="'+esc(d.id)+'">'+
     '<img loading="lazy" data-th="'+esc(GEOMS[d.g].f)+'">'+
     '<div class="t"><b>'+hlt(d.name,tk)+'</b>'+
-    '<span>'+hlt(d.brand,tk)+(d.lod?' · LOD '+d.lod:'')+'</span>'+
+    '<span class="meta">'+hlt(d.brand,tk)+(kwTag?'<i class="kwb">'+hlt(kwTag,tk)+'</i>':'')+'</span>'+
     (kind?'<span class="k'+(filt?' one':'')+'">'+hlt(kind,tk)+'</span>':'')+
-    (tagLine(d)?'<span class="k tg'+(filt?' full':'')+'">'+hlt(tagLine(d),tk)+'</span>':'')+
+    (tags.length?'<span class="tgs">'+tags.map(t=>'<i>'+hlt(t,tk)+'</i>').join('')+'</span>':'')+
     '</div>'+
     '<span class="info" title="Описание позиции">ⓘ</span>'+
     '<span class="add">'+add+'</span></div>';

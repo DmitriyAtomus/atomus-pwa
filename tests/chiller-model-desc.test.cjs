@@ -87,7 +87,8 @@ test('строка списка базы открывается с описан�
   const row = section('function catRow(d,add', 'function bindInfo(box,acts)');
   // hlt — то же экранирование, плюс <mark> на найденных словах (v2.46.003)
   assert.match(row, /class="k'\+\(filt\?' one':''\)\+'">'\+hlt\(kind,tk\)/);        // заводское наименование
-  assert.match(row, /class="k tg'\+\(filt\?' full':''\)\+'">'\+hlt\(tagLine\(d\),tk\)/);  // характеристики
+  assert.match(row, /class="tgs">'\+tags\.map\(t=>'<i>'\+hlt\(t,tk\)\+'<\/i>'\)/);  // теги — чипами
+  assert.match(row, /class="kwb">'\+hlt\(kwTag,tk\)/);                              // мощность — бейджем
   assert.match(row, /class="info" title="Описание позиции">ⓘ/);
   // один и тот же ряд и в подборе на схеме, и в базе компоновки
   assert.match(page, /rest\.map\(d=>catRow\(d,'→',tk\)\)/);
