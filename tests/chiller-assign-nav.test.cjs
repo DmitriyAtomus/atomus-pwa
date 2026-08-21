@@ -28,11 +28,12 @@ function sandbox(SECTIONS) {
 
 const FAKE_SECTIONS = [
   ['compressors', 'Компрессоры', [['scroll', 'Спиральные'], ['piston', 'Поршневые']]],
-  ['heat_exchanger', 'Теплообменники', [['cond', 'Конденсаторы воздушные'], ['plate', 'Пластинчатые (ПТО)']]],
+  ['heat_exchanger', 'Теплообменники', [['cond', 'Конденсаторы воздушные'], ['plate', 'Пластинчатые (ПТО)'], ['fan', 'Вентиляторы']]],
   ['vessels', 'Аппараты', [['recv', 'Ресиверы'], ['filt', 'Фильтры-осушители'], ['sep', 'Отделители жидкости']]],
   ['valves', 'Арматура', [['trv', 'ТРВ'], ['sol', 'Соленоидные клапаны'], ['serv', 'Сервисные'], ['check', 'Обратные клапаны']]],
   ['auto', 'Автоматика', [['psw', 'Реле давления'], ['gauge', 'Манометры'], ['flow', 'Реле потока']]],
   ['pumps', 'Насосы', []],
+  ['heat', 'Электронагрев', [['block', 'Блоки нагревателей'], ['elem', 'ТЭНы и термостаты']]],
 ];
 
 test('категория узла резолвится по именам разделов, а не по id', () => {
@@ -60,6 +61,32 @@ test('у каждого из 24 узлов схемы задана катего�
     const row = nodes.slice(nodes.indexOf("{k:'" + k + "'"));
     assert.match(row.slice(0, 200), / cat:\[/, 'нет категории у узла ' + k);
   }
+});
+
+// v2.45.1020: наш блок нагревателя AG-10.000.000 — это не нагреватель картера
+// и не вентилятор; ни один узел схемы не должен приводить в «Блоки нагревателей».
+test('ЕК1 и М1 не приводят в «Блоки нагревателей»', () => {
+  const { asgResolveCat } = sandbox(FAKE_SECTIONS);
+  const nodes = slice('const SCH_NODES=[', 'const SCH_DESC={');
+  const catOf = (k) => {
+    const row = nodes.slice(nodes.indexOf("{k:'" + k + "'"));
+    const m = /cat:\[([^\]]*)\]/.exec(row.slice(0, 300));
+    return eval('[' + m[1] + ']');
+  };
+  assert.deepEqual(asgResolveCat({ cat: catOf('EK1') }), { sec: 'heat', sub: 'elem' });
+  assert.deepEqual(asgResolveCat({ cat: catOf('M1') }), { sec: 'heat_exchanger', sub: 'fan' });
+  const keys = nodes.match(/\{k:'(\w+)'/g).map((m) => m.slice(4, -1));
+  for (const k of keys) {
+    const r = asgResolveCat({ cat: catOf(k) });
+    assert.notDeepEqual(r, { sec: 'heat', sub: 'block' }, 'узел ' + k + ' зовёт блок нагревателя');
+    assert.notDeepEqual(r, { sec: 'heat', sub: null }, 'узел ' + k + ' валится во весь «Электронагрев»');
+  }
+});
+
+test('пустая категория узла говорит об этом прямо', () => {
+  const dl = slice('function drawAsgList()', "$('#asgQ')&&");
+  assert.match(dl, /emptyCat/);
+  assert.match(dl, /В базе 3D пока нет позиций/);
 });
 
 test('мощность читается из тегов вида «10,2 кВт»', () => {
