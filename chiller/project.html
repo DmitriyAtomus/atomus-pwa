@@ -300,6 +300,9 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 .asg-grp{font-size:10px;letter-spacing:.5px;color:var(--faint);padding:6px 6px 0;font-weight:700}
 .asg-keys{padding:6px 14px;border-top:1px solid var(--line);font-size:10px;color:var(--faint);display:flex;gap:12px;flex-wrap:wrap}
 .asg-keys b{color:var(--dim);font-weight:600;background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:0 5px}
+/* v2.46.017: назначенное само встаёт в сцену — выключатель тут же, у подсказок */
+.asg-auto{cursor:pointer;user-select:none;color:var(--dim);border:1px solid var(--line2);border-radius:10px;padding:1px 8px;background:var(--panel2);white-space:nowrap}
+.asg-auto.on{color:#9ec9ad;border-color:#3f6b4e;background:rgba(72,140,96,.12)}
 /* v2.45.1025: каталог номенклатуры во весь экран */
 .ph #nomOpen{float:right;font-size:10px;font-weight:600;color:var(--ice);cursor:pointer;
   border:1px solid var(--line2);border-radius:9px;padding:1px 8px;margin-top:-2px}
@@ -960,7 +963,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
   <div class="search" style="margin:8px 10px 4px"><span style="color:var(--faint)">⌕</span><input id="asgQ" placeholder="поиск по базе…"><span class="asg-sort" id="asgSort"></span><span class="asg-scope" id="asgScope"></span></div>
   <div class="asg-unset" id="asgUnset" style="display:none">✕ Убрать назначение</div>
   <div class="asg-list" id="asgList"></div>
-  <div class="asg-keys"><span><b>Enter</b> — назначить верхнюю</span><span><b>←</b> <b>→</b> — соседний узел</span><span><b>Tab</b> — следующий неназначенный</span><span><b>Esc</b> — закрыть</span></div>
+  <div class="asg-keys"><span class="asg-auto" id="asgAuto" title="Назначенная модель сразу встаёт в машину"></span><span><b>Enter</b> — назначить верхнюю</span><span><b>←</b> <b>→</b> — соседний узел</span><span><b>Tab</b> — следующий неназначенный</span><span><b>Esc</b> — закрыть</span></div>
 </div></div>
 <div id="nom">
   <div class="nom-top">
@@ -1591,20 +1594,81 @@ function autoLayout(){
   toast('Расставлено по функциям: '+roles.map(r=>ROLE_NAME[r]||r).join(', '));
   }finally{histEnd(h);}
 }
-/* «Собрать по схеме»: всё, что назначено узлам контура, встаёт в сцену */
+/* ═══ v2.46.017: назначил на схеме — деталь сразу в машине ═══
+   Раньше после подбора модели надо было идти в «Компоновку» и жать «Собрать
+   по схеме». Теперь узел встаёт в сцену сам, на своё место по функции
+   (компрессор на дно, конденсатор под крышку, бак — рядом с корпусом), а в
+   проекте помнит, от какой позиции схемы он пришёл (`sch`). Отсюда всё
+   остальное: сменил модель — старая деталь ушла, новая встала; снял
+   назначение — деталь убралась; поставил её руками раньше — берём ту,
+   что уже стоит, а не плодим дубль. */
+let SCHAUTO=true;
+const SCHAUTO_KEY='chil.schauto';
+try{const v=localStorage.getItem(SCHAUTO_KEY);if(v!==null)SCHAUTO=v==='1';}catch(e){}
+const schItem=k=>placed.find(p=>p.sch===k);
+function schAutoBtn(){
+  const b=$('#asgAuto');if(!b)return;
+  b.classList.toggle('on',SCHAUTO);
+  b.innerHTML=(SCHAUTO?'◉':'○')+' ставить в сцену сразу';
+  b.title=SCHAUTO?'Назначенная модель сразу встаёт в машину, возле корпуса'
+                 :'Модель только назначается; в сцену — кнопкой «Собрать по схеме»';
+}
+function schAutoToggle(){
+  SCHAUTO=!SCHAUTO;
+  try{localStorage.setItem(SCHAUTO_KEY,SCHAUTO?'1':'0');}catch(e){}
+  schAutoBtn();
+  toast(SCHAUTO?'Назначенное будет вставать в сцену сразу'
+               :'Назначенное в сцену само не встаёт — кнопка «Собрать по схеме»');
+}
+/* деталь этой модели уже стоит в сцене и ни к какой позиции не привязана —
+   привязываем её, а не ставим вторую такую же */
+function schAdopt(k,id){
+  const free=placed.find(p=>p.id===id&&!p.sch);
+  if(free){free.sch=k;return free;}
+  return null;
+}
+/* поставить в сцену то, что назначено позиции k */
+async function schPlace(k,silent){
+  const a=schemaData[k];
+  if(!a||!a.id)return null;
+  const d=DATA.find(x=>x.id===a.id&&x.ready);
+  if(!d){if(!silent)toast('Модель ещё не готова к постановке в сцену: '+a.name);return null;}
+  const old=schItem(k);
+  if(old&&old.id===a.id)return old;                  // та же модель — она уже стоит
+  if(old)schDrop(k,true);                            // сменили модель — старая уходит
+  const had=schAdopt(k,a.id);
+  if(had){refresh();return had;}
+  const nw=await addItem(d);
+  if(nw)nw.sch=k;
+  return nw;
+}
+/* убрать со сцены деталь позиции k. Закреплённую (📌) не трогаем — её ставили
+   руками и место выбрали сами: только отвязываем от схемы */
+function schDrop(k,quiet){
+  const it=schItem(k);
+  if(!it)return false;
+  if(it.pin){it.sch=null;return false;}
+  if(it._pinBox){scene.remove(it._pinBox);it._pinBox=null;}
+  boltClear(it);
+  placed.forEach(p=>{if(p.link&&p.link.to===it.uid)p.link=null;});
+  scene.remove(it.obj);placed.splice(placed.indexOf(it),1);
+  if(sel===it)select(null);
+  if(!quiet){refresh();save();}
+  return true;
+}
+/* «Собрать по схеме»: всё, что назначено узлам контура, встаёт в сцену.
+   Кнопка осталась для старых проектов и для случая, когда автопостановка
+   выключена: догоняет сцену до схемы одним шагом */
 async function buildFromSchema(){
-  const need=new Map();
-  SCH_NODES.forEach(n=>{const a=schemaData[n.k];
-    if(a&&a.id)need.set(a.id,(need.get(a.id)||0)+1);});
-  if(!need.size){toast('Сначала назначь модели узлам на вкладке «Схема»');return;}
+  const keys=SCH_NODES.filter(n=>schemaData[n.k]&&schemaData[n.k].id).map(n=>n.k);
+  if(!keys.length){toast('Сначала назначь модели узлам на вкладке «Схема»');return;}
   const h=histBegin('сборку по схеме');
   try{
   let added=0;
-  for(const [id,n] of need){
-    const d=DATA.find(x=>x.id===id&&x.ready);
-    if(!d)continue;
-    const have=placed.filter(p=>p.id===id).length;
-    for(let i=have;i<n;i++){if(await addItem(d))added++;}
+  for(const k of keys){
+    const was=placed.length;
+    await schPlace(k,true);
+    if(placed.length>was)added++;
   }
   autoLayout();
   toast(added?('Добавлено по схеме: '+added+' '+plural(added)):'Все назначенные модели уже в сцене');
@@ -1634,7 +1698,7 @@ async function addItem(d,at,rot,tilt,roll){
   obj.position.z=-bb.min.z;                      // низ детали — на пол
   obj.rotation.set(roll||0,tilt||0,rot||0);
   scene.add(obj);
-  const it={uid:uidSeq++,id:d.id,obj,d,pin:false,link:null,off:[],
+  const it={uid:uidSeq++,id:d.id,obj,d,pin:false,link:null,off:[],sch:null,
     zn:geo.userData.zones||[],zm:!!geo.userData.zoneMats};
   placed.push(it);
   if(at){obj.position.x=at.x;obj.position.y=at.y;
@@ -1643,6 +1707,7 @@ async function addItem(d,at,rot,tilt,roll){
   if(at&&at.state){                                  // закрепление, связь и погашенные детали
     if(at.state.pl&&isPipeSeg(it))setPipeLen(it,at.state.pl);   // отрезок трубы своей длины
     it.pin=!!at.state.pin;
+    it.sch=at.state.sch||null;                     // v2.46.017: позиция схемы, откуда деталь
     it.link=at.state.link||null;
     it.off=Array.isArray(at.state.off)?at.state.off.slice():[];
     applyOff(it);pinMark(it);
@@ -3859,6 +3924,7 @@ function projPayload(){
                                              roll:p.link.roll}:null,
                                 tk:isTank(p.d)?p.d.tk:undefined,   // бак: структура и размеры
                                 pl:isPipeSeg(p)?pipeLen(p):undefined,
+                                sch:p.sch||undefined,   // v2.46.017: позиция схемы
                                 off:(p.off&&p.off.length)?p.off:undefined})),
           schema:schemaData};
 }
@@ -3981,7 +4047,7 @@ async function loadProjectData(data){
     if(!d)continue;
     // z, наклона и закрепления в старых проектах нет — там деталь просто стоит на полу
     const it=await addItem(d,{x:s.x,y:s.y,z:s.z,
-      state:{pin:s.pin,off:s.off,link:s.link,pl:s.pl}},s.r,s.t,s.k);
+      state:{pin:s.pin,off:s.off,link:s.link,pl:s.pl,sch:s.sch}},s.r,s.t,s.k);
     if(it&&s.uid)map[s.uid]=it.uid;
   }
   placed.forEach(p=>{if(p.link&&map[p.link.to])p.link={to:map[p.link.to],mount:p.link.mount,
@@ -4799,7 +4865,14 @@ function openAssign(key){
   $('#asgQ').value=cat.sec?'':(nd.hint||'');
   $('#asgSub').textContent=SCH_DESC[key]||'';
   $('#asgUnset').style.display=schemaData[key]?'block':'none';
-  $('#asgUnset').onclick=()=>{pushHist('снятие назначения на схеме');delete schemaData[key];$('#asg').classList.remove('on');renderSchema();save();};
+  $('#asgUnset').onclick=()=>{
+    /* v2.46.017: убрали назначение — деталь этой позиции уходит и из сцены */
+    const h=histBegin('снятие назначения на схеме');
+    let off=false;
+    try{off=schDrop(key,true);delete schemaData[key];}finally{histEnd(h);}
+    $('#asg').classList.remove('on');renderSchema();refresh();save();
+    if(off)toast('Назначение снято — деталь убрана из сцены');};
+  $('#asgAuto').onclick=schAutoToggle;schAutoBtn();
   drawAsgHead();
   drawAsgList();
   $('#asg').classList.add('on');
@@ -4814,13 +4887,22 @@ function drawAsgHead(){
     +'<i>'+(schemaData[n.k]?'●':'○')+'</i>'+esc(n.t)+'</span>').join('');
   document.querySelectorAll('#asgStrip .nd').forEach(el=>el.onclick=()=>openAssign(el.dataset.k));
 }
-function assignTo(d){
-  pushHist('назначение модели на схеме');
-  schemaData[asgKey]={id:d.id,name:(d.brand?d.brand+' ':'')+d.name};
-  renderSchema();save();
-  const cur=SCH_NODES.find(n=>n.k===asgKey);
+async function assignTo(d){
+  /* v2.46.017: назначение и постановка в сцену — один шаг истории (Ctrl+Z
+     отменяет и то и другое разом) */
+  const h=histBegin('назначение модели на схеме');
+  const key=asgKey;
+  let it=null;
+  try{
+    schemaData[key]={id:d.id,name:(d.brand?d.brand+' ':'')+d.name};
+    renderSchema();
+    if(SCHAUTO)it=await schPlace(key);
+    save();
+  }finally{histEnd(h);}
+  const cur=SCH_NODES.find(n=>n.k===key);
   const next=asgNextUn();
-  toast('Назначено: '+d.name+' → '+cur.t+(next?' · дальше: '+SCH_NODES.find(n=>n.k===next).t:' · все узлы назначены'));
+  toast('Назначено: '+d.name+' → '+cur.t+(it?' · встал в сцену':'')
+    +(next?' · дальше: '+SCH_NODES.find(n=>n.k===next).t:' · все узлы назначены'));
   if(next)openAssign(next);
   else $('#asg').classList.remove('on');
 }
