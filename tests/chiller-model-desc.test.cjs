@@ -90,7 +90,7 @@ test('строка списка базы открывается с описан�
   assert.match(row, /class="k tg'\+\(filt\?' full':''\)\+'">'\+hlt\(tagLine\(d\),tk\)/);  // характеристики
   assert.match(row, /class="info" title="Описание позиции">ⓘ/);
   // один и тот же ряд и в подборе на схеме, и в базе компоновки
-  assert.match(page, /\$\('#asgList'\)\.innerHTML=list\.map\(d=>catRow\(d,'→',tk\)\)/);
+  assert.match(page, /rest\.map\(d=>catRow\(d,'→',tk\)\)/);
   assert.match(page, /h\+=part\.map\(d=>catRow\(d,'\+',tk\)\)/);
 });
 
@@ -114,7 +114,7 @@ test('подбор модели открывается с описанием у�
   // описание есть у каждого узла схемы, иначе шапка окажется пустой
   const nodes = section('const SCH_NODES=[', 'const SCH_DESC=')
     .match(/\{k:'([A-Z0-9]+)'/g).map(m => m.slice(4, -1));
-  const desc = section('const SCH_DESC={', 'const SCH_LINES=[');
+  const desc = section('const SCH_DESC={', 'const SCH_SHEET=');
   assert.equal(nodes.length, 24);
   for (const k of nodes) assert.ok(new RegExp('\\n ' + k + ":'").test(desc), 'нет описания узла ' + k);
 });
@@ -140,8 +140,8 @@ test('поиск по базе ищет и по характеристикам �
     name: 'YH69T1-100', brand: 'Invotech', kind: 'Спиральный, A/C и чиллеры', tags: ['R407C'] });
   assert.ok(ctx.hayOf(comp).includes('компрессор'), 'подбор компрессора не найдёт ни одной модели');
   assert.match(page, /SECTIONS=ix\.sections;secNames\(\)/);
-  assert.match(page, /list=list\.filter\(d=>tkMatch\(hayOf\(d\),tk\)\)/);  // подбор на схеме
-  assert.match(page, /l=l\.filter\(d=>tkMatch\(hayOf\(d\),tk\)\)/);        // база компоновки
+  assert.match(page, /if\(tk\.length&&!tkMatch\(hayOf\(d\),tk\)\)return false;/);  // подбор на схеме
+  assert.match(page, /l=l\.filter\(d=>tkMatch\(hayOf\(d\),tk\)\)/);              // база компоновки
 });
 
 test('карточку закрывают Esc, крестик и клик мимо', () => {

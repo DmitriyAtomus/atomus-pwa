@@ -39,7 +39,7 @@ test('строка состояния считает и торчащие нар�
   assert.match(coll, /collSet=new Set\(\);checkOutside\(\);/);
   assert.match(coll, /⚠ вне корпуса: '\+o\+' дет\./);
   assert.match(coll, /✓ пересечений нет, всё в корпусе/);
-  assert.match(coll, /el\.onclick=o\?fitAllInside:null;/);   // строка — она же кнопка
+  assert.match(coll, /el\.onclick=\(o\|\|h\)\?fitAllInside:null;/); // строка — она же кнопка (жмётся и при пересечениях)
   // янтарная подсветка торчащей детали
   assert.match(section('function applyTint(p)', 'function checkOutside()'),
     /outSet\.has\(p\.uid\)\)\{m\.emissive\.setHex\(0xC9A227\)/);

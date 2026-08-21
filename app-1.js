@@ -29,8 +29,8 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.1015";
-const APP_VERSION_DATE = "20.08.2026";
+const APP_VERSION = "v2.45.1023";
+const APP_VERSION_DATE = "21.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -2023,6 +2023,18 @@ let _devChatHost = 'screen';       // где сейчас показываем �
 let _devChatTicking = false;       // тик уже идёт — второй дорисовал бы те же сообщения
 let _devChatDayKey = '';           // день последнего нарисованного сообщения — для разделителя
 
+// ---- v2.45.1015: чат открывается на последних репликах ----
+// Раньше лента запрашивалась «всё, что новее нуля», а сервер отдавал первые 200
+// сообщений. В чате «Чиллера» их 369: открывался кусок недельной давности, через
+// три секунды следующий тик дорисовывал хвост и прыгал вниз — лента на глазах
+// перелистывалась. Теперь при открытии берём ХВОСТ (tail), а история догружается
+// вверх, когда до неё домотали.
+const DEVCHAT_TAIL = 40;           // сколько реплик показываем при открытии
+const DEVCHAT_PAGE = 40;           // сколько добираем за одну догрузку вверх
+let _devChatOldest = 0;            // id самой верхней нарисованной реплики
+let _devChatHasOlder = false;      // выше есть история
+let _devChatOlderBusy = false;     // догрузка уже идёт
+
 // ---- чаты и проекты ----
 // Раньше лента была одна на всё, и темы мешались: разговор про цех продолжался
 // в сессии, где только что правили фронт. Теперь у каждого чата своя сессия
@@ -2188,6 +2200,64 @@ function _devChatStickBottom(ms) {
 function _devChatStickStop() {
   _devChatStickUntil = 0;
   if (_devChatStickTimer) { clearInterval(_devChatStickTimer); _devChatStickTimer = null; }
+}
+
+// ---- v2.45.1018: чат открывается уже в конце, без пролистывания ----
+// Даже с мгновенным прыжком открытие выглядело как прокрутка: сорок пузырей
+// сначала рисовались видимыми сверху вниз, потом лента скакала в конец, а
+// следом её дёргали дорисовка текста и картинки. Делаем как терминал в VS Code:
+// пока лента «усаживается», она невидима — показываем её уже стоящей внизу.
+let _devChatSettleTimer = null;
+
+function _devChatSettleStart(feed) {
+  feed = feed || _devChatEl('feed');
+  if (!feed) return;
+  feed.classList.add('is-settling');
+  // страховка: что бы ни случилось дальше, лента не останется невидимой
+  if (_devChatSettleTimer) clearTimeout(_devChatSettleTimer);
+  _devChatSettleTimer = setTimeout(function () { _devChatSettleShow(feed); }, 1200);
+}
+
+function _devChatSettleShow(feed) {
+  if (_devChatSettleTimer) { clearTimeout(_devChatSettleTimer); _devChatSettleTimer = null; }
+  feed = feed || _devChatEl('feed');
+  if (feed) feed.classList.remove('is-settling');
+}
+
+// Ждём, пока лента дорастёт до финальной высоты: кадр вёрстки, затем картинки
+// (они едут отдельным запросом под токеном). Дольше 700 мс не ждём — лучше
+// показать чат и доскроллить липучкой, чем держать пустой экран.
+function _devChatSettleEnd(feed) {
+  feed = feed || _devChatEl('feed');
+  if (!feed) return;
+  const done = function () {
+    const f = _devChatEl('feed');
+    if (!f) return;
+    _devChatToBottom(f, false);
+    _devChatSettleShow(f);
+  };
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      const f = _devChatEl('feed');
+      if (!f) { _devChatSettleShow(feed); return; }
+      _devChatToBottom(f, false);
+      const imgs = Array.prototype.slice.call(f.querySelectorAll('img')).filter(function (im) {
+        return !im.complete;
+      });
+      if (!imgs.length) { done(); return; }
+      let left = imgs.length, fired = false;
+      const tick = function () {
+        if (fired) return;
+        if (--left > 0) return;
+        fired = true; done();
+      };
+      imgs.forEach(function (im) {
+        im.addEventListener('load', tick, { once: true });
+        im.addEventListener('error', tick, { once: true });
+      });
+      setTimeout(function () { if (!fired) { fired = true; done(); } }, 700);
+    });
+  });
 }
 
 const _DEVCHAT_STATUS = {
@@ -2405,6 +2475,9 @@ function _devChatRender(msg) {
   const wrap = document.createElement('div');
   wrap.className = 'dchat-row' + (mine ? ' is-mine' : '');
   wrap.setAttribute('data-msg-id', msg.id);
+  // по времени пересобираются разделители дней: сообщения приезжают и сверху
+  // (догрузка истории), и снизу, одним курсором дня уже не обойтись
+  wrap.setAttribute('data-ts', msg.ts || '');
 
   // Ответ Клавы подписан аватаром — в длинной ленте сразу видно, где чья реплика.
   if (!mine) {
@@ -2515,6 +2588,23 @@ function _devChatGroupRow(row) {
   if (!prev || !prev.classList.contains('dchat-row')) return;
   if (prev.classList.contains('is-mine') !== row.classList.contains('is-mine')) return;
   row.classList.add('is-cont');
+}
+
+// Разделители дней пересобираем по всей ленте: догрузка истории вставляет
+// сообщения ВЫШЕ уже нарисованных, и вести один курсор дня стало нечестно —
+// в середине ленты появлялось второе «Сегодня».
+function _devChatSyncDays(feed) {
+  if (!feed) return;
+  feed.querySelectorAll('.dchat-day').forEach(function (el) { el.remove(); });
+  let key = '';
+  feed.querySelectorAll('.dchat-row[data-ts]').forEach(function (row) {
+    const day = _devChatDay(row.getAttribute('data-ts'));
+    if (day.key && day.key !== key) {
+      feed.insertBefore(_devChatDayRow(day.label), row);
+      key = day.key;
+    }
+  });
+  _devChatDayKey = key;
 }
 
 // Разделитель дня вставляется перед первым сообщением новых суток.
@@ -2665,12 +2755,16 @@ async function _devChatTick() {
 async function _devChatTickInner(feed) {
   let data;
   if (!_devChatThreadId) return;      // список чатов ещё не пришёл
+  const first = _devChatSince === 0;   // переписка рисуется с нуля: открыли чат
   try {
     data = await apiGet(_devChatApi('/messages') + '?since_id=' + _devChatSince +
-                        '&thread_id=' + _devChatThreadId);
+                        '&thread_id=' + _devChatThreadId +
+                        // открытие — только хвост ленты, история догрузится вверх
+                        (first ? '&tail=' + DEVCHAT_TAIL : ''));
   } catch (e) {
     // 403 здесь означает «лента не твоя», а не обрыв связи — писать про связь
     // в этом случае значит отправить искать проблему не там
+    _devChatSettleShow(feed);
     const denied = String(e && e.message || '').indexOf('403') >= 0;
     _devChatSetStatus(denied ? 'Чат доступен только владельцу' : 'Нет связи с бэкендом', 'off');
     if (denied) {
@@ -2681,30 +2775,36 @@ async function _devChatTickInner(feed) {
     return;
   }
   const msgs = (data && data.messages) || [];
-  const first = _devChatSince === 0;   // переписка рисуется с нуля: открыли чат
   if (first) {
+    // v2.45.1018: пока рисуем хвост переписки — лента невидима, показываем её
+    // уже стоящей на последнем сообщении (см. _devChatSettleEnd)
+    if (msgs.length) _devChatSettleStart(feed);
     feed.innerHTML = msgs.length ? '' : _devChatEmptyHtml();
     _devChatDayKey = '';
+    _devChatOldest = msgs.length ? msgs[0].id : 0;
+    _devChatHasOlder = !!(data && data.has_older);
   }
 
   const nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 120;
+  let added = 0;
   msgs.forEach(function (m) {
     if (!feed.querySelector('[data-msg-id="' + m.id + '"]')) {
-      const day = _devChatDay(m.ts);
-      if (day.key && day.key !== _devChatDayKey) {
-        feed.appendChild(_devChatDayRow(day.label));
-        _devChatDayKey = day.key;
-      }
       const row = _devChatRender(m);
+      // первая пачка появляется вся разом — гасим анимацию въезда, иначе
+      // открытие чата выглядит как рябь из сорока прилетающих пузырей
+      if (first) row.classList.add('no-anim');
       feed.appendChild(row);
       _devChatGroupRow(row);
+      added++;
     }
     if (m.id > _devChatSince) _devChatSince = m.id;
   });
+  if (added) _devChatSyncDays(feed);
+  if (first) _devChatOlderBtn(feed);
   // v2.45.978: открыли чат — прыгаем в конец мгновенно и придерживаем низ, пока
   // едут картинки и доверстывается текст. Новое сообщение в открытой ленте —
   // короткая липучка: плавная прокрутка тут успевала оборваться на полпути.
-  if (msgs.length && first) _devChatStickBottom(2500);
+  if (msgs.length && first) { _devChatStickBottom(2500); _devChatSettleEnd(feed); }
   else if (msgs.length && nearBottom) _devChatStickBottom(900);
 
   await _devChatRefreshStatuses();
@@ -2849,10 +2949,86 @@ function devChatJump() {
   devChatOnScroll();
 }
 
+// Шапка ленты: «показать раньше». Появляется, только если выше правда есть
+// история — в коротком чате наверху ничего лишнего не висит.
+function _devChatOlderBtn(feed) {
+  feed = feed || _devChatEl('feed');
+  if (!feed) return;
+  let btn = feed.querySelector('.dchat-older');
+  if (!_devChatHasOlder) { if (btn) btn.remove(); return; }
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dchat-older';
+    btn.onclick = function () { devChatLoadOlder(); };
+  }
+  btn.innerHTML = _devChatOlderBusy
+    ? '<i class="ti ti-loader-2"></i>Загружаю…'
+    : '<i class="ti ti-arrow-up"></i>Показать раньше';
+  btn.disabled = _devChatOlderBusy;
+  if (feed.firstChild !== btn) feed.insertBefore(btn, feed.firstChild);
+}
+
+// Догрузка истории вверх. Главное здесь — не сдвинуть картинку под руками:
+// запоминаем высоту до вставки и возвращаем ту же точку просмотра.
+async function devChatLoadOlder() {
+  const feed = _devChatEl('feed');
+  if (!feed || !_devChatHasOlder || _devChatOlderBusy || !_devChatOldest) return;
+  _devChatOlderBusy = true;
+  _devChatOlderBtn(feed);
+  let data;
+  try {
+    data = await apiGet(_devChatApi('/messages') + '?before_id=' + _devChatOldest +
+                        '&limit=' + DEVCHAT_PAGE + '&thread_id=' + _devChatThreadId);
+  } catch (e) {
+    _devChatOlderBusy = false;
+    _devChatOlderBtn(feed);
+    return;
+  }
+  const msgs = (data && data.messages) || [];
+  const anchorH = feed.scrollHeight;
+  const anchorTop = feed.scrollTop;
+  const frag = document.createDocumentFragment();
+  const rows = [];
+  msgs.forEach(function (m) {
+    if (feed.querySelector('[data-msg-id="' + m.id + '"]')) return;
+    const row = _devChatRender(m);
+    row.classList.add('no-anim');   // история не должна «въезжать»
+    frag.appendChild(row);
+    rows.push(row);
+  });
+  const btn = feed.querySelector('.dchat-older');
+  feed.insertBefore(frag, btn ? btn.nextSibling : feed.firstChild);
+  rows.forEach(_devChatGroupRow);
+  // граница пачки: у первой старой строки соседство сверху изменилось
+  const next = rows.length ? rows[rows.length - 1].nextElementSibling : null;
+  if (next && next.classList.contains('dchat-row')) {
+    next.classList.remove('is-cont');
+    _devChatGroupRow(next);
+  }
+  _devChatSyncDays(feed);
+  if (msgs.length) _devChatOldest = msgs[0].id;
+  _devChatHasOlder = !!(data && data.has_older);
+  _devChatOlderBusy = false;
+  _devChatOlderBtn(feed);
+  // тот же кусок переписки остаётся под курсором: прокручиваем ровно на
+  // высоту вставленного (behavior перебивает scroll-behavior: smooth из CSS)
+  const grew = feed.scrollHeight - anchorH;
+  try { feed.scrollTo({ top: anchorTop + grew, behavior: 'auto' }); }
+  catch (e) { feed.scrollTop = anchorTop + grew; }
+}
+
 // Кнопка «вниз» нужна, только когда лента отмотана от конца.
 function devChatOnScroll() {
   const feed = _devChatEl('feed');
   const btn = document.getElementById('devchat-jump');
+  // домотал до верха — подтягиваем предыдущую страницу истории сам.
+  // Условие «лента вообще прокручивается» важно: пока сообщений меньше экрана,
+  // scrollTop всегда 0, и без него история грузилась бы страница за страницей.
+  if (feed && _devChatHasOlder && !_devChatOlderBusy && feed.scrollTop < 120 &&
+      feed.scrollHeight > feed.clientHeight + 40) {
+    devChatLoadOlder();
+  }
   if (!feed || !btn) return;
   const away = feed.scrollHeight - feed.scrollTop - feed.clientHeight > 160;
   btn.classList.toggle('show', away && _devChatHost === 'screen');
@@ -3769,6 +3945,9 @@ function devChatOpenThread(id) {
   // Лента чужого чата — другая переписка целиком: обнуляем курсор и рисуем с нуля
   _devChatSince = 0;
   _devChatDayKey = '';
+  _devChatOldest = 0;
+  _devChatHasOlder = false;
+  _devChatOlderBusy = false;
   _devChatPending = new Set();
   _devChatResetLive();
   const feed = _devChatEl('feed');
@@ -4002,6 +4181,9 @@ function loadDevChat(host) {
   _devChatHost = host || 'screen';
   _devChatSince = 0;
   _devChatDayKey = '';
+  _devChatOldest = 0;
+  _devChatHasOlder = false;
+  _devChatOlderBusy = false;
   _devChatPending = new Set();
   _devChatResetLive();
   const feed = _devChatEl('feed');
@@ -9536,6 +9718,78 @@ async function setProductionWorkKitStatus(workId, kitStatus) {
 
 // ============ v2.24.0 (Stage 30.0): BOM-блок в модалке деталей ============
 
+// v2.45.1016: блок «дефицита нет» — человеческим языком, с цифрами склада.
+// Разводим четыре разных ситуации, которые раньше показывались одной фразой.
+function renderPkbBomReadyBlock(w) {
+  const qty       = Number(w.qty || 1);
+  const model     = escapeHtml(w.model_name || 'изделие');
+  const bomTotal  = Number(w.bom_total || 0);
+  const fs        = w.finished_stock || null;
+  const free      = fs ? Number(fs.free || 0) : null;
+  const reserved  = fs ? Number(fs.reserved || 0) : null;
+  const total     = fs ? Number(fs.total || 0) : null;
+  const forWhom   = w.contract_number
+    ? ' под договор ' + escapeHtml(String(w.contract_number))
+    : ' (без договора, на склад)';
+
+  const ok   = (t) => '<div class="pkb-bom-note"><i class="ti ti-circle-check" style="color:#0A5B41;"></i> ' + t + '</div>';
+  const info = (t) => '<div class="pkb-bom-note"><i class="ti ti-info-circle"></i> ' + t + '</div>';
+  const wrap = (cls, color, icon, title, body) =>
+    '<div class="pkb-bom-block ' + cls + '">' +
+      '<div class="pkb-bom-title plain" style="color:' + color + ';"><i class="ti ' + icon + '"></i>' + title + '</div>' +
+      body +
+    '</div>';
+
+  // Комплектующие: если сборка уже сделана — они не «лежат на складе», а списаны в неё.
+  const partsLine = w.assembly_built
+    ? info('Комплектующие по техкарте уже списаны на эту сборку — второй раз их брать не нужно.')
+    : ok('Комплектующие по техкарте на складе есть' +
+         (bomTotal ? ': все ' + bomTotal + ' ' + plural(bomTotal, 'позиция', 'позиции', 'позиций') + ' в наличии' : '') +
+         ', дефицита нет.');
+
+  // 1. Сборка по этой работе уже собрана — изготавливать нечего.
+  if (w.assembly_built) {
+    return wrap('no-deficit built', '#0A5B41', 'ti-package-check',
+      'Изделие по этой работе уже собрано',
+      info('Готовая сборка числится на складе' + (w.contract_number ? ' в резерве по договору ' + escapeHtml(String(w.contract_number)) : '') + '. Изготавливать заново не нужно.') +
+      partsLine);
+  }
+
+  // 2. Перекомплектация: корпус уже существует, меняем начинку.
+  if (w.work_type === 'reconfiguration') {
+    return wrap('no-deficit', '#1D5A8A', 'ti-refresh',
+      'Перекомплектация — изделие уже есть, меняем комплектацию',
+      info('Новый корпус не изготавливается: берём готовое изделие и переставляем комплектующие по новой конфигурации.') +
+      ok('Детали для замены на складе есть, дефицита нет.'));
+  }
+
+  // 3. На складе лежат свободные готовые такие же — возможно, собирать не нужно.
+  if (free !== null && free > 0) {
+    return wrap('no-deficit have-stock', '#9A5F12', 'ti-alert-circle',
+      'На складе уже есть готовые ' + model + ' — ' + free + ' шт. свободных',
+      info('По этой работе нужно собрать ' + qty + ' шт.' + forWhom +
+           '. Но свободных готовых на складе ' + free + ' шт.' +
+           (reserved ? ' (ещё ' + reserved + ' шт. в резерве под другие договоры)' : '') +
+           ' — проверьте, не проще ли закрыть потребность складом, а работу отменить.') +
+      partsLine);
+  }
+
+  // 4. Обычный случай: готовых нет, детали есть — работа именно на изготовление.
+  let stockLine;
+  if (fs && total > 0) {
+    stockLine = 'Готовые ' + model + ' на складе есть (' + total + ' шт.), но все они в резерве под другие договоры — свободных 0 шт.';
+  } else if (fs) {
+    stockLine = 'Готовых ' + model + ' на складе нет: 0 шт. — ни свободных, ни в резерве.';
+  } else {
+    stockLine = 'Готового ' + model + ' на складе под эту потребность нет.';
+  }
+  return wrap('no-deficit', '#9A5F12', 'ti-building-factory-2',
+    'Это работа на изготовление: собираем ' + qty + ' шт.',
+    info(stockLine + ' Взять со склада нечего, поэтому изделие собираем' + forWhom + '.') +
+    partsLine +
+    '<div class="pkb-bom-hint">«Изделия нет» — это про готовое изделие на складе, а не про детали: детали в наличии, работу можно начинать.</div>');
+}
+
 function renderPkbBomBlock(w) {
   const missing = w.missing_components || [];
   const mfgMatches = w.mfg_matches || [];
@@ -9549,14 +9803,12 @@ function renderPkbBomBlock(w) {
            '</div>';
   }
 
-  // BOM есть и нет дефицита. Это означает только наличие внесённых в техкарту
-  // деталей, а не наличие самого готового изделия: активная карточка работы как
-  // раз и появилась потому, что готовой сборкой потребность не закрыта.
+  // v2.45.1016: короткое «Готового изделия на складе нет — нужно изготовить»
+  // читалось в цеху как «на складе пусто, работать нечем». Теперь блок отвечает
+  // тремя фактами: что делаем по этой работе, сколько готовых изделий реально
+  // лежит на складе и хватает ли комплектующих по техкарте.
   if (missing.length === 0) {
-    return '<div class="pkb-bom-block no-deficit">' +
-             '<div class="pkb-bom-title" style="color:#9A5F12;"><i class="ti ti-building-factory-2"></i>Готового изделия на складе нет — нужно изготовить</div>' +
-             '<div style="font-size:11.5px;color:var(--text-light);margin-top:5px;"><i class="ti ti-circle-check" style="color:#0A5B41;"></i> Детали по внесённой техкарте есть на складе.</div>' +
-           '</div>';
+    return renderPkbBomReadyBlock(w);
   }
 
   // Есть дефицит — выводим список
