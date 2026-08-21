@@ -24,7 +24,7 @@ function section(from, to) {
 test('клик по корпусу отдаёт корпус, а деталь за панелью — деталь', () => {
   const pick = section('function pickItem(e,any)', 'function planePoint');
   // за панелью деталь — берём её; ничего внутри нет — сам корпус, а не null
-  assert.match(pick, /return inner\|\|list\[0\]\|\|null;/);
+  assert.match(pick, /list\.find\(p=>roleOf\(p\.d\)!=='frame'\)\|\|list\[0\]\|\|null/);
   assert.doesNotMatch(pick, /sel===fr\?fr:null/);
   // первый клик по корпусу только подсвечивает, тащится он вторым нажатием
   const down = section("cv.addEventListener('pointerdown'", "cv.addEventListener('pointermove'");

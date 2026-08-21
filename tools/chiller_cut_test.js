@@ -33,7 +33,7 @@ const grab=n=>{
   return m[0];
 };
 const NAMES=['connOf','connFit','isPipeSeg','setPipeLen','rotSeatLocal','mateZoneOf',
-             'rotMate','pipeEnds','cutMates','zIdxOf','cutPlan','cutInsert'];
+             'rotMate','rotKids','pipeEnds','cutMates','zIdxOf','cutPlan','cutInsert'];
 const CONST=SRC.match(/const CT_NAME=[\s\S]*?const nm1=[^\n]*\n/)[0]+
   SRC.match(/const SEC_ORD=[^\n]*\n/)[0]+
   SRC.match(/const PIPE_MIN=[^\n]*\n/)[0]+

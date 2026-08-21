@@ -77,9 +77,9 @@ test('подписи держатся за деталями и не наезжа
   assert.match(sync, /_pv\.copy\(t\.loc\)\.applyMatrix4\(t\.it\.obj\.matrixWorld\)/);
   // постоянный размер на экране, а не «далеко — мельче»
   assert.match(sync, /2\*dist\*Math\.tan\(camera\.fov\*Math\.PI\/360\)\*PORT_PX\/H/);
-  // занятое место запоминаем и поднимаем подпись ступенькой
-  assert.match(sync, /box\.some\(b=>/);
-  assert.match(sync, /c\+=1\.2/);
+  // занятое место запоминаем и разводим подпись по лесенке (v2.46.025)
+  assert.match(sync, /for\(const cc of PORT_LADDER\)/);
+  assert.match(sync, /if\(tagHit\(r\)\)continue;\s*tagPush\(r\);/);
   // выноска от точки к поднятой подписи
   assert.match(sync, /lp\.setXYZ\(p\.i\*2\+1/);
   assert.match(page, /portLine\.frustumCulled=false/);
