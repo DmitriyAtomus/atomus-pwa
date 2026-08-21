@@ -2633,6 +2633,176 @@ function checkOutside(){
        b.min.y<z.min.y-6||b.max.y>z.max.y+6||b.max.z>z.max.z+6)outSet.add(p.uid);
   });
 }
+/* ═══ пересечения по реальной геометрии меша ═══
+   Габаритная коробка врёт: у ресивера с лапами, у Г-образного кронштейна и
+   у наклонной трубы внутри габарита больше пустоты, чем металла. Соседние
+   узлы светились красным, хотя между ними ладонь проходит, — и наоборот,
+   деталь, залезшая в пустоту чужого габарита, считалась наездом.
+   Коробка осталась грубым ситом (быстро отсеять заведомо далёкое), а спор
+   решают треугольники: берём общую зону двух габаритов, оставляем в ней
+   треугольники обеих деталей и ищем настоящее пересечение — SAT по 17 осям
+   с допуском, так что касание и посадка в размер не в счёт. */
+const MESH_TOL=2;          // мм: глубже этого — наезд, мельче — касание
+const TRI_BUDGET=400000;   // пар треугольников на один спор: дальше верим коробке
+/* мировые треугольники детали и габарит каждого из них. Пересчитываем, только
+   когда деталь подвинули или погасили в ней часть: перебирать меш на каждый
+   сдвиг мыши нельзя, а сдвинулась-то одна деталь */
+function meshTris(p){
+  const o=p.obj||p;o.updateMatrixWorld(true);
+  /* в ключ идёт не только место, но и сама геометрия с погашенными деталями:
+     у бака размеры меняются на месте, меш пересобирается, а матрица та же */
+  let sig='';
+  o.traverse(n=>{
+    if(!n.isMesh)return;
+    const g=n.geometry,pa=g&&g.attributes&&g.attributes.position;
+    sig+=(g?g.uuid:'-')+(pa?('.'+pa.version+'.'+pa.count):'')+':'+
+         (Array.isArray(n.material)
+          ?n.material.map(m=>(m&&m.visible===false)?0:1).join(''):'1')+'|';});
+  const key=o.matrixWorld.elements.join(',')+'#'+sig;
+  if(p._mtKey===key)return p._mt;
+  const t=[],bx=[],v=new THREE.Vector3();
+  o.traverse(n=>{
+    if(!n.isMesh||n.visible===false)return;
+    const g=n.geometry,pos=g&&g.attributes&&g.attributes.position;if(!pos)return;
+    const ix=g.index,ms=Array.isArray(n.material)?n.material:null,rng=[];
+    if(ms&&g.groups.length)g.groups.forEach(gr=>{
+      const m=ms[gr.materialIndex||0];
+      if(!m||m.visible!==false)rng.push([gr.start,gr.count]);});   // погашенную деталь не считаем
+    else rng.push([0,ix?ix.count:pos.count]);
+    const M=n.matrixWorld;
+    rng.forEach(r=>{
+      const end=r[0]+r[1];
+      for(let i=r[0];i+2<end;i+=3){
+        let x0=0,y0=0,z0=0,x1=0,y1=0,z1=0;
+        for(let k=0;k<3;k++){
+          v.fromBufferAttribute(pos,ix?ix.getX(i+k):(i+k)).applyMatrix4(M);
+          t.push(v.x,v.y,v.z);
+          if(!k){x0=x1=v.x;y0=y1=v.y;z0=z1=v.z;}
+          else{if(v.x<x0)x0=v.x;if(v.x>x1)x1=v.x;
+               if(v.y<y0)y0=v.y;if(v.y>y1)y1=v.y;
+               if(v.z<z0)z0=v.z;if(v.z>z1)z1=v.z;}
+        }
+        bx.push(x0,y0,z0,x1,y1,z1);
+      }
+    });
+  });
+  const res=bx.length?{t:new Float64Array(t),b:new Float64Array(bx),n:bx.length/6}:null;
+  p._mtKey=key;p._mt=res;return res;
+}
+/* треугольники, попавшие в спорную зону q=[x0,y0,z0,x1,y1,z1] */
+function trisIn(T,q){
+  const out=[],b=T.b;
+  for(let i=0,j=0;i<T.n;i++,j+=6)
+    if(b[j]<=q[3]&&b[j+3]>=q[0]&&b[j+1]<=q[4]&&b[j+4]>=q[1]&&
+       b[j+2]<=q[5]&&b[j+5]>=q[2])out.push(i);
+  return out;
+}
+/* ось разводит два треугольника? проекции расходятся глубже допуска — разводит */
+function satGap(T1,o1,T2,o2,ax,ay,az,tol){
+  const L=Math.sqrt(ax*ax+ay*ay+az*az);if(L<1e-7)return false;   // вырожденная ось
+  ax/=L;ay/=L;az/=L;
+  let a0=Infinity,a1=-Infinity,b0=Infinity,b1=-Infinity,d;
+  for(let k=0;k<3;k++){
+    d=T1[o1+k*3]*ax+T1[o1+k*3+1]*ay+T1[o1+k*3+2]*az;
+    if(d<a0)a0=d;if(d>a1)a1=d;
+    d=T2[o2+k*3]*ax+T2[o2+k*3+1]*ay+T2[o2+k*3+2]*az;
+    if(d<b0)b0=d;if(d>b1)b1=d;
+  }
+  return b0>a1-tol||a0>b1-tol;
+}
+const _cr=(u,w)=>[u[1]*w[2]-u[2]*w[1],u[2]*w[0]-u[0]*w[2],u[0]*w[1]-u[1]*w[0]];
+function triHit(T1,i1,T2,i2,tol){
+  const o1=i1*9,o2=i2*9,e=[],f=[];
+  for(let k=0;k<3;k++){
+    const a=o1+k*3,b=o1+((k+1)%3)*3,c=o2+k*3,g=o2+((k+1)%3)*3;
+    e.push([T1[b]-T1[a],T1[b+1]-T1[a+1],T1[b+2]-T1[a+2]]);
+    f.push([T2[g]-T2[c],T2[g+1]-T2[c+1],T2[g+2]-T2[c+2]]);
+  }
+  const n1=_cr(e[0],e[1]),n2=_cr(f[0],f[1]),ax=[n1,n2];
+  for(let a=0;a<3;a++)for(let b=0;b<3;b++)ax.push(_cr(e[a],f[b]));
+  /* треугольники в одной плоскости обычные оси не разводят — добавляем
+     нормали рёбер, лежащие в самой плоскости: иначе две панели, стоящие
+     встык в одном листе, считались бы наездом */
+  for(let a=0;a<3;a++){ax.push(_cr(e[a],n1));ax.push(_cr(f[a],n2));}
+  for(let i=0;i<ax.length;i++)
+    if(satGap(T1,o1,T2,o2,ax[i][0],ax[i][1],ax[i][2],tol))return false;
+  return true;
+}
+/* металл одной детали лезет в металл другой внутри зоны q */
+function meshPairHit(A,B,q,tol){
+  const ia=trisIn(A,q),ib=trisIn(B,q);
+  if(!ia.length||!ib.length)return false;
+  if(ia.length*ib.length>TRI_BUDGET)return true;   // слишком густо — верим коробке
+  const ba=A.b,bb=B.b;
+  for(let x=0;x<ia.length;x++){
+    const j=ia[x]*6;
+    for(let y=0;y<ib.length;y++){
+      const k=ib[y]*6;
+      if(ba[j]>bb[k+3]+tol||bb[k]>ba[j+3]+tol||
+         ba[j+1]>bb[k+4]+tol||bb[k+1]>ba[j+4]+tol||
+         ba[j+2]>bb[k+5]+tol||bb[k+2]>ba[j+5]+tol)continue;
+      if(triHit(A.t,ia[x],B.t,ib[y],tol))return true;
+    }
+  }
+  return false;
+}
+/* точка внутри меша: считаем, сколько раз луч из неё протыкает металл.
+   Нечётное число — точка в теле детали. Меш из базы замкнутый, так что это
+   честнее, чем «попала в габаритную коробку». Луч намеренно косой: по осям
+   он ложился бы ровно на рёбра сетки и считал бы протыкания дважды */
+const RAY=[1,0.0413,0.0271];
+function inMesh(T,px,py,pz){
+  const b=T.b,t=T.t,dx=RAY[0],dy=RAY[1],dz=RAY[2];let cnt=0;
+  for(let i=0,j=0;i<T.n;i++,j+=6){
+    if(b[j+3]<px)continue;                         // треугольник позади луча
+    const o=i*9;
+    const ax=t[o],ay=t[o+1],az=t[o+2];
+    const e1x=t[o+3]-ax,e1y=t[o+4]-ay,e1z=t[o+5]-az;
+    const e2x=t[o+6]-ax,e2y=t[o+7]-ay,e2z=t[o+8]-az;
+    const px2=dy*e2z-dz*e2y,py2=dz*e2x-dx*e2z,pz2=dx*e2y-dy*e2x;
+    const det=e1x*px2+e1y*py2+e1z*pz2;
+    if(det>-1e-12&&det<1e-12)continue;             // луч вдоль треугольника
+    const inv=1/det,tx=px-ax,ty=py-ay,tz=pz-az;
+    const u=(tx*px2+ty*py2+tz*pz2)*inv;
+    if(u<0||u>1)continue;
+    const qx=ty*e1z-tz*e1y,qy=tz*e1x-tx*e1z,qz=tx*e1y-ty*e1x;
+    const v=(dx*qx+dy*qy+dz*qz)*inv;
+    if(v<0||u+v>1)continue;
+    if((e2x*qx+e2y*qy+e2z*qz)*inv>0)cnt++;
+  }
+  return (cnt&1)===1;
+}
+const RAY_MAX=80000;    // треугольников на пару: дальше лучом не ищем, дорого
+/* общая зона габаритов глубже допуска, и в ней есть точка в теле обеих деталей.
+   Нужно там, где стенки формально не пересекаются: две коробки, задвинутые
+   вровень, режутся ровно по граням, и треугольники друг друга не задевают.
+   Точки берём не по центру и не по сетке — иначе луч ляжет на ребро меша. */
+function deepIn(A,B,ba,bb){
+  const x0=Math.max(ba.min.x,bb.min.x),x1=Math.min(ba.max.x,bb.max.x),
+        y0=Math.max(ba.min.y,bb.min.y),y1=Math.min(ba.max.y,bb.max.y),
+        z0=Math.max(ba.min.z,bb.min.z),z1=Math.min(ba.max.z,bb.max.z);
+  if(x1-x0<MESH_TOL||y1-y0<MESH_TOL||z1-z0<MESH_TOL)return false;
+  if(A.n+B.n>RAY_MAX)return false;
+  const F=[0.5,0.31,0.69];
+  for(let a=0;a<3;a++)for(let c=0;c<3;c++)for(let d=0;d<3;d++){
+    const x=x0+(x1-x0)*F[a],y=y0+(y1-y0)*F[c],z=z0+(z1-z0)*F[d];
+    if(inMesh(A,x,y,z)&&inMesh(B,x,y,z))return true;
+  }
+  return false;
+}
+/* коробки задели друг друга — спрашиваем геометрию.
+   Меша нет (сборный узел из примитивов) — остаёмся при коробке. */
+function realHit(a,b,ba,bb){
+  try{
+    const A=meshTris(a),B=meshTris(b);
+    if(!A||!B)return true;
+    const q=[Math.max(ba.min.x,bb.min.x)-MESH_TOL,Math.max(ba.min.y,bb.min.y)-MESH_TOL,
+             Math.max(ba.min.z,bb.min.z)-MESH_TOL,Math.min(ba.max.x,bb.max.x)+MESH_TOL,
+             Math.min(ba.max.y,bb.max.y)+MESH_TOL,Math.min(ba.max.z,bb.max.z)+MESH_TOL];
+    if(meshPairHit(A,B,q,MESH_TOL))return true;
+    return deepIn(A,B,ba,bb);      // стенки не встретились — не сидит ли одна в другой
+  }catch(err){return true;}                        // сомневаемся — светим, как раньше
+}
 /* ═══ v2.45.1011: упор в корпус — светится, как наезд на соседний узел ═══
    Наезд узла на узел красится красным, а корпус из этого расчёта выкинут:
    иначе всё, что стоит внутри рамы, горело бы постоянно. Из-за этого узел,
@@ -2661,6 +2831,43 @@ function framePartBoxes(fr){
       bb.expandByPoint(v.fromBufferAttribute(pos,ix.getX(i)).applyMatrix4(fr.obj.matrixWorld));
   });
   fr._fpKey=key;fr._fpBox=boxes;return boxes;
+}
+/* треугольники детали корпуса в координатах сцены. Считаем только ту группу,
+   чья коробка уже задела узел, и держим до следующего сдвига корпуса */
+function framePartTris(fr,gi){
+  if(fr._fpTriKey!==fr._fpKey){fr._fpTri=[];fr._fpTriKey=fr._fpKey;}
+  if(fr._fpTri[gi]!==undefined)return fr._fpTri[gi];
+  const geo=fr.obj.geometry,g=geo.groups[gi],pos=geo.attributes.position,ix=geo.index;
+  let res=null;
+  if(g&&pos&&ix){
+    const M=fr.obj.matrixWorld,v=new THREE.Vector3(),t=[],bx=[],end=g.start+g.count;
+    for(let i=g.start;i+2<end;i+=3){
+      let x0=0,y0=0,z0=0,x1=0,y1=0,z1=0;
+      for(let k=0;k<3;k++){
+        v.fromBufferAttribute(pos,ix.getX(i+k)).applyMatrix4(M);
+        t.push(v.x,v.y,v.z);
+        if(!k){x0=x1=v.x;y0=y1=v.y;z0=z1=v.z;}
+        else{if(v.x<x0)x0=v.x;if(v.x>x1)x1=v.x;
+             if(v.y<y0)y0=v.y;if(v.y>y1)y1=v.y;
+             if(v.z<z0)z0=v.z;if(v.z>z1)z1=v.z;}
+      }
+      bx.push(x0,y0,z0,x1,y1,z1);
+    }
+    if(bx.length)res={t:new Float64Array(t),b:new Float64Array(bx),n:bx.length/6};
+  }
+  fr._fpTri[gi]=res;return res;
+}
+/* узел правда влез в металл балки, а не в пустоту её габарита */
+function frameRealHit(p,fr,gi,pb,fb){
+  try{
+    const A=meshTris(p),B=framePartTris(fr,gi);
+    if(!A||!B)return true;
+    const q=[Math.max(pb.min.x,fb.min.x)-MESH_TOL,Math.max(pb.min.y,fb.min.y)-MESH_TOL,
+             Math.max(pb.min.z,fb.min.z)-MESH_TOL,Math.min(pb.max.x,fb.max.x)+MESH_TOL,
+             Math.min(pb.max.y,fb.max.y)+MESH_TOL,Math.min(pb.max.z,fb.max.z)+MESH_TOL];
+    if(meshPairHit(A,B,q,MESH_TOL))return true;
+    return deepIn(A,B,pb,fb);                 // узел не утонул ли в балке целиком
+  }catch(err){return true;}
 }
 /* деталь корпуса, на которую узел надет сверху, — это посадка, а не упор:
    конденсатор и вентилятор садятся на крышку и лезут в её монтажный проём */
@@ -2696,6 +2903,7 @@ function checkHits(){
         if(ms[i]&&ms[i].visible===false)return;      // погашенную деталь не считаем
         const nm=(PT[i]&&PT[i].name)||'деталь корпуса';
         if(seatPart(p,nm)||!fb.intersectsBox(b))return;
+        if(!frameRealHit(p,fr,i,b,fb))return;        // коробки задели, металл — нет
         fr._hit.add(i);hitSet.add(p.uid);
         if(!hitWho.has(p.uid))hitWho.set(p.uid,new Set());
         hitWho.get(p.uid).add(nm);
@@ -3384,6 +3592,7 @@ $('#bRl').onclick=rotToggle;
    Заодно ловим стык встык: свободный конец трубы упёрся в патрубок, который
    с ней не сходится (медь к полипропилену) — так не паяют, нужен переход. */
 let pipeBad=new Map();
+const PIPE_RAY_MAX=20000;                          // треугольников в аппарате
 function checkPipes(){
   pipeBad=new Map();
   const tubes=placed.filter(isPipeSeg);
@@ -3401,11 +3610,19 @@ function checkPipes(){
       if(o.link&&o.link.to===t.uid)return;          // это он сидит на трубе
       const b=new THREE.Box3().setFromObject(o.obj).expandByScalar(-6);
       if(b.isEmpty())return;
-      let n=0;
+      let pts=null;
       for(let d=6;d<L;d+=8){
         P.copy(A).addScaledVector(ax,d);
-        if(b.containsPoint(P))n++;
+        if(b.containsPoint(P))(pts||(pts=[])).push(P.x,P.y,P.z);
       }
+      if(!pts)return;
+      /* коробка сказала «внутри» — дальше спрашиваем металл: труба, идущая
+         мимо аппарата в вырезе его габарита, сквозь него не проходит.
+         Меш побольше лучом не щупаем: на каждый сдвиг мыши это дорого */
+      const T0=meshTris(o),T=(T0&&T0.n<=PIPE_RAY_MAX)?T0:null;
+      let n=pts.length/3;
+      if(T){n=0;for(let i=0;i<pts.length;i+=3)
+        if(inMesh(T,pts[i],pts[i+1],pts[i+2]))n++;}
       if(n*8>=24)pipeBad.set(t.uid,'проходит сквозь · '+o.d.name);
     });
   });
@@ -3436,10 +3653,12 @@ function checkPipes(){
 function checkCollisions(){
   collSet=new Set();checkOutside();checkHits();checkPipes();
   pipeBad.forEach((txt,uid)=>collSet.add(uid));      // нарушитель светится красным
-  // AABB с усадкой 4 мм: касание — не пересечение.
+  // AABB теперь только грубое сито: коробки задели — спор решает геометрия меша.
+  // Усадка коробки убрана, допуск на касание держит разбор по треугольникам
+  // (MESH_TOL): от усадки в 4 мм коробка панели в 2 мм схлопывалась вовсе.
   // v2.45.974: корпус, виброопоры и трубы не считаем — деталь внутри рамы это норма
   const chk=placed.filter(p=>!NOCOLL.has(roleOf(p.d)));
-  const boxes=chk.map(p=>new THREE.Box3().setFromObject(p.obj).expandByScalar(-4));
+  const boxes=chk.map(p=>new THREE.Box3().setFromObject(p.obj));
   // деталь, сидящая на патрубке, обнимает бобышку аппарата — это посадка,
   // а не наезд, иначе пара светилась бы красным сразу после установки
   const mated=(a,b)=>(a.link&&a.link.mount==='rot'&&a.link.to===b.uid)||
@@ -3452,7 +3671,8 @@ function checkCollisions(){
                       !!(a.link&&a.link.face==='cap'&&b.link&&b.link.face==='cap'));
   for(let i=0;i<chk.length;i++)
     for(let j=i+1;j<chk.length;j++)
-      if(!mated(chk[i],chk[j])&&boxes[i].intersectsBox(boxes[j])){
+      if(!mated(chk[i],chk[j])&&boxes[i].intersectsBox(boxes[j])&&
+         realHit(chk[i],chk[j],boxes[i],boxes[j])){
         collSet.add(chk[i].uid);collSet.add(chk[j].uid);}
   placed.forEach(applyTint);
   const el=$('#fColl');
