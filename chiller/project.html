@@ -3831,6 +3831,7 @@ $('#bBom').onclick=()=>toast('Следующий шаг: спецификаци�
 
 /* ═══ спецификация + габарит ═══ */
 function refresh(){
+  schSceneMarks();                  // v2.46.021: метки «стоит в машине» на листе Г3
   rotReseat();                      // вентили держатся за свои штуцеры
   placed.forEach(p=>{if(p.link&&p.link.mount==='face')faceMate(p);});   // приборы — панели
   const by=new Map();
@@ -4612,7 +4613,13 @@ function renderSchema(){
     if(next===nd)h+='<rect class="sch-pulse" x="'+(px-2.5)+'" y="'+(py-2.5)+'" width="'+(w+5)+'" height="16" rx="8" fill="none" stroke="#C9A227" stroke-width="1.1" stroke-dasharray="4 2.6"/>';
     h+='<rect x="'+px+'" y="'+py+'" width="'+w+'" height="11" rx="5.5" fill="'+(asg?'#eef7f0':'#fdf3e2')+'" stroke="'+(asg?'#9ec9ad':'#d9b678')+'" stroke-width="0.6"/>';
     h+='<text class="tag" x="'+(px+5)+'" y="'+(py+8)+'" fill="'+(asg?'#1a6b3e':'#b0721a')+'">'+nd.t+'</text>';
-    if(off)h+='<text class="shs" x="'+(px+w+6)+'" y="'+(py+8)+'">'+esc(nd.n)+'</text>';
+    /* v2.46.021: точка справа от бирки — деталь этой позиции стоит в 3D.
+       Зелёная бирка говорила только «модель подобрана»; встала ли она в
+       машину (модель не готова, автопостановка выключена, деталь удалили
+       руками) — было не видно */
+    if(asg)h+='<circle class="in3d" data-k="'+esc(nd.k)+'" cx="'+(px+w+3.6)+'" cy="'+(py+5.5)+'" r="1.7"'
+      +' fill="none" stroke="#c9b98a" stroke-width="0.7"/>';
+    if(off)h+='<text class="shs" x="'+(px+w+9)+'" y="'+(py+8)+'">'+esc(nd.n)+'</text>';
     h+='<text class="shn '+(asg?'ok':'wt')+'" x="'+nx+'" y="'+ny+'" text-anchor="'+na+'">'
       +(asg?esc(String(asg.name).slice(0,nd.mx)):'назначить')+'</text>';
     /* второй строкой — присоединение: резьба и проход, как в монтаже */
@@ -4636,8 +4643,8 @@ function renderSchema(){
     +'<text class="bndt" x="146" y="55">ГРАНИЦА ПОСТАВКИ · МАШИНА В СБОРЕ</text>';
   const done=SCH_NODES.filter(n=>schemaData[n.k]).length;
   const nsup=SCH_NODES.filter(n=>schemaData[n.k]&&supOf(n.k)!=='ag').length;
-  h+='<text class="shl" x="22" y="34">Назначено: '+done+' из '+SCH_NODES.length+'</text>';
-  h+='<text class="shs" x="22" y="46">клик по бирке — подбор модели; квадратик слева — граница поставки</text>';
+  h+='<text class="shl" id="schCnt" x="22" y="34">Назначено: '+done+' из '+SCH_NODES.length+'</text>';
+  h+='<text class="shs" x="22" y="46">клик по бирке — подбор модели; квадратик слева — граница поставки; точка справа — деталь стоит в машине</text>';
   SUP.forEach((sp,i)=>{
     h+='<rect x="'+(22+i*104)+'" y="55" width="7" height="7" rx="1.6" fill="'+sp[3]
       +'" stroke="'+sp[2]+'"'+(sp[0]==='ag'?'':' stroke-dasharray="1.8 1.2"')+'/>'
@@ -4646,6 +4653,7 @@ function renderSchema(){
   if(nsup)h+='<text class="shs" x="'+(22+3*104)+'" y="61.5">вне комплекта: '+nsup+'</text>';
   svg.innerHTML=h;
   schRenderChips();
+  schSceneMarks();
   const tip=document.getElementById('schTip');
   svg.querySelectorAll('g.supb').forEach(g=>{
     g.onclick=ev=>{ev.stopPropagation();supCycle(g.dataset.sup);};
@@ -4660,6 +4668,8 @@ function renderSchema(){
       tip.innerHTML='<div class="t">'+esc(nd.t)+' · '+esc(nd.n)+'</div>'
         +(asg?'<span class="st2 ok">назначено: '+esc(String(asg.name).slice(0,26))+'</span>'
              :'<span class="st2 wt">ждёт модель</span>')
+        +(asg?(schItem(nd.k)?'<div class="d">в машине: деталь стоит в 3D</div>'
+                            :'<div class="d">в 3D её нет — «⤓ Собрать по схеме» в компоновке</div>'):'')
         +(asg?'<div class="d">поставка: '+esc(supRec(nd.k)[1])+
               (schConn(asg)?(' · '+esc(schConn(asg))):'')+'</div>':'')
         +'<div class="d">'+esc(nd.d||'')+'</div>'
@@ -4673,6 +4683,22 @@ function renderSchema(){
     };
     g.onmouseleave=()=>{if(tip)tip.style.display='none';};
   });
+}
+/* v2.46.021: метки «стоит в машине» пересчитываются без перерисовки листа —
+   сцена меняется часто (перенос, удаление, «Собрать по схеме»), а тут только
+   заливка кружков и счётчик в шапке */
+function schSceneMarks(){
+  const svg=$('#schSvg');if(!svg)return;
+  let n=0;
+  svg.querySelectorAll('circle.in3d').forEach(c=>{
+    const here=!!schItem(c.dataset.k);if(here)n++;
+    c.setAttribute('fill',here?'#1a6b3e':'none');
+    c.setAttribute('stroke',here?'#1a6b3e':'#c9b98a');
+  });
+  const t=svg.querySelector('#schCnt');
+  if(t)t.textContent='Назначено: '+SCH_NODES.filter(x=>schemaData[x.k]).length
+    +' из '+SCH_NODES.length+(n?' · в машине: '+n:'');
+  drawAsgHead();
 }
 // чипы групп: прогресс по типам позиций, клик подсвечивает группу на схеме
 function schRenderChips(){
@@ -4874,11 +4900,17 @@ function openAssign(key){
     if(c&&c.scrollIntoView)c.scrollIntoView({inline:'center',block:'nearest'});},20);
 }
 function drawAsgHead(){
+  if(!$('#asgProg')||!$('#asgStrip'))return;
   const done=SCH_NODES.filter(n=>schemaData[n.k]).length;
-  $('#asgProg').innerHTML='<b>'+done+'</b> из '+SCH_NODES.length;
-  $('#asgStrip').innerHTML=SCH_NODES.map(n=>
-    '<span class="nd'+(schemaData[n.k]?' done':'')+(n.k===asgKey?' cur':'')+'" data-k="'+n.k+'">'
-    +'<i>'+(schemaData[n.k]?'●':'○')+'</i>'+esc(n.t)+'</span>').join('');
+  const in3d=SCH_NODES.filter(n=>schItem(n.k)).length;
+  /* v2.46.021: в ленте узлов видно не только «назначено», но и «стоит в 3D»:
+     ● — деталь в машине, ◐ — модель подобрана, но в сцене её нет */
+  $('#asgProg').innerHTML='<b>'+done+'</b> из '+SCH_NODES.length+(in3d?' · в машине '+in3d:'');
+  $('#asgStrip').innerHTML=SCH_NODES.map(n=>{
+    const here=!!schItem(n.k),asg=!!schemaData[n.k];
+    return '<span class="nd'+(asg?' done':'')+(n.k===asgKey?' cur':'')+'" data-k="'+n.k+'"'
+    +' title="'+esc(n.t+(here?' · стоит в машине':(asg?' · модель подобрана, в 3D её нет':' · модель не назначена')))+'">'
+    +'<i>'+(here?'●':(asg?'◐':'○'))+'</i>'+esc(n.t)+'</span>';}).join('');
   document.querySelectorAll('#asgStrip .nd').forEach(el=>el.onclick=()=>openAssign(el.dataset.k));
 }
 async function assignTo(d){
