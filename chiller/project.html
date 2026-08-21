@@ -1266,7 +1266,7 @@ function bindCtl(cv){
       const fp=planePoint(e,hit.obj.position.z);
       dragOff=fp?{x:hit.obj.position.x-fp.x,y:hit.obj.position.y-fp.y}:{x:0,y:0};
       // v2.45.996: шаг истории пишем не на клик, а на первый реальный сдвиг
-      dragSnap={s:histSnap(),t:'перемещение детали'};}
+      dragSnap={s:histSnap(),t:'перемещение детали'};pipeMoved=0;}
     else{mode='orbit';}
   });
   cv.addEventListener('pointermove',e=>{
@@ -1284,7 +1284,9 @@ function bindCtl(cv){
       checkCollisions();save();posFill();
     }
   });
-  const off=()=>{mode=null;dragSnap=null;lpOff();cv.classList.remove('drag');};
+  const off=()=>{
+    if(mode==='item')pipeAfterDrag();   // отпустили узел — что стало с трубой
+    mode=null;dragSnap=null;lpOff();cv.classList.remove('drag');};
   cv.addEventListener('pointerup',off);cv.addEventListener('pointercancel',off);
   cv.addEventListener('contextmenu',e=>{
     e.preventDefault();
@@ -1719,7 +1721,7 @@ async function addItem(d,at,rot,tilt,roll){
   obj.position.z=-bb.min.z;                      // низ детали — на пол
   obj.rotation.set(roll||0,tilt||0,rot||0);
   scene.add(obj);
-  const it={uid:uidSeq++,id:d.id,obj,d,pin:false,link:null,off:[],sch:null,
+  const it={uid:uidSeq++,id:d.id,obj,d,pin:false,link:null,off:[],sch:null,fit:null,
     zn:geo.userData.zones||[],zm:!!geo.userData.zoneMats};
   placed.push(it);
   if(at){obj.position.x=at.x;obj.position.y=at.y;
@@ -1731,6 +1733,7 @@ async function addItem(d,at,rot,tilt,roll){
     it.sch=at.state.sch||null;                     // v2.46.017: позиция схемы, откуда деталь
     it.link=at.state.link||null;
     it.off=Array.isArray(at.state.off)?at.state.off.slice():[];
+    it.fit=at.state.fit||null;                     // v2.46.021: пара авто-длины трубы
     applyOff(it);pinMark(it);
   }
   select(it);refresh();save();
@@ -2506,8 +2509,10 @@ function ctxItems(it){
     go:()=>{select(it);tkOpen(it);}});
   if(isPipeSeg(it)){
     const pt=ctxPt?ctxPt.clone():null,cx=ctxXY.x,cy=ctxXY.y;
-    L.push({ic:'⇹',t:'Длина отрезка…',s:pipeLen(it)+' мм',
+    L.push({ic:'⇹',t:'Длина отрезка…',
+      s:pipeLen(it)+' мм'+(it.fit?' · авто':''),
       go:()=>{select(it);posShow();}},
+
       /* врезка идёт в то место трубы, по которому нажали правую кнопку */
       {ic:'⧎',t:'Врезать в разрыв…',s:'вентиль · фильтр · муфта',
        go:()=>{select(it);cutPick(it,cx,cy,pt);}});
@@ -3726,8 +3731,17 @@ async function rotAdd(hostUid,zi,d,pzi){
     if(!it)return;
     it.link={to:host.uid,mount:'rot',face:'port',zi:zi,pzi:(pzi==null?null:pzi)};
     if(!rotMate(it)){it.link=null;toast('Деталь не села на патрубок — база не дала ось');}
-    else toast(d.brand+' '+d.name+' — на патрубок «'+(z?z.name:'')+'» '+host.d.name+
-      (c?', '+c.txt:''));
+    else{
+      toast(d.brand+' '+d.name+' — на патрубок «'+(z?z.name:'')+'» '+host.d.name+
+        (c?', '+c.txt:''));
+      /* v2.46.021: трубу сразу тянем до ответного патрубка на её оси —
+         и дальше длина держится сама, при переносе узла тоже */
+      if(isPipeSeg(it)){
+        const f=pipeFitApply(it);
+        if(f)toast('Труба дотянута до «'+(f.z.name||'')+'» '+f.it.d.name+' — '+
+          pipeLen(it)+' мм, дальше длина держится сама');
+      }
+    }
   }finally{histEnd(h);}
   checkCollisions();showSelZ();refresh();save();
 }
@@ -3854,6 +3868,11 @@ function checkPipes(){
   }
 }
 function checkCollisions(){
+  /* v2.46.021: авто-длина трубы. Через эту функцию проходит любое изменение
+     геометрии сцены — перетаскивание, точный ввод, поворот, посадка на
+     патрубок. Поэтому трубы перетягиваются здесь, до проверки пересечений:
+     иначе красным светилась бы длина, которой уже нет. */
+  pipeAutoSync();
   collSet=new Set();checkOutside();checkHits();checkPipes();
   pipeBad.forEach((txt,uid)=>collSet.add(uid));      // нарушитель светится красным
   // AABB теперь только грубое сито: коробки задели — спор решает геометрия меша.
@@ -3990,7 +4009,26 @@ function setPipeLen(it,L){
   it.obj.updateMatrixWorld(true);
   if(it._pinBox)it._pinBox.update();
   if(it.link&&it.link.mount==='rot')rotMate(it);          // сидит на штуцере — растём от него
+  rotKids(it);          // на дальнем конце бывает вентиль или фитинг — едет с трубой
   return L;
+}
+/* пересадить всё, что сидит на этой детали, и дальше по цепочке */
+function rotKids(it,seen){
+  seen=seen||new Set();
+  if(seen.has(it.uid))return;
+  seen.add(it.uid);
+  placed.forEach(p=>{
+    if(p.link&&p.link.mount==='rot'&&p.link.to===it.uid&&rotMate(p))rotKids(p,seen);});
+}
+/* деталь сидит на этой (хоть через цепочку) — такую пару трубе брать нельзя:
+   она поедет за трубой, труба потянется за ней, и длина уйдёт в бесконечность */
+function ridesOn(o,it){
+  let g=o,n=0;
+  while(g&&g.link&&n++<20){
+    if(g.link.to===it.uid)return true;
+    g=placed.find(p=>p.uid===g.link.to);
+  }
+  return false;
 }
 /* Подгонка по месту: труба сидит одним концом на патрубке, второй ищет свою
    пару. Идём вдоль оси трубы и берём ближайший патрубок, который лежит на
@@ -4008,7 +4046,7 @@ function pipeFitLen(it){
   const my=connOf(mateZoneOf(it)||{});
   let best=null;
   placed.forEach(o=>{
-    if(o===it||o===host)return;
+    if(o===it||o===host||ridesOn(o,it))return;
     o.obj.updateMatrixWorld(true);
     (o.zn||[]).forEach((z,zi)=>{
       if(!z.p0||!z.dir)return;
@@ -4019,28 +4057,112 @@ function pipeFitLen(it){
       if(t<PIPE_MIN||t>PIPE_MAX)return;
       const off=v.addScaledVector(D,-t).length();
       if(off>25)return;                                   // патрубок не на оси трубы
-      if(!best||t<best.t)best={t:t,off:off,it:o,z:z};
+      if(!best||t<best.t)best={t:t,off:off,it:o,z:z,zi:zi};
     });
   });
   return best;
+}
+/* ═══ v2.46.021: авто-длина трубы ═══
+   Раньше подгонка была разовой: нажал «подогнать по патрубкам» — труба один
+   раз брала длину до ответного патрубка. Стоило подвинуть аппарат, и труба
+   оставалась прежней: один конец на штуцере, второй в воздухе, и подгонять
+   приходилось заново после каждого переноса.
+   Теперь пара запоминается (it.fit — деталь и номер её патрубка), и длина
+   держится сама: двигаешь узел — труба тянется за ним в том же кадре.
+   Отвязать просто: задал длину числом — авто-длина снялась. */
+
+/* Расстояние между посадочными плоскостями запомненной пары по оси трубы. */
+function pipeSpan(it){
+  if(!it||!it.fit||!isPipeSeg(it))return null;
+  if(!it.link||it.link.mount!=='rot')return null;
+  const host=placed.find(p=>p.uid===it.link.to);
+  const hz=host&&(host.zn||[])[it.link.zi];
+  const to=placed.find(p=>p.uid===it.fit.to);
+  const tz=to&&(to.zn||[])[it.fit.zi];
+  if(!hz||!hz.p0||!hz.dir||!tz||!tz.p0||!tz.dir)return null;
+  host.obj.updateMatrixWorld(true);to.obj.updateMatrixWorld(true);
+  const D=new THREE.Vector3(hz.dir[0],hz.dir[1],hz.dir[2])
+    .applyQuaternion(host.obj.quaternion).normalize();
+  const F=new THREE.Vector3(hz.p0[0],hz.p0[1],hz.p0[2])
+    .applyMatrix4(host.obj.matrixWorld).addScaledVector(D,hz.seat||0);
+  const A=new THREE.Vector3(tz.dir[0],tz.dir[1],tz.dir[2])
+    .applyQuaternion(to.obj.quaternion).normalize();
+  const T=new THREE.Vector3(tz.p0[0],tz.p0[1],tz.p0[2])
+    .applyMatrix4(to.obj.matrixWorld).addScaledVector(A,tz.seat||0);
+  const v=T.clone().sub(F),t=v.dot(D);
+  return {t:t,off:v.addScaledVector(D,-t).length(),it:to,z:tz};
+}
+/* Перетянуть все трубы с запомненной парой. Зовётся из checkCollisions, то
+   есть после любой правки сцены. Проходов три: труба может тянуться до
+   патрубка на другой трубе, которая в этом же кадре тоже поехала. */
+let PIPE_SYNC=false, pipeMoved=0;
+function pipeAutoSync(){
+  if(_loading||PIPE_SYNC)return 0;
+  const list=placed.filter(p=>p.fit&&isPipeSeg(p));
+  if(!list.length)return 0;
+  PIPE_SYNC=true;
+  let n=0;
+  try{
+    for(let pass=0;pass<3;pass++){
+      let ch=0;
+      list.forEach(p=>{
+        if(!p.fit)return;
+        const s=pipeSpan(p);
+        if(!s){p.fit=null;return;}                 // пары не стало — авто-длина снимается
+        const L=Math.max(PIPE_MIN,Math.min(PIPE_MAX,Math.round(s.t)));
+        if(Math.abs(L-pipeLen(p))<1)return;
+        setPipeLen(p,L);ch++;
+      });
+      n+=ch;
+      if(!ch)break;
+    }
+  }finally{PIPE_SYNC=false;}
+  pipeMoved+=n;
+  return n;
+}
+/* Хвост перетаскивания: пока узел едет — молчим (это каждый кадр), а когда
+   отпустили, обновляем метраж в спецификации и говорим, что вышло. */
+function pipeAfterDrag(){
+  if(!pipeMoved)return;
+  pipeMoved=0;
+  refresh();
+  const bad=placed.filter(p=>p.fit&&isPipeSeg(p))
+                  .map(p=>({p:p,s:pipeSpan(p)}))
+                  .filter(x=>x.s&&x.s.off>5);
+  toast(bad.length
+    ? ('Труба дотянулась — '+pipeLen(bad[0].p)+' мм, но ось разошлась на '+
+       Math.round(bad[0].s.off)+' мм: доверни узел')
+    : 'Труба дотянулась сама');
+}
+/* Найти пару и включить авто-длину. */
+function pipeFitApply(it){
+  const f=pipeFitLen(it);
+  if(!f)return null;
+  it.fit={to:f.it.uid,zi:f.zi};
+  setPipeLen(it,f.t);
+  return f;
 }
 function pipeFitSel(){
   if(!sel||!isPipeSeg(sel))return;
   if(!sel.link||sel.link.mount!=='rot'){
     toast('Посади трубу на патрубок — тогда подгоню длину по второму концу');return;}
-  const f=pipeFitLen(sel);
-  if(!f){toast('На оси трубы не нашёл ответного патрубка — задай длину числом');return;}
   pushHist('длину трубы');
-  const L=setPipeLen(sel,f.t);
+  const f=pipeFitApply(sel);
+  if(!f){toast('На оси трубы не нашёл ответного патрубка — задай длину числом');return;}
+  const L=pipeLen(sel);
   posDone();
   toast('Длина '+L+' мм — до патрубка «'+(f.z.name||'')+'» '+f.it.d.name+
-        (f.off>2?(' (ось разошлась на '+Math.round(f.off)+' мм)'):''));
+        (f.off>2?(' (ось разошлась на '+Math.round(f.off)+' мм)'):'')+
+        ' · дальше держится сама');
 }
 function pipeSetSel(L){
   if(!sel||!isPipeSeg(sel)||!isFinite(L))return;
   if(pipeLen(sel)===Math.round(L)){posFill();return;}
   pushHist('длину трубы');
+  const was=!!sel.fit;
+  sel.fit=null;                     // длину задали руками — авто-длина отвязывается
   setPipeLen(sel,L);posDone();
+  if(was)toast('Длина задана вручную — авто-длина по патрубкам снята');
 }
 
 /* ═══ автопротяжка трубы между двумя патрубками (задача #909) ═══
@@ -4594,6 +4716,14 @@ function posFill(){
     ['posLenR','posLenF','posLenC'].forEach(id=>posEl(id).style.display='flex');
     set('pL',pipeLen(sel),false);
     posEl('pLFit').disabled=!(sel.link&&sel.link.mount==='rot');
+    /* v2.46.021: пометка «авто» — труба сама тянется за своей парой */
+    posEl('pLFit').textContent=sel.fit?'⇥ длина держится сама':'⇥ подогнать по патрубкам';
+    posEl('pLFit').title=sel.fit
+      ? 'Пара найдена: двигаешь узел — труба тянется следом. Задай длину числом, чтобы отвязать'
+      : 'Взять длину по расстоянию до ответного патрубка на оси трубы и держать её дальше самому';
+    const au=posEl('posLenF').querySelector('.u');
+    au.textContent=sel.fit?'авто':'';
+    au.style.color=sel.fit?'var(--ok)':'';
   }
   const sz=new THREE.Vector3();b.getSize(sz);
   posEl('posDim').textContent='габарит '+Math.round(sz.x)+' × '+Math.round(sz.y)+
@@ -4850,6 +4980,7 @@ function projPayload(){
                                              roll:p.link.roll}:null,
                                 tk:isTank(p.d)?p.d.tk:undefined,   // бак: размеры и исполнение
                                 pl:isPipeSeg(p)?pipeLen(p):undefined,
+                                fit:p.fit?{to:p.fit.to,zi:p.fit.zi}:undefined,
                                 sch:p.sch||undefined,   // v2.46.017: позиция схемы
                                 off:(p.off&&p.off.length)?p.off:undefined})),
           schema:schemaData};
@@ -4976,13 +5107,18 @@ async function loadProjectData(data){
     if(!d)continue;
     // z, наклона и закрепления в старых проектах нет — там деталь просто стоит на полу
     const it=await addItem(d,{x:s.x,y:s.y,z:s.z,
-      state:{pin:s.pin,off:s.off,link:s.link,pl:s.pl,sch:s.sch}},s.r,s.t,s.k);
+      state:{pin:s.pin,off:s.off,link:s.link,pl:s.pl,sch:s.sch,fit:s.fit}},s.r,s.t,s.k);
     if(it&&s.uid)map[s.uid]=it.uid;
   }
   placed.forEach(p=>{if(p.link&&map[p.link.to])p.link={to:map[p.link.to],mount:p.link.mount,
                                                        face:p.link.face||'pan',zi:p.link.zi,
                                                        pzi:p.link.pzi,roll:p.link.roll};
                      else if(p.link&&!placed.some(x=>x.uid===p.link.to))p.link=null;});
+  /* v2.46.021: пара авто-длины тоже ссылается на uid — перевешиваем и её */
+  placed.forEach(p=>{
+    if(!p.fit)return;
+    if(map[p.fit.to])p.fit={to:map[p.fit.to],zi:p.fit.zi};
+    else if(!placed.some(x=>x.uid===p.fit.to))p.fit=null;});
   rotReseat();                      // связи починены — вентили садятся на свои штуцеры
   _loading=false;
   histReset();                      // v2.45.996: у каждого проекта своя история
