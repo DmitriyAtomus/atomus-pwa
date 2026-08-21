@@ -1265,6 +1265,19 @@ function roleOf(d){
   if(sec==='pipe')return 'pipe';
   return 'floor';
 }
+/* v2.46.011: манометр — прибор лицевой панели, а не узел на ярусе.
+   Циферблат должен смотреть наружу, к контуру прибор идёт капилляром от
+   клапана Шрадера, поэтому место ему ищем не в полости, а в обшивке. */
+function isGauge(d){
+  return (d.sub||'')==='gauge'||/маноме/i.test((d.kind||'')+' '+(d.name||''));
+}
+/* НД левее, ВД правее — как читают панель слева направо, по ходу контура */
+function gaugeRank(d){
+  const t=((d.kind||'')+' ').toLowerCase(),n=(d.name||'').toLowerCase();
+  if(/низк/.test(t)||/^cs-n\w*-l/.test(n))return 0;
+  if(/высок/.test(t)||/^cs-n\w*-h/.test(n))return 1;
+  return 2;
+}
 const ROLE_NAME={frame:'корпус',comp:'компрессор',cond:'конденсатор',fan:'вентилятор',
   evap:'испаритель',recv:'ресивер',sep:'отделитель',pump:'насос',vibro:'виброопора',
   panel:'щит',instr:'приборы',line:'арматура',pipe:'трубы',tank:'бак',floor:'на полу'};
@@ -1411,6 +1424,8 @@ const GAP=70;
 function autoPlace(it){
   const role=roleOf(it.d);
   if(role==='frame'){placeAt(it,0,0,0,0,0);return;}   // корпус — в центр сцены, он и есть площадка
+  // v2.46.011: манометр не ищет место на ярусе — он сам встаёт в лицевую панель
+  if(isGauge(it.d)&&facePlace(it))return;
   const s=site(),sl=SLOT[role]||SLOT.floor;
   const z=levelZ(sl.lvl,s),pt=slotPoint(sl,s);
   const byX=sl.dir==='x';
@@ -1483,6 +1498,7 @@ function autoLayout(){
     const list=groups.get(r).filter(p=>!p.pin);
     if(!list.length)return;
     if(r==='line')list.sort((a,b)=>lineRank(a.d)-lineRank(b.d));
+    if(r==='instr')list.sort((a,b)=>gaugeRank(a.d)-gaugeRank(b.d));   // НД слева, ВД справа
     list.forEach(autoPlace);
     const sl=SLOT[r];
     if(sl&&sl.center&&list.length>1)centerRow(list,sl,site());
@@ -1710,6 +1726,46 @@ function faceMate(it){
   const b=new THREE.Box3().setFromObject(it.obj);
   const dy=(fb.min.y-4)-b.min.y;              // кольцо выступает из панели на 4 мм
   if(Math.abs(dy)>0.01){it.obj.position.y+=dy;it.obj.updateMatrixWorld(true);}
+  if(it._pinBox)it._pinBox.update();
+  return true;
+}
+/* v2.46.011: автоматическая врезка — прибор сам находит место в панели.
+   Отметка одна на все приборы (0,72 высоты корпуса — уровень глаз), по ширине
+   идут слева направо с зазором: НД, ВД, дальше остальные. Занятые места ищем
+   среди уже врезанных, поэтому второй манометр не садится на первый. */
+const FACE_LVL=0.72, FACE_EDGE=90, FACE_GAP=40;
+function facePlace(it){
+  const fr=frameFor(it);
+  if(!fr)return false;                        // корпуса в сцене нет — ставить не во что
+  const fb=new THREE.Box3().setFromObject(fr.obj);
+  it.link={to:fr.uid,mount:'face',face:'front'};
+  if(!faceMate(it))return false;              // разворот лицом наружу и прижим по глубине
+  const b0=new THREE.Box3().setFromObject(it.obj),sz=b0.getSize(new THREE.Vector3());
+  const z=fb.min.z+(fb.max.z-fb.min.z)*FACE_LVL;
+  const busy=placed.filter(p=>p!==it&&p.link&&p.link.mount==='face')
+                   .map(p=>new THREE.Box3().setFromObject(p.obj));
+  const free=x=>{
+    const lo=x-sz.x/2-FACE_GAP/2,hi=x+sz.x/2+FACE_GAP/2;
+    return !busy.some(bb=>bb.max.x>lo&&bb.min.x<hi&&bb.max.z>z&&bb.min.z<z+sz.z);
+  };
+  /* ставим слева направо, но мимо стоек и балок: место годится, когда
+     прибор не наехал ни на соседа, ни на металл корпуса (лист обшивки
+     из проверки выключен — в него прибор и врезается, см. seatPart) */
+  const c0=b0.getCenter(new THREE.Vector3()),dz=Math.round(z-b0.min.z);
+  const p0={x:it.obj.position.x,z:it.obj.position.z};
+  const lim=fb.max.x-FACE_EDGE-sz.x/2;
+  const put=x=>{
+    it.obj.position.x=p0.x+snap(x-c0.x);
+    it.obj.position.z=p0.z+dz;it.obj.updateMatrixWorld(true);
+    return new THREE.Box3().setFromObject(it.obj);
+  };
+  let x=fb.min.x+FACE_EDGE+sz.x/2,ok=false;
+  for(let k=0;k<40&&x<=lim;k++,x+=sz.x+FACE_GAP){
+    if(!free(x))continue;
+    const box=put(x);
+    if(boxFree(box,it)&&frameFree(box,it)){ok=true;break;}
+  }
+  if(!ok)put(fb.min.x+FACE_EDGE+sz.x/2);   // свободного места нет — ставим в начало ряда
   if(it._pinBox)it._pinBox.update();
   return true;
 }
@@ -2110,6 +2166,8 @@ function checkOutside(){
   const z=siteIn();
   placed.forEach(p=>{
     if(!INSIDE.has(roleOf(p.d)))return;
+    // v2.46.011: врезанный прибор и должен торчать наружу — это не «вне корпуса»
+    if(p.link&&p.link.mount==='face')return;
     const b=new THREE.Box3().setFromObject(p.obj);
     if(b.min.x<z.min.x-6||b.max.x>z.max.x+6||
        b.min.y<z.min.y-6||b.max.y>z.max.y+6||b.max.z>z.max.z+6)outSet.add(p.uid);
@@ -2147,6 +2205,9 @@ function framePartBoxes(fr){
 /* деталь корпуса, на которую узел надет сверху, — это посадка, а не упор:
    конденсатор и вентилятор садятся на крышку и лезут в её монтажный проём */
 function seatPart(it,nm){
+  /* v2.46.011: прибор врезан в панель — лист обшивки ему не упор, а посадка.
+     Стойки и балки в этот список не входят: в них прибор попасть не должен. */
+  if(it.link&&it.link.mount==='face'&&/панел|дверк|обшив/i.test(nm))return true;
   if(!/крышк/i.test(nm))return false;
   const r=roleOf(it.d);
   return r==='cond'||r==='fan'||!!(it.link&&it.link.face==='cap');
