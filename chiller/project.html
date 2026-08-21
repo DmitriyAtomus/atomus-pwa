@@ -762,6 +762,8 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
         <div class="t t2">Сверху, на крышку:</div>
         <div class="o" data-m="bolt8" data-f="cap">Болты М8 <small>· 4 шт, к крышке</small></div>
         <div class="o" data-m="bolt10" data-f="cap">Болты М10 <small>· 4 шт, к крышке</small></div>
+        <div class="o" data-m="ang6" data-f="cap">Уголки М6 <small>· 4 шт, конденсатор к крышке</small></div>
+        <div class="o" data-m="bolt6" data-f="cap">Болты М6 <small>· 4 шт, вентилятор в крышку</small></div>
         <div class="o" data-m="weld" data-f="cap">Сварка <small>· приварить к крышке</small></div>
         <div class="o" data-m="free" data-f="cap">Просто надеть <small>· по проёму, без крепежа</small></div>
         <div class="o" data-m="off" id="mntOff" style="color:#f0a9a0">✕ Отсоединить</div>
@@ -800,6 +802,8 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
         <button id="bInfo" title="Описание позиции из базы">ⓘ Описание</button>
         <button id="bPin" title="Закрепить на этом месте (P)">📌 Закрепить</button>
         <button id="bLink" title="Поставить на дно или надеть на крышку корпуса">⛓ Соединить с корпусом</button>
+        <button id="bRoof" style="display:none"
+                title="Поставить на крышу чиллера: конденсатор — на штатные ряды через уголки, вентилятор — в проём на четыре М6">⌂ На крышу</button>
         <button id="bPos" title="Точные координаты и углы (G)">⌖ Координаты</button>
         <button id="bSwap" style="display:none" title="Поставить на этот патрубок другую деталь">⇄ Заменить</button>
         <button id="bRot" title="Повернуть вокруг вертикали (R)">⟳ 90°</button>
@@ -1560,6 +1564,12 @@ function togglePin(){
 const MOUNT={
   bolt8: {t:'болты М8',  hw:'Болт М8×25 с гайкой и шайбой',  n:4},
   bolt10:{t:'болты М10', hw:'Болт М10×30 с гайкой и шайбой', n:4},
+  /* v2.45.1027: верхний узел. Конденсатор в наших чиллерах цепляется к крышке
+     не напрямую, а через гнутые уголки — по два болта М6 на уголок (один в
+     крышку, второй в раму аппарата). Вентилятор садится в крышку сам. */
+  ang6:  {t:'уголки М6', hw:'Уголок монтажный гнутый, лист 2 мм', n:4,
+          hw2:'Болт М6×20 с гайкой и шайбой', n2:8},
+  bolt6: {t:'болты М6',  hw:'Болт М6×20 с гайкой и шайбой',  n:4},
   weld:  {t:'сварка',    hw:null, n:0},
   free:  {t:'без крепежа',hw:null, n:0},
 };
@@ -1640,6 +1650,162 @@ function capHole(fr,bb){
   return {x:sx,y:sy,w:Math.max(...xs)-Math.min(...xs)+w/N,
                     d:Math.max(...ys)-Math.min(...ys)+d/N};
 }
+/* ═══ v2.45.1027: штатный верхний узел — конденсатор и вентилятор на крышке ═══
+   Крышка 00.000.003 приходит из базы уже с сеткой отверстий (раскрой
+   «00.000.003 Крышка (лист 1 мм).DXF»), и вся она размечена от центра проёма
+   обдува Ø490:
+     · конденсатор — два ряда отверстий Ø7 (М6) на 651 мм друг от друга,
+       в ряду 5 штук с шагом 125 мм (от −250 до +250 поперёк рядов);
+     · вентилятор — четыре Ø7 квадратом 364,16 мм вокруг проёма: это ушки
+       проволочной корзины (исполнение G), они стоят под 45°.
+   Раньше деталь садилась «на глаз по проёму»; теперь — по этим отверстиям,
+   и крепёж на неё считается сам. */
+const CAP_G={dia:7,hole:490,cond:{span:651,step:125,n:5},fan:{sq:364.16},ang:2};
+/* Луч сверху шагает от центра проёма в сторону, пока не наткнётся на металл:
+   так находится кромка. Сетка крышки размечена от центра проёма, поэтому
+   центр нужен точный — грубого (по клеткам capHole) не хватает. */
+function capEdge(fr,z,x,y,dx,dy){
+  const ray=new THREE.Raycaster();ray.far=12;
+  const dir=new THREE.Vector3(0,0,-1),o=new THREE.Vector3();
+  for(let t=4;t<=340;t+=1){
+    o.set(x+dx*t,y+dy*t,z+5);ray.set(o,dir);
+    if(ray.intersectObject(fr.obj,false).length)return t;
+  }
+  return null;
+}
+/* Сетка есть только у нашей крышки: узнаём её по проёму Ø490 */
+function capGrid(fr){
+  const st=capTop(fr,true);
+  if(!st.part||!st.hole)return null;
+  let cx=st.hole.x,cy=st.hole.y,d=(st.hole.w+st.hole.d)/2;
+  const L=capEdge(fr,st.z,cx,cy,-1,0),R=capEdge(fr,st.z,cx,cy,1,0),
+        B=capEdge(fr,st.z,cx,cy,0,-1),T=capEdge(fr,st.z,cx,cy,0,1);
+  if(L&&R&&B&&T){cx+=(R-L)/2;cy+=(T-B)/2;d=(L+R+B+T)/2;}
+  if(d<430||d>560)return null;
+  return {st:st,cx:cx,cy:cy,rz:fr.obj.rotation.z||0,dia:d};
+}
+/* точка сетки в мире: сдвиг от центра проёма, повёрнутый вместе с корпусом */
+function capPt(g,dx,dy){
+  const c=Math.cos(g.rz),s=Math.sin(g.rz);
+  return {x:g.cx+dx*c-dy*s,y:g.cy+dx*s+dy*c};
+}
+/* обратный ход: где деталь стоит сейчас в координатах крышки */
+function capLocal(g,x,y){
+  const c=Math.cos(g.rz),s=Math.sin(g.rz),dx=x-g.cx,dy=y-g.cy;
+  return {dx:dx*c+dy*s,dy:-dx*s+dy*c};
+}
+/* все крепёжные отверстия крышки — для подсветки */
+function capHolePts(g,which){
+  const P=[],C=CAP_G.cond,q=CAP_G.fan.sq/2;
+  if(which!=='fan')for(const sx of [-C.span/2,C.span/2])
+    for(let i=0;i<C.n;i++)P.push(capPt(g,sx,(i-(C.n-1)/2)*C.step));
+  if(which!=='cond')for(const sx of [-q,q])for(const sy of [-q,q])P.push(capPt(g,sx,sy));
+  return P;
+}
+/* жёлтые кольца в отверстиях — видно, во что именно села деталь */
+let holeMk=null,holeTmr=0;
+function holesShow(pts,z){
+  holesHide();
+  holeMk=new THREE.Group();
+  const geo=new THREE.RingGeometry(5,10,20);
+  const mat=new THREE.MeshBasicMaterial({color:0xC9A227,transparent:true,opacity:.9,
+    side:THREE.DoubleSide,depthTest:false});
+  pts.forEach(p=>{const m=new THREE.Mesh(geo,mat);m.position.set(p.x,p.y,z+2);
+    m.renderOrder=990;holeMk.add(m);});
+  scene.add(holeMk);
+  holeTmr=setTimeout(holesHide,7000);
+}
+function holesHide(){
+  if(holeTmr){clearTimeout(holeTmr);holeTmr=0;}
+  if(!holeMk)return;
+  holeMk.children.forEach(m=>{m.geometry.dispose();m.material.dispose();});
+  scene.remove(holeMk);holeMk=null;
+}
+/* Конденсатор на ряды крышки: длинной стороной вдоль рядов, лапами — в
+   ближайшую пару отверстий с шагом 125, между крышкой и рамой — полка уголка. */
+function seatCond(it,fr,g){
+  const lb=it.obj.geometry.boundingBox,
+        lx=lb.max.x-lb.min.x,ly=lb.max.y-lb.min.y;
+  it.obj.rotation.z=(g?g.rz:(fr.obj.rotation.z||0))+(lx>=ly?0:Math.PI/2);
+  it.obj.updateMatrixWorld(true);
+  const st=g?g.st:capTop(fr,true);
+  const b=new THREE.Box3().setFromObject(it.obj),c=b.getCenter(new THREE.Vector3());
+  let tx=c.x,ty=c.y;
+  if(g){
+    const C=CAP_G.cond,loc=capLocal(g,c.x,c.y);
+    /* пятно ложится между двумя соседними отверстиями ряда — берём ту пару,
+       рядом с которой аппарат уже стоит */
+    let best=0,bd=Infinity;
+    for(let i=0;i<C.n-1;i++){
+      const cy=(i+0.5-(C.n-1)/2)*C.step;
+      const d=Math.abs(cy-loc.dy);if(d<bd){bd=d;best=i;}
+    }
+    const t=capPt(g,0,(best+0.5-(C.n-1)/2)*C.step);tx=t.x;ty=t.y;
+  }
+  const dz=Math.round(st.z+CAP_G.ang-b.min.z);
+  moveItem(it,snap(tx-c.x),snap(ty-c.y),dz);
+  it.link={to:fr.uid,mount:'ang6',face:'cap'};
+  pinMark(it);
+  if(!g)return 'Крышка без штатного проёма — конденсатор поставлен на её верх, крепление уголками';
+  /* проверка по пятну крепления из базы: у Belief это пазы 15 × 9,5, поэтому
+     2 мм разницы между 653 и 651 они и съедают */
+  const bl=(it.d.geom||{}).bolt||[],C=CAP_G.cond;
+  let warn='';
+  if(bl[0]&&bl[1]){
+    const okx=Math.abs(bl[0]-C.span)<=8,
+          k=Math.round(bl[1]/C.step),oky=k>=1&&Math.abs(bl[1]-k*C.step)<=6;
+    if(!okx||!oky)warn=' · пятно аппарата '+bl[0]+' × '+bl[1]+
+      ' мм в штатные ряды '+C.span+' × '+C.step+' не ложится — уголки под него по месту';
+  }
+  return 'Конденсатор на штатных рядах крышки '+C.span+' × '+C.step+
+    ' мм, 4 уголка М6, отм. '+Math.round(st.z+CAP_G.ang)+' мм'+warn;
+}
+/* Вентилятор — в проём Ø490, ушками корзины на четыре М6 (квадрат 364,16
+   под 45°): решётка и клеммная коробка сверху, крыльчатка уходит в корпус.
+   Так же он стоит и в заводской сборке корпуса из базы. */
+function seatFan(it,fr,g){
+  const st=g?g.st:capTop(fr,true);
+  const rz=g?g.rz:(fr.obj.rotation.z||0);
+  const q=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),rz)
+    .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI/2))
+    .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),Math.PI/4));
+  it.obj.quaternion.copy(q);
+  const drop=0.5;                       // начало СК вентилятора — на листе крышки
+  if(g)it.obj.position.set(g.cx,g.cy,st.z+drop);
+  else{const b=new THREE.Box3().setFromObject(it.obj);
+    it.obj.position.z+=st.z+drop-b.min.z;}
+  it.obj.updateMatrixWorld(true);
+  if(it._pinBox)it._pinBox.update();
+  it.link={to:fr.uid,mount:'bolt6',face:'cap',drop:drop};
+  pinMark(it);
+  if(!g)return 'Крышка без штатного проёма — вентилятор поставлен на её верх';
+  const bl=(it.d.geom||{}).bolt||[];
+  const warn=(bl[0]&&Math.abs(bl[0]-CAP_G.fan.sq)>8)
+    ?' · у этого исполнения крепёж по квадрату '+bl[0]+' мм, а в крышке '+
+      CAP_G.fan.sq+' — нужен вентилятор с проволочной корзиной (исполнение G) или переходная рама':'';
+  return 'Вентилятор в проём Ø'+Math.round(g.dia)+', 4 болта М6 в штатные отверстия'+warn;
+}
+/* Кнопка «На крышу»: один клик собирает весь верхний узел. */
+function roofSel(){
+  if(!sel)return;
+  const r=roleOf(sel.d);
+  if(r!=='cond'&&r!=='fan'){toast('«На крышу» — про конденсатор и вентилятор');return;}
+  const fr=frameFor(sel);
+  if(!fr){toast('В сцене нет корпуса — добавь его из раздела «Корпуса и рамы»');return;}
+  const g=capGrid(fr);
+  const h=histBegin('верхний узел на крышке');
+  const msg=[];
+  try{
+    if(r==='cond'){
+      msg.push(seatCond(sel,fr,g));
+      const fan=placed.find(p=>roleOf(p.d)==='fan'&&!p.pin);
+      if(fan)msg.push(seatFan(fan,fr,g));      // «и также вентилятор»
+    }else msg.push(seatFan(sel,fr,g));
+  }finally{histEnd(h);}
+  if(g)holesShow(capHolePts(g,r==='cond'&&placed.some(p=>roleOf(p.d)==='fan')?null:r),g.st.z);
+  selBtns();checkCollisions();showSelZ();refresh();save();
+  toast(msg.join(' · '));
+}
 /* Найти корпус, к которому сажаем: сначала тот, над которым деталь стоит,
    иначе единственный (или ближайший) в сцене. */
 function frameFor(it){
@@ -1665,7 +1831,12 @@ function reseatLink(it){
   const fr=placed.find(x=>x.uid===it.link.to);
   if(!fr){it.link=null;return;}
   const st=seatOf(fr,it.link.face),b=new THREE.Box3().setFromObject(it.obj);
-  moveItem(it,0,0,Math.round(st.z-b.min.z));
+  /* вентилятор сидит в проёме крышки: держим начало его СК на листе,
+     а не низ габарита — иначе он выпрыгивает наверх при каждой перекладке */
+  if(typeof it.link.drop==='number'){
+    moveItem(it,0,0,Math.round(st.z+it.link.drop-it.obj.position.z));return;}
+  const up=it.link.mount==='ang6'?CAP_G.ang:0;   // конденсатор стоит на полке уголка
+  moveItem(it,0,0,Math.round(st.z+up-b.min.z));
 }
 /* Посадить выделенную деталь на корпус и запомнить крепление.
    face='pan' — внутрь, на дно; face='cap' — сверху, на крышку (так у нас
@@ -1735,6 +1906,9 @@ function ctxItems(it){
            {ic:'⤫',t:'Снять с патрубка',s:hc?hc.txt:'',go:()=>rotOff(it)});
   }
   else L.push({ic:'⛓',t:lk?('Крепление · '+lk.t):'Соединить с корпусом',go:showMnt});
+  if((roleOf(it.d)==='cond'||roleOf(it.d)==='fan')&&placed.some(p=>roleOf(p.d)==='frame'))
+    L.push({ic:'⌂',t:roleOf(it.d)==='cond'?'На крышу · уголки М6':'В крышу · болты М6',
+            s:'штатные отверстия',go:()=>{select(it);roofSel();}});
   L.push(
     {sep:1},
     {ic:'⌖',t:'Точные координаты…',s:'G',go:()=>{select(it);posShow();}},
@@ -1854,6 +2028,7 @@ $('#bLink').onclick=()=>{
   if(sel&&sel.link&&sel.link.mount==='rot'){rotOff(sel);return;}
   $('#mnt').classList.contains('on')?hideMnt():showMnt();};
 $('#bSwap').onclick=()=>{if(sel)rotSwapAt(sel,$('#bSwap'));};
+$('#bRoof').onclick=roofSel;
 $('#mnt').querySelectorAll('.o').forEach(o=>o.onclick=()=>{hideMnt();linkSel(o.dataset.m,o.dataset.f);});
 /* подписи кнопок под выделенную деталь */
 function selBtns(){
@@ -1869,6 +2044,11 @@ function selBtns(){
   $('#bLink').title=rl?'Деталь сидит на патрубке аппарата — снять'
                      :'Поставить на дно или надеть на крышку корпуса';
   $('#bSwap').style.display=rl?'':'none';   // v2.45.1005: поставил не тот — поменяй
+  /* v2.45.1027: верхний узел — своя кнопка, у остальных ролей её нет */
+  const rr=sel?roleOf(sel.d):'';
+  const roof=(rr==='cond'||rr==='fan')&&placed.some(p=>roleOf(p.d)==='frame');
+  $('#bRoof').style.display=roof?'':'none';
+  if(roof)$('#bRoof').textContent=rr==='cond'?'⌂ На крышу · уголки М6':'⌂ В крышу · болты М6';
 }
 function select(it){
   const prev=sel;
@@ -2872,7 +3052,8 @@ function refresh(){
   const hw=new Map();
   placed.forEach(p=>{
     const m=p.link?MOUNT[p.link.mount]:null;
-    if(m&&m.hw)hw.set(m.hw,(hw.get(m.hw)||0)+m.n);});
+    if(m&&m.hw)hw.set(m.hw,(hw.get(m.hw)||0)+m.n);
+    if(m&&m.hw2)hw.set(m.hw2,(hw.get(m.hw2)||0)+m.n2);});
   if(hw.size)$('#spec').innerHTML+=[...hw.entries()].map(([t,n])=>
     `<div class="sr" style="color:var(--dim)"><span class="nm">${esc(t)}</span>`+
     `<span class="n">${n}</span><span class="u">компл</span></div>`).join('');
