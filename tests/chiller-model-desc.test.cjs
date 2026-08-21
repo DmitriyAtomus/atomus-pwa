@@ -84,20 +84,21 @@ test('данные позиции в карточке экранируются',
 });
 
 test('строка списка базы открывается с описанием и кнопкой ⓘ', () => {
-  const row = section('function catRow(d,add)', 'function bindInfo(box,acts)');
-  assert.match(row, /class="k'\+\(filt\?' one':''\)\+'">'\+esc\(kind\)/);        // заводское наименование
-  assert.match(row, /class="k tg'\+\(filt\?' full':''\)\+'">'\+esc\(tagLine\(d\)\)/);  // характеристики
+  const row = section('function catRow(d,add', 'function bindInfo(box,acts)');
+  // hlt — то же экранирование, плюс <mark> на найденных словах (v2.46.003)
+  assert.match(row, /class="k'\+\(filt\?' one':''\)\+'">'\+hlt\(kind,tk\)/);        // заводское наименование
+  assert.match(row, /class="k tg'\+\(filt\?' full':''\)\+'">'\+hlt\(tagLine\(d\),tk\)/);  // характеристики
   assert.match(row, /class="info" title="Описание позиции">ⓘ/);
   // один и тот же ряд и в подборе на схеме, и в базе компоновки
-  assert.match(page, /rest\.map\(d=>catRow\(d,'→'\)\)/);
-  assert.match(page, /\$\('#cat'\)\.innerHTML=list\.slice\(0,80\)\.map\(d=>catRow\(d,'\+'\)\)/);
+  assert.match(page, /rest\.map\(d=>catRow\(d,'→',tk\)\)/);
+  assert.match(page, /h\+=part\.map\(d=>catRow\(d,'\+',tk\)\)/);
 });
 
 test('«ⓘ» открывает карточку, а не назначает и не добавляет деталь', () => {
   const bind = section('function bindInfo(box,acts)', 'let asgKey=null;');
   assert.match(bind, /e\.stopPropagation\(\)/);
   assert.match(page, /bindInfo\('#asgList',d=>\[\{t:'✓ Назначить сюда',pri:true,go:\(\)=>assignTo\(d\)\}\]\)/);
-  assert.match(page, /bindInfo\('#cat',d=>\[\{t:'\+ Добавить в сцену',pri:true,go:\(\)=>addItem\(d\)\}\]\)/);
+  assert.match(page, /bindInfo\('#cat',d=>\[\{t:'\+ Добавить в сцену',pri:true,go:\(\)=>catPick\(d\)\}\]\)/);
 });
 
 test('назначение с карточки идёт тем же путём и пишет шаг истории', () => {
@@ -119,16 +120,28 @@ test('подбор модели открывается с описанием у�
 });
 
 test('поиск по базе ищет и по характеристикам из тегов', () => {
-  const ctx = sandbox();
-  assert.ok(ctx.hay(NRV).includes('kv 0,56'), 'теги должны попадать в строку поиска');
+  // строку поиска собирает hayOf из блока каталога (v2.46.003)
+  const code = section('/* ═══ каталог базы', 'const THUMBS=new Map();') +
+    ';Object.assign(globalThis,{tkMatch});';
+  const ctx = {
+    DATA: [], SECTIONS: [['compressors', 'Компрессоры', [['scroll', 'Спиральные']]]],
+    SECNAME: { compressors: 'Компрессоры', 'compressors/scroll': 'Спиральные' },
+    localStorage: { getItem: () => null, setItem() {} },
+    document: { querySelectorAll: () => [], querySelector: () => null },
+    addEventListener() {}, $: () => null, esc: (v) => String(v || ''),
+  };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(code, ctx);
+  assert.ok(ctx.hayOf(NRV).includes('kv 0.56'), 'теги должны попадать в строку поиска');
+  assert.ok(ctx.hayOf(NRV).includes('пропускная способность'), 'и характеристики тоже');
   // «компрессор» не написано ни в одной позиции — слово живёт в названии раздела
-  ctx.secNames();
-  const comp = Object.assign({}, NRV, { section: 'compressors', sub: 'scroll',
+  const comp = Object.assign({}, NRV, { id: 'YH69T1-100', section: 'compressors', sub: 'scroll',
     name: 'YH69T1-100', brand: 'Invotech', kind: 'Спиральный, A/C и чиллеры', tags: ['R407C'] });
-  assert.ok(ctx.hay(comp).includes('компрессор'), 'подбор компрессора не найдёт ни одной модели');
+  assert.ok(ctx.hayOf(comp).includes('компрессор'), 'подбор компрессора не найдёт ни одной модели');
   assert.match(page, /SECTIONS=ix\.sections;secNames\(\)/);
-  assert.match(page, /if\(q&&!hay\(d\)\.includes\(q\)\)return false;/);   // подбор на схеме ищет по hay
-  assert.match(page, /\.filter\(d=>!fQ\|\|hay\(d\)\.includes\(fQ\)\)/); // база компоновки
+  assert.match(page, /if\(tk\.length&&!tkMatch\(hayOf\(d\),tk\)\)return false;/);  // подбор на схеме
+  assert.match(page, /l=l\.filter\(d=>tkMatch\(hayOf\(d\),tk\)\)/);              // база компоновки
 });
 
 test('карточку закрывают Esc, крестик и клик мимо', () => {
