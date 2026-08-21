@@ -547,6 +547,10 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 #rpick .rr small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden;font-size:10px;color:var(--faint);line-height:1.3}
 /* v2.45.1005: в замене видно, какая деталь стоит на патрубке сейчас */
+/* v2.46.021: деталь в этот отрезок не влезает — строка гаснет и сама
+   пишет, сколько трубы не хватает */
+#rpick .rr.no{opacity:.55;cursor:default}
+#rpick .rr.no small{color:#f0a9a0}
 #rpick .rr.cur{background:rgba(232,212,154,.09);cursor:default}
 #rpick .rr.cur b{color:#e8d49a}
 #rpick .rr.cur small{color:#c9b784}
@@ -846,6 +850,10 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
         <div class="rw" id="posLenF" style="display:none"><label></label>
           <button id="pLFit" style="width:auto;flex:1 1 auto;font-size:11px;height:26px"
             title="Взять длину по расстоянию до ответного патрубка на оси трубы">⇥ подогнать по патрубкам</button>
+          <span class="u"></span></div>
+        <div class="rw" id="posLenC" style="display:none"><label></label>
+          <button id="pLCut" style="width:auto;flex:1 1 auto;font-size:11px;height:26px"
+            title="Разрезать отрезок и поставить в разрыв вентиль, фильтр или муфту">⧎ врезать арматуру…</button>
           <span class="u"></span></div>
         <div class="t t2">Повороты, градусы</div>
         <div class="rw"><label>вокруг Z</label><button data-pt="z" data-k="-1">−</button>
@@ -1179,22 +1187,27 @@ function toNDC(e){const r=$('#cv').getBoundingClientRect();
    строкой спецификации или кликом, когда он уже выделен (чтобы двигать). */
 const FRM_KEY='atomus_chiller_framethru';
 let FRMTHRU=(()=>{try{return localStorage.getItem(FRM_KEY)!=='0';}catch(e){return true;}})();
+/* v2.46.021: где именно луч попал в деталь — по этой точке врезают арматуру
+   в трубу: ткнул в место разрыва, а не «где-то посередине отрезка» */
+let pickPt=null;
 function pickItem(e,any){
   toNDC(e);ray.setFromCamera(ndc,camera);
   const hits=ray.intersectObjects(placed.map(p=>p.obj));
   /* v2.45.1002: погашённая деталь узла курсор не ловит — её и гасят затем,
      чтобы дотянуться до того, что за ней (луч сквозь невидимую панель) */
-  const list=[];
+  const list=[],pts=new Map();
   hits.forEach(x=>{
     const ms=Array.isArray(x.object.material)?x.object.material:[x.object.material];
     const m=ms[x.face?x.face.materialIndex:0];
     if(m&&m.visible===false)return;
     const p=placed.find(q=>q.obj===x.object);
-    if(p&&list.indexOf(p)<0)list.push(p);
+    if(p&&list.indexOf(p)<0){list.push(p);pts.set(p,x.point.clone());}
   });
-  if(any||!FRMTHRU)return list[0]||null;
-  const inner=list.find(p=>roleOf(p.d)!=='frame');
-  return inner||list[0]||null;      // за панелью деталь — берём её, иначе сам корпус
+  const out=(any||!FRMTHRU)?(list[0]||null)
+    // за панелью деталь — берём её, иначе сам корпус
+    :(list.find(p=>roleOf(p.d)!=='frame')||list[0]||null);
+  pickPt=out?(pts.get(out)||null):null;
+  return out;
 }
 /* v2.45.974: тащим деталь в плоскости её собственной отметки, а не по полу —
    иначе поднятый наверх конденсатор прыгал бы вниз при первом же перетаскивании */
@@ -2393,8 +2406,14 @@ function ctxItems(it){
             s:'штатные отверстия',go:()=>{select(it);roofSel();}});
   if(isTank(it.d))L.push({ic:'✎',t:'Размеры бака…',s:Math.round(tkCalc(it.d.tk).Vw)+' л',
     go:()=>{select(it);tkOpen(it);}});
-  if(isPipeSeg(it))L.push({ic:'⇹',t:'Длина отрезка…',s:pipeLen(it)+' мм',
-    go:()=>{select(it);posShow();}});
+  if(isPipeSeg(it)){
+    const pt=ctxPt?ctxPt.clone():null,cx=ctxXY.x,cy=ctxXY.y;
+    L.push({ic:'⇹',t:'Длина отрезка…',s:pipeLen(it)+' мм',
+      go:()=>{select(it);posShow();}},
+      /* врезка идёт в то место трубы, по которому нажали правую кнопку */
+      {ic:'⧎',t:'Врезать в разрыв…',s:'вентиль · фильтр · муфта',
+       go:()=>{select(it);cutPick(it,cx,cy,pt);}});
+  }
   if(!isPipeSeg(it))L.push({ic:'⌗',t:'Выровнять по корпусу',s:'углы 90° и сетка',
     go:()=>{select(it);alignSel();}});
   L.push(
@@ -2417,8 +2436,12 @@ function ctxItems(it){
     {ic:'✕',t:'Убрать со сцены',s:'Del',del:1,go:delSel});
   return L;
 }
+/* точка и место последнего вызова меню: врезка в трубу встаёт туда, куда
+   ткнули, а её список раскрывается от той же строки меню */
+let ctxPt=null,ctxXY={x:0,y:0};
 function ctxOpen(it,x,y){
   const box=$('#ctx');
+  ctxPt=pickPt?pickPt.clone():null;ctxXY={x:x,y:y};
   const b=new THREE.Box3().setFromObject(it.obj);
   box.innerHTML='<div class="hd"><b></b><span></span></div>';
   box.querySelector('b').textContent=it.d.brand+' '+it.d.name;
@@ -3279,8 +3302,10 @@ function rotMate(v){
   host.obj.updateMatrixWorld(true);
   const A=new THREE.Vector3(z.dir[0],z.dir[1],z.dir[2])
     .applyQuaternion(host.obj.quaternion).normalize();        // ось штуцера, наружу
-  const P=new THREE.Vector3(z.p0[0],z.p0[1],z.p0[2])
-    .applyMatrix4(host.obj.matrixWorld).addScaledVector(A,z.seat||0);
+  /* v2.46.021: у растянутого отрезка трубы отметка прилегания едет вместе с
+     масштабом — считаем её в системе координат детали и переводим в сцену
+     целиком, иначе врезанная арматура садится не на торец, а внутрь участка */
+  const P=rotSeatLocal(z).applyMatrix4(host.obj.matrixWorld);
   const dv=new THREE.Vector3(vz.dir[0],vz.dir[1],vz.dir[2]).normalize();
   const q=new THREE.Quaternion().setFromUnitVectors(dv,A.clone().negate());
   const stem=new THREE.Vector3(0,0,1).applyQuaternion(q);     // верх детали
@@ -3419,8 +3444,7 @@ function checkPipes(){
       if(it.link&&it.link.mount==='rot'&&it.link.pzi===i)return;
       const A=new THREE.Vector3(z.dir[0],z.dir[1],z.dir[2])
         .applyQuaternion(it.obj.quaternion).normalize();
-      ends.push({it:it,c:cn,p:new THREE.Vector3(z.p0[0],z.p0[1],z.p0[2])
-        .applyMatrix4(it.obj.matrixWorld).addScaledVector(A,z.seat||0)});
+      ends.push({it:it,c:cn,p:rotSeatLocal(z).applyMatrix4(it.obj.matrixWorld)});
     });
   });
   for(let i=0;i<ends.length;i++)for(let j=i+1;j<ends.length;j++){
@@ -3581,8 +3605,7 @@ function pipeFitLen(it){
   host.obj.updateMatrixWorld(true);
   const D=new THREE.Vector3(hz.dir[0],hz.dir[1],hz.dir[2])
     .applyQuaternion(host.obj.quaternion).normalize();
-  const F=new THREE.Vector3(hz.p0[0],hz.p0[1],hz.p0[2])
-    .applyMatrix4(host.obj.matrixWorld).addScaledVector(D,hz.seat||0);
+  const F=rotSeatLocal(hz).applyMatrix4(host.obj.matrixWorld);
   const my=connOf(mateZoneOf(it)||{});
   let best=null;
   placed.forEach(o=>{
@@ -3594,8 +3617,7 @@ function pipeFitLen(it){
       if(my&&c&&!connFit(my,c))return;                    // не тот размер или тип
       const A=new THREE.Vector3(z.dir[0],z.dir[1],z.dir[2])
         .applyQuaternion(o.obj.quaternion).normalize();
-      const T=new THREE.Vector3(z.p0[0],z.p0[1],z.p0[2])
-        .applyMatrix4(o.obj.matrixWorld).addScaledVector(A,z.seat||0);
+      const T=rotSeatLocal(z).applyMatrix4(o.obj.matrixWorld);
       const v=T.clone().sub(F),t=v.dot(D);
       if(t<PIPE_MIN||t>PIPE_MAX)return;
       const off=v.addScaledVector(D,-t).length();
@@ -3622,6 +3644,216 @@ function pipeSetSel(L){
   if(pipeLen(sel)===Math.round(L)){posFill();return;}
   pushHist('длину трубы');
   setPipeLen(sel,L);posDone();
+}
+
+/* ═══ v2.46.021: врезка арматуры в разрыв трубы ═══
+   Вентиль, фильтр-осушитель, смотровое стекло, обратный клапан, муфта стоят
+   не на конце линии, а в её разрыве: трубу режут, концы заводят в арматуру с
+   двух сторон. Раньше в сцене это делалось руками — отрезок укорачивали
+   числом, вентиль сажали на его конец, второй отрезок доставали из каталога
+   и подгоняли на глаз; трасса при этом рвалась, стоило подвинуть аппарат.
+   Теперь разрыв делает сама труба: ткнул по месту — отрезок расходится на два
+   участка, между ними встаёт выбранная деталь, и всё это сцеплено штатными
+   посадками на патрубки. Двинули аппарат — цепочка «труба → арматура →
+   труба» едет за ним целиком, а метраж в спецификации пересчитывается сам.
+
+   Что можно врезать, решает та же разметка базы, что и посадку на патрубок:
+   у детали должно быть два патрубка, оба сходятся с концом трубы по типу и
+   размеру и смотрят в разные стороны. Тройник и крестовина сюда попадают —
+   у них сквозной проход, а отвод трассу и продолжает; угольник нет, он ось
+   ломает. */
+
+/* Концы отрезка в сцене: точки прилегания обоих торцов, ось и во сколько раз
+   расстояние между торцами длиннее самой трубы (у отрезка с посадочной
+   отметкой торец выходит за длину). si — конец, которым труба уже сидит на
+   патрубке: он остаётся за первым участком, fi — свободный. */
+function pipeEnds(it){
+  if(!isPipeSeg(it))return null;
+  const zs=it.zn||[];
+  if(!zs[0]||!zs[1]||!zs[0].p0||!zs[1].p0)return null;
+  const si=(it.link&&it.link.mount==='rot'&&it.link.pzi!=null&&zs[it.link.pzi])
+    ?it.link.pzi:0;
+  const fi=si?0:1;
+  it.obj.updateMatrixWorld(true);
+  const A=rotSeatLocal(zs[si]).applyMatrix4(it.obj.matrixWorld);
+  const B=rotSeatLocal(zs[fi]).applyMatrix4(it.obj.matrixWorld);
+  const D=A.distanceTo(B);
+  if(D<1)return null;
+  return {si:si,fi:fi,A:A,B:B,D:D,u:B.clone().sub(A).divideScalar(D),
+          k:D/(pipeLen(it)||1)};
+}
+/* Фитинги, которые ломают ось: разметка PP-R даёт у них пару патрубков в
+   +X и −X, хотя канал внутри поворачивает (у угольника Ø20 «патрубок» в +X —
+   это наружная стенка колена), — по одной геометрии угольник от тройника не
+   отличить, поэтому отсеиваем их по названию. */
+const CUT_TURN=/угольник|отвод|колено|водорозетк|двухплоскостн/i;
+/* Проходная арматура под это присоединение: два сходящихся патрубка на одной
+   оси навстречу друг другу. sp — расстояние между их плоскостями прилегания,
+   ровно столько трубы уходит в разрыв. */
+function cutMates(c){
+  if(!c)return [];
+  const k='cut|'+c.t+'|'+c.size+'|'+c.sex;
+  if(MATE_CACHE.has(k))return MATE_CACHE.get(k);
+  const out=[];
+  (DATA||[]).forEach(d=>{
+    if(!d.ready||!d.g||CUT_TURN.test(d.name||''))return;
+    const zs=((GEOMS[d.g]||{}).zn)||[];
+    let best=null;
+    zs.forEach((z,i)=>{
+      const ci=connOf(z);
+      if(!ci||!connFit(c,ci))return;
+      const A=new THREE.Vector3(z.dir[0],z.dir[1],z.dir[2]).normalize();
+      zs.forEach((w,j)=>{
+        if(j===i)return;
+        const cj=connOf(w);
+        if(!cj||!connFit(c,cj))return;
+        const B=new THREE.Vector3(w.dir[0],w.dir[1],w.dir[2]).normalize();
+        if(A.dot(B)>-0.9)return;                 // не проходная: ось трассы ломается
+        const sp=Math.abs(rotSeatLocal(w).sub(rotSeatLocal(z)).dot(A));
+        if(sp<1)return;                          // патрубки в одной точке — не разрыв
+        if(!best||sp<best.sp)best={d:d,zi:i,zj:j,z:z,z2:w,c:ci,sp:sp};
+      });
+    });
+    if(best)out.push(best);
+  });
+  out.sort((a,b)=>(SEC_ORD[a.d.section]||9)-(SEC_ORD[b.d.section]||9)||
+                  String(a.d.name).localeCompare(String(b.d.name),'ru'));
+  MATE_CACHE.set(k,out);return out;
+}
+/* Номер патрубка у детали в сцене. В индексе базы зоны лежат все подряд, а в
+   сцену попадают только те, у которых есть точка выноски, — поэтому номер
+   сверяем по самой зоне, а не полагаемся на его совпадение. */
+function zIdxOf(it,i,z){
+  const zs=it.zn||[];
+  const same=w=>!!w&&!!w.p0&&!!w.dir&&String(w.conn)===String(z.conn)&&
+    w.dir[0]===z.dir[0]&&w.dir[1]===z.dir[1]&&w.dir[2]===z.dir[2]&&
+    w.p0[0]===z.p0[0]&&w.p0[1]===z.p0[1]&&w.p0[2]===z.p0[2];
+  if(same(zs[i]))return i;
+  const j=zs.findIndex(same);
+  return j>=0?j:i;
+}
+/* Сколько трубы должно остаться с каждой стороны, если врезать деталь длиной
+   sp в точку pt. Возвращает длины участков или причину, почему не выйдет. */
+function cutPlan(it,sp,pt){
+  const e=pipeEnds(it);
+  if(!e)return {err:'У отрезка в базе нет разметки торцов — резать нечего'};
+  const k=e.k||1,min=PIPE_MIN*k;
+  if(e.D-sp<2*min)
+    return {err:'Отрезок короткий: под врезку не хватает '+
+      Math.ceil((2*min+sp-e.D)/(k||1))+' мм'};
+  let t=pt?pt.clone().sub(e.A).dot(e.u):e.D/2;      // куда ткнули, по оси трубы
+  t=Math.max(min+sp/2,Math.min(e.D-min-sp/2,t));
+  return {e:e,L1:Math.max(PIPE_MIN,Math.round((t-sp/2)/k)),
+              L2:Math.max(PIPE_MIN,Math.round((e.D-t-sp/2)/k))};
+}
+/* Сама врезка: первый участок укорачиваем на месте, арматуру сажаем на его
+   освободившийся торец, второй участок — на дальний патрубок арматуры. Всё,
+   что висело на дальнем конце трубы, переезжает на второй участок. */
+async function cutInsert(it,m,pt){
+  if(!it||!m||!placed.includes(it))return;
+  const P=cutPlan(it,m.sp,pt);
+  if(P.err){toast(P.err);return;}
+  const e=P.e,si=e.si,fi=e.fi;
+  const tail=placed.filter(p=>p.link&&p.link.mount==='rot'&&
+                              p.link.to===it.uid&&p.link.zi===fi);
+  const h=histBegin('врезку в трубу');
+  try{
+    const A0=e.A.clone();
+    setPipeLen(it,P.L1);
+    /* труба ни на чём не сидит — масштаб тянет её в обе стороны от центра,
+       поэтому первый торец возвращаем на прежнее место */
+    if(!(it.link&&it.link.mount==='rot')){
+      const e2=pipeEnds(it);
+      if(e2)it.obj.position.add(A0.sub(e2.A));
+      it.obj.updateMatrixWorld(true);
+    }
+    const p0=it.obj.position;
+    const v=await addItem(m.d,{x:p0.x,y:p0.y,z:p0.z});
+    if(!v){toast('Врезка не вышла: модель арматуры не загрузилась');return;}
+    v.link={to:it.uid,mount:'rot',face:'port',zi:fi,pzi:zIdxOf(v,m.zi,m.z)};
+    if(!rotMate(v)){
+      v.link=null;
+      toast('Арматура не села на торец трубы — база не дала ось');return;}
+    const p2=await addItem(it.d,{x:p0.x,y:p0.y,z:p0.z});
+    if(!p2){toast('Второй участок не встал — модель трубы не загрузилась');return;}
+    p2.link={to:v.uid,mount:'rot',face:'port',zi:zIdxOf(v,m.zj,m.z2),pzi:si};
+    setPipeLen(p2,P.L2);                        // растёт от своего торца, к арматуре
+    tail.forEach(p=>{p.link.to=p2.uid;p.link.zi=fi;rotMate(p);});
+    select(v);
+    toast(m.d.name+' — в разрыв трубы, участки '+P.L1+' и '+P.L2+' мм'+
+      (tail.length?(' · на второй участок переехало '+tail.length+' дет.'):''));
+  }finally{histEnd(h);}
+  checkCollisions();showSelZ();refresh();save();
+}
+/* Список того, что встанет в этот разрыв. Окно то же, что у патрубка. */
+function cutPick(it,x,y,pt){
+  if(!isPipeSeg(it))return;
+  const e=pipeEnds(it);
+  const c=e?connOf((it.zn||[])[e.fi]):null;
+  if(!c){toast('У отрезка в базе нет присоединения — врезать нечего');return;}
+  select(it);
+  const list=cutMates(c);
+  const box=$('#rpick');
+  box.innerHTML='<div class="hd"><b></b><span></span></div>'+
+    (list.length>10?'<input class="fx" placeholder="фильтр по названию">':'')+
+    '<div class="rl"></div><div class="nt"></div>';
+  box.querySelector('.hd b').textContent='Врезать в разрыв · '+c.txt+
+    (list.length?(' · подходит '+list.length):'');
+  box.querySelector('.hd span').textContent=it.d.brand+' '+it.d.name+
+    ' · отрезок '+pipeLen(it)+' мм';
+  const rl=box.querySelector('.rl');
+  if(!list.length){
+    box.querySelector('.nt').textContent='В базе нет проходной арматуры под это '+
+      'присоединение — напиши в чате, добавлю в базу 3D.';
+  }else{
+    const draw=q=>{
+      rl.innerHTML='';
+      let sec='';
+      list.filter(m=>!q||(m.d.name+' '+(m.d.kind||'')).toLowerCase().indexOf(q)>=0)
+        .forEach(m=>{
+          const d=m.d,P=cutPlan(it,m.sp,pt);
+          if(d.section!==sec){
+            sec=d.section;
+            const hd=document.createElement('div');hd.className='gh';
+            hd.textContent=SEC_NAME[sec]||sec;rl.appendChild(hd);
+          }
+          const r=document.createElement('div');
+          r.className='rr'+(P.err?' no':'');
+          r.innerHTML='<img data-th="'+esc(GEOMS[d.g].f)+'"><div class="t"><b></b><small></small></div>';
+          r.querySelector('b').textContent=d.name;
+          /* сразу видно, на какие два участка разойдётся труба и сколько её
+             уйдёт в саму деталь — короткий отрезок честно говорит «не влезет» */
+          r.querySelector('small').textContent=P.err
+            ?P.err
+            :String(d.kind||'').replace(/\s*,.*$/,'')+' · в разрыв '+
+             Math.round(m.sp)+' мм · участки '+P.L1+' и '+P.L2;
+          r.onclick=()=>{
+            if(P.err){toast(P.err);return;}
+            rotPickClose();cutInsert(it,m,pt);
+          };
+          rl.appendChild(r);
+        });
+      fillThumbsIn('#rpick');
+    };
+    draw('');
+    const fx=box.querySelector('.fx');
+    if(fx)fx.oninput=()=>draw(fx.value.trim().toLowerCase());
+    box.querySelector('.nt').textContent='Труба разойдётся на два участка, между '+
+      'ними встанет выбранная деталь. Участки остаются одной позицией '+
+      'спецификации — метраж пересчитается. Ctrl+Z вернёт как было.';
+  }
+  box.classList.add('on');
+  const w=box.offsetWidth,hh=box.offsetHeight,M=8;
+  box.style.left=Math.max(M,Math.min(x+14,innerWidth-w-M))+'px';
+  box.style.top =Math.max(M,Math.min(y-24,innerHeight-hh-M))+'px';
+  fillThumbsIn('#rpick');
+}
+/* с кнопки панели: место разрыва не указано — режем посередине отрезка */
+function cutPickSel(btn){
+  if(!sel||!isPipeSeg(sel)){toast('Врезать можно только в отрезок трубы');return;}
+  let x=innerWidth/2,y=innerHeight/2;
+  if(btn){const r=btn.getBoundingClientRect();x=r.left-320;y=r.top;}
+  cutPick(sel,Math.max(8,x),y,null);
 }
 
 /* ═══ v2.46.001: точное позиционирование ═══
@@ -3662,9 +3894,9 @@ function posFill(){
   posEl('posRot').style.display=rl?'block':'none';
   /* длина отрезка — только у трубы: фитинг и вентиль тянуть нельзя */
   const pl=isPipeSeg(sel);
-  ['posLenT','posLenR','posLenF'].forEach(id=>posEl(id).style.display=pl?'':'none');
+  ['posLenT','posLenR','posLenF','posLenC'].forEach(id=>posEl(id).style.display=pl?'':'none');
   if(pl){
-    posEl('posLenR').style.display='flex';posEl('posLenF').style.display='flex';
+    ['posLenR','posLenF','posLenC'].forEach(id=>posEl(id).style.display='flex');
     set('pL',pipeLen(sel),false);
     posEl('pLFit').disabled=!(sel.link&&sel.link.mount==='rot');
   }
@@ -3673,7 +3905,7 @@ function posFill(){
     ' × '+Math.round(sz.z)+' мм'+(sel.pin?' · закреплена':'');
   posEl('pos').querySelectorAll('.rw button').forEach(btn=>{
     /* длина отрезка от посадки на патрубок не зависит — эти кнопки живые всегда */
-    if(btn.dataset.pl||btn.id==='pLFit')return;
+    if(btn.dataset.pl||btn.id==='pLFit'||btn.id==='pLCut')return;
     btn.disabled=rl&&!(btn.dataset.pt==='z');});
 }
 /* общий хвост правки: пересчёт пересечений, подписей и сохранение */
@@ -3761,6 +3993,7 @@ function posChips(){
     const k=+b.dataset.k;
     if(b.dataset.pl){b.onclick=()=>{if(sel)pipeSetSel(pipeLen(sel)+k*POS.step);};return;}
     if(b.id==='pLFit'){b.onclick=pipeFitSel;return;}
+    if(b.id==='pLCut'){b.onclick=()=>cutPickSel(b);return;}
     b.onclick=()=>b.dataset.pn?posNudge(b.dataset.pn,k):posTurn(b.dataset.pt,k);
   });
   const pl=posEl('pL');
@@ -3994,8 +4227,11 @@ async function histApply(snapshot){
       p.obj.rotation.set(it.k||0,it.t||0,it.r||0);
       p.obj.updateMatrixWorld(true);
       p.pin=!!it.pin;
+      /* v2.46.021: pzi — номер патрубка, которым деталь сидит; без него после
+         отмены цепочка «труба → арматура → труба» садиться перестаёт */
       p.link=it.link?{to:it.link.to,mount:it.link.mount,face:it.link.face||'pan',
-                      zi:it.link.zi,roll:it.link.roll}:null;
+                      zi:it.link.zi,pzi:it.link.pzi,roll:it.link.roll}:null;
+      if(it.pl&&isPipeSeg(p))setPipeLen(p,it.pl);      // длина отрезка тоже в снимке
       p.off=Array.isArray(it.off)?it.off.slice():[];
       applyOff(p);pinMark(p);
     }
