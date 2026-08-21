@@ -757,7 +757,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="swrap">
         <div id="schChips" class="sch-chips"></div>
-        <svg id="schSvg" viewBox="0 0 900 700"></svg>
+        <svg id="schSvg" viewBox="0 0 900 722"></svg>
         <div id="schTip"></div>
         <div class="sch-note">Лист АГ.ЧИЛ-104 Г3 — гидравлическая схема чиллера 7 кВт. Клик по бирке позиции — подбор модели из базы:
           зелёная бирка — назначено, янтарная «назначить» — ждёт. Зимний комплект и защита — на полке под листом. Назначения хранятся в проекте.</div>
@@ -778,6 +778,9 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
         <div class="o" data-m="bolt10" data-f="cap">Болты М10 <small>· 4 шт, к крышке</small></div>
         <div class="o" data-m="weld" data-f="cap">Сварка <small>· приварить к крышке</small></div>
         <div class="o" data-m="free" data-f="cap">Просто надеть <small>· по проёму, без крепежа</small></div>
+        <div class="t t2" id="mntFaceT" style="display:none">В лицевую панель:</div>
+        <div class="o" data-m="face" data-f="front" id="mntFace" style="display:none">Врезать в панель
+          <small>· циферблат наружу, штуцер внутрь</small></div>
         <div class="o" data-m="off" id="mntOff" style="color:#f0a9a0">✕ Отсоединить</div>
       </div>
       <div id="pos">
@@ -1252,6 +1255,7 @@ function roleOf(d){
   if(sub==='fan')return 'fan';
   if(sub==='evap'||sub==='plate')return 'evap';
   if(sub==='recv')return 'recv';
+  if(sub==='tank')return 'tank';              // аккумулирующий бак водяного контура
   if(sub==='sep')return 'sep';
   if(sec==='pumps')return 'pump';
   if(sub==='vibro')return 'vibro';
@@ -1263,7 +1267,7 @@ function roleOf(d){
 }
 const ROLE_NAME={frame:'корпус',comp:'компрессор',cond:'конденсатор',fan:'вентилятор',
   evap:'испаритель',recv:'ресивер',sep:'отделитель',pump:'насос',vibro:'виброопора',
-  panel:'щит',instr:'приборы',line:'арматура',pipe:'трубы',floor:'на полу'};
+  panel:'щит',instr:'приборы',line:'арматура',pipe:'трубы',tank:'бак',floor:'на полу'};
 /* ax/ay — доля габарита площадки (0 — левый/передний край, 1 — правый/задний) */
 const SLOT={
   frame:{lvl:'floor',ax:.50,ay:.50,dir:'x',rot:0},
@@ -1280,6 +1284,9 @@ const SLOT={
   // вентилятор в базе построен осью по X (посадка в стенку конденсатора) — на крыше кладём его осью вверх
   fan:  {lvl:'cond', ax:.50,ay:.50,dir:'x',rot:0,tilt:Math.PI/2,center:true},
   pipe: {lvl:'yard', ax:1.30,ay:.20,dir:'y',rot:0},
+  /* бак в корпус не влезает и не должен: он стоит рядом с машиной,
+     на полу, и водяная обвязка идёт к нему наружу */
+  tank: {lvl:'floor',ax:1.55,ay:.50,dir:'y',rot:0,center:true},
   floor:{lvl:'floor',ax:.50,ay:.50,dir:'x',rot:0},
 };
 /* порядок арматуры по ходу жидкостной линии: кран → фильтр → стекло → соленоид → ТРВ */
@@ -1457,7 +1464,7 @@ function centerRow(list,sl,s){
     clampInside(p,new THREE.Box3().setFromObject(p.obj),zone);});
 }
 /* полная перекладка сцены по функциям */
-const LAY_ORDER=['frame','vibro','comp','sep','recv','evap','pump','line','instr','panel','cond','fan','pipe','floor'];
+const LAY_ORDER=['frame','vibro','comp','sep','recv','evap','pump','line','instr','panel','cond','fan','pipe','tank','floor'];
 function autoLayout(){
   if(!placed.length){toast('Сцена пустая — добавь детали из базы слева');return;}
   const h=histBegin('расстановку по функциям');
@@ -1583,6 +1590,9 @@ function togglePin(){
 
 /* Крепление к корпусу: чем узел держится за дно. */
 const MOUNT={
+  /* v2.46.010: прибор не стоит на дне, а врезается в лицевую панель —
+     манометры ВД и НД видно снаружи, к контуру они идут капилляром */
+  face:  {t:'врезка в лицевую панель', hw:null, n:0},
   bolt8: {t:'болты М8',  hw:'Болт М8×25 с гайкой и шайбой',  n:4},
   bolt10:{t:'болты М10', hw:'Болт М10×30 с гайкой и шайбой', n:4},
   weld:  {t:'сварка',    hw:null, n:0},
@@ -1684,9 +1694,49 @@ function frameFor(it){
 function seatOf(fr,face,wantHole){
   return face==='cap'?capTop(fr,wantHole):panTop(fr);
 }
+/* ═══ v2.46.010: прибор в лицевой панели ═══
+   Манометры ВД и НД у нас стоят не на трубе, а в лицевой панели корпуса:
+   циферблат наружу, штуцер 1/4" SAE внутрь, к контуру — капилляр от клапана
+   Шрадера, впаянного в нагнетание и всасывание. Врезка держит прибор на
+   плоскости панели и разворачивает его лицом наружу; двигать его вдоль панели
+   и по высоте можно как обычно — прижим по глубине пересчитывается сам.
+   Лицевая панель — сторона минимального Y: там же стоит и щит (SLOT.panel). */
+function faceMate(it){
+  const fr=placed.find(p=>p.uid===it.link.to);
+  if(!fr){it.link=null;return false;}
+  const fb=new THREE.Box3().setFromObject(fr.obj);
+  it.obj.rotation.set(0,0,-Math.PI/2);        // локальный +X (циферблат) → −Y
+  it.obj.updateMatrixWorld(true);
+  const b=new THREE.Box3().setFromObject(it.obj);
+  const dy=(fb.min.y-4)-b.min.y;              // кольцо выступает из панели на 4 мм
+  if(Math.abs(dy)>0.01){it.obj.position.y+=dy;it.obj.updateMatrixWorld(true);}
+  if(it._pinBox)it._pinBox.update();
+  return true;
+}
+function faceSel(){
+  if(!sel)return;
+  const fr=frameFor(sel);
+  if(!fr){toast('В сцене нет корпуса — добавь его из раздела «Корпуса и рамы»');return;}
+  pushHist('врезку прибора в панель');
+  const fb=new THREE.Box3().setFromObject(fr.obj);
+  sel.link={to:fr.uid,mount:'face',face:'front'};
+  /* первое место: по высоте на уровень глаз (0,72 корпуса), по ширине —
+     там, где прибор и стоял, но не за краем панели */
+  const b0=new THREE.Box3().setFromObject(sel.obj),c=b0.getCenter(new THREE.Vector3());
+  const M=90;
+  const x=Math.min(Math.max(c.x,fb.min.x+M),Math.max(fb.min.x+M,fb.max.x-M));
+  const z=fb.min.z+(fb.max.z-fb.min.z)*0.72;
+  sel.obj.position.x+=snap(x-c.x);
+  sel.obj.position.z+=Math.round(z-b0.min.z);
+  faceMate(sel);
+  pinMark(sel);selBtns();checkCollisions();showSelZ();refresh();save();
+  toast('Врезано в лицевую панель, отм. '+Math.round(
+    new THREE.Box3().setFromObject(sel.obj).min.z)+' мм · подключение капилляром');
+}
 /* Вернуть посаженную деталь на её плоскость (после перекладки или поворота). */
 function reseatLink(it){
   if(!it.link)return;
+  if(it.link.mount==='face'){faceMate(it);return;}
   const fr=placed.find(x=>x.uid===it.link.to);
   if(!fr){it.link=null;return;}
   const st=seatOf(fr,it.link.face),b=new THREE.Box3().setFromObject(it.obj);
@@ -1701,6 +1751,7 @@ function linkSel(mount,face){
     pushHist('отсоединение от корпуса');
     sel.link=null;selBtns();refresh();save();toast('Отсоединено от корпуса');return;
   }
+  if(mount==='face'){hideMnt();faceSel();return;}
   const fr=frameFor(sel);
   if(!fr){toast('В сцене нет корпуса — добавь его из раздела «Корпуса и рамы»');return;}
   pushHist('посадку на корпус');
@@ -1741,8 +1792,18 @@ function linkSel(mount,face){
    в её габарит, и «упор в корпус» считался бы по ним. */
 const BOLT={bolt8: {d:8, hd:13,hh:5.5,wd:17,ln:25,t:'М8'},
             bolt10:{d:10,hd:17,hh:6.5,wd:21,ln:30,t:'М10'}};
-const boltMat=new THREE.MeshStandardMaterial({color:0x6d7278,metalness:.8,roughness:.35,
+const boltMat=new THREE.MeshStandardMaterial({color:0x3a4046,metalness:.85,roughness:.3,
   flatShading:true});
+const _blRay=new THREE.Raycaster();
+/* Верх лапы в точке болта: пускаем луч сверху вниз по самой детали. Без этого
+   головка тонула в лапе (у компрессора она 10 мм) и крепежа было не видно —
+   а смысл правки как раз в том, чтобы видеть, куда сядут болты. */
+function boltTop(it,x,y,z0){
+  _blRay.set(new THREE.Vector3(x,y,z0+400),new THREE.Vector3(0,0,-1));
+  _blRay.far=420;
+  const h=_blRay.intersectObject(it.obj,false);
+  return h.length?Math.max(z0,h[0].point.z):z0+8;
+}
 function boltPad(it){
   const g=(it.d&&it.d.geom)||{},b=g.bolt;
   const bb=new THREE.Box3().setFromObject(it.obj),sz=new THREE.Vector3();bb.getSize(sz);
@@ -1774,13 +1835,18 @@ function boltMark(it){
     g.rotateX(Math.PI/2);g.translate(0,0,z+h/2);
     return g;
   };
+  const bb0=new THREE.Box3().setFromObject(it.obj);
+  const c0=bb0.getCenter(new THREE.Vector3());
   [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([sx,sy])=>{
-    [cyl(m.d/2,m.ln+6,-m.ln),                      // стержень сквозь лапу и дно
-     cyl(m.wd/2,1.6,3.0),                          // шайба на лапе
-     cyl(m.hd/2,m.hh,4.6),                         // головка под ключ
+    const lx=sx*px/2,ly=sy*py/2;
+    // высота лапы в этой точке: головка ложится на неё, а не внутрь металла
+    const lap=Math.min(60,boltTop(it,c0.x+lx,c0.y+ly,bb0.min.z)-bb0.min.z);
+    [cyl(m.d/2,lap+m.ln+4,-m.ln),                  // стержень сквозь лапу и дно
+     cyl(m.wd/2,1.8,lap),                          // шайба на лапе
+     cyl(m.hd/2,m.hh,lap+1.8),                     // головка под ключ
      cyl(m.hd/2,m.hh,-m.ln)].forEach(g=>{          // гайка снизу
       const o=new THREE.Mesh(g,boltMat);
-      o.position.set(sx*px/2,sy*py/2,0);grp.add(o);
+      o.position.set(lx,ly,0);grp.add(o);
     });
   });
   grp.renderOrder=1;
@@ -1799,6 +1865,10 @@ function boltsSync(){placed.forEach(boltSync);}
 function showMnt(){
   const box=$('#mnt');
   $('#mntOff').style.display=(sel&&sel.link)?'block':'none';
+  /* врезают в панель приборы: манометры, реле давления, контроллеры */
+  const inst=!!sel&&roleOf(sel.d)==='instr';
+  $('#mntFace').style.display=inst?'block':'none';
+  $('#mntFaceT').style.display=inst?'block':'none';
   box.classList.add('on');
 }
 function hideMnt(){$('#mnt').classList.remove('on');}
@@ -1827,6 +1897,8 @@ function ctxItems(it){
   else L.push({ic:'⛓',t:lk?('Крепление · '+lk.t):'Соединить с корпусом',go:showMnt});
   if(isPipeSeg(it))L.push({ic:'⇹',t:'Длина отрезка…',s:pipeLen(it)+' мм',
     go:()=>{select(it);posShow();}});
+  if(!isPipeSeg(it))L.push({ic:'⌗',t:'Выровнять по корпусу',s:'углы 90° и сетка',
+    go:()=>{select(it);alignSel();}});
   L.push(
     {sep:1},
     {ic:'⌖',t:'Точные координаты…',s:'G',go:()=>{select(it);posShow();}},
@@ -2880,6 +2952,38 @@ function fitInside(){
   checkCollisions();showSelZ();refresh();save();
   toast('Убрал в корпус');
 }
+/* ═══ v2.46.010: выровнять узел по корпусу ═══
+   Насос и другие узлы после ручной возни стоят под случайным углом и мимо
+   сетки: на скрине это видно сразу — рама по сетке 10 мм, а узел на 7° и
+   между клетками. Выравнивание доводит углы до ближайших 90°, ставит узел
+   низом на дно (или на его нынешнюю плоскость посадки) и притягивает центр
+   к сетке. Деталь, сидящую на патрубке, не трогаем: её место задаёт штуцер. */
+function alignSel(){
+  if(!sel){return;}
+  if(sel.link&&sel.link.mount==='rot'){
+    toast('Деталь сидит на патрубке — её место задаёт штуцер');return;}
+  const r=sel.obj.rotation;
+  const q=v=>Math.round(v/(Math.PI/2))*(Math.PI/2);
+  const b0=new THREE.Box3().setFromObject(sel.obj);
+  const c0=b0.getCenter(new THREE.Vector3());
+  const turned=Math.abs(r.x-q(r.x))>1e-4||Math.abs(r.y-q(r.y))>1e-4||
+               Math.abs(r.z-q(r.z))>1e-4;
+  pushHist('выравнивание узла');
+  r.set(q(r.x),q(r.y),q(r.z));
+  sel.obj.updateMatrixWorld(true);
+  const b=new THREE.Box3().setFromObject(sel.obj);
+  const c=b.getCenter(new THREE.Vector3());
+  const dx=snap(c0.x)-c.x,dy=snap(c0.y)-c.y;
+  let dz=b0.min.z-b.min.z;
+  const fr=placed.find(p=>roleOf(p.d)==='frame');
+  if(fr&&!sel.link&&INSIDE.has(roleOf(sel.d)))dz=floorZ(fr)-b.min.z;   // на дно
+  moveItem(sel,Math.round(dx),Math.round(dy),Math.round(dz));
+  if(sel.link)reseatLink(sel);
+  checkCollisions();showSelZ();refresh();save();
+  toast(turned?'Углы доведены до 90°, узел встал по сетке'
+              :'Узел притянут к сетке 10 мм и поставлен на дно');
+}
+
 /* ═══ v2.46.010: длина отрезка трубы ═══
    Труба приходит из базы куском 500 мм, а между патрубками бывает 297 или
    1240. Резать её в базе на все случаи бессмысленно — отрезок тянется прямо
@@ -3166,6 +3270,7 @@ $('#bBom').onclick=()=>toast('Следующий шаг: спецификаци�
 /* ═══ спецификация + габарит ═══ */
 function refresh(){
   rotReseat();                      // вентили держатся за свои штуцеры
+  placed.forEach(p=>{if(p.link&&p.link.mount==='face')faceMate(p);});   // приборы — панели
   const by=new Map();
   placed.forEach(p=>{const k=p.id;
     if(!by.has(k))by.set(k,{d:p.d,n:0,mm:0});
@@ -3516,6 +3621,16 @@ const SCH_NODES=[
   d:'Гонит воду или гликоль через испаритель к потребителю.'},
  {k:'RP1', t:'РП1', n:'Реле потока', hint:'реле потока', cat:['автоматик','проток|реле поток'], grp:'auto', px:220,py:200, nx:232,ny:219,na:'middle',mx:13,
   d:'Нет протока воды — стоп машина, иначе испаритель замёрзнет.'},
+ /* v2.46.010: водяной буфер и сервисные порты манометров.
+    Бак и клапаны Шрадера на листе 7 кВт не нарисованы — они на полке
+    «вне листа», как зимний комплект: позиция есть, модель назначается,
+    в спецификацию и в сцену попадает. */
+ {k:'AB1', t:'АБ1', n:'Аккумулирующий бак', hint:'бак', cat:['аппарат','бак|буфер'], grp:'pump', off:6, mx:22,
+  d:'Буфер водяного контура: держит паузу между пусками компрессора. Минимальный объём V ≈ Q₀·τ/(c·ρ·ΔT): для 7 кВт, спирали (τ=180 с) и ΔT=4 К это 75 л — берут 100 л.'},
+ {k:'KSH2',t:'КШ2', n:'Клапан Шрадера ВД', hint:'шрадер', cat:['арматур','шрадер|сервисн'], grp:'arm', off:7, mx:22,
+  d:'Сервисный порт на нагнетании: к нему через капилляр подключается манометр ВД на панели, снять прибор можно не вскрывая контур.'},
+ {k:'KSH1',t:'КШ1', n:'Клапан Шрадера НД', hint:'шрадер', cat:['арматур','шрадер|сервисн'], grp:'arm', off:8, mx:22,
+  d:'То же на всасывании — под манометр НД.'},
 ];
 const SCH_DESC={
  KM1:'Сжимает пар хладагента и гонит контур — по нему считается холодопроизводительность машины.',
@@ -3542,6 +3657,9 @@ const SCH_DESC={
  MN2:'Манометр высокого давления — контроль нагнетания.',
  N1:'Насос гоняет воду через испаритель к потребителю.',
  RP1:'Реле потока не даёт запустить холод без протока воды через испаритель.',
+ AB1:'Аккумулирующий бак водяного контура: объём в литрах подбирается от холодопроизводительности и допустимого числа пусков компрессора.',
+ KSH2:'Клапан Шрадера на нагнетании — сервисный порт манометра высокого давления.',
+ KSH1:'Клапан Шрадера на всасывании — сервисный порт манометра низкого давления.',
 };
 const SCH_SHEET=`<defs>
     <!-- градиенты объёма -->
@@ -3866,6 +3984,9 @@ function schConn(a){
   const d=(DATA||[]).find(x=>x.id===a.id);
   if(!d||!d.g)return '';
   const out=[];
+  /* у бака первым идёт объём: по нему его и выбирают */
+  const vol=(d.specs||[]).find(r=>/^Объ[её]м$/i.test(String(r[0])));
+  if(vol)out.push(String(vol[1]));
   (((GEOMS[d.g]||{}).zn)||[]).forEach(z=>{
     const c=connOf(z);
     if(!c)return;
@@ -3902,14 +4023,17 @@ function renderSchema(){
   const PW=t=>10+4.6*t.length;         // ширина пилюли по длине тега
   let h=SCH_SHEET;
   // полка позиций, которых нет на листе 7 кВт
-  h+='<rect x="8" y="622" width="884" height="70" rx="6" fill="#fbfcfe"/>'
-    +'<rect x="8" y="622" width="884" height="70" rx="6" fill="url(#gridp)" stroke="#c3ccd8" stroke-width="1.2"/>'
-    +'<text class="shs" x="34" y="636">ПОЗИЦИИ ВНЕ ЛИСТА 7 кВт · ЗИМНИЙ КОМПЛЕКТ И ЗАЩИТА</text>';
+  /* v2.46.010: полка в два ряда — на неё приехали водяной буфер и клапаны
+     Шрадера, в одну строку девять позиций уже не влезали */
+  h+='<rect x="8" y="618" width="884" height="96" rx="6" fill="#fbfcfe"/>'
+    +'<rect x="8" y="618" width="884" height="96" rx="6" fill="url(#gridp)" stroke="#c3ccd8" stroke-width="1.2"/>'
+    +'<text class="shs" x="34" y="631">ПОЗИЦИИ ВНЕ ЛИСТА 7 кВт · ЗИМНИЙ КОМПЛЕКТ, ЗАЩИТА, ВОДЯНОЙ БУФЕР</text>';
   const next=SCH_NODES.find(n=>!schemaData[n.k]);
   SCH_NODES.forEach(nd=>{
     const off=nd.off!=null;
-    const px=off?34+nd.off*143:nd.px, py=off?646:nd.py;
-    const nx=off?px:nd.nx, ny=off?672:nd.ny, na=off?'start':nd.na;
+    const oc=off?nd.off%6:0, orw=off?Math.floor(nd.off/6):0;
+    const px=off?34+oc*143:nd.px, py=off?(640+orw*32):nd.py;
+    const nx=off?px:nd.nx, ny=off?(py+18):nd.ny, na=off?'start':nd.na;
     const w=PW(nd.t);
     const asg=schemaData[nd.k];
     const dim=schGrpSel&&nd.grp!==schGrpSel?' dim':'';
@@ -3936,8 +4060,10 @@ function renderSchema(){
       +'" stroke="'+sr[2]+'"'+(sr[0]==='ag'?'':' stroke-dasharray="1.8 1.2"')+'/></g>';
   });
   /* рамка «граница поставки»: всё внутри едет собранным на раме */
-  h+='<rect class="bnd" x="300" y="60" width="590" height="530" rx="10"/>'
-    +'<text class="bndt" x="306" y="55">ГРАНИЦА ПОСТАВКИ · МАШИНА В СБОРЕ</text>';
+  /* рамку ведём так, чтобы насос и реле протока остались внутри машины,
+     а входы-выходы теплоносителя и водяная арматура — снаружи */
+  h+='<rect class="bnd" x="140" y="60" width="750" height="530" rx="10"/>'
+    +'<text class="bndt" x="146" y="55">ГРАНИЦА ПОСТАВКИ · МАШИНА В СБОРЕ</text>';
   const done=SCH_NODES.filter(n=>schemaData[n.k]).length;
   const nsup=SCH_NODES.filter(n=>schemaData[n.k]&&supOf(n.k)!=='ag').length;
   h+='<text class="shl" x="22" y="34">Назначено: '+done+' из '+SCH_NODES.length+'</text>';
