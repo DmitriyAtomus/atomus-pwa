@@ -2247,7 +2247,23 @@ function linkSel(mount,face){
      площадке, а поедет она вместе с корпусом в любом случае */
   pinMark(sel);selBtns();checkCollisions();showSelZ();refresh();save();
   const m=MOUNT[mount]||MOUNT.free;
-  const z=' отм. '+Math.round(st.z)+' мм · '+m.t;
+  /* v2.46.021 (#894): о креплении говорим честно. Есть разметка отверстий —
+     пишем, сколько их и какой болт туда идёт; разметки нет и лапы нет —
+     предупреждаем, что болтить не во что: такой аппарат держит хомут. */
+  const bm=BOLT[mount];
+  let note='';
+  if(bm){
+    const H=holesOf(sel),num=v=>String(v).replace('.',',');
+    if(H.length){
+      const tight=H.filter(h=>h.d&&h.d<bm.d+0.2);
+      note=' · '+H.length+' × '+bm.t+' в штатные отверстия Ø'+num(H[0].d)+
+        (tight.length?', но болт '+bm.t+' в Ø'+num(tight[0].d)+' не проходит':'');
+    }else if(!boltPad(sel)){
+      note=' · монтажных отверстий у позиции нет: крепится хомутом или '+
+        'кронштейном, болты не показаны';
+    }
+  }
+  const z=' отм. '+Math.round(st.z)+' мм · '+m.t+note;
   if(face==='cap')toast((st.part?'Надето на крышку '+st.part.des:'Поставлено на верх корпуса')
     +(st.hole?' по проёму Ø'+Math.round((st.hole.w+st.hole.d)/2)+' мм,':',')+z);
   else toast((st.part?'Поставлено на дно '+st.part.des+',':'Поставлено на низ корпуса,')+z);
@@ -2261,7 +2277,12 @@ function linkSel(mount,face){
    Болты живут отдельным объектом сцены, а не в детали: иначе они попали бы
    в её габарит, и «упор в корпус» считался бы по ним. */
 const BOLT={bolt8: {d:8, hd:13,hh:5.5,wd:17,ln:25,t:'М8'},
-            bolt10:{d:10,hd:17,hh:6.5,wd:21,ln:30,t:'М10'}};
+            bolt10:{d:10,hd:17,hh:6.5,wd:21,ln:30,t:'М10'},
+            /* v2.46.021 (#894): М6 — это вентилятор в крышку. Раньше его в
+               справочнике не было и крепёж не рисовался вовсе; теперь у
+               панели вентилятора размечены четыре отверстия, и болт есть
+               куда посадить */
+            bolt6: {d:6, hd:10,hh:4,  wd:12,ln:20,t:'М6'}};
 const boltMat=new THREE.MeshStandardMaterial({color:0x3a4046,metalness:.85,roughness:.3,
   flatShading:true});
 const _blRay=new THREE.Raycaster();
@@ -2274,12 +2295,62 @@ function boltTop(it,x,y,z0){
   const h=_blRay.intersectObject(it.obj,false);
   return h.length?Math.max(z0,h[0].point.z):z0+8;
 }
+/* ═══ v2.46.021 (#894): болт садится в настоящее отверстие ═══
+   Раньше крепёж рисовался по углам габаритной коробки: пятна в базе не было
+   почти ни у кого, и болты торчали мимо лап, сквозь дно и всегда по четыре.
+   Теперь база размечает монтажные отверстия так же, как патрубки — точка,
+   ось, Ø, толщина лапы (mount_holes в генераторе, поле mh в индексе). Берём
+   их: болтов столько, сколько отверстий, стоят они в СК модели, поэтому
+   поворот и крен узла им не мешают. Разметки нет — болты не рисуем вовсе
+   и говорим об этом вслух: у такой позиции штатное крепление другое. */
+const holesOf=it=>(!it||!it.d?[]:((GEOMS[it.d.g]||{}).mh)||[]);
 function boltPad(it){
   const g=(it.d&&it.d.geom)||{},b=g.bolt;
-  const bb=new THREE.Box3().setFromObject(it.obj),sz=new THREE.Vector3();bb.getSize(sz);
   if(b&&b[0]>0&&b[1]>0)return [b[0],b[1]];
+  /* база прямо говорит: болтовой лапы у изделия нет (арматура на трубе,
+     ресивер в хомуте) — тогда и пятна не выдумываем */
+  if(g.bolt_plane==='none')return null;
+  const bb=new THREE.Box3().setFromObject(it.obj),sz=new THREE.Vector3();bb.getSize(sz);
   /* пятна в базе нет — ставим по углам опорной плиты, 30 мм от края */
   return [Math.max(40,sz.x-60),Math.max(40,sz.y-60)];
+}
+/* сколько болтов идёт на узел: по разметке отверстий, иначе штатные 4.
+   Ни отверстий, ни лапы — крепёж не считаем: ведомость не должна обещать
+   болты там, где их некуда вкрутить (ресивер держит хомут) */
+function boltCount(it,m){
+  const H=holesOf(it);
+  if(H.length)return H.length;
+  return boltPad(it)?(m?m.n:0):0;
+}
+/* Крепёж по разметке базы: на каждое отверстие стержень, шайба, головка и
+   гайка. Всё строится в системе координат модели, а группа повторяет матрицу
+   детали — тогда болт остаётся в отверстии и после поворота, и после крена. */
+const _bZ=new THREE.Vector3(0,0,1);
+function boltHoles(it,m,H){
+  const grp=new THREE.Group();grp.userData.mh=1;
+  const q=new THREE.Quaternion(),p=new THREE.Vector3(),d=new THREE.Vector3();
+  H.forEach(h=>{
+    d.set.apply(d,(h.dir&&h.dir.length===3)?h.dir:[0,0,1]);
+    if(!d.lengthSq())d.set(0,0,1);
+    d.normalize();
+    p.set.apply(p,(h.p&&h.p.length===3)?h.p:[0,0,0]);
+    q.setFromUnitVectors(_bZ,d);
+    const t=Math.max(h.t||0,2);              // толщина лапы: на ней лежит головка
+    const put=(r,len,off)=>{
+      const g=new THREE.CylinderGeometry(r,r,len,12);
+      g.rotateX(Math.PI/2);g.translate(0,0,len/2);
+      const o=new THREE.Mesh(g,boltMat);
+      o.quaternion.copy(q);
+      o.position.copy(p).addScaledVector(d,off);
+      grp.add(o);
+    };
+    put(m.d/2,t+m.ln+4,-m.ln);               // стержень сквозь лапу и опору
+    put(m.wd/2,1.8,t);                       // шайба
+    put(m.hd/2,m.hh,t+1.8);                  // головка под ключ
+    put(m.hd/2,m.hh,-m.ln);                  // гайка с той стороны опоры
+  });
+  grp.renderOrder=1;grp.matrixAutoUpdate=false;
+  scene.add(grp);it._bolts=grp;boltSync(it);
 }
 function boltClear(it){
   if(!it._bolts)return;
@@ -2319,14 +2390,18 @@ function angMark(it){
 function boltMark(it){
   if(it.link&&it.link.mount==='ang6'&&angMark(it))return;
   const m=it.link&&it.link.mount&&BOLT[it.link.mount];
+  const H=m?holesOf(it):[];
+  const pad=m&&!H.length?boltPad(it):null;
   /* крепёж не пересобираем на каждый чих: тот же болт на том же пятне —
      просто двигаем группу за деталью */
-  const key=m?(it.link.mount+'|'+boltPad(it).join('x')):'';
+  const key=!m?'':(it.link.mount+'|'+(H.length?'mh'+H.length:(pad?pad.join('x'):'no')));
   if(it._boltKey===key){if(it._bolts)boltSync(it);return;}
   it._boltKey=key;
   boltClear(it);
   if(!m)return;
-  const [px,py]=boltPad(it);
+  if(H.length){boltHoles(it,m,H);return;}
+  if(!pad)return;                 // отверстий нет и лапы нет — болтов не рисуем
+  const [px,py]=pad;
   /* группа стоит в точке посадки, болты внутри неё — в локальных координатах
      пятна; тогда сдвиг узла это сдвиг одной группы, а не пересборка геометрии */
   const grp=new THREE.Group();
@@ -2355,6 +2430,15 @@ function boltMark(it){
 /* болты держатся за деталь: подвинул или повернул узел — крепёж поехал с ним */
 function boltSync(it){
   if(!it._bolts)return;
+  /* крепёж по разметке живёт в системе координат модели — группа просто
+     повторяет матрицу детали, и болт остаётся в своём отверстии */
+  if(it._bolts.userData.mh){
+    it.obj.updateMatrixWorld(true);
+    it._bolts.matrix.copy(it.obj.matrixWorld);
+    it._bolts.matrixWorldNeedsUpdate=true;
+    it._bolts.updateMatrixWorld(true);
+    return;
+  }
   const bb=new THREE.Box3().setFromObject(it.obj);
   const c=bb.getCenter(new THREE.Vector3());
   const ang=it._bolts.userData.ang;
@@ -4180,7 +4264,10 @@ function refresh(){
   const hw=new Map();
   placed.forEach(p=>{
     const m=p.link?MOUNT[p.link.mount]:null;
-    if(m&&m.hw)hw.set(m.hw,(hw.get(m.hw)||0)+m.n);
+    /* v2.46.021 (#894): болтов столько, сколько монтажных отверстий у позиции,
+       а не всегда четыре: у насоса своя плита, у фланца рамы вентилятора шесть */
+    const nb=m&&m.hw?(BOLT[p.link.mount]?boltCount(p,m):m.n):0;
+    if(nb)hw.set(m.hw,(hw.get(m.hw)||0)+nb);
     if(m&&m.hw2)hw.set(m.hw2,(hw.get(m.hw2)||0)+m.n2);});
   if(hw.size)$('#spec').innerHTML+=[...hw.entries()].map(([t,n])=>
     `<div class="sr" style="color:var(--dim)"><span class="nm">${esc(t)}</span>`+
@@ -5076,6 +5163,11 @@ function descHtml(d,thumb){
   if((g.ports||[]).length)mnt.push(['Патрубки',g.ports.join(', ')]);
   if(g.bolt&&(g.bolt[0]||g.bolt[1])&&!(g.rows||[]).some(r=>/^Пятно/.test(r[0])))
     mnt.push(['Пятно крепления',g.bolt[0]+' × '+g.bolt[1]+' мм']);
+  /* v2.46.021 (#894): чем позиция крепится — по разметке отверстий из базы */
+  const MH=((GEOMS[d.g]||{}).mh)||[];
+  if(MH.length&&!(g.rows||[]).some(r=>/^Монтажные отвер/.test(r[0])))
+    mnt.push(['Монтажные отверстия',MH.length+' × '+(MH[0].slot?'паз ':'Ø')+
+      String(MH[0].d).replace('.',',')+' · крепёж '+MH[0].thr]);
   // таблицы позиции: холодопроизводительность компрессора по температурам,
   // киловатты фильтра и соленоида по хладагентам, ведомость деталей сборки
   (d.tbls||[]).forEach(t=>{

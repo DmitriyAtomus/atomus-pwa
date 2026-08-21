@@ -42,8 +42,13 @@ const NRV = {
 function sandbox() {
   const code = section('function tagLine(d)', 'function openDesc(d,acts)') +
     "\nfunction esc(s){return String(s||'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));}";
+  // GEOMS — индекс геометрий базы: из него карточка берёт монтажные
+  // отверстия позиции (поле mh, задача #894)
   const ctx = { SECTIONS: [['compressors', 'Компрессоры', [['scroll', 'Спиральные']]],
-    ['valves', 'Арматура', [['serv', 'Вентили и смотровые стёкла']]]] };
+    ['valves', 'Арматура', [['serv', 'Вентили и смотровые стёкла']]]],
+    GEOMS: { 'yh-small-418': { mh: [
+      { p: [-95.2, -95.2, 0], dir: [0, 0, 1], d: 13.46, t: 13, thr: 'М12', kind: 'foot' },
+      { p: [95.2, -95.2, 0], dir: [0, 0, 1], d: 13.46, t: 13, thr: 'М12', kind: 'foot' }] } } };
   vm.createContext(ctx);
   vm.runInContext(code, ctx);
   return ctx;
@@ -70,6 +75,15 @@ test('пятно крепления показываем только там, г
   // если пятно лап уже есть строкой из базы — второй раз его не печатаем
   const dbl = Object.assign({}, NRV, { geom: { rows: [['Пятно лап', '190,5 × 190,5 мм']], bolt: [190.5, 190.5] } });
   assert.ok(!ctx.descHtml(dbl, 'x').includes('Пятно крепления'), 'пятно продублировалось');
+  // монтажные отверстия из индекса базы: сколько их, какие и чем крутить
+  const scr = Object.assign({}, NRV, { g: 'yh-small-418',
+    geom: { rows: [], bolt: [190.5, 190.5], ports: [] } });
+  const hs = ctx.descHtml(scr, 'x');
+  assert.ok(hs.includes('Монтажные отверстия') && hs.includes('2 × Ø13,46'),
+    'в карточке нет монтажных отверстий');
+  assert.ok(hs.includes('крепёж М12'), 'не сказано, каким болтом крутить');
+  assert.ok(!ctx.descHtml(NRV, 'x').includes('Монтажные отверстия'),
+    'у клапана отверстий нет — строки быть не должно');
   // заводское наименование стоит описанием в шапке — в характеристиках его нет
   const zav = Object.assign({}, NRV, { specs: [['Наименование завода', 'Клапан обратный'], ['Материал', 'медь']] });
   assert.ok(!ctx.descHtml(zav, 'x').includes('Наименование завода'), 'описание задвоилось');
