@@ -18412,7 +18412,7 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
-    version: 'v2.46.026',
+    version: 'v2.46.027',
     date: '21.08.2026',
     title: 'Идеи: сначала макет, потом ТЗ',
     features: [
