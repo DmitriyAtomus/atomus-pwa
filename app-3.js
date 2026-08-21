@@ -26188,15 +26188,22 @@ function _ltActOptions(sel) {
     '</option>').join('');
 }
 // Своя точка: что сделать, куда заехать, комментарий. Одинаково в «Новом
-// рейсе» и в допланировании — чтобы поля не расходились.
+// рейсе» и в допланировании — чтобы поля не расходились. Скрытые lat/lon
+// заполняются при выборе места: координаты уже известны — геокодер не нужен.
 function _ltCustomRowHtml(act) {
   return '<div class="lt-custom-row">' +
     '<select class="form-input" data-f="action">' + _ltActOptions(act) + '</select>' +
-    '<input class="form-input" placeholder="Куда / к кому заехать" data-f="title">' +
-    '<button class="icon-btn" title="Убрать" ' +
-      'onclick="this.closest(\'.lt-custom-row\').remove()"><i class="ti ti-x"></i></button>' +
+    '<input class="form-input" placeholder="Куда / к кому заехать" data-f="title" ' +
+      'list="lt-places-dl" onchange="ltPlaceRowType(this)">' +
+    '<span class="lt-row-ops">' +
+      '<button class="icon-btn" title="Выбрать из своих мест" ' +
+        'onclick="ltPlaceRowPick(this)"><i class="ti ti-map-pin"></i></button>' +
+      '<button class="icon-btn" title="Убрать" ' +
+        'onclick="this.closest(\'.lt-custom-row\').remove()"><i class="ti ti-x"></i></button>' +
+    '</span>' +
     '<input class="form-input full" placeholder="Адрес — на карту встанет сам" data-f="address">' +
     '<input class="form-input full" placeholder="Комментарий: что сделать, что взять с собой" data-f="note">' +
+    '<input type="hidden" data-f="lat"><input type="hidden" data-f="lon">' +
   '</div>';
 }
 // Собрать свои точки из формы: пустые строки без названия пропускаем.
@@ -26206,10 +26213,157 @@ function _ltCollectCustom(sel) {
     const val = f => ((row.querySelector('[data-f="' + f + '"]') || {}).value || '').trim();
     const t = val('title');
     if (!t) return;
-    out.push({ title: t, address: val('address'), note: val('note'),
-      action: val('action') || 'pickup', source_kind: 'custom' });
+    const pt = { title: t, address: val('address'), note: val('note'),
+      action: val('action') || 'pickup', source_kind: 'custom' };
+    // координаты есть только у выбранного места — иначе адрес ищет геокодер
+    if (val('lat') && val('lon')) { pt.lat = val('lat'); pt.lon = val('lon'); }
+    out.push(pt);
   });
   return out;
+}
+
+// ---------- v2.46.017: «Куда уже ездили» — выбор места вместо набора адреса ----------
+// Список мест = справочник точек + свои точки прошлых рейсов (их склеивает
+// бэкенд в /api/logistics/places). Выбрал место — название, адрес и
+// координаты подставились целиком, опечатка в улице маршрут не ломает.
+async function _ltPlacesEnsure(force) {
+  if (window._ltPlaces && !force) return window._ltPlaces;
+  try {
+    const d = await apiGet('/api/logistics/places');
+    window._ltPlaces = d.places || [];
+  } catch (e) {
+    window._ltPlaces = window._ltPlaces || [];
+  }
+  _ltPlacesDatalist();
+  return window._ltPlaces;
+}
+// Подсказка прямо в поле «куда заехать»: набрал первые буквы — выбрал место
+function _ltPlacesDatalist() {
+  let dl = document.getElementById('lt-places-dl');
+  if (!dl) {
+    dl = document.createElement('datalist');
+    dl.id = 'lt-places-dl';
+    document.body.appendChild(dl);
+  }
+  // опции строим полями, а не строкой: в названии места бывают кавычки
+  dl.innerHTML = '';
+  (window._ltPlaces || []).forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.name || '';
+    o.textContent = p.address || '';
+    dl.appendChild(o);
+  });
+}
+function _ltPlaceByName(name) {
+  const k = String(name || '').trim().toLowerCase();
+  if (!k) return null;
+  return (window._ltPlaces || []).find(p =>
+    String(p.name || '').trim().toLowerCase() === k) || null;
+}
+// Поставить место в строку своей точки (та же разметка в форме рейса и в правке)
+function _ltPlaceToRow(row, p) {
+  if (!row || !p) return;
+  const set = (f, v) => {
+    const el = row.querySelector('[data-f="' + f + '"]');
+    if (el) el.value = (v == null ? '' : v);
+  };
+  set('title', p.name || '');
+  if (p.address) set('address', p.address);
+  set('lat', p.lat == null ? '' : p.lat);
+  set('lon', p.lon == null ? '' : p.lon);
+}
+// Название вписали руками: совпало со знакомым местом — подставим адрес;
+// не совпало — координаты прежнего места сбрасываем, иначе рейс поедет туда
+function ltPlaceRowType(input) {
+  const row = input && input.closest('.lt-custom-row');
+  if (!row) return;
+  const p = _ltPlaceByName(input.value);
+  const addr = row.querySelector('[data-f="address"]');
+  if (p && (!addr || !addr.value.trim())) _ltPlaceToRow(row, p);
+  else if (!p) _ltPlaceToRow(row, { name: input.value, lat: '', lon: '' });
+}
+// Правка точки живёт в своей форме, но поля те же data-f — переиспользуем
+function ltPlaceEditPick() {
+  const form = document.getElementById('lt-pe-form');
+  if (form) ltPlacePick(p => _ltPlaceToRow(form, p));
+}
+function ltPlaceEditType(input) {
+  const form = document.getElementById('lt-pe-form');
+  if (!form) return;
+  const p = _ltPlaceByName(input.value);
+  const addr = form.querySelector('[data-f="address"]');
+  if (p && (!addr || !addr.value.trim())) _ltPlaceToRow(form, p);
+  else if (!p) _ltPlaceToRow(form, { name: input.value, lat: '', lon: '' });
+}
+function ltPlaceRowPick(btn) {
+  const row = btn && btn.closest('.lt-custom-row');
+  if (!row) return;
+  ltPlacePick(p => _ltPlaceToRow(row, p));
+}
+// Общий выбор места: список с поиском, callback получает место целиком
+async function ltPlacePick(cb) {
+  window._ltPlaceCb = cb;
+  let m = document.getElementById('lt-place-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'lt-place-modal';
+  m.className = 'modal-overlay visible';
+  m.style.zIndex = '10050';  // поверх формы рейса
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" ' +
+    'style="max-width:520px;max-height:86vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><h3><i class="ti ti-map-pin"></i> Куда уже ездили</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'lt-place-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="overflow-y:auto;">' +
+      '<input class="form-input" id="lt-place-q" placeholder="Поиск: название или адрес" ' +
+        'oninput="ltPlaceFilter(this.value)" autocomplete="off">' +
+      '<div id="lt-place-list"><div class="loading-block">Загрузка…</div></div>' +
+    '</div></div>';
+  document.body.appendChild(m);
+  await _ltPlacesEnsure();
+  ltPlaceFilter('');
+  const q = document.getElementById('lt-place-q');
+  if (q && window.innerWidth > 720) q.focus();
+}
+function ltPlaceFilter(q) {
+  const box = document.getElementById('lt-place-list');
+  if (!box) return;
+  const s = String(q || '').trim().toLowerCase();
+  const all = window._ltPlaces || [];
+  const hit = (p) => !s ||
+    (String(p.name || '') + ' ' + String(p.address || '')).toLowerCase().includes(s);
+  const item = (p, i) => {
+    const sub = [p.source === 'dir' ? _ltKindName(p.kind) : '', p.address || '',
+      p.used > 1 ? 'ездили ' + p.used + ' раз' : ''].filter(Boolean).join(' · ');
+    return '<button type="button" class="lt-place-i" onclick="ltPlaceChoose(' + i + ')">' +
+      '<span class="ic">' + (p.source === 'dir' ? '📍' : '🕘') + '</span>' +
+      '<span class="tx"><b>' + escapeHtml(p.name || '') + '</b>' +
+      '<small>' + escapeHtml(sub || 'адреса нет — впиши руками') + '</small></span>' +
+      (p.lat != null && p.lon != null
+        ? '<i class="ti ti-map-2" title="координаты есть"></i>' : '') +
+    '</button>';
+  };
+  // индекс берём по всему списку: фильтр не должен путать выбор
+  const rows = all.map((p, i) => [p, i]).filter(x => hit(x[0]));
+  const dir = rows.filter(x => x[0].source === 'dir');
+  const hist = rows.filter(x => x[0].source !== 'dir');
+  let html = '';
+  if (dir.length) html += '<div class="lt-new-sec"><i class="ti ti-map-pin"></i> Справочник точек</div>' +
+    dir.map(x => item(x[0], x[1])).join('');
+  if (hist.length) html += '<div class="lt-new-sec"><i class="ti ti-history"></i> Из прошлых рейсов</div>' +
+    hist.map(x => item(x[0], x[1])).join('');
+  if (!html) html = '<div class="lgc-empty" style="padding:14px;">' +
+    (s ? 'Ничего не нашлось — впиши место руками, в следующий раз оно будет тут.'
+       : 'Мест пока нет. Заведи адрес в «Справочнике точек» или впиши руками — своя точка запомнится сама.') +
+    '</div>';
+  box.innerHTML = html;
+}
+function ltPlaceChoose(i) {
+  const p = (window._ltPlaces || [])[i];
+  const m = document.getElementById('lt-place-modal');
+  if (m) m.remove();
+  if (p && typeof window._ltPlaceCb === 'function') window._ltPlaceCb(p);
+  window._ltPlaceCb = null;
 }
 
 const _LT_STATUS = {
@@ -26326,13 +26480,16 @@ async function logiTripNew() {
       '<button class="btn btn-secondary btn-sm" onclick="ltCustomAdd()"><i class="ti ti-plus"></i> Добавить точку</button>' +
       '<div class="lt-hint"><i class="ti ti-info-circle"></i> Точку можно завести самому: выбери дело ' +
         '(забрать, отвезти, оплатить, документы, просто заехать), впиши адрес и комментарий. ' +
-        'Всё это уйдёт водителю в MAX, в задачу и на ТВ в цеху.</div>' +
+        'Всё это уйдёт водителю в MAX, в задачу и на ТВ в цеху. Кнопка ' +
+        '<i class="ti ti-map-pin"></i> в строке — выбрать место, куда уже ездили: ' +
+        'адрес и координаты подставятся сами.</div>' +
     '</div>' +
     '<div class="modal-footer">' +
       '<button class="btn btn-secondary" onclick="document.getElementById(\'lt-new-modal\').remove()">Отмена</button>' +
       '<button class="btn btn-primary" id="lt-new-go" onclick="logiTripCreate()"><i class="ti ti-check"></i> Собрать рейс</button>' +
     '</div></div>';
   document.body.appendChild(m);
+  _ltPlacesEnsure(true);  // список мест — фоном, к первой своей точке успеет
   try {
     const d = await apiGet('/api/logistics/pickup-pool');
     window._ltPool = d.pool || [];
@@ -26551,13 +26708,18 @@ function ltPtEdit(pid) {
     '<div class="modal-header"><h3><i class="ti ti-pencil"></i> Точка ' + Number(p.seq || 0) + '</h3>' +
       '<button class="icon-btn" onclick="document.getElementById(\'lt-pt-edit\').remove()"><i class="ti ti-x"></i></button></div>' +
     '<div class="modal-body">' +
-      '<div class="lt-dir-form">' +
+      '<div class="lt-dir-form" id="lt-pe-form">' +
         '<select class="form-input" id="lt-pe-act">' + _ltActOptions(p.action) + '</select>' +
-        '<input class="form-input" id="lt-pe-title" placeholder="Куда / к кому заехать">' +
-        '<input class="form-input" id="lt-pe-addr" placeholder="Адрес">' +
+        '<input class="form-input" id="lt-pe-title" data-f="title" placeholder="Куда / к кому заехать" ' +
+          'list="lt-places-dl" onchange="ltPlaceEditType(this)">' +
+        '<button class="btn btn-secondary btn-sm" onclick="ltPlaceEditPick()">' +
+          '<i class="ti ti-map-pin"></i> Выбрать из своих мест</button>' +
+        '<input class="form-input" id="lt-pe-addr" data-f="address" placeholder="Адрес">' +
         '<textarea class="form-input" id="lt-pe-note" rows="2" placeholder="Комментарий: что сделать, что взять с собой"></textarea>' +
+        '<input type="hidden" id="lt-pe-lat" data-f="lat"><input type="hidden" id="lt-pe-lon" data-f="lon">' +
       '</div>' +
       '<div class="lt-hint"><i class="ti ti-info-circle"></i> Поменял адрес — координаты найдутся заново. ' +
+        'Выбрал место из своих — адрес и координаты встанут сами. ' +
         'Рейс уже у водителя? Нажми потом «Отправить ещё раз».</div>' +
     '</div>' +
     '<div class="modal-footer">' +
@@ -26570,6 +26732,7 @@ function ltPtEdit(pid) {
   set('lt-pe-title', p.title);
   set('lt-pe-addr', p.address);
   set('lt-pe-note', p.note);
+  _ltPlacesEnsure(true);
 }
 
 async function ltPtEditSave(pid) {
@@ -26581,8 +26744,14 @@ async function ltPtEditSave(pid) {
   const btn = document.getElementById('lt-pe-go');
   if (btn) btn.disabled = true;
   try {
-    const r = await apiPatch('/api/logistics/trips/' + trip.id + '/points/' + pid,
-      { title, address: v('lt-pe-addr'), note: v('lt-pe-note'), action: v('lt-pe-act') });
+    const body = { title, address: v('lt-pe-addr'), note: v('lt-pe-note'),
+      action: v('lt-pe-act') };
+    // место выбрали из своих — координаты уже есть, геокодер не нужен
+    if (v('lt-pe-lat') && v('lt-pe-lon')) {
+      body.lat = v('lt-pe-lat');
+      body.lon = v('lt-pe-lon');
+    }
+    const r = await apiPatch('/api/logistics/trips/' + trip.id + '/points/' + pid, body);
     const m = document.getElementById('lt-pt-edit');
     if (m) m.remove();
     _ltTripRender(r);
@@ -26928,6 +27097,7 @@ async function ltPtAddOpen() {
       '<button class="btn btn-primary" id="lt-add-go" onclick="ltPtAddGo()"><i class="ti ti-check"></i> Добавить в рейс</button>' +
     '</div></div>';
   document.body.appendChild(m);
+  _ltPlacesEnsure(true);
   try {
     const d = await apiGet('/api/logistics/pickup-pool');
     // то, что уже в этом рейсе, второй раз не предлагаем
