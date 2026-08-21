@@ -90,7 +90,7 @@ test('IDEA_STATUS покрывает все статусы бэкенда', () =
     ['declined', 'done', 'open', 'ready', 'sent', 'taken']);
 });
 
-// v2.46.023: скриншоты и файлы в чате идей
+// v2.46.024: скриншоты и файлы в чате идей
 test('к сообщению можно приложить файл и вставить скриншот из буфера', () => {
   const shell = app4.slice(app4.indexOf('function _ideasRenderShell'),
                            app4.indexOf('function ideasToggleList'));
