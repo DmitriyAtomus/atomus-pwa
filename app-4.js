@@ -1827,12 +1827,19 @@ function _ideasRenderShell() {
       '<div class="ich-main">' +
         '<div class="ich-feed" id="ideas-feed"></div>' +
         '<div class="ich-actions" id="ideas-actions"></div>' +
+        '<div class="ich-picked" id="idea-picked"></div>' +
         '<div class="ich-composer">' +
+          '<input type="file" id="idea-files" multiple style="display:none" ' +
+            'accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.dxf,.dwg,.step,.stp" ' +
+            'onchange="ideasPickFiles(this)">' +
+          '<button class="ich-clip" onclick="document.getElementById(\'idea-files\').click()" ' +
+            'title="Скриншот или файл"><i class="ti ti-paperclip"></i></button>' +
           '<textarea id="idea-input" class="ich-input" rows="1" placeholder="Что улучшить в программе?" ' +
-            'oninput="ideasGrow(this)" onkeydown="ideasKey(event)"></textarea>' +
+            'oninput="ideasGrow(this)" onkeydown="ideasKey(event)" onpaste="ideasPaste(event)"></textarea>' +
           '<button class="ich-send" onclick="ideaSend()" title="Отправить (Enter)"><i class="ti ti-arrow-up"></i></button>' +
         '</div>' +
-        '<div class="ich-hint">Клава только смотрит: код не правит, договоры и суммы не показывает. ' +
+        '<div class="ich-hint">Скриншот можно вставить прямо из буфера (Ctrl+V) — Клава его видит. ' +
+          'Код она не правит, договоры и суммы не показывает. ' +
           'Готовое ТЗ уходит директору — внедрять или нет, решает он.</div>' +
       '</div>' +
     '</div>';
@@ -1884,6 +1891,8 @@ function _ideasWhen(raw) {
 function ideasNew() {
   state._ideas = state._ideas || {};
   state._ideas.current = null;
+  state._ideas.files = [];
+  _ideasRenderPicked();
   const feed = document.getElementById('ideas-feed');
   const acts = document.getElementById('ideas-actions');
   if (!feed) { _ideasRenderShell(); return ideasNew(); }
@@ -1905,6 +1914,8 @@ function ideasNew() {
 async function ideasOpen(id) {
   state._ideas = state._ideas || {};
   state._ideas.current = id;
+  state._ideas.files = [];
+  _ideasRenderPicked();
   const feed = document.getElementById('ideas-feed');
   if (!feed) return;
   document.querySelectorAll('.ich-item').forEach(function (el) { el.classList.remove('active'); });
@@ -1919,7 +1930,9 @@ async function ideasOpen(id) {
   const th = (d && d.thread) || {};
   state._ideas.thread = th;
   feed.innerHTML = '';
-  (th.messages || []).forEach(function (m) { _ideaAddMsg(m.role, m.text, m.created_at); });
+  (th.messages || []).forEach(function (m) {
+    _ideaAddMsg(m.role, m.text, m.created_at, m.files);
+  });
   if (th.spec_text) _ideaAddSpec(th.spec_text);
   _ideasRenderActions(th);
   _ideasScroll();
@@ -1980,7 +1993,7 @@ function _ideaFormat(text) {
   return escapeHtml(String(text || '')).replace(/\n/g, '<br>');
 }
 
-function _ideaAddMsg(role, text, when) {
+function _ideaAddMsg(role, text, when, files, local) {
   const feed = document.getElementById('ideas-feed');
   if (!feed) return null;
   const mine = role === 'user';
@@ -1994,12 +2007,39 @@ function _ideaAddMsg(role, text, when) {
   }
   const bubble = document.createElement('div');
   bubble.className = 'ich-bubble';
-  bubble.innerHTML = '<div class="ich-text">' + _ideaFormat(text) + '</div>' +
+  bubble.innerHTML = (text ? '<div class="ich-text">' + _ideaFormat(text) + '</div>' : '') +
+    _ideaFilesHtml(files, local) +
     (when ? '<div class="ich-time">' + escapeHtml(_ideasWhen(when)) + '</div>' : '');
   row.appendChild(bubble);
   feed.appendChild(row);
   _ideasScroll();
   return bubble.querySelector('.ich-text');
+}
+
+// Вложения в пузыре: картинка — картинкой (тап открывает во весь экран),
+// остальное — плиткой с именем. `local` — свежеотправленное с телефона: адрес
+// уже готовый (blob), подставлять API_BASE нельзя.
+function _ideaAttr(v) {
+  // escapeHtml кавычки не трогает, а адрес едет в атрибут и в onclick
+  return escapeHtml(v).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _ideaFilesHtml(files, local) {
+  if (!files || !files.length) return '';
+  const items = files.map(function (f) {
+    const isImg = (f.content_type || '').indexOf('image/') === 0;
+    const url = f.url ? (local ? f.url : API_BASE + f.url) : '';
+    if (isImg && url) {
+      return '<button type="button" class="ich-img" onclick="openPhotoLightbox(\'' +
+        _ideaAttr(url) + '\')"><img src="' + _ideaAttr(url) + '" loading="lazy" alt=""></button>';
+    }
+    const name = escapeHtml(f.name || 'файл');
+    return url
+      ? '<a class="ich-file" href="' + _ideaAttr(url) + '" target="_blank" rel="noopener">' +
+          '<i class="ti ti-file"></i><span>' + name + '</span></a>'
+      : '<span class="ich-file"><i class="ti ti-file"></i><span>' + name + '</span></span>';
+  }).join('');
+  return '<div class="ich-files">' + items + '</div>';
 }
 
 function _ideaAddSpec(spec) {
@@ -2028,27 +2068,159 @@ function ideasKey(e) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ideaSend(); }
 }
 
+// ============ Вложения: скриншоты и файлы ============
+// Скриншот объясняет проблему быстрее трёх абзацев, поэтому картинки уходят
+// Клаве в глаза, а вместе с ТЗ едут директору. Пределы те же, что на сервере:
+// больше пяти файлов и больше 40 МБ за раз не принимаем — и говорим об этом ДО
+// загрузки, а не после минуты ожидания.
+
+const IDEA_MAX_FILES = 5;
+const IDEA_MAX_IMAGE = 8 * 1024 * 1024;
+const IDEA_MAX_DOC = 20 * 1024 * 1024;
+const IDEA_MAX_TOTAL = 40 * 1024 * 1024;
+
+function _ideasPicked() {
+  state._ideas = state._ideas || {};
+  if (!state._ideas.files) state._ideas.files = [];
+  return state._ideas.files;
+}
+
+function _ideasAddPicked(list) {
+  const picked = _ideasPicked();
+  let total = picked.reduce(function (s, f) { return s + (f.size || 0); }, 0);
+  for (let i = 0; i < list.length; i++) {
+    const f = list[i];
+    if (!f || !f.size) continue;
+    if (picked.length >= IDEA_MAX_FILES) {
+      showToast('Больше ' + IDEA_MAX_FILES + ' файлов за раз не отправить', 'error');
+      break;
+    }
+    const isImg = (f.type || '').indexOf('image/') === 0;
+    const max = isImg ? IDEA_MAX_IMAGE : IDEA_MAX_DOC;
+    if (f.size > max) {
+      showToast('«' + (f.name || 'файл') + '» больше ' + Math.round(max / 1048576) + ' МБ', 'error');
+      continue;
+    }
+    if (total + f.size > IDEA_MAX_TOTAL) {
+      showToast('Вложений больше ' + Math.round(IDEA_MAX_TOTAL / 1048576) + ' МБ за раз', 'error');
+      break;
+    }
+    total += f.size;
+    picked.push(f);
+  }
+  _ideasRenderPicked();
+}
+
+function ideasPickFiles(input) {
+  _ideasAddPicked(Array.prototype.slice.call(input.files || []));
+  input.value = '';       // тот же файл можно выбрать повторно
+}
+
+// Ctrl+V со скриншотом: на ПК это самый частый способ показать экран.
+function ideasPaste(e) {
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  const imgs = [];
+  for (let i = 0; i < items.length; i++) {
+    if ((items[i].type || '').indexOf('image/') !== 0) continue;
+    const f = items[i].getAsFile();
+    if (f) imgs.push(f);
+  }
+  if (!imgs.length) return;      // обычный текст вставляется как обычно
+  e.preventDefault();
+  _ideasAddPicked(imgs);
+}
+
+function ideasDropPicked(i) {
+  const picked = _ideasPicked();
+  const f = picked[i];
+  if (f && f._preview) URL.revokeObjectURL(f._preview);
+  picked.splice(i, 1);
+  _ideasRenderPicked();
+}
+
+function _ideasRenderPicked() {
+  const box = document.getElementById('idea-picked');
+  if (!box) return;
+  const picked = _ideasPicked();
+  box.innerHTML = picked.map(function (f, i) {
+    const isImg = (f.type || '').indexOf('image/') === 0;
+    if (isImg && !f._preview) f._preview = URL.createObjectURL(f);
+    return '<div class="ich-pick">' +
+      (isImg ? '<img src="' + f._preview + '" alt="">'
+             : '<i class="ti ti-file"></i><span>' + escapeHtml(f.name || 'файл') + '</span>') +
+      '<button type="button" onclick="ideasDropPicked(' + i + ')" title="Убрать">' +
+        '<i class="ti ti-x"></i></button>' +
+    '</div>';
+  }).join('');
+  box.style.display = picked.length ? '' : 'none';
+}
+
+// Загрузка через XHR, а не fetch: нужны проценты на кнопке. Длинная отправка
+// без отклика читается как «не работает» — эту грабину уже проходили в чате Клавы.
+function _ideaUpload(url, form, onProgress) {
+  return new Promise(function (resolve) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', API_BASE + url, true);
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = function (e) {
+        if (e.lengthComputable) onProgress(Math.round(e.loaded * 100 / e.total));
+      };
+    }
+    xhr.onload = function () {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText || '{}'); } catch (_) {}
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, data: data });
+    };
+    xhr.onerror = function () {
+      resolve({ ok: false, status: 0, data: { message: 'Не ушло: связь оборвалась' } });
+    };
+    xhr.send(form);
+  });
+}
+
+function _ideaSendProgress(pct) {
+  const btn = document.querySelector('.ich-send');
+  if (!btn) return;
+  if (pct === null) { btn.classList.remove('upl'); btn.innerHTML = '<i class="ti ti-arrow-up"></i>'; return; }
+  btn.classList.add('upl');
+  btn.textContent = pct + '%';
+}
+
 async function ideaSend() {
   const inp = document.getElementById('idea-input');
   if (!inp) return;
   const text = (inp.value || '').trim();
-  if (!text) return;
+  const picked = _ideasPicked().slice();
+  if (!text && !picked.length) return;
   inp.value = '';
   ideasGrow(inp);
-  _ideaAddMsg('user', text);
+  state._ideas.files = [];
+  _ideasRenderPicked();
+  _ideaAddMsg('user', text, null, picked.map(function (f) {
+    return { name: f.name, content_type: f.type,
+             url: (f.type || '').indexOf('image/') === 0 ? URL.createObjectURL(f) : '' };
+  }), true);
   const ph = _ideaAddMsg('assistant', 'думаю…');
   try {
     let d;
-    if (!state._ideas.current) {
-      const r = await apiPost('/api/ideas', { text });
-      d = (r && r.data) || {};
-      if (!r.ok) { if (ph) ph.textContent = d.message || 'Не отправилось'; return; }
-      if (d.thread_id) state._ideas.current = d.thread_id;
+    const isNew = !state._ideas.current;
+    const url = isNew ? '/api/ideas' : '/api/ideas/' + state._ideas.current + '/message';
+    let r;
+    if (picked.length) {
+      const form = new FormData();
+      form.append('text', text);
+      picked.forEach(function (f, i) { form.append('file_' + (i + 1), f, f.name); });
+      _ideaSendProgress(0);
+      r = await _ideaUpload(url, form, _ideaSendProgress);
+      _ideaSendProgress(null);
     } else {
-      const r = await apiPost('/api/ideas/' + state._ideas.current + '/message', { text });
-      d = (r && r.data) || {};
-      if (!r.ok) { if (ph) ph.textContent = d.message || 'Не отправилось'; return; }
+      r = await apiPost(url, { text });
     }
+    d = (r && r.data) || {};
+    if (!r.ok) { if (ph) ph.textContent = d.message || 'Не отправилось'; return; }
+    if (isNew && d.thread_id) state._ideas.current = d.thread_id;
     if (ph) ph.innerHTML = _ideaFormat(d.reply || 'Принял.');
     _ideasScroll();
     const th = state._ideas.thread || {};
@@ -2056,6 +2228,7 @@ async function ideaSend() {
                           spec_text: th.spec_text });
     ideasLoadListSilent();
   } catch (e) {
+    _ideaSendProgress(null);
     if (ph) ph.textContent = 'Ошибка связи';
   }
 }

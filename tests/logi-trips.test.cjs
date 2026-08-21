@@ -170,3 +170,23 @@ test('стили рейсов на месте', () => {
     assert.ok(css.includes(cls), `нет стиля ${cls}`);
   }
 });
+
+// v2.46.023: геокодер не знает дом (Миасс, Готвальда 1/1в) — точка садится на
+// улицу. Это должно быть видно в списке, а место — уточняться тыком по карте.
+test('точка с примерными координатами помечена и правится по карте', () => {
+  const render = section('function _ltTripRender(trip)', 'async function ltPtMove');
+  assert.match(render, /geo_exact/, 'в списке точек нет признака примерных координат');
+  assert.match(render, /Точка на карте примерная/, 'нет пометки о примерной точке');
+
+  const edit = section('function ltPtEdit(pid)', 'function ltPtGeoClear');
+  assert.match(edit, /lt-pe-map/, 'в правке точки нет карты');
+  assert.match(edit, /draggable: true/, 'маркер нельзя перетащить');
+  assert.match(edit, /map\.on\('click'/, 'клик по карте не ставит точку');
+
+  const save = section('async function ltPtEditSave(pid)', 'async function ltPtDel');
+  assert.match(save, /body\.lat = /, 'ручные координаты не уходят на сервер');
+
+  for (const cls of ['.lt-geo-warn', '#lt-pe-map']) {
+    assert.ok(css.includes(cls), `нет стиля ${cls}`);
+  }
+});

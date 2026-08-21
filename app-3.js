@@ -26271,6 +26271,16 @@ function _ltPlaceToRow(row, p) {
   if (p.address) set('address', p.address);
   set('lat', p.lat == null ? '' : p.lat);
   set('lon', p.lon == null ? '' : p.lon);
+  // выбрали знакомое место в правке точки — маркер на карте едет за ним
+  if (row.id === 'lt-pe-form' && p.lat != null && p.lon != null
+      && window._ltPeMarker && window._ltPeMapObj) {
+    try {
+      window._ltPeMarker.setLatLng([Number(p.lat), Number(p.lon)]);
+      window._ltPeMapObj.setView([Number(p.lat), Number(p.lon)], 17);
+      const st = document.getElementById('lt-pe-geo-st');
+      if (st) st.textContent = 'координаты знакомого места';
+    } catch (e) {}
+  }
 }
 // Название вписали руками: совпало со знакомым местом — подставим адрес;
 // не совпало — координаты прежнего места сбрасываем, иначе рейс поедет туда
@@ -26618,6 +26628,12 @@ function _ltTripRender(trip) {
         escapeHtml(p.title || '') + '</b>' +
         '<small>' + escapeHtml(p.address || '—') +
         (p.status_note ? ' · <i>' + escapeHtml(p.status_note) + '</i>' : '') + '</small>' +
+        // v2.46.023: дом на карте не значится — точка села на улицу, надо поправить
+        (p.lat != null && Number(p.geo_exact) === 0
+          ? '<em class="lt-geo-warn" title="Такого дома нет на карте OpenStreetMap">' +
+            '<i class="ti ti-map-pin-question"></i> Точка на карте примерная — ' +
+            (own ? '<span class="lnk" onclick="ltPtEdit(' + p.id + ')">укажи место</span>'
+                 : 'проверь по адресу') + '</em>' : '') +
         (p.note ? '<em class="lt-cmt"><i class="ti ti-message-2"></i> ' + escapeHtml(p.note) + '</em>' : '') +
       '</span>' +
       // v2.45.906: ETA — заполняется, когда OSRM посчитает маршрут
@@ -26719,6 +26735,15 @@ function ltPtEdit(pid) {
         '<textarea class="form-input" id="lt-pe-note" rows="2" placeholder="Комментарий: что сделать, что взять с собой"></textarea>' +
         '<input type="hidden" id="lt-pe-lat" data-f="lat"><input type="hidden" id="lt-pe-lon" data-f="lon">' +
       '</div>' +
+      // v2.46.023: место на карте — ткнуть пальцем, когда дома нет в OSM
+      '<div class="lt-pe-geo">' +
+        '<div class="lt-pe-geo-hd"><b><i class="ti ti-map-pin"></i> Место на карте</b>' +
+          '<span id="lt-pe-geo-st"></span>' +
+          '<button class="btn btn-secondary btn-sm" onclick="ltPtGeoClear()">Найти по адресу</button></div>' +
+        '<div id="lt-pe-map"></div>' +
+        '<small>Геокодер не знает такой дом — ткни в карту, где въезд. ' +
+          'Курьер поедет ровно туда.</small>' +
+      '</div>' +
       '<div class="lt-hint"><i class="ti ti-info-circle"></i> Поменял адрес — координаты найдутся заново. ' +
         'Выбрал место из своих — адрес и координаты встанут сами. ' +
         'Рейс уже у водителя? Нажми потом «Отправить ещё раз».</div>' +
@@ -26734,6 +26759,48 @@ function ltPtEdit(pid) {
   set('lt-pe-addr', p.address);
   set('lt-pe-note', p.note);
   _ltPlacesEnsure(true);
+  _ltPeMap(p);
+}
+
+// v2.46.023: карта в правке точки — маркер перетаскивается, клик ставит его заново
+async function _ltPeMap(p) {
+  try { await _ltEnsureLeaflet(); } catch (e) { return; }
+  const el = document.getElementById('lt-pe-map');
+  if (!el) return;
+  const lat = p.lat != null ? Number(p.lat) : 55.048;   // Миасс, если точки ещё нет
+  const lon = p.lon != null ? Number(p.lon) : 60.108;
+  if (window._ltPeMapObj) { try { window._ltPeMapObj.remove(); } catch (e) {} }
+  const map = L.map('lt-pe-map', { scrollWheelZoom: false });
+  window._ltPeMapObj = map;
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
+  map.setView([lat, lon], p.lat != null ? (Number(p.geo_exact) === 0 ? 15 : 17) : 12);
+  const mk = L.marker([lat, lon], { draggable: true }).addTo(map);
+  window._ltPeMarker = mk;
+  const put = (ll) => {
+    const la = document.getElementById('lt-pe-lat');
+    const lo = document.getElementById('lt-pe-lon');
+    if (la) la.value = ll.lat.toFixed(6);
+    if (lo) lo.value = ll.lng.toFixed(6);
+    const st = document.getElementById('lt-pe-geo-st');
+    if (st) st.textContent = 'место указано вручную';
+  };
+  mk.on('dragend', () => put(mk.getLatLng()));
+  map.on('click', (e) => { mk.setLatLng(e.latlng); put(e.latlng); });
+  const st = document.getElementById('lt-pe-geo-st');
+  if (st) st.textContent = p.lat == null ? 'координат пока нет'
+    : (Number(p.geo_exact) === 0 ? 'сейчас примерно — дома нет на карте' : '');
+  setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 60);
+}
+
+// Сбросить ручные координаты — пусть адрес ищется геокодером заново
+function ltPtGeoClear() {
+  ['lt-pe-lat', 'lt-pe-lon'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const st = document.getElementById('lt-pe-geo-st');
+  if (st) st.textContent = 'координаты найдутся по адресу';
 }
 
 async function ltPtEditSave(pid) {
@@ -26941,7 +27008,9 @@ async function _ltTripMap(trip) {
       iconSize: [26, 26], iconAnchor: [13, 13],
       html: '<span style="background:' + color + '">' + (i + 1) + '</span>' }) })
       .addTo(map)
-      .bindPopup('<b>' + escapeHtml(p.title || '') + '</b><br>' + escapeHtml(p.address || ''));
+      .bindPopup('<b>' + escapeHtml(p.title || '') + '</b><br>' + escapeHtml(p.address || '') +
+        (Number(p.geo_exact) === 0
+          ? '<br><i>⚠️ дома нет на карте — точка примерная</i>' : ''));
     bounds.push([p.lat, p.lon]);
   });
   map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });

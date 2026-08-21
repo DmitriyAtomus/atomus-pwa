@@ -89,3 +89,49 @@ test('IDEA_STATUS покрывает все статусы бэкенда', () =
   assert.deepEqual(Object.keys(ctx.out).sort(),
     ['declined', 'done', 'open', 'ready', 'sent', 'taken']);
 });
+
+// v2.46.024: скриншоты и файлы в чате идей
+test('к сообщению можно приложить файл и вставить скриншот из буфера', () => {
+  const shell = app4.slice(app4.indexOf('function _ideasRenderShell'),
+                           app4.indexOf('function ideasToggleList'));
+  assert.match(shell, /id="idea-files"[^>]*multiple/);
+  assert.match(shell, /onchange="ideasPickFiles\(this\)"/);
+  assert.match(shell, /onpaste="ideasPaste\(event\)"/);
+  assert.match(shell, /id="idea-picked"/);
+});
+
+test('пределы вложений проверяются ДО загрузки', () => {
+  const ctx = { showToast: () => {}, state: {}, _ideasRenderPicked: () => {} };
+  const src = app4.slice(app4.indexOf('const IDEA_MAX_FILES'),
+                         app4.indexOf('function ideasPickFiles'));
+  vm.createContext(ctx);
+  vm.runInContext(src + '\n;globalThis.add = _ideasAddPicked; globalThis.picked = _ideasPicked;', ctx);
+  // шестой файл не берём
+  ctx.add(Array.from({ length: 7 }, (_, i) => ({ name: 'f' + i, size: 1000, type: 'image/png' })));
+  assert.equal(ctx.picked().length, 5);
+  // тяжёлая картинка отсеивается по своему пределу
+  ctx.state._ideas.files = [];
+  ctx.add([{ name: 'big.png', size: 9 * 1024 * 1024, type: 'image/png' }]);
+  assert.equal(ctx.picked().length, 0);
+});
+
+test('отправка с файлами идёт multipart с прогрессом, без файлов — как раньше', () => {
+  const fn = app4.slice(app4.indexOf('async function ideaSend'),
+                        app4.indexOf('async function ideaCompile'));
+  assert.match(fn, /new FormData\(\)/);
+  assert.match(fn, /form\.append\('file_' \+ \(i \+ 1\), f, f\.name\)/);
+  assert.match(fn, /_ideaUpload\(url, form, _ideaSendProgress\)/);
+  assert.match(fn, /apiPost\(url, \{ text \}\)/);
+  // XHR нужен ради процентов: fetch их не отдаёт
+  assert.match(app4, /xhr\.upload\.onprogress/);
+});
+
+test('картинка из переписки открывается во весь экран, стили есть', () => {
+  const fn = app4.slice(app4.indexOf('function _ideaFilesHtml'),
+                        app4.indexOf('function _ideaAddSpec'));
+  assert.match(fn, /openPhotoLightbox/);
+  assert.match(fn, /API_BASE \+ f\.url/);        // адрес подписывает сервер
+  for (const cls of ['.ich-files', '.ich-img', '.ich-pick', '.ich-clip']) {
+    assert.ok(css.includes(cls), 'нет стиля ' + cls);
+  }
+});
