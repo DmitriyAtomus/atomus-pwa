@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.028";
+const APP_VERSION = "v2.46.029";
 const APP_VERSION_DATE = "21.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1974,6 +1974,7 @@ function runScreenLoader(screenName) {
   // v2.45.971: внутри чата прячем круглый «+» таб-бара — он выпирал над панелью
   // и отбирал у ленты полсантиметра, а по смыслу дублировал «+» композера
   document.body.classList.toggle('dchat-screen', screenName === 'devchat' || screenName === 'codex');
+  _devChatSkinSync();   // дождь «Матрицы» живёт только на видимом чате
   // v2.45.956: на самом экране чата плавающая кнопка не нужна — она ложится
   // ровно на поле ввода (особенно на телефоне)
   const devFab2 = document.getElementById('devchat-fab');
@@ -4289,6 +4290,7 @@ function loadDevChat(host) {
   // список обновляем реже — там меняются только превью и значок «работает»
   _devChatListTimer = setInterval(function () { devChatLoadThreads(false); }, 15000);
   _devChatApplyFull();
+  _devChatSkinApply();
 }
 
 // ---- «на всё окно» ----
@@ -4350,6 +4352,7 @@ function devChatToggleDrawer() {
       _devChatUseAgent(state.currentScreen === 'codex' ? 'codex' : 'claude');
       loadDevChat('screen');
     } else stopDevChat();
+    _devChatSkinSync();
   }
 }
 
@@ -4452,6 +4455,176 @@ function stopDevChat() {
   _devChatWorkTick(false);      // секундная стрелка карточки работы
   _devChatStickStop();          // липучка низа ленты
   if (_dcVoiceRec) devChatVoiceCancel();   // ушли с экрана — микрофон отпускаем
+}
+
+// ============ v2.46.029: вид «Атомус × Матрица» для чата с Клавой ============
+// Механика матричная — цифровой дождь фоном, строчная развёртка ЭЛТ и виньетка,
+// но палитра наша: дождь падает бренд-синим #5B8FC7, искры и слова в потоке —
+// фиолетовым Клавы #8B7BF0, зелёного неона нет вовсе. Формы тоже наши:
+// шапка-строка с плиткой-аватаром, пузыри 16/16/16/6, композер 18 px.
+// Вид включён по умолчанию; кнопка в шапке возвращает светлый Атомус.
+// Выбор живёт в localStorage — на бэкенд не ходит, у каждого свой.
+const DEVCHAT_SKIN_KEY = 'atomus_dchat_skin';
+// В потоке проступают слова — их видно краем глаза, как в фильме.
+const _DC_MX_WORDS = ['АТОМУС', 'КЛАВА', 'ИДЕИ', 'АТОМ', 'CRM'];
+const _DC_MX_GLYPHS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン' +
+  '0123456789<>[]{}/|=+*';
+let _dcMxRains = [];      // живые полотна дождя: экран и/или шторка
+let _dcMxRaf = 0;
+
+// Пусто в хранилище — значит человек ещё не выбирал: показываем новый вид.
+function devChatSkinIsMatrix() {
+  try { return localStorage.getItem(DEVCHAT_SKIN_KEY) !== 'atomus'; } catch (e) { return true; }
+}
+
+// Кнопка в шапке: иконка отвечает на вопрос «куда я вернусь».
+function _devChatSkinBtns() {
+  const on = devChatSkinIsMatrix();
+  document.querySelectorAll('.dchat-skin-btn').forEach(function (b) {
+    b.innerHTML = '<i class="ti ' + (on ? 'ti-sun-high' : 'ti-binary-tree') + '"></i>';
+    b.title = on ? 'Вернуть светлый вид Атомуса' : 'Матрица: цифровой дождь в наших цветах';
+    b.classList.toggle('is-on', on);
+  });
+}
+
+function devChatSkinToggle() {
+  const next = devChatSkinIsMatrix() ? 'atomus' : 'matrix';
+  try { localStorage.setItem(DEVCHAT_SKIN_KEY, next); } catch (e) {}
+  _devChatSkinApply();
+  if (typeof showToast === 'function') {
+    showToast(next === 'matrix' ? 'Матрица включена' : 'Вернул светлый вид', 'success');
+  }
+}
+
+function _devChatSkinApply() {
+  document.body.classList.toggle('dchat-mx', devChatSkinIsMatrix());
+  _devChatSkinBtns();
+  _devChatSkinSync();
+}
+
+// Полотно вешаем только туда, где чат сейчас видно: на закрытой шторке дождь
+// крутил бы rAF впустую.
+function _devChatSkinSync() {
+  const want = [];
+  const cur = (typeof state === 'object' && state) ? state.currentScreen : '';
+  if (devChatSkinIsMatrix()) {
+    const drawer = document.getElementById('devchat-drawer');
+    if (drawer && drawer.style.display === 'flex') want.push(drawer);
+    if (cur === 'devchat' || cur === 'codex') {
+      // Полотно вешаем на колонку с лентой, а не на весь экран: шапка выше
+      // непрозрачная, и дождь за ней всё равно не виден.
+      const screen = document.querySelector('.screen[data-screen="devchat"]');
+      const box = screen && screen.querySelector('.dchat-main');
+      if (box) want.push(box);
+    }
+  }
+  _dcMxRains = _dcMxRains.filter(function (r) {
+    if (want.indexOf(r.host) !== -1) return true;
+    if (r.wrap && r.wrap.parentNode) r.wrap.parentNode.removeChild(r.wrap);
+    r.host.classList.remove('dchat-mxhost');
+    return false;
+  });
+  want.forEach(function (host) {
+    if (!_dcMxRains.some(function (r) { return r.host === host; })) _dcMxRainAdd(host);
+  });
+  if (_dcMxRains.length && !_dcMxRaf) _dcMxRaf = requestAnimationFrame(_dcMxTick);
+  if (!_dcMxRains.length && _dcMxRaf) { cancelAnimationFrame(_dcMxRaf); _dcMxRaf = 0; }
+}
+
+function _dcMxRainAdd(host) {
+  const wrap = document.createElement('div');
+  wrap.className = 'dchat-mxbg';
+  wrap.innerHTML = '<canvas></canvas><div class="scan"></div><div class="vig"></div>';
+  host.classList.add('dchat-mxhost');
+  host.insertBefore(wrap, host.firstChild);
+  const rain = { host: host, wrap: wrap, canvas: wrap.querySelector('canvas'), cols: 0, drops: [], w: 0, h: 0 };
+  rain.ctx = rain.canvas.getContext('2d');
+  _dcMxFit(rain);
+  _dcMxRains.push(rain);
+}
+
+// Размер держим в пикселях и снимаем с самой ленты, а не растягиваем на
+// родителя: absolute с inset:0 внутри flex-колонки заводил layout в петлю —
+// полотно тянуло высоту, высота тянула полотно, и чат уезжал вбок.
+function _dcMxBox(rain) {
+  const feed = rain.host.querySelector('.dchat-feed');
+  if (!feed) return null;
+  const f = feed.getBoundingClientRect(), h = rain.host.getBoundingClientRect();
+  // Пока раскладка не устоялась, лента успевает померяться во всю переписку —
+  // это десятки тысяч пикселей. Полотно такого размера браузер не выделит,
+  // поэтому режем по экрану: больше видимой части всё равно не нужно.
+  return { x: Math.round(f.left - h.left), y: Math.round(f.top - h.top),
+           w: Math.max(1, Math.min(Math.round(f.width), window.innerWidth)),
+           h: Math.max(1, Math.min(Math.round(f.height), window.innerHeight)) };
+}
+
+// Одна капля: где голова, каким словом падает (или без слова) и сколько букв прошло.
+function _dcMxDrop(h, st) {
+  const word = Math.random() < 0.12 ? _DC_MX_WORDS[(Math.random() * _DC_MX_WORDS.length) | 0] : '';
+  return { y: -Math.random() * (h / st) - 2, word: word, wi: 0 };
+}
+
+function _dcMxFit(rain) {
+  const b = _dcMxBox(rain);
+  if (!b) return;
+  if (b.w === rain.w && b.h === rain.h && b.x === rain.x && b.y === rain.y) return;
+  // Рисуем в единицах CSS: на телефоне полное DPR — это лишний нагрев ради фона.
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  rain.x = b.x; rain.y = b.y; rain.w = b.w; rain.h = b.h;
+  rain.wrap.style.left = b.x + 'px';
+  rain.wrap.style.top = b.y + 'px';
+  rain.wrap.style.width = b.w + 'px';
+  rain.wrap.style.height = b.h + 'px';
+  rain.canvas.width = Math.round(b.w * dpr);
+  rain.canvas.height = Math.round(b.h * dpr);
+  rain.canvas.style.width = b.w + 'px';
+  rain.canvas.style.height = b.h + 'px';
+  rain.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  rain.step = 16;
+  rain.cols = Math.ceil(b.w / rain.step);
+  rain.drops = [];
+  for (let i = 0; i < rain.cols; i++) rain.drops.push(_dcMxDrop(b.h, rain.step));
+  rain.ctx.fillStyle = '#0A1B2E';
+  rain.ctx.fillRect(0, 0, b.w, b.h);
+}
+
+function _dcMxTick() {
+  _dcMxRaf = _dcMxRains.length ? requestAnimationFrame(_dcMxTick) : 0;
+  if (document.hidden) return;
+  // Кадр раз в ~55 мс: дождь и так читается, а батарею телефона жалко.
+  const now = performance.now();
+  if (_dcMxTick._t && now - _dcMxTick._t < 55) return;
+  _dcMxTick._t = now;
+  const fit = !_dcMxTick._f || now - _dcMxTick._f > 700;
+  if (fit) _dcMxTick._f = now;
+  _dcMxRains.forEach(function (rain) {
+    if (fit) _dcMxFit(rain);
+    const c = rain.ctx, st = rain.step;
+    if (!c || !rain.w) return;
+    c.fillStyle = 'rgba(10,27,46,.14)';     // хвост тает, а не стирается разом
+    c.fillRect(0, 0, rain.w, rain.h);
+    c.font = '600 ' + (st - 3) + 'px ui-monospace, Consolas, monospace';
+    c.textBaseline = 'top';
+    for (let i = 0; i < rain.cols; i++) {
+      const d = rain.drops[i], y = d.y * st;
+      if (y > -st) {
+        let ch;
+        if (d.word) {                       // слово падает буква за буквой
+          ch = d.word.charAt(d.wi % d.word.length);
+          d.wi++;
+          c.fillStyle = 'rgba(139,123,240,.95)';   // фиолетовый Клавы
+        } else {
+          ch = _DC_MX_GLYPHS.charAt((Math.random() * _DC_MX_GLYPHS.length) | 0);
+          c.fillStyle = 'rgba(226,238,255,.9)';    // голова капли — почти белая
+        }
+        c.fillText(ch, i * st, y);
+        c.fillStyle = 'rgba(91,143,199,.32)';      // хвост — бренд-синий
+        c.fillText(_DC_MX_GLYPHS.charAt((Math.random() * _DC_MX_GLYPHS.length) | 0), i * st, y - st);
+      }
+      d.y++;
+      if (y > rain.h && Math.random() > 0.975) rain.drops[i] = _dcMxDrop(rain.h * .6, st);
+    }
+  });
 }
 
 function stopSecurity() {
@@ -18109,3 +18282,9 @@ async function mydayEditSeg(sessionId, curMinutes, workId, empId) {
     openMyDaySegments(workId, empId);
   } catch (e) { showToast('Ошибка', 'error'); }
 }
+
+// Класс вешаем сразу: иначе при заходе на чат кадр-другой светится белым.
+document.addEventListener('DOMContentLoaded', function () {
+  document.body.classList.toggle('dchat-mx', devChatSkinIsMatrix());
+  _devChatSkinBtns();
+});
