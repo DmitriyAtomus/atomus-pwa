@@ -9623,6 +9623,7 @@ state.employeeForm = {
   email: '',                    // ЭТАП 16А
   tab_number: '',
   telegram_id: '',
+  max_user_id: '',              // личный MAX (чек-листы рейсов приходят в личку)
   roles: [],            // массив строк (legacy — для обратной совместимости)
   _is_active: true,
   password: '',
@@ -9650,6 +9651,7 @@ function openNewEmployee() {
   state.currentEmployeeId = null;
   state.employeeForm = {
     full_name: '', position: '', phone: '', email: '', tab_number: '', telegram_id: '',
+    max_user_id: '',
     roles: [], _is_active: true,
     password: '', _has_password: false, _password_action: 'set',
     access_level_id: null,
@@ -9677,6 +9679,7 @@ function openEditEmployee(empId) {
     email: emp.email || '',
     tab_number: emp.tab_number || '',
     telegram_id: emp.telegram_id ? String(emp.telegram_id) : '',
+    max_user_id: emp.max_user_id ? String(emp.max_user_id) : '',
     roles: [...(emp.roles || [])],
     _is_active: !!emp.is_active,
     password: '',
@@ -9860,6 +9863,17 @@ function renderEmployeeForm() {
   html += '<div class="advanced-block" id="empf-advanced">';
   html += '<div class="sales-form-row cols-1"><div><label>Telegram ID <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(необязательно — обычно сотрудник входит через /login)</span></label>' +
           '<input type="text" id="empf-telegram-id" value="' + escapeHtml(f.telegram_id) + '" placeholder="напр. 123456789" inputmode="numeric"></div></div>';
+  if (isEdit) {
+    html += '<div class="sales-form-row cols-1" style="margin-top:10px;"><div><label>MAX ID ' +
+            '<span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(чек-листы рейсов придут ему в личку в MAX)</span></label>' +
+            '<input type="text" id="empf-max-id" value="' + escapeHtml(f.max_user_id) + '" placeholder="напр. 103763925" inputmode="numeric"></div></div>';
+    html += '<div style="background: var(--bg); padding: 12px 14px; border-radius: 8px; font-size: 12.5px; color: var(--text-mid); line-height: 1.6; margin-top: 6px;">' +
+            '<b>Где взять MAX ID:</b> сотрудник пишет что угодно нашему боту в MAX — бот отвечает «Ваш ID: …». ' +
+            'Этот номер сюда. После сохранения он попадёт к боту и будет получать чек-листы рейсов. Пусто — отвязать.' +
+            '</div>';
+  } else {
+    html += '<div style="font-size: 12px; color: var(--text-light); margin-top: 6px; line-height: 1.5;">MAX ID (для рейсов) можно привязать после создания карточки.</div>';
+  }
   html += '<div style="background: var(--bg); padding: 12px 14px; border-radius: 8px; font-size: 12.5px; color: var(--text-mid); line-height: 1.6; margin-top: 6px;">' +
           '<b>Как сотрудник войдёт в систему:</b><br>' +
           '1. Откроет бота <code style="background:white; padding:1px 5px; border-radius:4px; border:1px solid var(--border);">@AtomusgroupBot</code><br>' +
@@ -9913,6 +9927,8 @@ function renderEmployeeForm() {
   document.getElementById('empf-tab-number').addEventListener('input', e => { state.employeeForm.tab_number = e.target.value; });
   const tgEl = document.getElementById('empf-telegram-id');
   if (tgEl) tgEl.addEventListener('input', e => { state.employeeForm.telegram_id = e.target.value.replace(/\D/g, ''); });
+  const maxEl = document.getElementById('empf-max-id');
+  if (maxEl) maxEl.addEventListener('input', e => { state.employeeForm.max_user_id = e.target.value.replace(/\D/g, ''); });
 
   // ЭТАП 29: подгрузка списка уровней доступа и подвязка select
   const accSel = document.getElementById('empf-access-level');
@@ -10045,6 +10061,10 @@ async function submitEmployeeForm() {
       return;
     }
     payload.telegram_id = tg;
+  }
+  // MAX ID — только при редактировании; пусто = отвязать
+  if (isEdit) {
+    payload.max_user_id = f.max_user_id ? parseInt(f.max_user_id) : null;
   }
 
   // При СОЗДАНИИ — пароль шлём прямо в payload, бэк создаст одной транзакцией
