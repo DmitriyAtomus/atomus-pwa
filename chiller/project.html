@@ -107,6 +107,25 @@ header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px
    в корпус, про это написано прямым текстом, а не только серой строкой
    в подвале: аппарат подобрали, конденсатор упёрся в стойку — и это видно
    сразу, не открывая ведомость. */
+/* v2.46.032: сцена «темнеет» — в кадре не остаётся ничего (вид увели двумя
+   пальцами, деталь уехала за сетку, координаты стали нечислом). Раньше это был
+   просто ровный фон без единой подсказки. Теперь пустой кадр сам себя объявляет. */
+#lost{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:6;display:none;
+  flex-direction:column;align-items:center;gap:9px;padding:16px 20px;border-radius:12px;
+  background:rgba(10,24,44,.94);border:1px solid var(--line2);color:var(--dim);
+  font-size:12.5px;text-align:center;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+#lost.on{display:flex}
+#stray{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:6;display:none;
+  flex-direction:column;align-items:center;gap:7px;max-width:min(560px,92%);padding:10px 16px;
+  border-radius:11px;background:rgba(44,34,8,.95);border:1px solid #7a6320;color:#f0e0b0;
+  font-size:12px;text-align:center;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+#stray.on{display:flex}
+#stray b{color:#fff;font-weight:700;font-size:12.5px}
+#stray u{text-decoration:none;color:#ffe08a;border:1px solid #7a6320;border-radius:8px;padding:5px 12px}
+body.mob #stray{bottom:60px;left:8px;right:8px;transform:none;max-width:none}
+#lost b{color:#fff;font-weight:700;font-size:13.5px}
+#lost u{text-decoration:none;color:var(--ice);border:1px solid var(--ice2);border-radius:8px;
+  padding:6px 14px;font-size:12.5px}
 #nofit{position:absolute;left:50%;top:44px;transform:translateX(-50%);z-index:5;display:none;
   align-items:center;gap:8px;max-width:min(620px,86%);padding:7px 13px;border-radius:9px;
   background:rgba(58,14,12,.92);border:1px solid #8d3a30;color:#ffd9d2;font-size:12.5px;
@@ -712,6 +731,8 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
   #chat{width:100vw;border-left:none}
   .ch-b{max-width:92%}
   #chatFab{right:12px;bottom:12px}
+  /* v2.46.032: на телефоне кружок чата садился ровно на кнопку «Ещё» — поднимаем его над панелью */
+  body.mob #chatFab{bottom:60px}
   #chatFab.open{display:none}
   #partsBox{width:min(92vw,296px)}
 }
@@ -950,6 +971,9 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <div class="vb hist off" id="bRedo" title="Возвращать нечего">↷ Вернуть</div>
       </div>
       <div id="nofit" title="Нажми — выделю деталь и покажу, во что упёрлась"></div>
+      <div id="stray" title="Нажми — верну деталь на её место по функции"></div>
+      <div id="lost" title="Нажми — верну машину в кадр"><b>Машина не в кадре</b>
+        <span>Вид увели в сторону — в кадре пусто.</span><u>⤢ Вернуть машину</u></div>
       <div id="plegend"><b>Патрубки:</b>
         <span><i style="background:#e8705f"></i>нагнетание, вход газа</span>
         <span><i style="background:#6cb4ec"></i>всасывание, выход</span>
@@ -1348,11 +1372,42 @@ function fogSync(){
    удалении, и на телефоне (узкий кадр, объектив 35°) собранный чиллер уезжал
    в угол сетки: приходилось искать его пальцем. Считаем габарит сцены и
    отходим ровно настолько, чтобы он влез и по высоте, и по ширине. */
+/* v2.46.032: одна деталь, уехавшая от машины (конденсатор в проекте «Чиллер»
+   стоял в 27 метрах), раздувала габарит сцены: «вписать» отходило на предел и
+   смотрело в пустоту между машиной и беглянкой — экран становился ровным фоном.
+   Кадр считаем по основной массе деталей, выбросы в габарит не берём. */
+const STRAY_LIM=6000;                     // дальше 6 м от машины — это уже не компоновка
+function strayList(){
+  const c=placed.map(p=>{try{const b=new THREE.Box3().setFromObject(p.obj),v=new THREE.Vector3();
+    b.getCenter(v);return {p,v};}catch(e){return null;}}).filter(x=>x&&isFinite(x.v.x));
+  if(c.length<3)return {near:c.map(x=>x.p),far:[]};
+  const med=k=>{const a=c.map(x=>x.v[k]).sort((m,n)=>m-n);return a[a.length>>1];};
+  const m=new THREE.Vector3(med('x'),med('y'),med('z'));
+  const near=[],far=[];
+  c.forEach(x=>(x.v.distanceTo(m)>STRAY_LIM?far:near).push(x.p));
+  return {near:near.length?near:c.map(x=>x.p),far};
+}
 function camFitBox(){
   const bb=new THREE.Box3();
-  placed.forEach(p=>{try{p.obj.traverse(o=>{
+  strayList().near.forEach(p=>{try{p.obj.traverse(o=>{
     if(o.isMesh&&o.visible)bb.expandByObject(o);});}catch(e){}});
   return bb;
+}
+/* Беглянку не прячем: говорим прямо и даём вернуть её на своё место по функции. */
+function strayGuard(){
+  const el=$('#stray');if(!el)return;
+  const far=strayList().far;
+  if(!far.length){el.classList.remove('on');return;}
+  const it=far[0],nm=(it.d&&(it.d.name||it.d.art))||'Деталь';
+  const bb=new THREE.Box3().setFromObject(it.obj),v=new THREE.Vector3();bb.getCenter(v);
+  const m=Math.round(Math.hypot(v.x,v.y,v.z-300)/100)/10;
+  el.innerHTML='<b>Деталь стоит далеко от машины</b><span>'+esc(String(nm).slice(0,60))+
+    ' — в '+m+' м от корпуса'+(far.length>1?' (и ещё '+(far.length-1)+')':'')+
+    '.</span><u>Вернуть на место</u>';
+  el.classList.add('on');
+  el.onclick=()=>{far.forEach(x=>{autoPlace(x);});save();refresh();
+    camTouched=false;_fitPrev=-1;camFitSoon(0);el.classList.remove('on');
+    toast('Вернул на место: '+String(nm).slice(0,40));};
 }
 function camFit(){
   if(!placed.length||!camera)return;
@@ -1363,8 +1418,10 @@ function camFit(){
   target.copy(c);
   const r=Math.max(sz.x,sz.y,sz.z,300)*0.5*1.18;
   const vf=camera.fov*Math.PI/360;                       // половина вертикального угла
-  const hf=Math.atan(Math.tan(vf)*(camera.aspect||1));   // и горизонтального — по кадру
-  dist=Math.max(dMin,Math.min(dMax,r/Math.sin(Math.max(0.05,Math.min(vf,hf)))));
+  const asp=isFinite(camera.aspect)&&camera.aspect>0?camera.aspect:1;
+  const hf=Math.atan(Math.tan(vf)*asp);                  // и горизонтального — по кадру
+  const nd=r/Math.sin(Math.max(0.05,Math.min(vf,hf)));
+  if(isFinite(nd))dist=Math.max(dMin,Math.min(dMax,nd)); // нечисло в габарите кадр не ломает
 }
 /* меши деталей приезжают из базы уже после того, как проект «открыт»: пока их
    нет, габарит сцены пустой. Поэтому подгоняем кадр несколько раз подряд —
@@ -1397,7 +1454,42 @@ function tick(){
                       target.z+dist*Math.cos(phi));
   camera.lookAt(target);
   tagReset();portsSync();rotSync();
+  camSane();
   renderer.render(scene,camera);
+  frameGuard();
+}
+/* координаты камеры иногда становятся нечислом (пустой габарит, деление на ноль
+   в подгонке кадра) — тогда three не рисует ничего и экран остаётся фоном.
+   Проверяем каждый кадр: сломалось — молча возвращаем рабочие значения. */
+function camSane(){
+  const bad=v=>!isFinite(v);
+  if(bad(dist)||bad(theta)||bad(phi)||bad(target.x)||bad(target.y)||bad(target.z)
+     ||bad(camera.aspect)||camera.aspect<=0){
+    dist=isFinite(dist)&&dist>0?Math.min(dMax,Math.max(dMin,dist)):3200;
+    if(bad(theta))theta=-0.95;
+    if(bad(phi))phi=1.15;
+    if(bad(target.x)||bad(target.y)||bad(target.z))target.set(0,0,300);
+    const cv=$('#cv'),w=cv.clientWidth,h=cv.clientHeight;
+    if(w>0&&h>0){camera.aspect=w/h;camera.updateProjectionMatrix();}
+    camTouched=false;try{camFit();}catch(e){}
+    return true;
+  }
+  return false;
+}
+/* Пустой кадр: в сцене есть детали, а нарисовано ноль треугольников. Значит
+   смотрим мимо машины. Сразу говорим об этом плашкой, а если так и стоим —
+   через 3 секунды возвращаем вид сами: чёрный экран не должен быть тупиком. */
+let _blankSince=0,_strayT=0;
+function frameGuard(){
+  const t=performance.now();
+  if(t-_strayT>1500){_strayT=t;try{strayGuard();}catch(e){}}
+  const el=$('#lost');if(!el)return;
+  const empty=placed.length>0&&renderer.info.render.triangles===0;
+  if(!empty){if(_blankSince){_blankSince=0;el.classList.remove('on');}return;}
+  const now=performance.now();
+  if(!_blankSince){_blankSince=now;el.classList.add('on');return;}
+  if(now-_blankSince>3000){_blankSince=0;el.classList.remove('on');
+    camTouched=false;_fitPrev=-1;camFitSoon(0);toast('Машина была не в кадре — вернул');}
 }
 
 /* ═══ управление: вращение/панорама/зум + перетаскивание деталей ═══ */
@@ -1445,6 +1537,19 @@ function pan(dx,dy){
   const up=new THREE.Vector3().crossVectors(rt,
     new THREE.Vector3().subVectors(camera.position,target)).normalize();
   target.addScaledVector(rt,-dx*dist*0.0012).addScaledVector(up,-dy*dist*0.0012);
+  panClamp();
+}
+/* v2.46.032: двумя пальцами панораму на телефоне уводили так далеко, что и машина,
+   и сетка оставались за кадром — экран становился ровным фоном. Держим точку
+   взгляда возле машины: дальше её габарита плюс запас уехать нельзя. */
+function panClamp(){
+  const bb=camFitBox();
+  const c=new THREE.Vector3(),sz=new THREE.Vector3();
+  if(bb.isEmpty()||!isFinite(bb.min.x)){c.set(0,0,300);sz.set(2000,2000,2000);}
+  else{bb.getCenter(c);bb.getSize(sz);}
+  const lim=Math.max(sz.x,sz.y,sz.z,600)*0.75+2500;
+  const d=new THREE.Vector3().subVectors(target,c),L=d.length();
+  if(isFinite(L)&&L>lim)target.copy(c).addScaledVector(d.normalize(),lim);
 }
 function bindCtl(cv){
   let mode=null,last=null,dragOff=null,dragSnap=null;   // dragSnap — снимок до перетаскивания
@@ -1536,6 +1641,8 @@ function bindCtl(cv){
   document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{
     const v=V[b.dataset.v];theta=v[0];phi=v[1];});
   $('#bFit').onclick=()=>{camTouched=false;_fitPrev=-1;camFitSoon(0);};
+  $('#lost').onclick=()=>{_blankSince=0;$('#lost').classList.remove('on');
+    camTouched=false;_fitPrev=-1;camFitSoon(0);};
   $('#bGrid').onclick=()=>{grid.visible=!grid.visible;
     $('#bGrid').classList.toggle('on',grid.visible);};
   $('#bGrid').classList.add('on');
@@ -1971,7 +2078,18 @@ async function addItem(d,at,rot,tilt,roll){
     applyOff(it);pinMark(it);
   }
   select(it);refresh();save();
+  /* v2.46.032: меши приезжают из базы вразнобой. Подгонка кадра раньше могла
+     остановиться на полупустой сцене — и камера оставалась внутри корпуса,
+     носом в компрессор. Пока вид не трогали руками, пересчитываем его после
+     каждой приехавшей детали. */
+  if(!camTouched)camFitLater();
   return it;
+}
+let _fitT=null;
+function camFitLater(){
+  if(_fitT)clearTimeout(_fitT);
+  _fitT=setTimeout(()=>{_fitT=null;if(camTouched)return;_fitPrev=-1;
+    try{camFit();}catch(e){}},400);
 }
 
 /* ═══ v2.45.994: закрепление, посадка на корпус и гашение деталей ═══ */
