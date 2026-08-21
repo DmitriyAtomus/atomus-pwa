@@ -135,3 +135,41 @@ test('картинка из переписки открывается во ве�
     assert.ok(css.includes(cls), 'нет стиля ' + cls);
   }
 });
+
+// v2.46.026: сначала макет, потом ТЗ. Порядок держится кнопками (здесь) и
+// воротами на бэкенде (my-bot, tests/test_idea_mockup.py).
+test('кнопка ТЗ появляется только после согласованного макета', () => {
+  const acts = app4.slice(app4.indexOf('function _ideasRenderActions'),
+                          app4.indexOf('function _ideaFormat'));
+  assert.match(acts, /const mockup = th\.mockup_status \|\| 'none'/);
+  assert.match(acts, /Показать макет/);
+  assert.match(acts, /Согласовать макет/);
+  // «Сформировать ТЗ» — под условием согласованного макета
+  const specBtn = acts.slice(acts.indexOf("mockup === 'approved'"));
+  assert.match(specBtn, /ideaCompile\(\)/);
+  assert.ok(acts.indexOf('ideaCompile()') > acts.indexOf("mockup === 'approved'"),
+    'кнопка ТЗ должна стоять после проверки согласования');
+  // обход для идей без экрана — есть, но неброский
+  assert.match(acts, /ideaCompile\(true\)/);
+});
+
+test('макет рисуется и согласуется своими запросами', () => {
+  assert.match(app4, /apiPost\('\/api\/ideas\/' \+ id \+ '\/mockup', \{\}\)/);
+  assert.match(app4, /apiPost\('\/api\/ideas\/' \+ id \+ '\/mockup\/approve', \{\}\)/);
+  // «без макета» уходит явным флагом, иначе бэкенд не пустит
+  assert.match(app4, /skip_mockup: true/);
+});
+
+test('макет в переписке — живая страница, а не скрепка', () => {
+  const files = app4.slice(app4.indexOf('function _ideaIsMockup'),
+                           app4.indexOf('function _ideaAddSpec'));
+  assert.match(files, /text\/html/);
+  assert.match(files, /ideasOpenMockup\(/);
+  assert.match(files, /dchat-art/);
+  // открывается тем же просмотрщиком, что макеты в ленте разработки
+  assert.match(app4, /devChatOpenArtifact\(url, name \|\| 'Макет'\)/);
+  assert.match(app1, /function devChatOpenArtifact/);
+  for (const cls of ['.ich-chip.is-mockup', '.ich-skip']) {
+    assert.ok(css.includes(cls), 'нет стиля ' + cls);
+  }
+});

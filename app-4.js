@@ -1744,8 +1744,11 @@ function renderHelpCard(a) {
 // через ТВ); «Клод» остаётся именем агента-разработчика в ленте директора.
 // Клава здесь работает ТОЛЬКО на чтение: смотрит
 // склад, производство и карту разделов, но договоры, суммы и зарплаты ему
-// закрыты (границы стоят на бэкенде, atomus/idea_agent.py). Вместе с человеком
-// она доводит идею до ТЗ; готовое ТЗ уезжает директору в ленту разработки
+// закрыты (границы стоят на бэкенде, atomus/idea_agent.py). Порядок работы:
+// обсудили → Клава рисует МАКЕТ будущего экрана (живая html-страница прямо в
+// чате) → сотрудник правит его словами и согласовывает → и только потом
+// собирается ТЗ. Спорить о картинке дешевле, чем переделывать код.
+// Готовое ТЗ уезжает директору в ленту разработки
 // ПРЕДЛОЖЕНИЕМ — правка кода начинается только с его кнопки «Внедрить».
 // Вход в раздел — по паролю, который выдаёт директор.
 
@@ -1757,6 +1760,16 @@ const IDEA_STATUS = {
   declined: { label: 'отложено',   cls: 'is-declined' },
   done:     { label: 'сделано',    cls: 'is-done' },
 };
+
+// Пока идея в черновике, полезнее видеть не «черновик», а где она встала:
+// ждёт согласования макета или уже готова к ТЗ.
+function _ideaChip(it) {
+  const st = IDEA_STATUS[it.status] || IDEA_STATUS.open;
+  if ((it.status || 'open') !== 'open') return st;
+  if ((it.mockup_status || 'none') === 'draft') return { label: 'макет', cls: 'is-mockup' };
+  if ((it.mockup_status || 'none') === 'approved') return { label: 'макет ок', cls: 'is-ready' };
+  return st;
+}
 
 // Старая точка входа из «Помощи» — теперь ведёт в раздел, а не в модалку.
 function openIdeasModal() { selectSidebarItem('ideas'); }
@@ -1838,8 +1851,9 @@ function _ideasRenderShell() {
             'oninput="ideasGrow(this)" onkeydown="ideasKey(event)" onpaste="ideasPaste(event)"></textarea>' +
           '<button class="ich-send" onclick="ideaSend()" title="Отправить (Enter)"><i class="ti ti-arrow-up"></i></button>' +
         '</div>' +
-        '<div class="ich-hint">Скриншот можно вставить прямо из буфера (Ctrl+V) — Клава его видит. ' +
-          'Код она не правит, договоры и суммы не показывает. ' +
+        '<div class="ich-hint">Порядок: обсудили → «Показать макет» → поправили словами → ' +
+          '«Согласовать макет» → «Сформировать ТЗ». Скриншот можно вставить из буфера (Ctrl+V) — ' +
+          'Клава его видит. Код она не правит, договоры и суммы не показывает. ' +
           'Готовое ТЗ уходит директору — внедрять или нет, решает он.</div>' +
       '</div>' +
     '</div>';
@@ -1863,7 +1877,7 @@ async function ideasLoadList() {
     return;
   }
   items.innerHTML = list.map(function (it) {
-    const st = IDEA_STATUS[it.status] || IDEA_STATUS.open;
+    const st = _ideaChip(it);
     const mine = !state._ideas.isDir || !it.author_name;
     return '<button class="ich-item' + (it.id === state._ideas.current ? ' active' : '') +
       '" onclick="ideasOpen(' + it.id + ')">' +
@@ -1901,7 +1915,8 @@ function ideasNew() {
       '<div class="ich-ava"><i class="ti ti-sparkles"></i></div>' +
       '<div><b>Привет' + (state._ideas.name ? ', ' + escapeHtml(state._ideas.name) : '') + '!</b><br>' +
       'Я Клава. Расскажите, что в программе мешает или чего не хватает. Я уточню детали, ' +
-      'посмотрю, как устроено сейчас, и вместе оформим ТЗ для директора.</div>' +
+      'нарисую макет будущего экрана — посмотрите, поправим, — и уже по нему соберём ' +
+      'ТЗ для директора.</div>' +
     '</div>';
   if (acts) acts.innerHTML = '';
   document.querySelectorAll('.ich-item.active').forEach(function (el) { el.classList.remove('active'); });
@@ -1947,7 +1962,7 @@ async function ideasLoadListSilent() {
   const items = document.getElementById('ideas-items');
   if (!items || !state._ideas.list.length) return;
   items.innerHTML = state._ideas.list.map(function (it) {
-    const st = IDEA_STATUS[it.status] || IDEA_STATUS.open;
+    const st = _ideaChip(it);
     const who = (state._ideas.isDir && it.author_name) ? escapeHtml(it.author_name) + ' · ' : '';
     return '<button class="ich-item' + (it.id === state._ideas.current ? ' active' : '') +
       '" onclick="ideasOpen(' + it.id + ')">' +
@@ -1962,10 +1977,34 @@ function _ideasRenderActions(th) {
   const acts = document.getElementById('ideas-actions');
   if (!acts) return;
   const status = th.status || 'open';
+  const mockup = th.mockup_status || 'none';
   let h = '';
   if (status === 'open' || status === 'ready') {
-    h += '<button class="btn btn-secondary btn-small" onclick="ideaCompile()">' +
+    // Пока макет не согласован, главная кнопка — про макет: ТЗ пишется уже по
+    // картинке, на которую человек посмотрел и сказал «да».
+    if (mockup !== 'approved') {
+      h += '<button class="btn btn-primary btn-small" onclick="ideasMockup()">' +
+           '<i class="ti ti-layout-2"></i> ' +
+           (mockup === 'draft' ? 'Перерисовать макет' : 'Показать макет') + '</button>';
+    }
+    if (mockup === 'draft') {
+      h += '<button class="btn btn-secondary btn-small" onclick="ideasApproveMockup()">' +
+           '<i class="ti ti-check"></i> Согласовать макет</button>';
+    }
+    if (mockup === 'approved') {
+      h += '<span class="ich-note"><i class="ti ti-check"></i> Макет согласован</span>' +
+           '<button class="btn btn-secondary btn-small" onclick="ideasMockup()">' +
+           '<i class="ti ti-refresh"></i> Переделать макет</button>';
+    }
+  }
+  if ((status === 'open' || status === 'ready') && mockup === 'approved') {
+    h += '<button class="btn btn-primary btn-small" onclick="ideaCompile()">' +
          '<i class="ti ti-file-check"></i> ' + (th.spec_text ? 'Пересобрать ТЗ' : 'Сформировать ТЗ') + '</button>';
+  }
+  // Аварийный выход для идей без экрана («присылать уведомление», «звук в цеху»):
+  // держать человека на макете там не за что.
+  if ((status === 'open' || status === 'ready') && mockup !== 'approved') {
+    h += '<button class="ich-skip" onclick="ideaCompile(true)">Идея без экрана — собрать ТЗ без макета</button>';
   }
   if (th.spec_text && (status === 'open' || status === 'ready')) {
     h += '<button class="btn btn-primary btn-small" onclick="ideaSubmit()">' +
@@ -2024,11 +2063,24 @@ function _ideaAttr(v) {
   return escapeHtml(v).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+function _ideaIsMockup(f) {
+  const ct = ((f && f.content_type) || '').toLowerCase();
+  return ct.indexOf('text/html') === 0 || /\.html?$/i.test((f && f.name) || '');
+}
+
 function _ideaFilesHtml(files, local) {
   if (!files || !files.length) return '';
   const items = files.map(function (f) {
     const isImg = (f.content_type || '').indexOf('image/') === 0;
     const url = f.url ? (local ? f.url : API_BASE + f.url) : '';
+    // Макет смотрят живой страницей: тот же просмотрщик, что в ленте
+    // разработки, — панель рядом с чатом, песочница без доступа к API.
+    if (_ideaIsMockup(f) && url) {
+      return '<button type="button" class="dchat-art" onclick="ideasOpenMockup(\'' +
+        _ideaAttr(f.url) + '\',\'' + _ideaAttr(f.name || 'Макет') + '\')">' +
+        '<i class="ti ti-layout-2"></i><span class="nm">' + escapeHtml(f.name || 'Макет') +
+        '</span><span class="go">Посмотреть</span></button>';
+    }
     if (isImg && url) {
       return '<button type="button" class="ich-img" onclick="openPhotoLightbox(\'' +
         _ideaAttr(url) + '\')"><img src="' + _ideaAttr(url) + '" loading="lazy" alt=""></button>';
@@ -2040,6 +2092,13 @@ function _ideaFilesHtml(files, local) {
       : '<span class="ich-file"><i class="ti ti-file"></i><span>' + name + '</span></span>';
   }).join('');
   return '<div class="ich-files">' + items + '</div>';
+}
+
+// Открывашка макета живёт в ленте разработки (app-1.js): один просмотрщик на
+// всю CRM — панель справа на компьютере, во весь экран на телефоне.
+function ideasOpenMockup(url, name) {
+  if (typeof devChatOpenArtifact === 'function') { devChatOpenArtifact(url, name || 'Макет'); return; }
+  window.open(API_BASE + url, '_blank', 'noopener');
 }
 
 function _ideaAddSpec(spec) {
@@ -2225,7 +2284,8 @@ async function ideaSend() {
     _ideasScroll();
     const th = state._ideas.thread || {};
     _ideasRenderActions({ id: state._ideas.current, status: th.status || 'open',
-                          spec_text: th.spec_text });
+                          spec_text: th.spec_text,
+                          mockup_status: th.mockup_status || 'none' });
     ideasLoadListSilent();
   } catch (e) {
     _ideaSendProgress(null);
@@ -2233,11 +2293,57 @@ async function ideaSend() {
   }
 }
 
-async function ideaCompile() {
+// Макет рисуется отдельной кнопкой (а не сам собой в ответе): это долгий
+// запрос, и человек должен понимать, чего ждёт.
+async function ideasMockup() {
   const id = state._ideas.current;
   if (!id) { showToast('Сначала опишите идею', 'error'); return; }
+  const th = state._ideas.thread || {};
+  const again = (th.mockup_status || 'none') !== 'none';
+  const ph = _ideaAddMsg('assistant', again ? 'Перерисовываю макет…' : 'Рисую макет…');
+  const acts = document.getElementById('ideas-actions');
+  if (acts) acts.innerHTML = '<span class="ich-note"><i class="ti ti-loader"></i> Клава рисует макет…</span>';
+  const r = await apiPost('/api/ideas/' + id + '/mockup', {});
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) {
+    if (ph) ph.textContent = d.message || 'Макет не получился, попробуйте ещё раз';
+    _ideasRenderActions(state._ideas.thread || { id: id, status: 'open' });
+    return;
+  }
+  if (ph) {
+    ph.innerHTML = _ideaFormat(d.reply || 'Готов макет.');
+    const bubble = ph.parentElement;
+    if (bubble) bubble.insertAdjacentHTML('beforeend', _ideaFilesHtml(d.files));
+  }
+  state._ideas.thread = Object.assign(state._ideas.thread || {}, {
+    id: id, mockup_status: 'draft',
+  });
+  _ideasRenderActions(state._ideas.thread);
+  _ideasScroll();
+  ideasLoadListSilent();
+}
+
+async function ideasApproveMockup() {
+  const id = state._ideas.current;
+  if (!id) return;
+  const r = await apiPost('/api/ideas/' + id + '/mockup/approve', {});
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не получилось', 'error'); return; }
+  if (d.reply) _ideaAddMsg('assistant', d.reply, null);
+  state._ideas.thread = Object.assign(state._ideas.thread || {}, {
+    id: id, mockup_status: 'approved',
+  });
+  _ideasRenderActions(state._ideas.thread);
+  ideasLoadListSilent();
+  showToast('Макет согласован — можно собирать ТЗ', 'success');
+}
+
+async function ideaCompile(skipMockup) {
+  const id = state._ideas.current;
+  if (!id) { showToast('Сначала опишите идею', 'error'); return; }
+  if (skipMockup && !confirm('Собрать ТЗ без макета? Обычно сначала смотрят макет — так меньше переделок.')) return;
   showToast('Собираю ТЗ…', 'info');
-  const r = await apiPost('/api/ideas/' + id + '/compile', {});
+  const r = await apiPost('/api/ideas/' + id + '/compile', skipMockup ? { skip_mockup: true } : {});
   const d = (r && r.data) || {};
   if (!r.ok || !d.ok) { showToast(d.message || 'Не удалось собрать ТЗ', 'error'); return; }
   state._ideas.thread = Object.assign(state._ideas.thread || {}, {
