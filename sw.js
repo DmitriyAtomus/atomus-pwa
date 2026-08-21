@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.910';
+const CACHE_VERSION = 'atomus-v1.8.1031';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -134,6 +134,12 @@ self.addEventListener('fetch', (event) => {
     // v2.45.325: /atomcad/* — модуль «Атом Электрика», активно дорабатывается,
     // поэтому всегда свежий (network-first), чтобы не залипал старый билд.
     if (url.pathname.startsWith('/atomcad/')) {
+      event.respondWith(networkFirst(req));
+      return;
+    }
+    // /chiller/* — модуль «Атом Чиллер», тоже в активной доработке: оболочка
+    // должна приезжать свежей, иначе после выкатки останется старая.
+    if (url.pathname.startsWith('/chiller/')) {
       event.respondWith(networkFirst(req));
       return;
     }

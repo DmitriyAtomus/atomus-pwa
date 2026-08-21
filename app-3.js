@@ -3412,9 +3412,7 @@ async function downloadInventoryXlsx() {
     }
     const blob = await r.blob();
     const cd = r.headers.get('Content-Disposition') || '';
-    let filename = 'inventory.xlsx';
-    const mm = cd.match(/filename="?([^";]+)"?/i);
-    if (mm) filename = mm[1];
+    const filename = filenameFromCD(cd, 'inventory.xlsx');
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename;
@@ -4897,9 +4895,9 @@ function showAssemblyStockModal(d) {
     
     '<div class="modal" onclick="event.stopPropagation()">' +
       '<div class="modal-header">' +
-        '<h3><i class="ti ti-package"></i> ' + escapeHtml(a.model_name || (a.work_type && a.work_type !== 'assembly' ? ({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'}[a.work_type] || 'Работа') : 'Работа')) +
+        '<h3><i class="ti ti-package"></i> ' + escapeHtml(a.model_name || (a.work_type && a.work_type !== 'assembly' ? ({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',reconfiguration:'Перекомплектация',other:'Прочее'}[a.work_type] || 'Работа') : 'Работа')) +
           (a.work_type && a.work_type !== 'assembly'
-            ? ' <span class="work-type-badge wt-' + a.work_type + '" style="margin-left: 6px;">' + escapeHtml({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'}[a.work_type] || a.work_type) + '</span>'
+            ? ' <span class="work-type-badge wt-' + a.work_type + '" style="margin-left: 6px;">' + escapeHtml({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',reconfiguration:'Перекомплектация',other:'Прочее'}[a.work_type] || a.work_type) + '</span>'
             : '') +
         '</h3>' +
         '<div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">' +
@@ -5600,6 +5598,13 @@ function showSupplierModal(s) {
         // если синк ЛК не прислал адрес конкретного заказа
         '<div class="form-group"><label>Адрес самовывоза <span style="text-transform:none;font-weight:400;color:var(--text-light);">— где забирать заказы (виден в Логистике)</span></label>' +
           '<input type="text" id="sm-address" value="' + escapeHtml(isEdit ? (s.address || '') : '') + '" placeholder="напр. ул. Богдана Хмельницкого, д. 4Б, ТЦ «Домострой»" ' + (canManage ? '' : 'disabled') + '></div>' +
+        // v2.45.987: «забираем сами» — оплаченный счёт такого поставщика сам
+        // встаёт в Логистику отдельной карточкой «Забрать по нашему счёту»
+        '<div class="form-group"><label style="display:flex;align-items:center;gap:9px;text-transform:none;font-weight:600;cursor:pointer;">' +
+          '<input type="checkbox" id="sm-selfpickup" style="width:18px;height:18px;margin:0;" ' +
+            ((isEdit && s.self_pickup) ? 'checked ' : '') + (canManage ? '' : 'disabled') + '>' +
+          '<span>Забираем сами со склада <span style="font-weight:400;color:var(--text-light);">— оплаченный счёт сам появится в «Логистике → Забрать»</span></span>' +
+        '</label></div>' +
         '<div class="form-group"><label>Комментарий</label><textarea id="sm-comment" rows="3" ' + (canManage ? '' : 'disabled') + '>' + escapeHtml(isEdit ? s.comment : '') + '</textarea></div>' +
         // v2.45.239: прайс поставщика — его номенклатура для сопоставления в заявках
         (isEdit && canManage ?
@@ -6334,6 +6339,7 @@ async function saveSupplier(supplierId) {
     email:          document.getElementById('sm-email').value.trim(),
     address:        (document.getElementById('sm-address') || { value: '' }).value.trim(),
     comment:        document.getElementById('sm-comment').value.trim(),
+    self_pickup:    !!(document.getElementById('sm-selfpickup') || {}).checked,
   };
   if (!payload.name) { showToast('Укажите название', 'error'); return; }
   try {
@@ -6555,7 +6561,10 @@ function _mailRenderList() {
   const cMax = convs.filter(c => c.channel === 'max').length;
   const cMail = convs.length - cMax;
   const shown = convs.filter(c => f === 'all' || (f === 'max' ? c.channel === 'max' : c.channel !== 'max'));
-  let html = '<div class="mm-filters">' +
+  let html = '<div class="mm-composebar">' +
+    '<button class="btn btn-primary" onclick="openNewMailComposer()"><i class="ti ti-pencil"></i> Написать письмо</button>' +
+  '</div>' +
+  '<div class="mm-filters">' +
     '<button class="mm-filter' + (f === 'all' ? ' on' : '') + '" onclick="_mailSetFilter(\'all\')">Все <span class="c">' + convs.length + '</span></button>' +
     '<button class="mm-filter' + (f === 'mail' ? ' on' : '') + '" onclick="_mailSetFilter(\'mail\')"><i class="ti ti-mail"></i> Почта <span class="c">' + cMail + '</span></button>' +
     '<button class="mm-filter' + (f === 'max' ? ' on' : '') + '" onclick="_mailSetFilter(\'max\')"><i class="ti ti-message-circle"></i> MAX <span class="c">' + cMax + '</span></button>' +
@@ -6563,6 +6572,102 @@ function _mailRenderList() {
   html += shown.length ? shown.map(_mailConvRow).join('')
     : '<div class="empty-block">' + (convs.length ? 'В этом канале пусто' : 'Переписок пока нет') + '</div>';
   list.innerHTML = html;
+}
+
+// v2.45.930: новое письмо прямо из «Почта и MAX». Раньше здесь можно было
+// только отвечать на уже существующий диалог, хотя сервер умеет отправлять
+// письмо первым. Поставщик подставляет адрес из справочника; адрес остаётся
+// редактируемым на случай дополнительной почты.
+async function openNewMailComposer() {
+  if (!cache.suppliers) {
+    try {
+      const d = await apiGet('/api/suppliers');
+      cache.suppliers = d.suppliers || [];
+    } catch (e) {
+      cache.suppliers = [];
+    }
+  }
+  const suppliers = (cache.suppliers || [])
+    .filter(s => s.is_active !== 0)
+    .slice()
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ru'));
+  const options = suppliers.map(s =>
+    '<option value="' + Number(s.id) + '" data-email="' + escapeHtml(s.email || '') + '">' +
+      escapeHtml(s.name || ('Поставщик #' + s.id)) + (s.email ? ' — ' + escapeHtml(s.email) : ' — нет почты') +
+    '</option>'
+  ).join('');
+
+  document.getElementById('mail-compose-modal')?.remove();
+  const el = document.createElement('div');
+  el.className = 'modal-overlay visible';
+  el.id = 'mail-compose-modal';
+  el.innerHTML =
+    '<div class="modal" style="max-width:680px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-mail-plus"></i> Новое письмо</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'mail-compose-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label class="form-label">Поставщик</label>' +
+          '<select class="form-input" id="mail-compose-supplier" onchange="mailComposeSupplierChanged()">' +
+            '<option value="">Выберите поставщика или укажите адрес вручную</option>' + options +
+          '</select></div>' +
+        '<div class="form-group"><label class="form-label">Кому</label>' +
+          '<input type="email" class="form-input" id="mail-compose-to" placeholder="supplier@example.ru"></div>' +
+        '<div class="form-group"><label class="form-label">Тема</label>' +
+          '<input class="form-input" id="mail-compose-subject" placeholder="Тема письма"></div>' +
+        '<div class="form-group"><label class="form-label">Текст</label>' +
+          '<textarea class="form-input" id="mail-compose-body" rows="11" style="font-family:inherit;" placeholder="Добрый день!\n\nНапишите сообщение…"></textarea></div>' +
+        '<div class="form-group"><label class="form-label">Подпись (добавится автоматически)</label>' +
+          '<pre id="mail-compose-signature" style="margin:0;padding:10px 12px;background:var(--bg-soft,#F5F7FA);border:1px dashed var(--border);border-radius:8px;font:inherit;font-size:13px;white-space:pre-wrap;color:var(--text-light);">загружаю…</pre></div>' +
+        '<div style="font-size:12px;color:var(--text-light);">После отправки письмо появится в этой переписке.</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'mail-compose-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="mail-compose-send" onclick="sendNewMail()"><i class="ti ti-send"></i> Отправить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+  apiGet('/api/mail/signature').then(d => {
+    const box = document.getElementById('mail-compose-signature');
+    if (box) box.textContent = (d && d.signature) || '—';
+  }).catch(() => {
+    const box = document.getElementById('mail-compose-signature');
+    if (box) box.textContent = 'не удалось загрузить';
+  });
+  setTimeout(() => document.getElementById('mail-compose-supplier')?.focus(), 50);
+}
+
+function mailComposeSupplierChanged() {
+  const select = document.getElementById('mail-compose-supplier');
+  const input = document.getElementById('mail-compose-to');
+  if (!select || !input) return;
+  const option = select.options[select.selectedIndex];
+  input.value = option ? (option.getAttribute('data-email') || '') : '';
+  if (!input.value) input.focus();
+}
+
+async function sendNewMail() {
+  const to = ((document.getElementById('mail-compose-to') || {}).value || '').trim();
+  const subject = ((document.getElementById('mail-compose-subject') || {}).value || '').trim();
+  const body = ((document.getElementById('mail-compose-body') || {}).value || '').trim();
+  if (!to || !to.includes('@')) { showToast('Укажите правильный e-mail получателя', 'error'); return; }
+  if (!body) { showToast('Напишите текст письма', 'error'); return; }
+  const btn = document.getElementById('mail-compose-send');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Отправляем…'; }
+  try {
+    const r = await apiPost('/api/mail/compose', { to: to, subject: subject, body: body });
+    const d = (r && r.data) || {};
+    if (!r || !r.ok || !d.ok) throw new Error(d.message || 'Не удалось отправить');
+    document.getElementById('mail-compose-modal')?.remove();
+    showToast('Письмо отправлено', 'success');
+    state._mailFilter = 'mail';
+    await loadMailMessenger();
+    await openMailThread(to);
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка отправки', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Отправить'; }
+  }
 }
 function _mailInitials(n) {
   const p = String(n || '').replace(/["«»]/g, '').trim().split(/\s+/);
@@ -7086,11 +7191,18 @@ function calcBack() {
 }
 
 // ---------- правая панель: мяч + чат ----------
+var _calcChatPendingFiles = [];
+var _calcChatPendingCalcId = null;
+
 async function renderCalcPane(calcId) {
   const pane = document.getElementById('calcs-pane');
   if (!pane) return;
   const c = (_calcs && _calcs.calcs || []).find(x => x.id === calcId);
   if (!c) { pane.innerHTML = '<div class="empty-block">Выбери расчёт слева</div>'; return; }
+  if (_calcChatPendingCalcId !== c.id) {
+    _calcChatPendingCalcId = c.id;
+    _calcChatPendingFiles = [];
+  }
   const days = Number(c.ball_days || 0);
   let ballbar;
   if (c.ball_mine) {
@@ -7109,7 +7221,15 @@ async function renderCalcPane(calcId) {
       '<div class="t"><b>Мяч ничей</b><span>назначь, чей сейчас ход</span></div>' +
       '<div class="calc-passwrap" id="calc-passwrap-' + c.id + '"><button class="calc-passbtn" onclick="calcPassOpen(' + c.id + ')">🏓 Назначить</button></div></div>';
   }
+  pane.dataset.calcChatId = c.chat_id || '';
+  pane.dataset.calcId = c.id;
+  pane.classList.remove('is-file-dragging');
   pane.innerHTML =
+    '<div class="calc-drop-overlay" aria-hidden="true">' +
+      '<i class="ti ti-file-upload"></i>' +
+      '<b>Отпустите файлы здесь</b>' +
+      '<span>Они добавятся к сообщению · до 5 файлов</span>' +
+    '</div>' +
     '<div class="calc-ph">' +
       '<div class="row1">' +
         '<button class="calc-back" onclick="calcBack()"><i class="ti ti-chevron-left"></i></button>' +
@@ -7121,11 +7241,20 @@ async function renderCalcPane(calcId) {
       ballbar +
     '</div>' +
     '<div class="calc-chat" id="calc-chat-' + c.id + '"><div class="loading-block">Чат…</div></div>' +
+    '<div class="calc-attach-preview cchat-attach-preview" id="calc-chat-attach-preview"></div>' +
     '<div class="calc-in">' +
+      '<input type="file" id="calc-chat-file-input" multiple ' +
+        'accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.dwg,.dxf,.step,.stp,.iges,.igs,.3dm" ' +
+        'style="display:none" onchange="_calcChatFilesSelected(this.files)">' +
+      '<button class="calc-attach-btn" type="button" ' +
+        'onclick="document.getElementById(\'calc-chat-file-input\').click()" title="Прикрепить файлы">' +
+        '<i class="ti ti-paperclip"></i></button>' +
       '<input id="calc-chat-inp" placeholder="Написать в чат расчёта…" ' +
         'onkeydown="if(event.key===\'Enter\')calcChatSend(' + c.id + ',' + (c.chat_id || 'null') + ')">' +
-      '<button onclick="calcChatSend(' + c.id + ',' + (c.chat_id || 'null') + ')"><i class="ti ti-send"></i></button>' +
+      '<button class="calc-send-btn" id="calc-chat-send-btn" onclick="calcChatSend(' + c.id + ',' + (c.chat_id || 'null') + ')"><i class="ti ti-send"></i></button>' +
     '</div>';
+  _renderCalcChatAttachPreview();
+  _wireCalcChatFileDrop(pane);
   _calcChatLoad(c.id, c.chat_id);
   _calcStartPolling();
 }
@@ -7160,22 +7289,137 @@ async function _calcChatLoad(calcId, chatId) {
   }
 }
 
-async function calcChatSend(calcId, chatId) {
-  if (!chatId) return;
-  const inp = document.getElementById('calc-chat-inp');
-  const v = inp ? inp.value.trim() : '';
-  if (!v) return;
-  if (inp) inp.value = '';
-  try {
-    const r = await apiPost('/api/team-chats/' + chatId + '/messages', { text: v });
-    if (!(r && r.ok)) {
-      showToast(((r && r.data) || {}).message || 'Не отправилось', 'error');
-      if (inp) inp.value = v;
+function _calcChatFilesSelected(files) {
+  if (!files || !files.length) return;
+  for (let i = 0; i < files.length; i++) {
+    if (_calcChatPendingFiles.length >= 5) {
+      showToast('Не больше 5 файлов на сообщение', 'info');
+      break;
     }
-  } catch (e) { showToast('Ошибка соединения', 'error'); if (inp) inp.value = v; }
-  const boxEl = document.getElementById('calc-chat-' + calcId);
-  if (boxEl) boxEl.dataset.key = '';
-  _calcChatLoad(calcId, chatId);
+    const f = files[i];
+    const isVideo = (f.type || '').startsWith('video/');
+    const maxSize = isVideo ? 100 * 1024 * 1024 : 20 * 1024 * 1024;
+    if (f.size > maxSize) {
+      showToast('Файл "' + f.name + '" слишком большой', 'error');
+      continue;
+    }
+    _calcChatPendingFiles.push(f);
+  }
+  _renderCalcChatAttachPreview();
+  const input = document.getElementById('calc-chat-file-input');
+  if (input) input.value = '';
+}
+
+function _renderCalcChatAttachPreview() {
+  const wrap = document.getElementById('calc-chat-attach-preview');
+  if (!wrap) return;
+  if (!_calcChatPendingFiles.length) { wrap.innerHTML = ''; return; }
+  let html = '<div class="cchat-attach-row">';
+  _calcChatPendingFiles.forEach((f, i) => {
+    const isImg = (f.type || '').startsWith('image/');
+    const isVideo = (f.type || '').startsWith('video/');
+    let thumb;
+    if (isImg) thumb = '<img src="' + URL.createObjectURL(f) + '" alt="">';
+    else if (isVideo) thumb = '<div class="cchat-thumb-icon"><i class="ti ti-video"></i></div>';
+    else thumb = '<div class="cchat-thumb-icon"><i class="ti ti-file"></i></div>';
+    html += '<div class="cchat-attach-item">' + thumb +
+      '<div class="cchat-attach-name" title="' + escapeHtml(f.name) + '">' + escapeHtml(f.name) + '</div>' +
+      '<button class="cchat-attach-remove" onclick="_removeCalcChatAttachment(' + i + ')" title="Убрать">' +
+        '<i class="ti ti-x"></i></button></div>';
+  });
+  wrap.innerHTML = html + '</div>';
+}
+
+function _removeCalcChatAttachment(index) {
+  _calcChatPendingFiles.splice(index, 1);
+  _renderCalcChatAttachPreview();
+}
+
+function _wireCalcChatFileDrop(pane) {
+  if (!pane || pane.dataset.calcFileDropWired === '1') return;
+  pane.dataset.calcFileDropWired = '1';
+  let dragDepth = 0;
+  const isFileDrag = (event) => {
+    const types = event.dataTransfer && event.dataTransfer.types;
+    return !!types && Array.prototype.indexOf.call(types, 'Files') !== -1;
+  };
+  const clearDragState = () => {
+    dragDepth = 0;
+    pane.classList.remove('is-file-dragging');
+  };
+  pane.addEventListener('dragenter', (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth += 1;
+    pane.classList.add('is-file-dragging');
+  });
+  pane.addEventListener('dragover', (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'copy';
+  });
+  pane.addEventListener('dragleave', (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) pane.classList.remove('is-file-dragging');
+  });
+  pane.addEventListener('drop', (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    clearDragState();
+    const files = event.dataTransfer && event.dataTransfer.files;
+    if (!files || !files.length) return;
+    _calcChatFilesSelected(files);
+    showToast('Файлы добавлены — нажмите «Отправить»', 'success');
+  });
+}
+
+async function calcChatSend(calcId, chatId) {
+  if (!chatId) { showToast('У расчёта ещё нет чата', 'error'); return; }
+  const inp = document.getElementById('calc-chat-inp');
+  const btn = document.getElementById('calc-chat-send-btn');
+  const v = inp ? inp.value.trim() : '';
+  if (!v && !_calcChatPendingFiles.length) return;
+  if (btn) btn.disabled = true;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    let response;
+    if (_calcChatPendingFiles.length) {
+      const form = new FormData();
+      if (v) form.append('text', v);
+      _calcChatPendingFiles.forEach((file, i) => form.append('file_' + (i + 1), file, file.name));
+      response = await fetch(API_BASE + '/api/team-chats/' + chatId + '/messages', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: form,
+      });
+    } else {
+      response = await fetch(API_BASE + '/api/team-chats/' + chatId + '/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ text: v }),
+      });
+    }
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      showToast(err.message || err.error || 'Не отправилось', 'error');
+      return;
+    }
+    if (inp) inp.value = '';
+    _calcChatPendingFiles = [];
+    _renderCalcChatAttachPreview();
+    const boxEl = document.getElementById('calc-chat-' + calcId);
+    if (boxEl) boxEl.dataset.key = '';
+    await _calcChatLoad(calcId, chatId);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+    if (inp) inp.focus();
+  }
 }
 
 // ---------- передача мяча ----------
@@ -7462,7 +7706,7 @@ function renderPlanerka() {
   const running = !!(m && m.started_at && !m.finished_at);
   const finished = !!(m && m.finished_at);
   const items = _pl.items || [];
-  const groups = { auto: [], q: [], carry: [] };
+  const groups = { auto: [], improvement: [], q: [], carry: [] };
   items.forEach(it => { (groups[it.grp] || groups.q).push(it); });
   // v2.45.723: «кто был» — из таблицы посещаемости (json — фолбэк для старых дней)
   let ppl = (_pl.attendance || []).map(a => a.name).filter(Boolean);
@@ -7529,6 +7773,7 @@ function renderPlanerka() {
   h += '<div class="pl-card">';
   const SEC = [
     ['auto', '🔥 CRM подсветила сама'],
+    ['improvement', '🛠 Доработки из MAX'],
     ['q', '💬 Вопросы от команды'],
     ['carry', '⏭ Перенесено с прошлых дней'],
   ];
@@ -7549,6 +7794,24 @@ function renderPlanerka() {
       if (g === 'carry' && it.carry_count > 1) sub.push('переносится ' + it.carry_count + '-й день');
       if (it.task_id) sub.push('✓ задача' + (it.task_assignee ? ': ' + escapeHtml(it.task_assignee) : '') +
         (it.task_status === 'done' ? ' (сделана)' : ''));
+      const details = String(it.details || '').trim();
+      const detailsHtml = details && details !== String(it.title || '').trim()
+        ? '<div class="pl-impr-text">' + escapeHtml(details).replace(/\n/g, '<br>') + '</div>' : '';
+      const filesHtml = (it.attachments || []).map(a => {
+        const url = escapeHtml(a.url || '');
+        const name = escapeHtml(a.name || 'вложение');
+        const ctype = String(a.content_type || '');
+        if (a.kind === 'image' || ctype.indexOf('image/') === 0) {
+          return '<a class="pl-impr-file image" href="' + url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' +
+            '<img src="' + url + '" alt="' + name + '" loading="lazy"></a>';
+        }
+        if (a.kind === 'audio' || ctype.indexOf('audio/') === 0) {
+          return '<div class="pl-impr-file audio" onclick="event.stopPropagation()"><i class="ti ti-microphone"></i>' +
+            '<audio controls preload="metadata" src="' + url + '"></audio></div>';
+        }
+        return '<a class="pl-impr-file doc" href="' + url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' +
+          '<i class="ti ti-paperclip"></i> ' + name + '</a>';
+      }).join('');
       const t1click = expandable ? ' onclick="plExpand(' + it.id + ',\'' + it.kind + '\')" style="cursor:pointer;"'
         : (openable ? ' onclick="openProductionWorkDetail(' + it.ref_id + ')" style="cursor:pointer;"' : '');
       h += '<div class="pl-item' + (done ? ' done' : '') + '" id="pl-item-' + it.id + '">' +
@@ -7557,6 +7820,7 @@ function renderPlanerka() {
           (expandable ? ' <span class="pl-more" id="pl-more-' + it.id + '">раскрыть ▾</span>' : '') +
           (openable ? ' <span class="pl-more">открыть ↗</span>' : '') + '</div>' +
         (sub.length ? '<div class="t2">' + sub.join(' · ') + '</div>' : '') +
+        detailsHtml + (filesHtml ? '<div class="pl-impr-files">' + filesHtml + '</div>' : '') +
         '<div class="pl-detail" id="pl-detail-' + it.id + '" style="display:none;"></div></div>' +
         (!done ? '<div class="pl-acts">' +
           (!it.task_id && _pl.can_manage ? '<button class="mini task" onclick="plTaskOpen(' + it.id + ')">→ Задача</button>' : '') +
@@ -7961,14 +8225,20 @@ async function loadLogisticsPickups() {
   box.innerHTML = _logiTabsHtml('pickups') + '<div class="loading-block">Загрузка…</div>';
   try {
     // Параллельно тянем самовывозы, почтовые статусы и транспортные компании.
-    const [d, oz, lu, cd, dl] = await Promise.all([
+    const [d, oz, lu, cd, dl, ea, um] = await Promise.all([
       apiGet('/api/logistics/pickups'),
       apiGet('/api/logistics/ozon').catch(() => null),
       apiGet('/api/logistics/luch').catch(() => null),
       apiGet('/api/logistics/cdek').catch(() => null),
       apiGet('/api/logistics/dellin').catch(() => null),
+      apiGet('/api/logistics/express').catch(() => null),
+      apiGet('/api/logistics/utm').catch(() => null),
     ]);
     const ready = d.ready || [], transit = d.in_transit || [], done = d.done || [];
+    // v2.45.987: «забираем сами» — оплаченные счета поставщиков с этим флагом
+    const sp = (d && d.self_pickup) || {};
+    const spReady = sp.ready || [], spDone = sp.done || [];
+    const spGroups = _selfPickupGroups(spReady);
     const ozList = (oz && oz.shipments) || [];
     const ozActive = ozList.filter(sh => !_ozonIsCompleted(sh));
     const ozDone = ozList.filter(_ozonIsCompleted);
@@ -7980,6 +8250,12 @@ async function loadLogisticsPickups() {
     const dlList = (dl && dl.shipments) || [];
     const dlActive = dlList.filter(sh => !sh.is_closed && !sh.delivered_at);
     const dlDone = dlList.filter(sh => !!sh.is_closed || !!sh.delivered_at);
+    const eaList = (ea && ea.shipments) || [];
+    const eaActive = eaList.filter(sh => !sh.manual_done);
+    const eaDone = eaList.filter(sh => !!sh.manual_done);
+    const umList = (um && um.orders) || [];
+    const umActive = umList.filter(o => !o.manual_done);
+    const umDone = umList.filter(o => !!o.manual_done);
 
     // ---- 🔥 «горит»: истёкший Ozon и самовывоз с горящим сроком хранения
     let fireOz = 0, firePk = 0;
@@ -7991,6 +8267,18 @@ async function loadLogisticsPickups() {
         '<div class="t">Ozon: заказ ' + escapeHtml(sh.order_number || '') + ' ждёт в пункте выдачи — срок истёк' +
         '<small>ещё день-два — и отправят обратно. Кто едет мимо — пусть заберёт.</small></div>' +
         '<button class="lg-fire-btn" onclick="ozonMarkDone(' + Number(sh.id) + ')">✓ Забрали</button></div>');
+    });
+    let fireSp = 0;
+    spReady.forEach(it => {
+      const days = _spDaysSince(it.paid_at);
+      if (days === null || days < 3 || days > 30) return;
+      fireSp++;
+      fire.push('<div class="lg-fire-i"><span class="ic">🔥</span>' +
+        '<div class="t">Забрать у ' + escapeHtml(it.supplier_name || 'поставщика') +
+        ' — счёт оплачен ' + days + ' ' + _logiPlural(days, 'день', 'дня', 'дней') + ' назад' +
+        '<small>№ ' + escapeHtml(String(it.invoice_number || it.order_label || it.order_id)) +
+        ' · товар ждёт на складе, выдают по нашему счёту</small></div>' +
+        '<button class="lg-fire-btn" onclick="logiPickupDone(' + it.order_id + ')">✓ Забрал</button></div>');
     });
     ready.forEach(it => {
       const days = _logiDaysFromToday(it.reserve);
@@ -8030,6 +8318,34 @@ async function loadLogisticsPickups() {
         '<span>к нам <b>' + luActive.length + '</b></span>' +
           (luDone.length ? '<span class="lnk" onclick="lgScrollDone()">забрано: ' + luDone.length + ' →</span>' : ''),
         !luActive.length);
+    }
+
+    // ---- карточка Экспресс-Авто (v2.45.916)
+    let eaCard = '';
+    if (ea) {
+      const body = eaActive.length ? eaActive.map(_expressCardHtml).join('')
+        : '<div class="lgc-empty"><i class="ti ti-mail-forward"></i>Грузов на складе нет.<br>Прибытия появятся сами из писем Экспресс-Авто.</div>';
+      eaCard = _lgCardHtml('lgc-ea', 'ti-truck-loading', 'Экспресс-Авто',
+        eaActive.length ? eaActive.length + ' на складе' : 'пусто',
+        '<button class="abtn" onclick="expressRefresh()" title="Перечитать письма Экспресс-Авто"><i class="ti ti-refresh"></i></button>',
+        body,
+        '<span>забрать <b>' + eaActive.length + '</b></span>' +
+          (eaDone.length ? '<span class="lnk" onclick="lgScrollDone()">забрано: ' + eaDone.length + ' →</span>' : ''),
+        !eaActive.length);
+    }
+
+    // ---- карточка УТМ (готовые корпуса к забору, v2.45.935)
+    let umCard = '';
+    if (um) {
+      const body = umActive.length ? umActive.map(_utmCardHtml).join('')
+        : '<div class="lgc-empty"><i class="ti ti-building-factory-2"></i>Готовых заказов нет.<br>Появятся сами, когда УТМ пришлёт «Заказ готов».</div>';
+      umCard = _lgCardHtml('lgc-um', 'ti-building-factory-2', 'УТМ · корпуса',
+        umActive.length ? umActive.length + ' готово' : 'пусто',
+        '',
+        body,
+        '<span>забрать <b>' + umActive.length + '</b></span>' +
+          (umDone.length ? '<span class="lnk" onclick="lgScrollDone()">забрано: ' + umDone.length + ' →</span>' : ''),
+        !umActive.length);
     }
 
     // ---- карточка Деловых линий
@@ -8129,18 +8445,58 @@ async function loadLogisticsPickups() {
         (pkDoneN ? '<span class="lnk" onclick="lgScrollDone()">забрали: ' + pkDoneN + ' →</span>' : ''),
       !ready.length && !transit.length);
 
+    // ---- карточки «забираем сами» — по одной на поставщика (ТД Электрика и т.п.)
+    const spCards = spGroups.map(g => {
+      const n = g.items.length;
+      const lateN = g.fresh.filter(x => { const dd = _spDaysSince(x.paid_at); return dd !== null && dd >= 3; }).length;
+      const sum = g.fresh.reduce((a, x) => a + (Number(x.invoice_total) || 0), 0);
+      const gDone = spDone.filter(x => (x.supplier_key || _spKey(x.supplier_name)) === g.key).length;
+      return {
+        hot: lateN ? 1 : 0, act: g.fresh.length ? 1 : 0,
+        html: _lgCardHtml('lgc-sp', 'ti-receipt', escapeHtml(g.name),
+          g.fresh.length ? g.fresh.length + ' ' + _logiPlural(g.fresh.length, 'счёт', 'счёта', 'счетов')
+            : (g.stale.length ? 'только старые' : 'пусто'),
+          '',
+          n ? (
+              (g.fresh.length
+                ? '<div class="lgc-sub g"><i class="ti ti-package-import"></i> Забрать по нашему счёту <span>' + g.fresh.length + '</span></div>' +
+                  g.fresh.map(_selfPickupCard).join('')
+                : '') +
+              // v2.45.987: счета старше месяца почти наверняка уже забрали, просто
+              // не отметили — не пугаем ими, но и не прячем совсем
+              (g.stale.length
+                ? '<details class="sp-stale"><summary><i class="ti ti-clock-question"></i> ' +
+                  (g.stale.every(x => x.stale_reason === 'dup')
+                    ? 'Дубли счетов — уже закрыты'
+                    : 'Оплачены давно или задвоились — похоже, уже забрали') +
+                  ' <span>' + g.stale.length + '</span></summary>' +
+                  '<div>' + g.stale.map(_selfPickupCard).join('') + '</div></details>'
+                : '')
+            )
+            : '<div class="lgc-empty"><i class="ti ti-circle-check" style="color:var(--success);"></i>Всё забрали.<br>Счёт появится здесь, как только его оплатят.</div>',
+          '<span>забрать <b>' + g.fresh.length + '</b></span>' +
+            (sum > 0 ? '<span>на сумму <b>' + _logiSum(sum) + '</b></span>' : '') +
+            // v2.45.989: «забрали» считаем по своему поставщику, а не по всем
+            (gDone ? '<span class="lnk" onclick="lgScrollDone()">забрали: ' + gDone + ' →</span>' : ''),
+          !g.fresh.length),
+      };
+    });
+
     // ---- порядок карточек: сначала «горящие», потом с активными, пустые в конце
     const cards = [];
+    spCards.forEach(c => cards.push(c));
     if (oz) cards.push({ hot: fireOz ? 1 : 0, act: ozActive.length ? 1 : 0, html: ozCard });
     if (lu) cards.push({ hot: 0, act: luActive.length ? 1 : 0, html: luCard });
+    if (ea) cards.push({ hot: 0, act: eaActive.length ? 1 : 0, html: eaCard });
+    if (um) cards.push({ hot: 0, act: umActive.length ? 1 : 0, html: umCard });
     if (dl) cards.push({ hot: 0, act: dlActive.length ? 1 : 0, html: dlCard });
     if (cd) cards.push({ hot: 0, act: cdActive.length ? 1 : 0, html: cdCard });
     cards.push({ hot: firePk ? 1 : 0, act: (ready.length + transit.length) ? 1 : 0, html: pkCard });
     cards.sort((a, b) => (b.hot - a.hot) || (b.act - a.act));
 
     // ---- сводка и завершённые
-    const activeTotal = ready.length + transit.length + ozActive.length + luActive.length + cdActive.length + dlActive.length;
-    const doneTotal = pkDoneN + ozDone.length + luDone.length + dlDone.length;
+    const activeTotal = ready.length + transit.length + ozActive.length + luActive.length + cdActive.length + dlActive.length + eaActive.length + umActive.length + spGroups.reduce((a, g) => a + g.fresh.length, 0);
+    const doneTotal = pkDoneN + ozDone.length + luDone.length + dlDone.length + eaDone.length + umDone.length + spDone.length;
     let html = _logiTabsHtml('pickups') + '<div class="lg-sum">' +
       (fire.length ? '<span class="hot">горит <b>' + fire.length + '</b></span>' : '') +
       '<span>активных <b>' + activeTotal + '</b></span>' +
@@ -8149,7 +8505,7 @@ async function loadLogisticsPickups() {
     if (fire.length) html += '<div class="lg-fire">' + fire.join('') + '</div>';
     html += '<div class="lg-grid">' + cards.map(c => c.html).join('') + '</div>';
 
-    if (done.length || ozDone.length || luDone.length || dlDone.length) {
+    if (done.length || ozDone.length || luDone.length || dlDone.length || eaDone.length || umDone.length || spDone.length) {
       html += '<div class="lg-done-wrap" id="lg-done">' +
         '<div class="logi-sec mut"><i class="ti ti-circle-check"></i> Завершённые <span class="logi-cnt">' + doneTotal + '</span></div>' +
         done.map(_logiDoneRow).join('') +
@@ -8160,6 +8516,18 @@ async function loadLogisticsPickups() {
         (luDone.length
           ? '<details class="ozon-archive"><summary><i class="ti ti-building-warehouse"></i> ТК-Луч — забранные <span>' + luDone.length + '</span></summary>' +
             '<div>' + luDone.map(_luchCardHtml).join('') + '</div></details>'
+          : '') +
+        (eaDone.length
+          ? '<details class="ozon-archive"><summary><i class="ti ti-truck-loading"></i> Экспресс-Авто — забранные <span>' + eaDone.length + '</span></summary>' +
+            '<div>' + eaDone.map(_expressCardHtml).join('') + '</div></details>'
+          : '') +
+        (umDone.length
+          ? '<details class="ozon-archive"><summary><i class="ti ti-building-factory-2"></i> УТМ — забранные <span>' + umDone.length + '</span></summary>' +
+            '<div>' + umDone.map(_utmCardHtml).join('') + '</div></details>'
+          : '') +
+        (spDone.length
+          ? '<details class="ozon-archive"><summary><i class="ti ti-receipt"></i> Забрали сами — по счетам <span>' + spDone.length + '</span></summary>' +
+            '<div>' + spDone.map(_logiDoneRow).join('') + '</div></details>'
           : '') +
         (dlDone.length
           ? '<details class="dl-archive"><summary><i class="ti ti-truck-delivery"></i> Деловые линии — завершённые <span>' + dlDone.length + '</span></summary>' +
@@ -8296,6 +8664,16 @@ function _ozonDeadline(sh) {
     (late ? 'Срок истёк · ' : 'Забрать до ') + text + '</span>';
 }
 
+function _ozonExpectedDelivery(sh) {
+  const raw = String(sh.expected_at || '');
+  if (!raw) return '';
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return '<span class="ozon-deadline"><i class="ti ti-truck-delivery"></i> Доставка ' +
+    escapeHtml(raw) + '</span>';
+  return '<span class="ozon-deadline"><i class="ti ti-truck-delivery"></i> Доставка ' +
+    match[3] + '.' + match[2] + '</span>';
+}
+
 function _ozonCardHtml(sh) {
   const completed = _ozonIsCompleted(sh);
   const url = String(sh.details_url || '');
@@ -8311,6 +8689,7 @@ function _ozonCardHtml(sh) {
     (sh.notification_title ? '<div class="ozon-note">' + escapeHtml(sh.notification_title) + '</div>' : '') +
     '<div class="ozon-meta">' +
       (sh.delivery_method ? '<span><i class="ti ti-map-pin"></i> ' + escapeHtml(sh.delivery_method) + '</span>' : '') +
+      _ozonExpectedDelivery(sh) +
       _ozonDeadline(sh) +
     '</div>' +
     '<div class="ozon-actions">' +
@@ -8378,6 +8757,16 @@ function _cdekStatusChip(sh) {
   if (code === 'NOT_DELIVERED') return '<span class="cdek-st bad">⚠ Не вручён</span>';
   return '<span class="cdek-st run">' + escapeHtml(sh.status_name || code) + '</span>';
 }
+function _cdekFriendlyError(value) {
+  const text = String(value || '');
+  if (/entity is forbidden|forbidden/i.test(text)) {
+    return 'Накладная поставщика — подробности доступны по кнопке «Отследить»';
+  }
+  return text;
+}
+function _cdekTrackingUrl(sh) {
+  return 'https://ff.cdek.ru/tracking?trackingNumber=' + encodeURIComponent(sh.cdek_number || '');
+}
 function _cdekDirection(sh) {
   return ['incoming', 'outgoing'].includes(sh.direction) ? sh.direction : 'unknown';
 }
@@ -8401,7 +8790,8 @@ function _cdekRoute(sh) {
   return '';
 }
 function _cdekCardHtml(sh) {
-  const delivered = !!sh.delivered_at;
+  // забрали своим рейсом — статуса «вручён» у чужой накладной может не быть
+  const delivered = !!sh.delivered_at || !!sh.pickup_done_at;
   const proj = [sh.contract_number ? '№' + sh.contract_number : '', sh.contractor_name].filter(Boolean).join(' · ');
   return '<div class="cdek-card ' + _cdekDirection(sh) + (delivered ? ' done' : '') + '">' +
     '<div class="cdek-main">' +
@@ -8410,13 +8800,15 @@ function _cdekCardHtml(sh) {
         (sh.title ? ' <span class="cdek-title">' + escapeHtml(sh.title) + '</span>' : '') + '</div>' +
       _cdekRoute(sh) +
       '<div class="cdek-sub">' + _cdekStatusChip(sh) +
+        (sh.pickup_done_at ? ' <span class="cdek-st done">✓ Забрали</span>' : '') +
         (sh.status_city ? ' · ' + escapeHtml(sh.status_city) : '') +
         (sh.status_at ? ' · ' + escapeHtml(sh.status_at) : '') +
         (proj ? ' · ' + escapeHtml(proj) : '') +
-        (sh.sync_error ? ' · <span style="color:var(--danger);">' + escapeHtml(sh.sync_error) + '</span>' : '') +
+        (sh.sync_error ? ' · <span style="color:var(--text-light);">' + escapeHtml(_cdekFriendlyError(sh.sync_error)) + '</span>' : '') +
       '</div>' +
     '</div>' +
     (!delivered && sh.planned_date ? _logiEtaTile(sh.planned_date) : '') +
+    '<a class="cdek-track" href="' + _cdekTrackingUrl(sh) + '" target="_blank" rel="noopener" title="Открыть официальное отслеживание СДЭК"><i class="ti ti-map-pin-search"></i> Отследить</a>' +
     '<button class="cdek-del" onclick="cdekRemove(' + sh.id + ')" title="Убрать из списка"><i class="ti ti-x"></i></button>' +
   '</div>';
 }
@@ -8851,11 +9243,7 @@ async function dellinDocDownload(id, mode) {
       return;
     }
     const cd = r.headers.get('Content-Disposition') || '';
-    let filename = 'dellin_' + mode + '_' + id + '.pdf';
-    const star = cd.match(/filename\*=UTF-8''([^;]+)/i);
-    const plain = cd.match(/filename="?([^";]+)"?/i);
-    if (star) { try { filename = decodeURIComponent(star[1]); } catch (e) {} }
-    else if (plain) filename = plain[1];
+    const filename = filenameFromCD(cd, 'dellin_' + mode + '_' + id + '.pdf');
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -9196,6 +9584,87 @@ function _logiDoneRow(it) {
     '</div>' +
   '</div>';
 }
+// ============ v2.45.987: «Забираем сами» — оплаченные счета поставщиков ============
+// У таких поставщиков (ТД Электрика и т.п.) статусов из личного кабинета нет:
+// товар выдают со склада по номеру НАШЕГО счёта, а сигнал «пора ехать» — оплата.
+// v2.45.989: имя поставщика → ключ склейки (без кавычек и правовой формы).
+// В JS граница слова // не видит кириллицу, поэтому разбираем на слова.
+function _spKey(name) {
+  return String(name || '').toLowerCase().replace(/ё/g, 'е')
+    .split(/[^0-9a-zа-я]+/)
+    .filter(w => w && !/^(ооо|оао|зао|пао|ао|ип|чп|нао)$/.test(w))
+    .join('');
+}
+function _selfPickupGroups(list) {
+  const map = new Map();
+  (list || []).forEach(it => {
+    // v2.45.989: у поставщика бывает несколько записей в справочнике (старые
+    // удаляли, счета на них остались) — группируем по ключу имени, иначе
+    // в Логистике вырастал веер одинаковых карточек «ТД Электрика»
+    const key = it.supplier_key || _spKey(it.supplier_name) || it.supplier_id || 0;
+    if (!map.has(key)) map.set(key, { key: key, name: it.supplier_name || 'Поставщик', items: [], fresh: [], stale: [] });
+    const g = map.get(key);
+    g.items.push(it);
+    // v2.45.991: «давний»/дубль считает бэкенд (он же прячет их от рейсов);
+    // старый расчёт по дате оставлен на случай ответа без флага
+    const days = _spDaysSince(it.paid_at);
+    const isStale = (typeof it.stale === 'boolean') ? it.stale : (days !== null && days > 30);
+    (isStale ? g.stale : g.fresh).push(it);
+  });
+  return Array.from(map.values());
+}
+// Сколько дней прошло с оплаты (null — даты нет)
+function _spDaysSince(ts) {
+  const m = String(ts || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const d = new Date(m[1] + '-' + m[2] + '-' + m[3] + 'T00:00:00+05:00');
+  if (isNaN(d.getTime())) return null;
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  return days < 0 ? 0 : days;
+}
+function _spPaidTxt(it) {
+  const days = _spDaysSince(it.paid_at);
+  if (days === null) return 'оплачен';
+  if (days === 0) return 'оплачен сегодня';
+  if (days === 1) return 'оплачен вчера';
+  return 'оплачен ' + days + ' ' + _logiPlural(days, 'день', 'дня', 'дней') + ' назад';
+}
+function _selfPickupCard(it) {
+  const num = String(it.invoice_number || it.order_label || ('#' + it.order_id));
+  const days = _spDaysSince(it.paid_at);
+  const late = days !== null && days >= 3;
+  const sum = _logiSum(it.invoice_total);
+  const phone = String(it.supplier_phone || '').replace(/[^0-9+]/g, '');
+  return '<div class="logi-card ready sp-card' + (late ? ' late' : '') + '">' +
+    '<div class="logi-head">' +
+      '<div class="logi-ava sp-ava"><i class="ti ti-receipt"></i></div>' +
+      '<div class="logi-t">' +
+        '<div class="logi-sup">Счёт № ' + escapeHtml(num) + '</div>' +
+        '<div class="logi-num">' + escapeHtml(_spPaidTxt(it)) +
+          (it.status === 'partial' ? ' · забрали не всё' : '') +
+          ' · ' + escapeHtml(it.order_label || ('ORD-' + it.order_id)) + '</div>' +
+      '</div>' +
+      (sum ? '<div class="logi-sum"><div class="rub">' + sum + '</div></div>' : '') +
+    '</div>' +
+    '<div class="logi-body">' +
+      (it.stale_reason === 'dup'
+        ? '<div class="sp-hint dup"><i class="ti ti-copy"></i>Похоже, дубль: этот же счёт уже закрыт заказом ' +
+          escapeHtml('ORD-' + (it.twin_order_id || '')) + ' — забирать нечего</div>'
+        : '<div class="sp-hint"><i class="ti ti-info-circle"></i>На складе называем <b>наш счёт № ' + escapeHtml(num) + '</b>' +
+          (it.supplier_contact ? ' · ' + escapeHtml(it.supplier_contact) : '') + '</div>') +
+      (it.pickup_place
+        ? '<div class="logi-place"><i class="ti ti-map-pin"></i><span>' + escapeHtml(it.pickup_place) + '</span></div>'
+        : '<div class="logi-place sp-noaddr"><i class="ti ti-map-pin"></i><span>Адрес склада не заполнен — впишите его в карточке поставщика, тогда точка встанет и в «Рейсы»</span></div>') +
+      _logiItemsBlock(it, 'Что забирать') +
+    '</div>' +
+    '<div class="logi-foot">' +
+      '<button type="button" class="logi-take" onclick="logiPickupDone(' + it.order_id + ')"><i class="ti ti-check"></i> Забрал</button>' +
+      '<button type="button" class="logi-open" onclick="openSupplyOrder(' + it.order_id + ')"><i class="ti ti-file-invoice"></i> Счёт</button>' +
+      (phone ? '<a class="logi-call" href="tel:' + escapeHtml(phone) + '"><i class="ti ti-phone"></i> ' + escapeHtml(it.supplier_phone) + '</a>' : '') +
+    '</div>' +
+  '</div>';
+}
+
 async function logiPickupDone(orderId, fromDone) {
   const msg = fromDone
     ? 'Скрыть этот заказ из логистики? Он уже выдан/завершён.'
@@ -10310,6 +10779,52 @@ function toggleSupplyShopV2() {
   localStorage.setItem('supplyShopV2', cur ? '0' : '1');
   if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
 }
+// Черновик ещё не отправлен поставщику: он остаётся «К закупке» и его можно
+// продолжить. В ожидание поставки позиция уезжает только после отправки/оформления.
+function _shopIsWaitingStatus(status) {
+  return !!status && status !== 'draft';
+}
+
+function _shopMfgMatches(group) {
+  if (!group || group.supplier_id) return [];
+  const visibleIds = new Set((group.items || []).map(it => Number(it.component_id)));
+  return (group.mfg_matches || []).map(match => {
+    const parts = (match.parts || []).filter(p => visibleIds.has(Number(p.component_id)));
+    const bundleQty = parts.reduce((maxQty, p) => {
+      const perBody = Math.max(Number(p.part_qty) || 1, 1);
+      return Math.max(maxQty, Math.ceil((Number(p.qty) || 0) / perBody));
+    }, 1);
+    return Object.assign({}, match, {
+      parts: parts,
+      matched_count: parts.length,
+      pieces_count: parts.reduce((sum, p) => sum + (Number(p.qty) || 0), 0),
+      bundle_qty: bundleQty,
+    });
+  }).filter(match => match.matched_count >= 2);
+}
+
+function _shopMfgBundledIds(group) {
+  const ids = new Set();
+  _shopMfgMatches(group).forEach(match => {
+    (match.parts || []).forEach(p => ids.add(Number(p.component_id)));
+  });
+  return ids;
+}
+
+function _shopDisplayedItemsCount(group) {
+  const bundled = _shopMfgBundledIds(group).size;
+  const bundles = _shopMfgMatches(group).length;
+  return Math.max(0, (group.items || []).length - bundled + bundles);
+}
+
+function _shopProjectGroupKey(planContracts) {
+  if (!Array.isArray(planContracts) || !planContracts.length) return 'на склад';
+  return String(planContracts[0])
+    .replace(/^\s*Договор\s*№\s*/i, '')
+    .replace(/^\s*№\s*/, '')
+    .trim() || 'на склад';
+}
+
 // Применяет скрытие/переопределения к items группы — возвращает {items, hiddenCount, hiddenItems}
 function _shopApplyLocal(items) {
   const hidden = _shopGetHidden();
@@ -10319,7 +10834,7 @@ function _shopApplyLocal(items) {
   const out = (items || []).filter(it => {
     // v2.45.428: уже заказанные/оплаченные — не «к закупке», а «ждём поставку».
     // Исключаем из групп и из формирования заказа (чтобы не заказывать повторно).
-    if (it.order_status) return false;
+    if (_shopIsWaitingStatus(it.order_status)) return false;
     if (hidden.has(it.component_id)) { hiddenCount++; hiddenItems.push(it); return false; }
     return true;
   }).map(it => {
@@ -10431,7 +10946,7 @@ function renderSupplyShopping(d) {
   groups.forEach(g => {
     // заказанные комплектующие → в «Ждём поставку» (из исходных, до фильтра)
     (g.items || []).forEach(it => {
-      if (it.order_status) waitingItems.push(_componentToTracking(it, g));
+      if (_shopIsWaitingStatus(it.order_status)) waitingItems.push(_componentToTracking(it, g));
     });
     const r = _shopApplyLocal(g.items);   // исключает заказанные + скрытые
     r.hiddenItems.forEach(it => hiddenAcc.push(Object.assign({ _sup_name: g.supplier_name || '' }, it)));
@@ -10453,7 +10968,7 @@ function renderSupplyShopping(d) {
     : '';
   // v2.45.x: KPI-строка одним взглядом
   const _pendCp = cpItems.filter(x => x.purchase_status !== 'ordered').length;
-  const _lowCnt = visibleGroups.reduce((s, g) => s + (g.items_count || 0), 0);
+  const _lowCnt = visibleGroups.reduce((s, g) => s + _shopDisplayedItemsCount(g), 0);
   const buyCount = _pendCp + _lowCnt;
   const waitCount = waitingItems.length;
   const _today = new Date().toISOString().slice(0, 10);
@@ -10488,7 +11003,12 @@ function renderSupplyShopping(d) {
   // Чистим невалидные id (если строка ушла после прошлого назначения)
   const allNoSupIds = new Set();
   visibleGroups.forEach(g => {
-    if (!g.supplier_id) (g.items || []).forEach(it => allNoSupIds.add(it.component_id));
+    if (!g.supplier_id) {
+      const bundledIds = _shopMfgBundledIds(g);
+      (g.items || []).forEach(it => {
+        if (!bundledIds.has(Number(it.component_id))) allNoSupIds.add(it.component_id);
+      });
+    }
   });
   Array.from(window._noSupSelected).forEach(id => {
     if (!allNoSupIds.has(id)) window._noSupSelected.delete(id);
@@ -10497,21 +11017,46 @@ function renderSupplyShopping(d) {
   visibleGroups.forEach((g, idx) => {
     const supName = g.supplier_name || '(поставщик не назначен)';
     const noSupplier = !g.supplier_id;
+    const mfgMatches = _shopMfgMatches(g);
+    const mfgBundledIds = _shopMfgBundledIds(g);
+    const displayedItemsCount = _shopDisplayedItemsCount(g);
+    const draftItems = (g.items || []).filter(it => it.order_status === 'draft' && it.order_id);
+    const draftOrderId = draftItems.length
+      ? Math.max.apply(null, draftItems.map(it => Number(it.order_id) || 0))
+      : 0;
+    const draftOrderLabel = draftItems.length
+      ? (draftItems.find(it => Number(it.order_id) === draftOrderId) || {}).order_label
+      : '';
     // v2.45.642: у «не назначен» позиции группируются по проекту (первому
     // договору из plan_contracts) — вместо колонки «Причина» с 50 повторами.
     let orderedItems = g.items || [];
     if (noSupplier) {
       const nsGroups = {};
       orderedItems.forEach(it => {
-        const key = (Array.isArray(it.plan_contracts) && it.plan_contracts.length)
-          ? ('№' + String(it.plan_contracts[0]).replace(/^№\s*/, ''))
-          : 'на склад';
+        const key = _shopProjectGroupKey(it.plan_contracts);
+        if (mfgBundledIds.has(Number(it.component_id))) return;
         (nsGroups[key] = nsGroups[key] || []).push(it);
       });
+      const bundlesByProject = {};
+      mfgMatches.forEach(match => {
+        const key = _shopProjectGroupKey(match.plan_contracts);
+        (bundlesByProject[key] = bundlesByProject[key] || []).push(match);
+      });
       orderedItems = [];
-      Object.keys(nsGroups).sort((a, b) => nsGroups[b].length - nsGroups[a].length).forEach(k => {
-        orderedItems.push({ _nsHead: k, _ids: nsGroups[k].map(x => x.component_id), _n: nsGroups[k].length });
-        orderedItems = orderedItems.concat(nsGroups[k]);
+      const projectKeys = Array.from(new Set(Object.keys(nsGroups).concat(Object.keys(bundlesByProject))));
+      projectKeys.sort((a, b) =>
+        ((nsGroups[b] || []).length + (bundlesByProject[b] || []).length) -
+        ((nsGroups[a] || []).length + (bundlesByProject[a] || []).length)
+      ).forEach(k => {
+        const rows = nsGroups[k] || [];
+        const bundles = bundlesByProject[k] || [];
+        orderedItems.push({
+          _nsHead: k,
+          _ids: rows.map(x => x.component_id),
+          _n: rows.length + bundles.length,
+        });
+        bundles.forEach(match => orderedItems.push({ _mfgBundle: match }));
+        orderedItems = orderedItems.concat(rows);
       });
     }
     const itemRows = orderedItems.map(it => {
@@ -10531,6 +11076,28 @@ function renderSupplyShopping(d) {
             '<button class="btn btn-secondary btn-sm" data-ids="' + idsJson + '" onclick="nsAssignGroup(this)" ' +
               'title="Выбрать группу и назначить одного поставщика на все её позиции">' +
               '<i class="ti ti-truck"></i>Поставщик на группу</button></td>' +
+        '</tr>';
+      }
+      if (it._mfgBundle) {
+        const match = it._mfgBundle;
+        const partsEncoded = encodeURIComponent(JSON.stringify(match.parts || []));
+        const bundles = Number(match.bundle_qty || 1);
+        const positions = Number(match.matched_count || 0);
+        const pieces = Number(match.pieces_count || 0);
+        return '<tr class="nsg-mfg-bundle">' +
+          '<td class="ns-check-cell"><span class="nsg-mfg-icon"><i class="ti ti-building-factory-2"></i></span></td>' +
+          '<td colspan="3"><div class="nsg-mfg-title">' +
+            '<b>' + escapeHtml(match.item_designation || match.item_name || 'Корпус') + '</b>' +
+            '<span>' + escapeHtml(match.item_name || '') + '</span></div>' +
+            '<div class="nsg-mfg-meta">' + bundles + ' ' +
+              _plural(bundles, ['комплект', 'комплекта', 'комплектов']) +
+              ' · ' + positions + ' ' + _plural(positions, ['позиция', 'позиции', 'позиций']) +
+              ' · ' + pieces + ' деталей — оформить одним заказом</div></td>' +
+          '<td colspan="2" style="text-align:right;">' +
+            '<button class="btn btn-primary btn-sm" onclick="openMfgFromProduction(' +
+              Number(match.item_id) + ',\'' + partsEncoded + '\')" ' +
+              'title="Открыть комплект в разделе изготовления корпусов">' +
+              '<i class="ti ti-package-export"></i>Открыть комплект</button></td>' +
         '</tr>';
       }
       // v2.45.335: показываем «под какой проект» (договоры) или «на склад»
@@ -10681,8 +11248,8 @@ function renderSupplyShopping(d) {
       '<div class="sup-shop-group-head">' +
         '<div class="sup-shop-group-name">' +
           _supAvatarHtml(supName, noSupplier) + escapeHtml(supName) +
-          '<span class="sup-shop-group-count">' + (g.items_count || 0) + ' ' +
-            (g.items_count === 1 ? 'позиция' : (g.items_count < 5 ? 'позиции' : 'позиций')) +
+          '<span class="sup-shop-group-count">' + displayedItemsCount + ' ' +
+            _plural(displayedItemsCount, ['позиция', 'позиции', 'позиций']) +
           '</span>' +
         '</div>' +
         '<div class="sup-shop-group-actions">' +
@@ -10694,10 +11261,14 @@ function renderSupplyShopping(d) {
                 // Сформировать заказ — превью письма + отправка
                 ' <button class="btn btn-primary btn-sm" ' +
                   (g.supplier_email
-                    ? 'onclick="openCreateOrderPreview(' + g.supplier_id + ')" title="Создать заказ и отправить письмо поставщику"'
+                    ? 'onclick="openCreateOrderPreview(' + g.supplier_id + ')" title="' +
+                      (draftOrderId ? 'Продолжить черновик и отправить письмо поставщику' : 'Создать заказ и отправить письмо поставщику') + '"'
                     : 'disabled title="У поставщика не указан email — заполни его в карточке поставщика"'
                   ) + '>' +
-                  '<i class="ti ti-mail-send"></i>Сформировать заказ</button>' +
+                  '<i class="ti ti-mail-send"></i>' +
+                  (draftOrderId
+                    ? ('Продолжить ' + escapeHtml(draftOrderLabel || ('ORD-' + draftOrderId)))
+                    : 'Сформировать заказ') + '</button>' +
                 // v2.45.337: оформить вручную — заказ уже сделан/оплачен по телефону, без письма
                 ' <button class="btn btn-secondary btn-sm" onclick="openManualOrderDialog(' + g.supplier_id + ')" ' +
                   'title="Уже заказал/оплатил по телефону — записать заказ без письма и сразу поставить статус">' +
@@ -10834,7 +11405,27 @@ async function downloadShoppingGroupDocx(supplierId) {
   }
 }
 
-// «Сформировать заказ» — создаём черновик, открываем модалку превью письма
+async function openExistingShoppingDraft(orderId) {
+  if (!orderId) return false;
+  try {
+    const resp = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/preview', {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      showToast(j.message || 'Не удалось открыть черновик', 'error');
+      return false;
+    }
+    _renderOrderPreviewModal(await resp.json());
+    return true;
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+    return false;
+  }
+}
+
+// «Сформировать заказ» — продолжаем уже созданный черновик либо создаём новый,
+// затем открываем модалку превью письма.
 async function openCreateOrderPreview(supplierId) {
   const d = await apiGet('/api/supply/shopping-list');
   const group = (d.groups || []).find(g => g.supplier_id === supplierId);
@@ -10846,6 +11437,16 @@ async function openCreateOrderPreview(supplierId) {
   }
   if (!group.supplier_email) {
     showToast('У поставщика не указан email', 'error');
+    return;
+  }
+  // Закрыли превью или обновили страницу — не плодим ORD-дубли. Открываем самый
+  // свежий черновик этого поставщика, позиции которого уже видны в группе.
+  const draftIds = (group.items || [])
+    .filter(it => it.order_status === 'draft' && it.order_id)
+    .map(it => Number(it.order_id))
+    .filter(Boolean);
+  if (draftIds.length) {
+    await openExistingShoppingDraft(Math.max.apply(null, draftIds));
     return;
   }
   // Создаём draft + получаем превью
@@ -11212,8 +11813,7 @@ async function downloadSupplierPriceFile(fileId) {
     const a = document.createElement('a');
     a.href = url;
     const cd = r.headers.get('Content-Disposition') || '';
-    const mm = cd.match(/filename="?([^";]+)"?/);
-    a.download = mm ? mm[1] : 'price.xlsx';
+    a.download = filenameFromCD(cd, 'price.xlsx');
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -12666,6 +13266,7 @@ function renderSupplyOrders() {
     const hasInvoice = !!o.invoice_file_key;
     const isSel = state.supplyOrdersSelected.has(o.id);
     const entColor = _entityBorderColor(o.invoice_payer_tag);
+    const dupO = supOrdDup(o);   // v2.45.986: похоже на повтор — видно из списка
     let rowStyle = '';
     if (isSel) {
       rowStyle = 'style="border-color:#2563EB;background:rgba(37,99,235,0.05);"';
@@ -12686,7 +13287,8 @@ function renderSupplyOrders() {
     // распознанные позиции счёта → показываем их количество как фолбэк.
     const itemsCount = o.items_count || ((o.invoice_items && o.invoice_items.length) || 0);
     const itemsWord = (typeof _plural === 'function') ? _plural(itemsCount, ['позиция', 'позиции', 'позиций']) : 'позиций';
-    html += '<div class="sup-row sup-ord-card" ' + rowStyle + ' onclick="openSupplyOrder(' + o.id + ')">';
+    html += '<div class="sup-row sup-ord-card' + (dupO ? ' is-dup' : '') + '" ' + rowStyle +
+      ' onclick="openSupplyOrder(' + o.id + ')">';
     if (canDelete) {
       html += '<label class="sup-check-wrap" onclick="event.stopPropagation();">' +
         '<input type="checkbox" ' + (isSel ? 'checked' : '') +
@@ -12707,6 +13309,7 @@ function renderSupplyOrders() {
           // Оплачены→оплата, Получены→поставка, иначе→создание (fallback на оплату).
           '<span class="sup-status-pill ord-' + o.status + '">' + escapeHtml(o.status_label) +
             (_supOrdCardDate(o) ? ' · ' + _supOrdDate(_supOrdCardDate(o)) : '') + '</span>' +
+          dupOrderPill(o) +
           newPill +
           payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, false) +
           (itemsCount ? '<span class="sup-ord-meta-num"><i class="ti ti-list"></i>' + itemsCount + ' ' + itemsWord + '</span>' : '') +
@@ -13165,8 +13768,7 @@ async function downloadEdoUpdFile(updId, idx) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const cd = r.headers.get('Content-Disposition') || '';
-    const mm = cd.match(/filename="?([^";]+)"?/);
-    a.href = url; a.download = mm ? mm[1] : 'upd.bin';
+    a.href = url; a.download = filenameFromCD(cd, 'upd.bin');
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (e) { showToast('Сеть: ' + (e.message || e), 'error'); }
@@ -13412,6 +14014,21 @@ function payerEntityPill(pe, withName) {
     escapeHtml(label) + '</span>';
 }
 
+// v2.45.984: чип «Повторный» — бэкенд принял счёт, у которого ИНН + номер +
+// сумма совпали с уже принятым (ai_data.possible_duplicate). Раньше такой счёт
+// вообще не пускали в CRM, и перевыставленные счета (правка НДС) терялись.
+// Теперь он приходит как обычно, но с меткой: человек решает, платить ли.
+function dupWarnPill(ai, withHint) {
+  const d = (ai || {}).possible_duplicate;
+  if (!d) return '';
+  const when = String(d.received_at || '').replace('T', ' ').substring(0, 16);
+  const title = 'Такой счёт (номер и сумма) уже приходил' +
+    (when ? ' ' + when : '') + ' — письмо #' + d.inbox_id + '. Проверьте, чтобы не оплатить дважды.';
+  const label = withHint && d.inbox_id ? ('Повторный · был #' + d.inbox_id) : 'Повторный';
+  return '<span class="sup-status-pill" style="background:#FEF3C7;color:#92400E;font-weight:700;" title="' +
+    escapeHtml(title) + '">⚠️ ' + escapeHtml(label) + '</span>';
+}
+
 // Заметный бейдж «MAX» для счетов, пришедших через мессенджер MAX (а не почту).
 // Источник бэкенд помечает from_addr="max:<id>" + folder="MAX" + ai_data.source="max".
 function isFromMax(m) {
@@ -13492,7 +14109,7 @@ async function openInboxInvoice(inboxId) {
   const vat = (tot.vat_sum != null) ? Number(tot.vat_sum) : null;
   const chip = (label, cp) => '<span onclick="_copyTxt(' + JSON.stringify(String(cp)).replace(/"/g, '&quot;') + ')" title="Нажми — скопируется" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:4px 10px;font-size:12.5px;">' + label + ' <i class="ti ti-copy" style="color:var(--text-light);font-size:13px;"></i></span>';
   const info = (t, bg, fg, bd) => '<span style="display:inline-flex;align-items:center;gap:5px;background:' + bg + ';border:1px solid ' + bd + ';color:' + fg + ';border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:600;">' + t + '</span>';
-  let chips = payerEntityPill(ai.payer_entity, true);
+  let chips = payerEntityPill(ai.payer_entity, true) + dupWarnPill(ai, true);
   if (num) chips += chip('№ ' + escapeHtml(num), num);
   if (dt) chips += chip(escapeHtml(dt), dt);
   if (withV != null) chips += chip('<b>' + _f2(withV) + ' ₽</b>', String(withV));
@@ -13639,7 +14256,7 @@ function _ibxInvoiceCard(m, isMatched) {
   } else if (m.detected_label) {
     tags += '<span class="ibx-chip ord">' + escapeHtml(m.detected_label) + '</span>';
   }
-  tags += payerEntityPill((m.ai_data || {}).payer_entity, false);
+  tags += payerEntityPill((m.ai_data || {}).payer_entity, false) + dupWarnPill(m.ai_data, false);
 
   // v2.45.7xx: для читаемости показываем ПОСТАВЩИКА (главным) и СУММУ.
   // Раньше строка = тема + обрезанный отправитель, без суммы → «ничего не понятно».
@@ -13891,7 +14508,7 @@ function _renderInboxOldRows(items) {
     html += '<div class="sup-row">' +
       '<div class="sup-row-main">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
-          maxSourcePill(m) + labelHtml + statusHtml + orderPayStatusPill(m) + payerEntityPill((m.ai_data || {}).payer_entity, false) +
+          maxSourcePill(m) + labelHtml + statusHtml + orderPayStatusPill(m) + payerEntityPill((m.ai_data || {}).payer_entity, false) + dupWarnPill(m.ai_data, false) +
         '</div>' +
         '<div style="font-weight:600;color:var(--text-dark);font-size:14px;">' + escapeHtml(m.subject || '(без темы)') + '</div>' +
         '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">' +
@@ -14003,7 +14620,7 @@ async function openInboxMessage(inboxId) {
         '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content" style="overflow-y:auto;">' +
-        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + maxSourcePill(msg) + labelPill + statusPill + orderPayStatusPill(msg) + payerEntityPill((msg.ai_data || {}).payer_entity, true) + '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + maxSourcePill(msg) + labelPill + statusPill + orderPayStatusPill(msg) + payerEntityPill((msg.ai_data || {}).payer_entity, true) + dupWarnPill(msg.ai_data, true) + '</div>' +
         '<div style="display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;font-size:13px;margin-bottom:12px;">' +
           '<div style="color:var(--text-light);">От:</div><div>' + fromLine + '</div>' +
           '<div style="color:var(--text-light);">Получено:</div><div style="font-variant-numeric:tabular-nums;">' + escapeHtml(received) + '</div>' +
@@ -14580,10 +15197,8 @@ async function downloadInboxAttachmentDirect(inboxId, idx, suggestedName) {
       return;
     }
     // Имя из Content-Disposition или из подсказки
-    let filename = suggestedName || 'attachment';
     const cd = r.headers.get('Content-Disposition') || '';
-    const m = cd.match(/filename="?([^";]+)"?/i);
-    if (m) filename = m[1];
+    const filename = filenameFromCD(cd, suggestedName || 'attachment');
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -15360,8 +15975,26 @@ function renderSupplyOrderDetail(o) {
       '<i class="ti ti-file-invoice"></i>' +
       '<h1>Заказ #' + o.id + '</h1>' +
       '<span class="sup-status-pill ord-' + o.status + '" style="margin-left: 8px;">' + escapeHtml(o.status_label) + '</span>' +
+      dupOrderPill(o) +
     '</div>' +
     '</div>';
+
+  // v2.45.986: «возможный ПОВТОР» — красной плашкой первым делом, а не серым
+  // хвостом комментария: этот счёт уже может оплачиваться другим заказом.
+  const dupO = supOrdDup(o);
+  if (dupO) {
+    html += '<div class="dup-alert">' +
+      '<i class="ti ti-alert-triangle"></i>' +
+      '<div class="dup-alert-body">' +
+        '<div class="dup-alert-title">Возможный повтор счёта</div>' +
+        '<div class="dup-alert-text">' + escapeHtml(dupO.note || 'Такой счёт (номер и сумма) уже приходил — проверьте, чтобы не оплатить дважды') + '</div>' +
+      '</div>' +
+      (dupO.orderId
+        ? '<button class="btn btn-secondary" onclick="openSupplyOrder(' + dupO.orderId + ')">' +
+            '<i class="ti ti-external-link"></i> Открыть ' + escapeHtml(dupO.orderLabel || ('#' + dupO.orderId)) + '</button>'
+        : '') +
+    '</div>';
+  }
 
   // Сведения о поставщике
   html += '<div class="detail-block">' +
@@ -15388,7 +16021,8 @@ function renderSupplyOrderDetail(o) {
     (o.purpose ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-tag" style="font-size:16px;"></i> Назначение: ' + escapeHtml(o.purpose) + '</div>' : '') +
     // v2.45.665: внешний статус поставки (из ЛК Всеинструментов)
     (o.ext_status ? '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;background:#E7EEFB;border:1px solid #B9CCEF;color:#2749A0;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;"><i class="ti ti-truck-delivery" style="font-size:16px;"></i> Поставка: ' + escapeHtml(o.ext_status) + (o.expected_date ? ' · придёт ' + escapeHtml(o.expected_date) : '') + '</div>' : '') +
-    (o.comment ? '<div class="detail-comment">' + escapeHtml(o.comment) + '</div>' : '') +
+    // пометку повтора из комментария вырезали — она уже наверху красным
+    ((dupO ? dupO.comment : o.comment) ? '<div class="detail-comment">' + escapeHtml(dupO ? dupO.comment : o.comment) + '</div>' : '') +
     '</div>';
 
   // История переходов (только если есть хоть один таймстамп лайфцикла)
@@ -15752,7 +16386,12 @@ async function sendOrder(orderId) {
 // ========== ЭТАП 52.2: FSM-переходы статусов и счёт от поставщика ==========
 
 async function transitionSupplyOrder(orderId, newStatus, confirmText) {
-  if (confirmText && !confirm(confirmText)) return;
+  // v2.45.986: платить по счёту-повтору — отдельный вопрос, с текстом совпадения
+  const _cur = (cache.currentSupplyOrder && cache.currentSupplyOrder.id === orderId)
+    ? cache.currentSupplyOrder : null;
+  if (['to_pay', 'paid'].includes(newStatus) && !dupPayConfirmed(_cur)) return;
+  const _dupSkip = ['to_pay', 'paid'].includes(newStatus) && !!supOrdDup(_cur);
+  if (confirmText && !_dupSkip && !confirm(confirmText)) return;
   try {
     // v2.45.309: для 'paid' бэкенд требует подтверждение личным паролём —
     // общий помощник (из app-1.js) спросит пароль и повторит при необходимости.
@@ -15986,9 +16625,7 @@ async function downloadSupplyOrderInvoice(orderId) {
     }
     // Получаем имя из Content-Disposition
     const cd = r.headers.get('Content-Disposition') || '';
-    let filename = 'invoice_' + orderId;
-    const m = cd.match(/filename="?([^";]+)"?/i);
-    if (m) filename = m[1];
+    const filename = filenameFromCD(cd, 'invoice_' + orderId);
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -17775,7 +18412,209 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
-    version: 'v2.45.909',
+    version: 'v2.46.018',
+    date: '21.08.2026',
+    title: 'Идеи: свой чат с Клодом для сотрудников',
+    features: [
+      'Новый раздел <b>«Идеи»</b> на Главной: рассказываете Клоду, что улучшить в программе, он уточняет детали и оформляет <b>ТЗ</b>',
+      'Клод здесь работает <b>только на чтение</b>: код не правит, а договоры, суммы и зарплаты ему закрыты — он их просто не видит',
+      'Вход <b>по паролю</b>, который выдаёт директор; в шапке раздела у директора ключ — задать пароль, посмотреть, кто вошёл, и убрать доступ',
+      'Выездным монтажникам раздел закрыт всегда, даже если пароль им передали',
+      'Готовое ТЗ уезжает директору в чат <b>«ТЗ от сотрудников»</b> предложением: правка кода начинается только с его кнопки «Внедрить»',
+      'Автор идеи видит решение в своей переписке и получает push: «взяли в работу» или «не сейчас» с причиной',
+    ],
+  },
+  {
+    version: 'v2.45.1016',
+    date: '20.08.2026',
+    title: 'Карточка работы объясняет, чего именно нет',
+    features: [
+      'Вместо короткого «Готового изделия на складе нет — нужно изготовить» карточка пишет <b>что делаем, сколько готовых лежит на складе и хватает ли деталей</b>',
+      'Прямо сказано, что «нет» — это про <b>готовое изделие</b>, а не про комплектующие: детали в наличии, работу можно начинать',
+      'Видно цифру склада: «готовых 0 шт.» или «есть 3 шт., но все в резерве под другие договоры»',
+      'Если свободные готовые изделия на складе <b>есть</b> — карточка предупреждает: возможно, собирать не нужно, закройте потребность складом',
+      'Перекомплектация больше не притворяется изготовлением: «изделие уже есть, меняем комплектацию»',
+      'Если сборка по работе уже сделана — пишем «уже собрано, детали списаны», а не «детали есть на складе»',
+    ],
+  },
+  {
+    version: 'v2.45.1011',
+    date: '20.08.2026',
+    title: 'Атом Чиллер: упор в корпус видно сразу',
+    features: [
+      'Узел, который влез в металл корпуса — в стойку, балку или панель обшивки, — <b>светится красным</b>, как и при наезде на соседний узел',
+      'Красным горит и сама деталь корпуса, в которую упёрлись: видно, что именно мешает',
+      'В подписи выделенной детали и в меню написано, во что упор: «упор в Стойка, Балка»',
+      'В строке состояния — «⚠ упор в корпус: N дет.»; нажатие на строку убирает детали в полость и ставит на дно',
+      'Пол внутри корпуса теперь — верх дна, а не низ рамы: узлы больше не тонут в дне на 35 мм',
+      '«Расставить по функциям» обходит стойки и отсек электрощита, а не сажает в них компрессор',
+    ],
+  },
+  {
+    version: 'v2.45.1009',
+    date: '20.08.2026',
+    title: 'Скачанные файлы снова с русскими именами',
+    features: [
+      'Вложение из «Почты и MAX» сохранялось как <b>Ð£Ð_Ð__Ñ_Ñ_Ð°Ñ_Ñ_Ñ_.pdf</b> — теперь это снова «УПД_статус_1_1144_от_20_августа_2026_г.pdf»',
+      'То же выправлено у счёта заказа, файла УПД из ЭДО, прайса поставщика, спецификации договора, КП и файлов из чатов',
+    ],
+  },
+  {
+    version: 'v2.45.980',
+    date: '17.08.2026',
+    title: 'Клава: вложение не ушло — теперь понятно почему',
+    features: [
+      'Перепаковал архив тем же именем после того, как прикрепил — Клава скажет об этом <b>по имени файла</b> и попросит прикрепить заново, а не будет валить на связь',
+      'Проверка идёт до загрузки: 40 МБ не гоняются впустую',
+      'Случайный обрыв на длинной загрузке — <b>второй заход сам</b>, а если и он не удался, видно, докуда доехало (например «оборвалась на 62%»)',
+    ],
+  },
+  {
+    version: 'v2.45.979',
+    date: '17.08.2026',
+    title: 'Клава: чат открывается на последнем сообщении',
+    features: [
+      'Открыл переписку — она сразу <b>в конце</b>, а не где-то в середине: долистывать руками больше не нужно',
+      'Плавная прокрутка через всю ленту заменена на мгновенный прыжок — раньше она обрывалась на полпути от первого же касания экрана',
+      'Пока едут картинки и доверстывается длинный ответ, лента <b>придерживает низ</b> — фото больше не выталкивает последнее сообщение за экран. Отмотал вверх — придерживание сразу выключается',
+    ],
+  },
+  {
+    version: 'v2.45.978',
+    date: '17.08.2026',
+    title: 'Кодя: новое имя на главной',
+    features: [
+      'Отдельный помощник Codex на главной CRM теперь подписан по-дружески — <b>Кодя</b>. Название изменено в меню, шапке чата и служебных подсказках; его отдельные чаты и очередь остались прежними',
+    ],
+  },
+  {
+    version: 'v2.45.977',
+    date: '17.08.2026',
+    title: 'Клава: чаты работают одновременно',
+    features: [
+      'Задачи из <b>разных чатов</b> больше не стоят в общей очереди — Клава ведёт их параллельно, каждую своим процессом. Пока в одном чате идёт получасовая правка фронта, вопрос по чиллерам отвечается сразу',
+      'Внутри одного чата порядок прежний: следующая задача ждёт, пока закончится предыдущая — иначе две правки перебивали бы друг друга в одной сессии',
+      'Одновременно идёт до трёх задач; подпись «жду очереди» теперь честно говорит, что ждём предыдущую задачу этого же чата',
+    ],
+  },
+  {
+    version: 'v2.45.975',
+    date: '17.08.2026',
+    title: 'Атом Чиллер: чат прямо в базе 3D',
+    features: [
+      'Переписка по чиллерам открывается <b>в самом просмотрщике</b> — кружок с трубкой в правом нижнем углу. Смотришь узел, крутишь модель на весь экран и тут же пишешь замечание: раньше для этого приходилось выходить из карточки в CRM',
+      'Пока Клава работает, кнопка светится жёлтым, а в шторке видно, чем она занята сейчас, сколько идёт работа и есть кнопка «Стоп»',
+      'Задача уезжает с пометкой, какая позиция открыта, — дописывать «это про корпус 600×900» больше не нужно',
+      'Ответ с макетом (html) открывается прямо в просмотрщике, картинки — в ленте',
+    ],
+  },
+  {
+    version: 'v2.45.974',
+    date: '17.08.2026',
+    title: 'Клава: у каждого чата своя работа',
+    features: [
+      'Карточка «Работаю над задачей», её таймер и окно «Смотреть вживую» показывают работу <b>того чата, который открыт</b>. Раньше во всех чатах бежал один и тот же расчёт: открыл «Производство» — а там лог задачи по чиллеру и чужое время',
+      'Задача, ожидающая своей очереди, так и подписана — «жду очереди», а не показывает время уже идущей работы',
+    ],
+  },
+  {
+    version: 'v2.45.973',
+    date: '17.08.2026',
+    title: 'Чат с Клавой: лента с перепиской и очередь без повторов',
+    features: [
+      'Раздел «Атом Чиллер» открывает тот чат, где лежит переписка: если в проекте остался пустой дубль от прежней версии, шторка на него больше не садится',
+      'Задача, полежавшая в очереди дольше часа, больше не выполняется копиями: старый вопрос перестал повторяться и задвигать свежие сообщения',
+    ],
+  },
+  {
+    version: 'v2.45.970',
+    date: '17.08.2026',
+    title: 'Чат по чиллерам не раздваивается',
+    features: [
+      'Чат с <b>Клавой</b> в разделе «Атом Чиллер» больше не заводит второй, пустой чат: если подходящая переписка уже есть, она просто переносится в проект «Атом Чиллер». Раньше после перезагрузки страницы шторка открывалась на пустом дубле, и казалось, что переписка пропала',
+      'Переписка по чиллерам одна и та же в шторке раздела и на экране <b>«Клава»</b>',
+    ],
+  },
+  {
+    version: 'v2.45.960',
+    date: '15.08.2026',
+    title: 'Клава: скриншоты в чате наконец видно',
+    features: [
+      'Картинки в чате с <b>Клавой</b> (и присланные вами, и снятые ею скриншоты) больше не остаются пустым местом: файл скачивался под авторизацией, но само изображение оставалось скрытым стилем — теперь показывается сразу после загрузки',
+    ],
+  },
+  {
+    version: 'v2.45.959',
+    date: '15.08.2026',
+    title: 'Шапка на телефоне: надпись Atom видна целиком',
+    features: [
+      'Логотип <b>«Atom»</b> в шапке больше не обрезался до «Ато»: на телефонах ~360–430 px отступы, промежутки и кнопки действий стали чуть компактнее — слово помещается целиком даже с пятью кнопками (Фото УПД, QR, Экран на ТВ, Чаты, Колокольчик)',
+      'На совсем узких экранах (уже 330 px) вместо огрызка слова остаётся один шарик-логотип',
+    ],
+  },
+  {
+    version: 'v2.45.934',
+    date: '13.08.2026',
+    title: 'Атом Чиллер: проекты в CRM и вкладка «Схема»',
+    features: [
+      'Проекты конструктора теперь <b>хранятся в CRM</b>, а не в браузере: список проектов с именами, автосохранение, открыть может любой из команды. Старый черновик из браузера предложит забрать в первый проект',
+      'Новая вкладка <b>«Схема»</b> — принципиальная схема типового контура Атомус (по листу АГ.ЧИЛ-104 Г3): компрессор, зимний комплект KVR+NRD, ресивер, отделитель жидкости, ПТО, байпас, гидроконтур',
+      'Клик по элементу схемы — <b>назначить конкретную модель из базы 3D</b>: зелёным подписано что назначено, жёлтым — что ждёт. Назначения хранятся в проекте',
+      'Это фундамент автообвязки: схема знает, что с чем соединено — следующий шаг строит трубы сам',
+    ],
+  },
+
+  {
+    version: 'v2.45.933',
+    date: '13.08.2026',
+    title: 'Атом Чиллер · Проект: подсветка пересечений',
+    features: [
+      'Детали, которые <b>наезжают друг на друга</b>, светятся красным — прямо во время перетаскивания',
+      'Внизу счётчик: «⚠ пересекаются: N дет.» или «✓ пересечений нет»; касание вплотную пересечением не считается',
+    ],
+  },
+
+  {
+    version: 'v2.45.932',
+    date: '13.08.2026',
+    title: 'Атом Чиллер: прототип конструктора «Проект»',
+    features: [
+      'В базе 3D (Производство → Атом Чиллер) — кнопка <b>«⚙ Проект»</b>: сцена, куда детали ставятся <b>настоящими моделями из базы</b> — кликом из каталога слева',
+      'Деталь тащится мышью по полу (снап 10 мм), поворот на 90° (клавиша R), дублирование, удаление; виды изометрия/спереди/сверху',
+      '<b>Спецификация собирается сама</b> из сцены: что поставил — то и в списке, с количеством; габарит сборки считается автоматически',
+      'Прототип: проект автосохраняется в браузере; следующий шаг — сохранение в CRM, BOM модели ЧИЛ и чертёж сборки',
+    ],
+  },
+
+  {
+    version: 'v2.45.931',
+    date: '13.08.2026',
+    title: 'Количество штучных позиций — только целое',
+    items: [
+      'Для штучных, комплектных и упаковочных позиций договора количество меняется по 1: 1, 2, 3…',
+      'Дробные значения сохранены для метров, площади, массы и объёма.',
+    ],
+  },
+  {
+    version: 'v2.45.930',
+    date: '13.08.2026',
+    title: 'Новое письмо поставщику из переписки',
+    items: [
+      'В разделе «Почта и MAX → Переписка» появилась кнопка «Написать письмо».',
+      'Можно выбрать поставщика, автоматически подставить его e-mail и начать новую переписку первым.',
+    ],
+  },
+  {
+    version: 'v2.45.929',
+    date: '13.08.2026',
+    title: 'Ретро FM · чаты монтажника только по назначению',
+    items: [
+      'В радио на главной добавлена станция «Ретро FM».',
+      'Монтажник видит чаты только приглашённых групп и назначенных ему договоров.',
+    ],
+  },
+  {
+    version: 'v2.45.910',
     date: '11.08.2026',
     title: 'Письма читаются, а не рассыпаются лесенкой',
     items: [
@@ -25328,6 +26167,205 @@ function logiViewSwitch(v) {
   loadLogisticsPickups();
 }
 
+// v2.46.015: точка рейса — не только «забрать». Ключи те же, что на бэкенде
+// (logi_trips.POINT_ACTIONS): забрать / отвезти / оплатить / документы /
+// встреча / посмотреть / просто заехать.
+const _LT_ACTIONS = [
+  ['pickup',  'Забрать',    '📦', 'Забрал'],
+  ['deliver', 'Отвезти',    '🚚', 'Отвёз'],
+  ['pay',     'Оплатить',   '💳', 'Оплатил'],
+  ['docs',    'Документы',  '✍️', 'Подписал'],
+  ['meet',    'Встреча',    '🤝', 'Съездил'],
+  ['look',    'Посмотреть', '👀', 'Посмотрел'],
+  ['other',   'Заехать',    '📍', 'Сделал'],
+];
+function _ltAct(k) {
+  return _LT_ACTIONS.find(a => a[0] === k) || _LT_ACTIONS[0];
+}
+function _ltActOptions(sel) {
+  return _LT_ACTIONS.map(a => '<option value="' + a[0] + '"' +
+    (a[0] === (sel || 'pickup') ? ' selected' : '') + '>' + a[2] + ' ' + a[1] +
+    '</option>').join('');
+}
+// Своя точка: что сделать, куда заехать, комментарий. Одинаково в «Новом
+// рейсе» и в допланировании — чтобы поля не расходились. Скрытые lat/lon
+// заполняются при выборе места: координаты уже известны — геокодер не нужен.
+function _ltCustomRowHtml(act) {
+  return '<div class="lt-custom-row">' +
+    '<select class="form-input" data-f="action">' + _ltActOptions(act) + '</select>' +
+    '<input class="form-input" placeholder="Куда / к кому заехать" data-f="title" ' +
+      'list="lt-places-dl" onchange="ltPlaceRowType(this)">' +
+    '<span class="lt-row-ops">' +
+      '<button class="icon-btn" title="Выбрать из своих мест" ' +
+        'onclick="ltPlaceRowPick(this)"><i class="ti ti-map-pin"></i></button>' +
+      '<button class="icon-btn" title="Убрать" ' +
+        'onclick="this.closest(\'.lt-custom-row\').remove()"><i class="ti ti-x"></i></button>' +
+    '</span>' +
+    '<input class="form-input full" placeholder="Адрес — на карту встанет сам" data-f="address">' +
+    '<input class="form-input full" placeholder="Комментарий: что сделать, что взять с собой" data-f="note">' +
+    '<input type="hidden" data-f="lat"><input type="hidden" data-f="lon">' +
+  '</div>';
+}
+// Собрать свои точки из формы: пустые строки без названия пропускаем.
+function _ltCollectCustom(sel) {
+  const out = [];
+  document.querySelectorAll(sel + ' .lt-custom-row').forEach(row => {
+    const val = f => ((row.querySelector('[data-f="' + f + '"]') || {}).value || '').trim();
+    const t = val('title');
+    if (!t) return;
+    const pt = { title: t, address: val('address'), note: val('note'),
+      action: val('action') || 'pickup', source_kind: 'custom' };
+    // координаты есть только у выбранного места — иначе адрес ищет геокодер
+    if (val('lat') && val('lon')) { pt.lat = val('lat'); pt.lon = val('lon'); }
+    out.push(pt);
+  });
+  return out;
+}
+
+// ---------- v2.46.017: «Куда уже ездили» — выбор места вместо набора адреса ----------
+// Список мест = справочник точек + свои точки прошлых рейсов (их склеивает
+// бэкенд в /api/logistics/places). Выбрал место — название, адрес и
+// координаты подставились целиком, опечатка в улице маршрут не ломает.
+async function _ltPlacesEnsure(force) {
+  if (window._ltPlaces && !force) return window._ltPlaces;
+  try {
+    const d = await apiGet('/api/logistics/places');
+    window._ltPlaces = d.places || [];
+  } catch (e) {
+    window._ltPlaces = window._ltPlaces || [];
+  }
+  _ltPlacesDatalist();
+  return window._ltPlaces;
+}
+// Подсказка прямо в поле «куда заехать»: набрал первые буквы — выбрал место
+function _ltPlacesDatalist() {
+  let dl = document.getElementById('lt-places-dl');
+  if (!dl) {
+    dl = document.createElement('datalist');
+    dl.id = 'lt-places-dl';
+    document.body.appendChild(dl);
+  }
+  // опции строим полями, а не строкой: в названии места бывают кавычки
+  dl.innerHTML = '';
+  (window._ltPlaces || []).forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.name || '';
+    o.textContent = p.address || '';
+    dl.appendChild(o);
+  });
+}
+function _ltPlaceByName(name) {
+  const k = String(name || '').trim().toLowerCase();
+  if (!k) return null;
+  return (window._ltPlaces || []).find(p =>
+    String(p.name || '').trim().toLowerCase() === k) || null;
+}
+// Поставить место в строку своей точки (та же разметка в форме рейса и в правке)
+function _ltPlaceToRow(row, p) {
+  if (!row || !p) return;
+  const set = (f, v) => {
+    const el = row.querySelector('[data-f="' + f + '"]');
+    if (el) el.value = (v == null ? '' : v);
+  };
+  set('title', p.name || '');
+  if (p.address) set('address', p.address);
+  set('lat', p.lat == null ? '' : p.lat);
+  set('lon', p.lon == null ? '' : p.lon);
+}
+// Название вписали руками: совпало со знакомым местом — подставим адрес;
+// не совпало — координаты прежнего места сбрасываем, иначе рейс поедет туда
+function ltPlaceRowType(input) {
+  const row = input && input.closest('.lt-custom-row');
+  if (!row) return;
+  const p = _ltPlaceByName(input.value);
+  const addr = row.querySelector('[data-f="address"]');
+  if (p && (!addr || !addr.value.trim())) _ltPlaceToRow(row, p);
+  else if (!p) _ltPlaceToRow(row, { name: input.value, lat: '', lon: '' });
+}
+// Правка точки живёт в своей форме, но поля те же data-f — переиспользуем
+function ltPlaceEditPick() {
+  const form = document.getElementById('lt-pe-form');
+  if (form) ltPlacePick(p => _ltPlaceToRow(form, p));
+}
+function ltPlaceEditType(input) {
+  const form = document.getElementById('lt-pe-form');
+  if (!form) return;
+  const p = _ltPlaceByName(input.value);
+  const addr = form.querySelector('[data-f="address"]');
+  if (p && (!addr || !addr.value.trim())) _ltPlaceToRow(form, p);
+  else if (!p) _ltPlaceToRow(form, { name: input.value, lat: '', lon: '' });
+}
+function ltPlaceRowPick(btn) {
+  const row = btn && btn.closest('.lt-custom-row');
+  if (!row) return;
+  ltPlacePick(p => _ltPlaceToRow(row, p));
+}
+// Общий выбор места: список с поиском, callback получает место целиком
+async function ltPlacePick(cb) {
+  window._ltPlaceCb = cb;
+  let m = document.getElementById('lt-place-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'lt-place-modal';
+  m.className = 'modal-overlay visible';
+  m.style.zIndex = '10050';  // поверх формы рейса
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" ' +
+    'style="max-width:520px;max-height:86vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><h3><i class="ti ti-map-pin"></i> Куда уже ездили</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'lt-place-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="overflow-y:auto;">' +
+      '<input class="form-input" id="lt-place-q" placeholder="Поиск: название или адрес" ' +
+        'oninput="ltPlaceFilter(this.value)" autocomplete="off">' +
+      '<div id="lt-place-list"><div class="loading-block">Загрузка…</div></div>' +
+    '</div></div>';
+  document.body.appendChild(m);
+  await _ltPlacesEnsure();
+  ltPlaceFilter('');
+  const q = document.getElementById('lt-place-q');
+  if (q && window.innerWidth > 720) q.focus();
+}
+function ltPlaceFilter(q) {
+  const box = document.getElementById('lt-place-list');
+  if (!box) return;
+  const s = String(q || '').trim().toLowerCase();
+  const all = window._ltPlaces || [];
+  const hit = (p) => !s ||
+    (String(p.name || '') + ' ' + String(p.address || '')).toLowerCase().includes(s);
+  const item = (p, i) => {
+    const sub = [p.source === 'dir' ? _ltKindName(p.kind) : '', p.address || '',
+      p.used > 1 ? 'ездили ' + p.used + ' раз' : ''].filter(Boolean).join(' · ');
+    return '<button type="button" class="lt-place-i" onclick="ltPlaceChoose(' + i + ')">' +
+      '<span class="ic">' + (p.source === 'dir' ? '📍' : '🕘') + '</span>' +
+      '<span class="tx"><b>' + escapeHtml(p.name || '') + '</b>' +
+      '<small>' + escapeHtml(sub || 'адреса нет — впиши руками') + '</small></span>' +
+      (p.lat != null && p.lon != null
+        ? '<i class="ti ti-map-2" title="координаты есть"></i>' : '') +
+    '</button>';
+  };
+  // индекс берём по всему списку: фильтр не должен путать выбор
+  const rows = all.map((p, i) => [p, i]).filter(x => hit(x[0]));
+  const dir = rows.filter(x => x[0].source === 'dir');
+  const hist = rows.filter(x => x[0].source !== 'dir');
+  let html = '';
+  if (dir.length) html += '<div class="lt-new-sec"><i class="ti ti-map-pin"></i> Справочник точек</div>' +
+    dir.map(x => item(x[0], x[1])).join('');
+  if (hist.length) html += '<div class="lt-new-sec"><i class="ti ti-history"></i> Из прошлых рейсов</div>' +
+    hist.map(x => item(x[0], x[1])).join('');
+  if (!html) html = '<div class="lgc-empty" style="padding:14px;">' +
+    (s ? 'Ничего не нашлось — впиши место руками, в следующий раз оно будет тут.'
+       : 'Мест пока нет. Заведи адрес в «Справочнике точек» или впиши руками — своя точка запомнится сама.') +
+    '</div>';
+  box.innerHTML = html;
+}
+function ltPlaceChoose(i) {
+  const p = (window._ltPlaces || [])[i];
+  const m = document.getElementById('lt-place-modal');
+  if (m) m.remove();
+  if (p && typeof window._ltPlaceCb === 'function') window._ltPlaceCb(p);
+  window._ltPlaceCb = null;
+}
+
 const _LT_STATUS = {
   draft:       { t: 'Черновик',          cls: 'wait', ic: 'ti-pencil' },
   sent:        { t: 'Отправлен курьеру', cls: 'run',  ic: 'ti-send' },
@@ -25343,12 +26381,12 @@ function _ltDate(v) {
   const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? m[3] + '.' + m[2] + '.' + m[1] : String(v || '');
 }
-// Ссылки в навигаторы считаем прямо тут — те же, что бэкенд шлёт курьеру
+// Ссылка в навигатор — та же, что бэкенд шлёт курьеру. Только Яндекс:
+// 2ГИС на прогоне 12.08.2026 собирал маршрут из ссылки криво (v2.45.915)
 function _ltNavLinks(points) {
   const pts = (points || []).filter(p => p.lat != null && p.lon != null);
-  if (pts.length < 2) return { gis: '', ya: '' };
+  if (pts.length < 2) return { ya: '' };
   return {
-    gis: 'https://2gis.ru/directions/points/' + pts.map(p => p.lon + ',' + p.lat).join(';'),
     ya: 'https://yandex.ru/maps/?rtext=' + pts.map(p => p.lat + ',' + p.lon).join('~') + '&rtt=auto',
   };
 }
@@ -25366,13 +26404,18 @@ async function loadLogiTrips() {
     html += '<div class="lt-bar">' +
       '<button class="btn btn-primary" onclick="logiTripNew()"><i class="ti ti-plus"></i> Новый рейс</button>' +
       '<button class="btn btn-secondary" onclick="logiPointsDir()"><i class="ti ti-map-pin"></i> Справочник точек</button>' +
+      (((state.user && state.user.roles) || []).some(r => r === 'director' || r === 'master')
+        ? '<span class="lt-test-btns">' +
+          '<button class="btn btn-secondary btn-sm" onclick="ltTestSeed()" title="Создать пробные грузы от всех перевозчиков">🧪 Пробные грузы</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="ltTestCleanup()" title="Убрать пробные грузы и рейсы из них">🧹 Убрать</button>' +
+          '</span>' : '') +
     '</div>';
     if (trips.length) html += _ltStatsHtml(trips, Date.now());
     if (!trips.length) {
       html += '<div class="lt-hello"><div class="ic">🚐</div>' +
         '<b>Рейсов ещё не было</b>' +
         '<p>Рейс — это маршрут забора грузов на день: Ozon, терминалы ТК, самовывозы у поставщиков. ' +
-        'Собираешь точки, отправляешь курьеру чек-лист в MAX со ссылкой на 2ГИС — ' +
+        'Собираешь точки, отправляешь курьеру чек-лист в MAX со ссылкой на Яндекс-маршрут — ' +
         'он едет и отвечает «2 забрал», а СРМ сама закрывает грузы.</p></div>';
     } else {
       if (active.length) html += '<div class="lt-list">' + active.map(_ltTripCard).join('') + '</div>';
@@ -25433,15 +26476,21 @@ async function logiTripNew() {
         'в карточке сотрудника. Без привязки чек-лист уйдёт директору.</div>' +
       '<div class="lt-new-sec"><i class="ti ti-package-import"></i> Что сейчас ждёт забора <span id="lt-pool-cnt"></span></div>' +
       '<div id="lt-pool"><div class="loading-block">Собираем со всех перевозчиков…</div></div>' +
-      '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Свои точки</div>' +
+      '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Свои точки — куда заехать и что сделать</div>' +
       '<div id="lt-custom"></div>' +
       '<button class="btn btn-secondary btn-sm" onclick="ltCustomAdd()"><i class="ti ti-plus"></i> Добавить точку</button>' +
+      '<div class="lt-hint"><i class="ti ti-info-circle"></i> Точку можно завести самому: выбери дело ' +
+        '(забрать, отвезти, оплатить, документы, просто заехать), впиши адрес и комментарий. ' +
+        'Всё это уйдёт водителю в MAX, в задачу и на ТВ в цеху. Кнопка ' +
+        '<i class="ti ti-map-pin"></i> в строке — выбрать место, куда уже ездили: ' +
+        'адрес и координаты подставятся сами.</div>' +
     '</div>' +
     '<div class="modal-footer">' +
       '<button class="btn btn-secondary" onclick="document.getElementById(\'lt-new-modal\').remove()">Отмена</button>' +
       '<button class="btn btn-primary" id="lt-new-go" onclick="logiTripCreate()"><i class="ti ti-check"></i> Собрать рейс</button>' +
     '</div></div>';
   document.body.appendChild(m);
+  _ltPlacesEnsure(true);  // список мест — фоном, к первой своей точке успеет
   try {
     const d = await apiGet('/api/logistics/pickup-pool');
     window._ltPool = d.pool || [];
@@ -25463,16 +26512,12 @@ async function logiTripNew() {
   }
 }
 
-function ltCustomAdd() {
-  const box = document.getElementById('lt-custom');
+function ltCustomAdd(boxId) {
+  const box = document.getElementById(boxId || 'lt-custom');
   if (!box) return;
-  const row = document.createElement('div');
-  row.className = 'lt-custom-row';
-  row.innerHTML = '<input class="form-input" placeholder="Что забрать / у кого" data-f="title">' +
-    '<input class="form-input" placeholder="Адрес — на карту встанет сам" data-f="address">' +
-    '<button class="icon-btn" onclick="this.parentNode.remove()" title="Убрать"><i class="ti ti-x"></i></button>';
-  box.appendChild(row);
-  const inp = row.querySelector('input');
+  box.insertAdjacentHTML('beforeend', _ltCustomRowHtml('pickup'));
+  const row = box.lastElementChild;
+  const inp = row && row.querySelector('[data-f="title"]');
   if (inp) inp.focus();
 }
 
@@ -25490,11 +26535,7 @@ async function logiTripCreate() {
     if (p) points.push({ title: p.title, address: p.address, lat: p.lat, lon: p.lon,
       source_kind: p.source_kind, source_id: p.source_id, note: p.sub || '' });
   });
-  document.querySelectorAll('#lt-custom .lt-custom-row').forEach(row => {
-    const t = (row.querySelector('[data-f="title"]') || {}).value || '';
-    const a = (row.querySelector('[data-f="address"]') || {}).value || '';
-    if (t.trim()) points.push({ title: t.trim(), address: a.trim(), source_kind: 'custom' });
-  });
+  _ltCollectCustom('#lt-custom').forEach(pt => points.push(pt));
   if (!points.length) { showToast('Отметь хотя бы одну точку', 'error'); return; }
   if (btn) { btn.disabled = true; btn.innerHTML = 'Собираем…'; }
   try {
@@ -25504,7 +26545,8 @@ async function logiTripCreate() {
     if (r && r.ok) {
       const mm = document.getElementById('lt-new-modal');
       if (mm) mm.remove();
-      showToast('Рейс ' + (j.doc_number || '') + ' собран', 'success');
+      showToast('Рейс ' + (j.doc_number || '') + ' собран' +
+        (j.task_id ? ' · задача в «Заданиях»' : ''), 'success');
       state._logiView = 'trips';
       loadLogisticsPickups();
       logiTripOpen(j.id);
@@ -25547,15 +26589,19 @@ function _ltTripRender(trip) {
   const links = _ltNavLinks(pts);
   const activeSt = ['draft', 'sent', 'in_progress'].includes(trip.status);
   const doneN = pts.filter(p => p.status === 'done').length;
-  let html = '<div class="lt-trip-hd">' +
-    '<h3><i class="ti ti-steering-wheel"></i> ' + escapeHtml(trip.doc_number || ('Рейс #' + trip.id)) + '</h3>' +
-    _ltStatusChip(trip.status) +
-    '<button class="icon-btn" onclick="document.getElementById(\'lt-trip-modal\').remove()" style="margin-left:auto;"><i class="ti ti-x"></i></button>' +
-  '</div>' +
-  '<div class="lt-trip-meta">' +
-    '<span><i class="ti ti-calendar"></i> ' + _ltDate(trip.trip_date) + '</span>' +
-    '<span><i class="ti ti-user"></i> ' + escapeHtml(trip.driver_name || 'исполнитель не назначен') + '</span>' +
-    '<span><i class="ti ti-map-pin"></i> ' + doneN + ' из ' + pts.length + '</span>' +
+  // v2.45.921: герой-шапка — номер, статус, прогресс одной плашкой
+  const pct = pts.length ? Math.round(doneN / pts.length * 100) : 0;
+  let html = '<div class="lt-hero">' +
+    '<div class="lt-hero-row">' +
+      '<span class="lt-hero-badge"><i class="ti ti-steering-wheel"></i></span>' +
+      '<div class="lt-hero-tt"><b>' + escapeHtml(trip.doc_number || ('Рейс #' + trip.id)) + '</b>' +
+        '<small>' + _ltDate(trip.trip_date) + ' · ' +
+        escapeHtml(trip.driver_name || 'исполнитель не назначен') + '</small></div>' +
+      _ltStatusChip(trip.status) +
+      '<button class="icon-btn lt-hero-x" onclick="document.getElementById(\'lt-trip-modal\').remove()"><i class="ti ti-x"></i></button>' +
+    '</div>' +
+    (pts.length ? '<div class="lt-hero-prog"><i style="width:' + pct + '%;"></i>' +
+      '<span>' + doneN + ' из ' + pts.length + '</span></div>' : '') +
   '</div>';
   // v2.45.905: живая карта рейса — появляется, если у точек есть координаты
   html += '<div class="lt-map-wrap" id="lt-map-wrap" style="display:none;">' +
@@ -25563,18 +26609,25 @@ function _ltTripRender(trip) {
   html += '<div class="lt-pts">' + pts.map((p, i) => {
     const st = p.status || 'pending';
     const ic = st === 'done' ? '<i class="ti ti-check"></i>' : (st === 'problem' ? '<i class="ti ti-alert-triangle"></i>' : (i + 1));
+    const act = _ltAct(p.action);
+    const own = !p.source_id;  // своя точка — её можно поправить
     return '<div class="lt-pt ' + st + '">' +
       '<span class="n">' + ic + '</span>' +
-      '<span class="tx"><b>' + escapeHtml(p.title || '') + '</b>' +
+      '<span class="tx"><b>' +
+        (act[0] !== 'pickup' ? '<span class="lt-act">' + act[2] + ' ' + act[1] + '</span> ' : '') +
+        escapeHtml(p.title || '') + '</b>' +
         '<small>' + escapeHtml(p.address || '—') +
-        (p.status_note ? ' · <i>' + escapeHtml(p.status_note) + '</i>' : '') + '</small></span>' +
+        (p.status_note ? ' · <i>' + escapeHtml(p.status_note) + '</i>' : '') + '</small>' +
+        (p.note ? '<em class="lt-cmt"><i class="ti ti-message-2"></i> ' + escapeHtml(p.note) + '</em>' : '') +
+      '</span>' +
       // v2.45.906: ETA — заполняется, когда OSRM посчитает маршрут
       (st === 'pending' ? '<span class="lt-eta" id="lt-eta-' + p.id + '"></span>' : '') +
       (activeSt
         ? '<span class="ops">' +
           (i > 0 ? '<button class="icon-btn" onclick="ltPtMove(' + p.id + ',-1)" title="Выше"><i class="ti ti-arrow-up"></i></button>' : '') +
           (i < pts.length - 1 ? '<button class="icon-btn" onclick="ltPtMove(' + p.id + ',1)" title="Ниже"><i class="ti ti-arrow-down"></i></button>' : '') +
-          (st !== 'done' ? '<button class="icon-btn ok" onclick="ltPtStatus(' + p.id + ',\'done\')" title="Забрал"><i class="ti ti-check"></i></button>' : '') +
+          (own ? '<button class="icon-btn" onclick="ltPtEdit(' + p.id + ')" title="Поправить точку"><i class="ti ti-pencil"></i></button>' : '') +
+          (st !== 'done' ? '<button class="icon-btn ok" onclick="ltPtStatus(' + p.id + ',\'done\')" title="' + act[3] + '"><i class="ti ti-check"></i></button>' : '') +
           (st === 'pending' ? '<button class="icon-btn warn" onclick="ltPtStatus(' + p.id + ',\'problem\')" title="Проблема"><i class="ti ti-alert-triangle"></i></button>' : '') +
           (st !== 'pending' ? '<button class="icon-btn" onclick="ltPtStatus(' + p.id + ',\'pending\')" title="Вернуть в ожидание"><i class="ti ti-rotate"></i></button>' : '') +
           (trip.status === 'draft' ? '<button class="icon-btn" onclick="ltPtDel(' + p.id + ')" title="Убрать из рейса"><i class="ti ti-x"></i></button>' : '') +
@@ -25582,11 +26635,19 @@ function _ltTripRender(trip) {
     '</div>';
   }).join('') + '</div>';
   if (!pts.length) html += '<div class="lgc-empty" style="padding:14px;">Точек нет.</div>';
+  // v2.45.992: рейс держит задачу в «Заданиях» — видно, что она висит, и можно открыть
+  if (trip.task_id) {
+    html += '<div class="lt-task"><i class="ti ti-clipboard-check"></i>' +
+      '<span>Задача в «Заданиях»' +
+        (activeSt ? ' — висит на исполнителе, закроется сама, когда заберут всё'
+                  : ' — закрыта вместе с рейсом') + '</span>' +
+      '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'lt-trip-modal\').remove();openTaskDetail(' +
+        trip.task_id + ')">Открыть</button></div>';
+  }
   if (activeSt) {
     html += '<div class="lt-trip-btns">' +
       '<button class="btn btn-primary" onclick="ltTripSend()"><i class="ti ti-send"></i> ' +
         (trip.status === 'draft' ? 'Отправить курьеру в MAX' : 'Отправить ещё раз') + '</button>' +
-      (links.gis ? '<a class="btn btn-secondary" href="' + links.gis + '" target="_blank" rel="noopener">📍 2ГИС</a>' : '') +
       (links.ya ? '<a class="btn btn-secondary" href="' + links.ya + '" target="_blank" rel="noopener">🧭 Яндекс</a>' : '') +
       (pts.length >= 3 && pts.every(p => p.lat != null && p.lon != null)
         ? '<button class="btn btn-secondary" onclick="ltTripOptimize()"><i class="ti ti-route"></i> Оптимизировать</button>' : '') +
@@ -25594,7 +26655,7 @@ function _ltTripRender(trip) {
       '<button class="btn btn-secondary" onclick="ltTripSetStatus(\'done\')"><i class="ti ti-flag-check"></i> Завершить</button>' +
       '<button class="btn btn-secondary danger" onclick="ltTripSetStatus(\'cancelled\')"><i class="ti ti-x"></i> Отменить</button>' +
     '</div>';
-    if (!links.gis && pts.length >= 2) {
+    if (!links.ya && pts.length >= 2) {
       html += '<div class="lt-hint"><i class="ti ti-info-circle"></i> Ссылки на навигатор появятся, когда у точек будут координаты — заполни их в «Справочнике точек».</div>';
     }
   }
@@ -25630,6 +26691,76 @@ async function ltPtStatus(pid, st) {
     if (r && r.ok) { _ltTripRender(r.data); loadLogisticsPickups(); }
     else showToast('Не удалось обновить точку', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// v2.46.015: поправить свою точку — дело, адрес, комментарий
+function ltPtEdit(pid) {
+  const trip = window._ltTrip;
+  if (!trip) return;
+  const p = (trip.points || []).find(x => Number(x.id) === Number(pid));
+  if (!p) return;
+  let m = document.getElementById('lt-pt-edit');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'lt-pt-edit';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
+    '<div class="modal-header"><h3><i class="ti ti-pencil"></i> Точка ' + Number(p.seq || 0) + '</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'lt-pt-edit\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body">' +
+      '<div class="lt-dir-form" id="lt-pe-form">' +
+        '<select class="form-input" id="lt-pe-act">' + _ltActOptions(p.action) + '</select>' +
+        '<input class="form-input" id="lt-pe-title" data-f="title" placeholder="Куда / к кому заехать" ' +
+          'list="lt-places-dl" onchange="ltPlaceEditType(this)">' +
+        '<button class="btn btn-secondary btn-sm" onclick="ltPlaceEditPick()">' +
+          '<i class="ti ti-map-pin"></i> Выбрать из своих мест</button>' +
+        '<input class="form-input" id="lt-pe-addr" data-f="address" placeholder="Адрес">' +
+        '<textarea class="form-input" id="lt-pe-note" rows="2" placeholder="Комментарий: что сделать, что взять с собой"></textarea>' +
+        '<input type="hidden" id="lt-pe-lat" data-f="lat"><input type="hidden" id="lt-pe-lon" data-f="lon">' +
+      '</div>' +
+      '<div class="lt-hint"><i class="ti ti-info-circle"></i> Поменял адрес — координаты найдутся заново. ' +
+        'Выбрал место из своих — адрес и координаты встанут сами. ' +
+        'Рейс уже у водителя? Нажми потом «Отправить ещё раз».</div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'lt-pt-edit\').remove()">Отмена</button>' +
+      '<button class="btn btn-primary" id="lt-pe-go" onclick="ltPtEditSave(' + Number(pid) + ')"><i class="ti ti-check"></i> Сохранить</button>' +
+    '</div></div>';
+  document.body.appendChild(m);
+  // значения ставим полями, а не атрибутами: в названии бывают кавычки
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  set('lt-pe-title', p.title);
+  set('lt-pe-addr', p.address);
+  set('lt-pe-note', p.note);
+  _ltPlacesEnsure(true);
+}
+
+async function ltPtEditSave(pid) {
+  const trip = window._ltTrip;
+  if (!trip) return;
+  const v = (id) => ((document.getElementById(id) || {}).value || '').trim();
+  const title = v('lt-pe-title');
+  if (!title) { showToast('Впиши, куда заехать', 'error'); return; }
+  const btn = document.getElementById('lt-pe-go');
+  if (btn) btn.disabled = true;
+  try {
+    const body = { title, address: v('lt-pe-addr'), note: v('lt-pe-note'),
+      action: v('lt-pe-act') };
+    // место выбрали из своих — координаты уже есть, геокодер не нужен
+    if (v('lt-pe-lat') && v('lt-pe-lon')) {
+      body.lat = v('lt-pe-lat');
+      body.lon = v('lt-pe-lon');
+    }
+    const r = await apiPatch('/api/logistics/trips/' + trip.id + '/points/' + pid, body);
+    const m = document.getElementById('lt-pt-edit');
+    if (m) m.remove();
+    _ltTripRender(r);
+    showToast('Точка обновлена', 'success');
+  } catch (e) {
+    showToast('Не удалось сохранить точку', 'error');
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function ltPtDel(pid) {
@@ -25673,7 +26804,9 @@ async function ltTripSetStatus(st) {
 // ---------- Справочник точек ----------
 const _LT_KINDS = [
   ['ozon_pvz', 'ПВЗ Ozon'], ['luch_terminal', 'Терминал ТК-Луч'],
-  ['dl_terminal', 'Терминал Деловых линий'], ['vi_store', 'ВсеИнструменты'],
+  ['express_terminal', 'Склад Экспресс-Авто'], ['utm_factory', 'Завод УТМ'],
+  ['dl_terminal', 'Терминал Деловых линий'], ['cdek_pvz', 'ПВЗ СДЭК'],
+  ['vi_store', 'ВсеИнструменты'],
   ['supplier', 'Поставщик'], ['custom', 'Другое'],
 ];
 function _ltKindName(k) {
@@ -25956,18 +27089,16 @@ async function ltPtAddOpen() {
     '<div class="modal-body" style="overflow-y:auto;">' +
       '<div class="lt-new-sec"><i class="ti ti-package-import"></i> Из ожидающих забора</div>' +
       '<div id="lt-add-pool"><div class="loading-block">Смотрим, что ждёт…</div></div>' +
-      '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Своя точка</div>' +
-      '<div class="lt-custom-row">' +
-        '<input class="form-input" id="lt-add-title" placeholder="Что забрать / у кого">' +
-        '<input class="form-input" id="lt-add-addr" placeholder="Адрес — на карту встанет сам">' +
-        '<span></span>' +
-      '</div>' +
+      '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Свои точки — куда заехать и что сделать</div>' +
+      '<div id="lt-add-custom">' + _ltCustomRowHtml('pickup') + '</div>' +
+      '<button class="btn btn-secondary btn-sm" onclick="ltCustomAdd(\'lt-add-custom\')"><i class="ti ti-plus"></i> Ещё точка</button>' +
     '</div>' +
     '<div class="modal-footer">' +
       '<button class="btn btn-secondary" onclick="document.getElementById(\'lt-add-modal\').remove()">Отмена</button>' +
       '<button class="btn btn-primary" id="lt-add-go" onclick="ltPtAddGo()"><i class="ti ti-check"></i> Добавить в рейс</button>' +
     '</div></div>';
   document.body.appendChild(m);
+  _ltPlacesEnsure(true);
   try {
     const d = await apiGet('/api/logistics/pickup-pool');
     // то, что уже в этом рейсе, второй раз не предлагаем
@@ -26000,9 +27131,7 @@ async function ltPtAddGo() {
     if (p) points.push({ title: p.title, address: p.address, lat: p.lat, lon: p.lon,
       source_kind: p.source_kind, source_id: p.source_id, note: p.sub || '' });
   });
-  const t = ((document.getElementById('lt-add-title') || {}).value || '').trim();
-  const a = ((document.getElementById('lt-add-addr') || {}).value || '').trim();
-  if (t) points.push({ title: t, address: a, source_kind: 'custom' });
+  _ltCollectCustom('#lt-add-custom').forEach(pt => points.push(pt));
   if (!points.length) { showToast('Отметь груз или впиши свою точку', 'error'); return; }
   const btn = document.getElementById('lt-add-go');
   if (btn) btn.disabled = true;
@@ -26055,4 +27184,117 @@ async function ltDirGeo() {
     if (st) st.innerHTML = '';
     window._ltGeoLast = null;
   }
+}
+
+// ---------- v2.45.911: пробный прогон рейсов ----------
+// Тестовые грузы от всех источников — прогнать цикл, не дожидаясь писем
+async function ltTestSeed() {
+  if (!confirm('Создать пробные грузы от Ozon, ТК-Луч, ДЛ и поставщика?\n' +
+      'Они помечены «ТЕСТ» и убираются кнопкой «Убрать».')) return;
+  try {
+    const r = await apiPost('/api/logistics/test-seed', {});
+    if (r && r.ok) {
+      showToast('Пробные грузы созданы: ' + (((r.data || {}).created) || []).join(', ') +
+        '. Жми «Новый рейс» — они в пуле.', 'success');
+      loadLogisticsPickups();
+    } else showToast('Не удалось создать пробные грузы', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function ltTestCleanup() {
+  if (!confirm('Убрать все пробные грузы и рейсы, собранные из них?')) return;
+  try {
+    const r = await apiPost('/api/logistics/test-cleanup', {});
+    if (r && r.ok) {
+      const n = Number(((r.data || {}).trips_hidden) || 0);
+      showToast('Пробные грузы убраны' + (n ? ', тестовых рейсов скрыто: ' + n : ''), 'success');
+      loadLogisticsPickups();
+    } else showToast('Не удалось убрать', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// ============ v2.45.916: ТК «Экспресс-Авто» — прибытия из почты ============
+function _expressDate(v) {
+  const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[3] + '.' + m[2] + '.' + m[1] : String(v || '');
+}
+
+function _expressCardHtml(sh) {
+  const completed = !!sh.manual_done;
+  const meta = [];
+  if (sh.arrived_date) meta.push('<span><i class="ti ti-calendar"></i> Прибыл ' + _expressDate(sh.arrived_date) + '</span>');
+  const sz = [];
+  if (sh.places) sz.push(sh.places + ' ' + plural(Number(sh.places), 'место', 'места', 'мест'));
+  if (sh.weight_kg) sz.push(Number(sh.weight_kg) + ' кг');
+  if (sh.volume_m3) sz.push(Number(sh.volume_m3) + ' м³');
+  if (sz.length) meta.push('<span><i class="ti ti-package"></i> ' + sz.join(' · ') + '</span>');
+  if (sh.warehouse_address) meta.push('<span><i class="ti ti-map-pin"></i> ' + escapeHtml(sh.warehouse_address) + '</span>');
+  return '<div class="ozon-card ea-card' + (completed ? ' done' : '') + '">' +
+    '<div class="ozon-top">' +
+      '<div class="ozon-logo ea-logo">ЭА</div>' +
+      '<div class="ozon-title"><b>Расписка ' + escapeHtml(sh.receipt_number || '') + '</b>' +
+        (sh.sender_name ? '<small>От: ' + escapeHtml(sh.sender_name) + '</small>' : '') +
+      '</div>' +
+      '<span class="ozon-status ' + (completed ? 'done' : 'ready') + '">' +
+        '<i class="ti ' + (completed ? 'ti-check' : 'ti-package-import') + '"></i> ' +
+        escapeHtml(sh.status_label || 'Груз на складе') + '</span>' +
+    '</div>' +
+    (meta.length ? '<div class="ozon-meta">' + meta.join('') + '</div>' : '') +
+    '<div class="ozon-actions">' +
+      (!completed ? '<button class="btn btn-primary btn-small" onclick="expressMarkDone(' + Number(sh.id) + ')"><i class="ti ti-check"></i> Забрали</button>'
+                  : '<button class="btn btn-secondary btn-small" onclick="expressMarkDone(' + Number(sh.id) + ', true)"><i class="ti ti-rotate"></i> Вернуть</button>') +
+    '</div>' +
+  '</div>';
+}
+
+async function expressMarkDone(id, undo) {
+  try {
+    const r = await apiPost('/api/logistics/express/' + id + '/done', { done: !undo });
+    if (r && r.ok) { showToast(undo ? 'Вернул на склад' : 'Отмечено: забрали', 'success'); loadLogisticsPickups(); }
+    else showToast('Не удалось', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function expressRefresh() {
+  showToast('Перечитываем письма Экспресс-Авто…', 'info');
+  try {
+    const r = await apiPost('/api/logistics/express/refresh', {});
+    const j = (r && r.data) || {};
+    if (r && r.ok) {
+      showToast('Найдено прибытий: ' + Number(j.found || 0) +
+        (j.created ? ', новых: ' + j.created : ''), 'success');
+      loadLogisticsPickups();
+    } else showToast('Почта сейчас недоступна', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// ============ v2.45.935: УТМ — готовые корпуса к забору ============
+function _utmCardHtml(o) {
+  const completed = !!o.manual_done;
+  const meta = [];
+  if (o.upd_number) meta.push('<span><i class="ti ti-file-text"></i> УПД № ' + escapeHtml(o.upd_number) + '</span>');
+  if (o.amount) meta.push('<span><i class="ti ti-cash"></i> ' + _logiSum(o.amount) + '</span>');
+  return '<div class="ozon-card um-card' + (completed ? ' done' : '') + '">' +
+    '<div class="ozon-top">' +
+      '<div class="ozon-logo um-logo">У</div>' +
+      '<div class="ozon-title"><b>Корпуса · счёт № ' + escapeHtml(o.invoice_number || o.order_key || '') + '</b>' +
+        '<small>изготовлены на заводе УТМ</small></div>' +
+      '<span class="ozon-status ' + (completed ? 'done' : 'ready') + '">' +
+        '<i class="ti ' + (completed ? 'ti-check' : 'ti-package-import') + '"></i> ' +
+        escapeHtml(o.status_label || 'Готов к забору') + '</span>' +
+    '</div>' +
+    (meta.length ? '<div class="ozon-meta">' + meta.join('') + '</div>' : '') +
+    '<div class="ozon-actions">' +
+      (!completed ? '<button class="btn btn-primary btn-small" onclick="utmMarkDone(' + Number(o.id) + ')"><i class="ti ti-check"></i> Забрали</button>'
+                  : '<button class="btn btn-secondary btn-small" onclick="utmMarkDone(' + Number(o.id) + ', true)"><i class="ti ti-rotate"></i> Вернуть</button>') +
+    '</div>' +
+  '</div>';
+}
+
+async function utmMarkDone(id, undo) {
+  try {
+    const r = await apiPost('/api/logistics/utm/' + id + '/done', { done: !undo });
+    if (r && r.ok) { showToast(undo ? 'Вернул в готовые' : 'Отмечено: забрали', 'success'); loadLogisticsPickups(); }
+    else showToast('Не удалось', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }

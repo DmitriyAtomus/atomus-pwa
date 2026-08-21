@@ -263,6 +263,21 @@
         </a>
         <!-- v2.45.39: пункт «Калькулятор холода» убран с главного сайдбара
              (остался в Продажах). -->
+        <!-- Идеи: чат сотрудника с Клодом. Виден всем — вход по паролю от директора,
+             монтажникам закрыто на бэкенде. Клод здесь только смотрит. -->
+        <button class="nav-item" id="sb-ideas" data-nav="ideas" onclick="selectSidebarItem('ideas')">
+          <i class="ti ti-bulb"></i><span>Идеи</span>
+          <span class="nav-badge" id="ideas-badge" style="display:none;"></span>
+        </button>
+        <!-- Чат с Клавой: задачи уходят агенту на сервер .30. Личный, показ в app-1.js. -->
+        <button class="nav-item" id="sb-devchat" data-nav="devchat" onclick="selectSidebarItem('devchat')" style="display:none;">
+          <i class="ti ti-message-code"></i><span>Клава</span>
+          <span class="nav-badge" id="devchat-badge" style="display:none;"></span>
+        </button>
+        <!-- Отдельный Кодя (Codex): тот же удобный интерфейс, но другая очередь и история. -->
+        <button class="nav-item" id="sb-codex" data-nav="codex" onclick="selectSidebarItem('codex')" style="display:none;">
+          <i class="ti ti-terminal-2"></i><span>Кодя</span>
+        </button>
         <!-- Безопасность: живой просмотр камеры офиса. Только директору (показ в app-1.js). -->
         <button class="nav-item" id="sb-security" data-nav="security" onclick="selectSidebarItem('security')" style="display:none;">
           <i class="ti ti-shield-lock"></i><span>Безопасность</span>
@@ -333,6 +348,9 @@
         </button>
         <button class="nav-item" data-nav="atom-electrica" onclick="selectSidebarItem('atom-electrica')">
           <i class="ti ti-bolt"></i><span>Атом Электрика</span>
+        </button>
+        <button class="nav-item" data-nav="atom-chiller" onclick="selectSidebarItem('atom-chiller')">
+          <i class="ti ti-snowflake"></i><span>Атом Чиллер</span>
         </button>
         <div class="sub-nav">
           <div class="sub-nav-title">Справочники</div>
@@ -894,6 +912,147 @@
         </div>
       </div>
 
+      <!-- ============ ИДЕИ: ЧАТ СОТРУДНИКА С КЛОДОМ ============ -->
+      <!-- Клод здесь только СМОТРИТ: код не правит, договоры и суммы не видит.
+           Вместе с сотрудником доводит идею до ТЗ, готовое ТЗ уезжает директору
+           в ленту разработки предложением — внедрять или нет, решает он. -->
+      <div class="screen" data-screen="ideas" data-section="home">
+        <div class="page-header">
+          <div class="page-header-title">
+            <button class="back-btn" onclick="selectSidebarItem('home-dashboard')" title="Назад"><i class="ti ti-arrow-left"></i></button>
+            <button class="back-btn ich-list-btn" onclick="ideasToggleList()" title="Мои идеи" aria-label="Мои идеи">
+              <i class="ti ti-messages"></i>
+            </button>
+            <div>
+              <h1>Идеи</h1>
+              <div class="page-subtitle">Что улучшить в программе — расскажите Клоду</div>
+            </div>
+          </div>
+          <div class="ich-hd-right">
+            <button class="icon-btn" id="ideas-key-btn" onclick="ideasAdminDialog()"
+                    style="display:none;" title="Пароль и доступ"><i class="ti ti-key"></i></button>
+            <button class="icon-btn" onclick="loadIdeas()" title="Обновить"><i class="ti ti-refresh"></i></button>
+          </div>
+        </div>
+        <div class="content-inner" id="ideas-body">
+          <div class="loading-block">Загружаем…</div>
+        </div>
+      </div>
+
+      <!-- ============ ЧАТ С КЛОДОМ ============ -->
+      <!-- Задача уходит в очередь на бэкенде, агент на сервере .30 забирает её
+           long-poll'ом, выполняет Claude Code и пишет ответ обратно в эту ленту. -->
+      <div class="screen" data-screen="devchat" data-section="home">
+        <!-- v2.45.961: шапка-строка вместо заголовка раздела — аватар, имя и
+             состояние агента в одной строке; на телефоне это ~70px ленты. -->
+        <div class="page-header dchat-topbar">
+          <div class="page-header-title">
+            <button class="back-btn" onclick="selectSidebarItem('home-dashboard')" title="Назад"><i class="ti ti-arrow-left"></i></button>
+            <!-- Список чатов: на широком экране панель видна всегда, на телефоне
+                 выезжает по этой кнопке. -->
+            <button class="back-btn dchat-list-btn" onclick="devChatToggleList()"
+                    title="Чаты и проекты" aria-label="Чаты и проекты">
+              <i class="ti ti-messages"></i>
+            </button>
+            <div class="dchat-hd-ava">К<i></i></div>
+            <div class="dchat-hd-id">
+              <h1 id="devchat-title">Клава</h1>
+              <!-- v2.45.955: тап по статусу открывает терминал «работа вживую» -->
+              <!-- v2.45.984: шеврон и пунктир — чтобы было видно, что строка нажимается -->
+              <div id="devchat-status" class="dchat-status" onclick="devChatTermOpen()"
+                   role="button" tabindex="0" title="Смотреть работу агента вживую">
+                <span class="dot"></span><span id="devchat-status-text">Связь с агентом…</span><i class="ti ti-chevron-right dchat-st-arrow"></i>
+              </div>
+            </div>
+          </div>
+          <div class="dchat-hd-right">
+            <button class="dchat-eye" onclick="devChatTermOpen()" title="Смотреть работу вживую">
+              <i class="ti ti-eye"></i>
+            </button>
+            <!-- Красный квадрат появляется, только когда есть что останавливать -->
+            <button class="dchat-stopbtn" id="devchat-stop" onclick="devChatStop()"
+                    style="display:none;" title="Остановить задачу">
+              <i class="ti ti-player-stop-filled"></i>
+            </button>
+            <!-- Разворачивает ленту на всё окно: шелл CRM ограничен 1400px,
+                 на широком мониторе чат иначе живёт узкой колонкой. -->
+            <button class="dchat-full-btn" id="devchat-full-btn" onclick="devChatToggleFull()"
+                    title="Развернуть на всё окно (F11 не нужен, Esc — свернуть)">
+              <i class="ti ti-maximize"></i>
+            </button>
+          </div>
+        </div>
+        <div class="content-inner dchat">
+          <!-- Панель чатов: вкладки проектов, поиск по всем чатам, список бесед.
+               Каждый чат — своя сессия агента, поэтому темы не мешаются. -->
+          <aside class="dchat-list" id="devchat-list">
+            <div class="dcl-top">
+              <button class="dcl-new" onclick="devChatNewThread()"><i class="ti ti-plus"></i>Новый чат</button>
+              <button class="dcl-icon" onclick="devChatProjectsDialog()" title="Проекты"><i class="ti ti-folders"></i></button>
+              <button class="dcl-icon dcl-close" onclick="devChatToggleList()" title="Закрыть"><i class="ti ti-x"></i></button>
+            </div>
+            <div class="dcl-search">
+              <i class="ti ti-search"></i>
+              <input id="devchat-search" type="search" placeholder="Поиск по всем чатам"
+                     oninput="devChatSearchInput(this.value)">
+            </div>
+            <div class="dcl-tabs" id="devchat-proj-tabs"></div>
+            <div class="dcl-items" id="devchat-thread-list">
+              <div class="loading-block">Загружаем чаты…</div>
+            </div>
+          </aside>
+          <div class="dchat-main">
+          <div id="devchat-feed" class="dchat-feed" onscroll="devChatOnScroll()">
+            <div class="loading-block">Загружаем переписку…</div>
+          </div>
+          <button class="dchat-jump" id="devchat-jump" onclick="devChatJump()" title="В конец переписки">
+            <i class="ti ti-arrow-down"></i>
+          </button>
+          <div class="dchat-composer">
+            <!-- v2.45.955: быстрые чипы — типовые запросы в один тап (важно на телефоне) -->
+            <!-- v2.45.957: эмодзи заменены иконками Tabler — чипы стали одного роста -->
+            <!-- v2.45.971: чип «Снять фото» убран — он дублировал кнопку слева и
+                 торчал из ряда чужим цветом; ряд скроллится с растушёвкой справа -->
+            <div class="dchat-chips" id="devchat-chips" onscroll="_devChatChipsFade()">
+              <button onclick="devChatQuick(this)"><i class="ti ti-progress"></i>Что сейчас в работе?</button>
+              <button onclick="devChatQuick(this)"><i class="ti ti-file-search"></i>Проверь логи за сегодня</button>
+              <button onclick="devChatQuick(this)"><i class="ti ti-brush"></i>Поправь дизайн раздела…</button>
+            </div>
+            <div id="devchat-files" class="dchat-files"></div>
+            <div class="dchat-box">
+              <div class="dchat-input-row">
+                <!-- v2.45.971: вместо камеры и скрепки — одна кнопка «+» ростом с
+                     микрофон: ряд стал симметричным, источники съехали в шторку -->
+                <button class="dchat-attach" onclick="devChatAttachMenu()" title="Прикрепить: фото, галерея, файл">
+                  <i class="ti ti-plus"></i>
+                </button>
+                <!-- accept держал только картинки и текст: архив от конструктора
+                     (zip со STEP/DXF/чертежами) в диалоге выбора не показывался -->
+                <input type="file" id="devchat-file-input" multiple
+                       style="display:none;" onchange="devChatPickFiles(this.files)">
+                <input type="file" id="devchat-camera-input" accept="image/*" capture="environment"
+                       style="display:none;" onchange="devChatAddFiles(this.files)">
+                <input type="file" id="devchat-gallery-input" multiple accept="image/*"
+                       style="display:none;" onchange="devChatAddFiles(this.files)">
+                <textarea id="devchat-input" class="dchat-input" rows="1" placeholder="Что сделать? Скриншот — Ctrl+V, файл — перетащи в окно"
+                          oninput="devChatGrow(this)" onkeydown="devChatKey(event)"
+                          onpaste="devChatPaste(event)"></textarea>
+                <!-- v2.45.961: в цеху говорить быстрее, чем печатать: удерживай —
+                     говори — отпусти, текст падает в поле, его можно поправить -->
+                <button class="dchat-mic" id="devchat-mic" title="Удерживай — говори — отпусти">
+                  <i class="ti ti-microphone"></i>
+                </button>
+                <button class="dchat-send" id="devchat-send" onclick="devChatSend()" title="Отправить (Enter)">
+                  <i class="ti ti-arrow-up"></i>
+                </button>
+              </div>
+            </div>
+            <div class="dchat-hint">Enter — отправить, Shift+Enter — новая строка. Файлы можно перетащить прямо в окно. Агент работает на офисном сервере и правит проекты сам.</div>
+          </div>
+          </div><!-- /dchat-main -->
+        </div>
+      </div>
+
       <!-- ============ ДАШБОРД ============ -->
       <div class="screen" data-screen="dashboard" data-section="production">
         <div class="page-header">
@@ -1222,6 +1381,17 @@
         <iframe id="atomcad-frame" class="atomcad-frame" title="Атом Электрика — проектирование щитов" allow="fullscreen" allowfullscreen data-src="/atomcad/index.html"></iframe>
       </div>
 
+      <!-- ============ АТОМ ЧИЛЛЕР (база 3D и компоновка) ============ -->
+      <div class="screen atomcad-screen" data-screen="atom-chiller" data-section="production">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
+          <h2>Атом Чиллер</h2>
+          <button class="icon-btn" id="chiller-chat-btn" onclick="openChillerChat()"
+                  title="Чат по чиллерам" style="display:none;"><i class="ti ti-message-2"></i></button>
+        </div>
+        <iframe id="chiller-frame" class="atomcad-frame" title="Атом Чиллер — база 3D и компоновка" allow="fullscreen" allowfullscreen data-src="/chiller/index.html"></iframe>
+      </div>
+
       <!-- ============ МОДЕЛИ ============ -->
       <div class="screen" data-screen="models" data-section="production">
         <div class="screen-header">
@@ -1464,6 +1634,13 @@
                 </div>
                 <span class="qty-suffix">шт.</span>
               </div>
+            </div>
+
+            <!-- v2.45.912: обязательный выбор ТЭНа/варианта комплектации -->
+            <div class="form-section bom-config-section" id="bom-options-section" style="display:none;">
+              <label class="form-label"><i class="ti ti-adjustments-horizontal"></i> Комплектация нагревателя <span class="required">*</span></label>
+              <div class="form-hint" style="margin-bottom:10px;">Выберите точный артикул — он зафиксируется в производственном задании и спишется при завершении.</div>
+              <div id="bom-options-content"></div>
             </div>
 
             <!-- ЭТАП 32: Предпросмотр автосписания со склада -->
@@ -3052,7 +3229,12 @@
 
 <!-- ============ v2.42.3: МОДАЛКА ЧАТА ПО ДОГОВОРУ ============ -->
 <div class="modal-overlay" id="contract-chat-modal" onclick="if(event.target===this) closeContractChat()">
-  <div class="modal contract-chat-modal" onclick="event.stopPropagation()">
+  <div class="modal contract-chat-modal" id="cchat-drop-zone" onclick="event.stopPropagation()">
+    <div class="tchat-drop-overlay" id="cchat-drop-overlay" aria-hidden="true">
+      <i class="ti ti-file-upload"></i>
+      <b>Отпустите файлы здесь</b>
+      <span>Они добавятся к сообщению · до 5 файлов</span>
+    </div>
     <div class="modal-header">
       <div>
         <h3><i class="ti ti-message-circle"></i> <span id="cchat-title">Чат по договору</span></h3>
@@ -3109,7 +3291,12 @@
     </div>
     <div class="tchat-body">
       <aside class="tchat-side" id="tchat-side"></aside>
-      <div class="tchat-main">
+      <div class="tchat-main" id="tchat-drop-zone">
+        <div class="tchat-drop-overlay" id="tchat-drop-overlay" aria-hidden="true">
+          <i class="ti ti-file-upload"></i>
+          <b>Отпустите файлы здесь</b>
+          <span>Они добавятся к сообщению · до 5 файлов</span>
+        </div>
         <div class="cchat-messages" id="tchat-messages">
           <div class="loading-block">Загружаем сообщения…</div>
         </div>
@@ -5217,7 +5404,7 @@ async function openSupplyAdminTools() {
                'openTextReplaceBulk()') +
           // v2.45.178: корректировка склада готовой продукции по инвентаризации
           tool('ti-clipboard-check', 'Инвентаризация ГП',
-               'Поправить склад готовой продукции по факту: добавить излишек (БЕЗ списания комплектующих) или убрать недостачу (со свободного остатка)',
+               'Поправить склад готовой продукции по факту: добавить излишек или убрать недостачу, в том числе из резерва с возвратом потребности в производство',
                'openFinishedInventory()') +
         '</div>' +
       '</div>' +
@@ -5241,7 +5428,7 @@ async function openFinishedInventory() {
         '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
       '<div style="padding:16px 20px;">' +
         '<div style="font-size:12.5px;color:var(--text-light);margin-bottom:12px;line-height:1.5;">' +
-          'Поправка склада по факту инвентаризации. <b>Излишек</b> добавляет изделия <b>без списания комплектующих</b>. <b>Недостача</b> убирает со <b>свободного</b> остатка (резерв под договоры не трогается).' +
+          'Поправка склада по факту инвентаризации. <b>Излишек</b> добавляет изделия <b>без списания комплектующих</b>. <b>Недостача</b> сначала убирает свободный остаток, затем резерв. Снятая из резерва единица автоматически возвращает потребность договора в производство.' +
         '</div>' +
         '<input id="fi-search" type="text" placeholder="Модель: название или артикул…" oninput="_fiSearch(this.value)" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box;font-size:14px;">' +
         '<div id="fi-results" style="max-height:30vh;overflow:auto;margin-top:8px;"></div>' +
@@ -5323,14 +5510,17 @@ async function _fiApply(sign) {
   const delta = sign * qty;
   const word = sign > 0
     ? ('добавить ' + qty + ' шт (излишек, БЕЗ списания комплектующих)')
-    : ('убрать ' + qty + ' шт (недостача, со свободного остатка)');
+    : ('убрать ' + qty + ' шт (недостача; сначала свободные, затем резерв)');
   if (!confirm('Точно ' + word + ' по модели «' + sel.name + '»?')) return;
   try {
     const resp = await apiPost('/api/admin/inventory/finished-adjust', { model_id: sel.id, delta: delta, comment: comment });
     if (resp && resp.ok && resp.data && resp.data.ok) {
       const d = resp.data;
       let msg = 'Готово: ' + (d.applied > 0 ? ('+' + d.applied) : d.applied) + ' шт';
-      if (d.shortfall && d.shortfall > 0) msg += ' · не хватило ' + d.shortfall + ' свободных (убрано сколько было)';
+      if (d.reserved_removed && d.reserved_removed > 0) {
+        msg += ' · из резерва ' + d.reserved_removed + ' шт, потребность возвращена в производство';
+      }
+      if (d.shortfall && d.shortfall > 0) msg += ' · не хватило ' + d.shortfall + ' шт на складе (убрано сколько было)';
       showToast(msg, 'success');
       if (qtyEl) qtyEl.value = '1';
       await _fiRenderAdjust();
@@ -8791,6 +8981,83 @@ function _ccReset() {
   _ccRenderModal();
 }
 </script>
+
+<!-- ============ ШТОРКА «КЛОД» ============ -->
+<!-- Плавающая кнопка поверх любого раздела: и в «Атом Чиллере» (там 3D открыт в
+     iframe, поэтому шторка живёт в самой CRM), и в остальных экранах. Лента — та же,
+     что на экране «Клава», к сообщению добавляется, откуда его написали. -->
+<button id="devchat-fab" onclick="devChatToggleDrawer()" title="Спросить Клаву"
+        style="display:none;position:fixed;right:18px;bottom:78px;z-index:900;width:52px;height:52px;border-radius:50%;
+               border:none;background:var(--brand);color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;font-size:22px;">
+  <i class="ti ti-message-code"></i>
+</button>
+<div id="devchat-backdrop" class="dchat-backdrop" onclick="devChatToggleDrawer()"></div>
+
+<!-- v2.45.955: полноэкранный терминал «работа Клавы вживую» (тап по статусу) -->
+<div id="devchat-term-full" class="dchat-term-full" onclick="if (event.target === this) devChatTermClose()">
+  <div class="tf-card">
+    <div class="tf-hd">
+      <span class="tf-ava"><i class="ti ti-sparkles"></i></span>
+      <b id="devchat-term-title">Клава — работа вживую</b>
+      <button class="tf-x" onclick="devChatTermClose()"><i class="ti ti-x"></i></button>
+    </div>
+    <pre class="tf-log" id="devchat-term-log"></pre>
+    <div class="tf-ft" id="devchat-term-ft"><span class="dot"></span><span id="devchat-term-ft-text">Агент свободен</span></div>
+  </div>
+</div>
+<!-- v2.45.961: запись голосом. Держим кнопку — пишем звук, отпустили — уходит
+     на расшифровку и падает текстом в поле ввода (отправка остаётся ручной). -->
+<div id="devchat-voice" class="dchat-voice">
+  <div class="vc-card">
+    <div class="vc-t" id="devchat-voice-title">Слушаю…</div>
+    <div class="vc-wave" id="devchat-voice-wave">
+      <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    </div>
+    <div class="vc-txt" id="devchat-voice-txt">Говорите — расшифрую и вставлю в поле</div>
+    <button class="vc-mic" id="devchat-voice-mic" type="button"><i class="ti ti-microphone"></i></button>
+    <div class="vc-hint" id="devchat-voice-hint">Отпустите — текст попадёт в поле. Смахните вниз — отмена.</div>
+  </div>
+</div>
+
+<div id="devchat-drawer" class="dchat"
+     style="display:none;position:fixed;right:0;top:0;bottom:0;width:min(420px,100vw);z-index:901;
+            background:var(--bg);border-left:1px solid var(--border);box-shadow:-8px 0 30px rgba(12,22,40,.24);">
+  <div class="dchat-drawer-head">
+    <i class="ti ti-message-code" style="font-size:19px;"></i>
+    <b>Клава</b>
+    <span id="devchat-drawer-context" class="ctx"></span>
+    <button class="icon-btn" style="margin-left:auto;" onclick="devChatToggleDrawer()" title="Закрыть">
+      <i class="ti ti-x"></i>
+    </button>
+  </div>
+  <div id="devchat-drawer-feed" class="dchat-feed" style="padding:6px 14px 12px;" onscroll="devChatOnScroll()"></div>
+  <div class="dchat-composer" style="padding:0 12px 12px;">
+    <div id="devchat-drawer-files" class="dchat-files"></div>
+    <div class="dchat-box">
+      <div class="dchat-input-row">
+        <!-- v2.45.971: та же кнопка «+», что и на экране (камера/галерея/файл) -->
+        <button class="dchat-attach" onclick="devChatAttachMenu()" title="Прикрепить: фото, галерея, файл">
+          <i class="ti ti-plus"></i>
+        </button>
+        <input type="file" id="devchat-drawer-file-input" multiple
+               style="display:none;" onchange="devChatPickFiles(this.files)">
+        <input type="file" id="devchat-drawer-camera-input" accept="image/*" capture="environment"
+               style="display:none;" onchange="devChatAddFiles(this.files)">
+        <input type="file" id="devchat-drawer-gallery-input" multiple accept="image/*"
+               style="display:none;" onchange="devChatAddFiles(this.files)">
+        <textarea id="devchat-drawer-input" class="dchat-input" rows="1" placeholder="Что сделать? Скриншот — Ctrl+V"
+                  oninput="devChatGrow(this)" onkeydown="devChatKey(event)"
+                  onpaste="devChatPaste(event)"></textarea>
+        <button class="dchat-mic" id="devchat-drawer-mic" title="Удерживай — говори — отпусти">
+          <i class="ti ti-microphone"></i>
+        </button>
+        <button class="dchat-send" id="devchat-drawer-send" onclick="devChatSend()" title="Отправить (Enter)">
+          <i class="ti ti-arrow-up"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

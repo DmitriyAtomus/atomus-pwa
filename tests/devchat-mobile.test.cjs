@@ -1,0 +1,59 @@
+// Мобильный комфорт чата «Клава» (v2.45.955): камера, чипы, терминал «вживую».
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+
+const root = path.join(__dirname, '..');
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const app = fs.readFileSync(path.join(root, 'app-1.js'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
+
+test('камера: отдельный input с capture, кнопка и чип зовут его', () => {
+  assert.match(html, /id="devchat-camera-input"[^>]*capture="environment"/,
+    'нет input с capture — на телефоне не откроется камера');
+  // с v2.45.971 камеру зовёт не иконка в ряду ввода, а пункт шторки вложений
+  assert.match(html, /onclick="devChatAttachMenu\(\)"/);
+  assert.match(app, /devChatAttachPick\(\\'camera\\'\)/);
+  assert.match(app, /function devChatCamera\(\)/);
+  // на компьютере камеры обычно нет — пункт прячется
+  assert.match(app, /cam\.style\.display = document\.querySelector\('\.app\.desktop-layout'\) \? 'none' : ''/);
+});
+
+test('быстрые чипы над полем ввода подставляют текст', () => {
+  assert.match(html, /id="devchat-chips"/);
+  assert.match(html, /devChatQuick\(this\)/);
+});
+
+test('терминал «вживую»: открывается тапом по статусу, копит журнал со временем', () => {
+  assert.match(html, /id="devchat-term-full"/);
+  assert.match(html, /onclick="devChatTermOpen\(\)"/, 'статус в шапке не открывает терминал');
+  assert.match(app, /function devChatTermOpen\(\)/);
+  assert.match(app, /function devChatTermClose\(\)/);
+  // журнал пишется в момент прихода строк — бэкенд времени не хранит
+  assert.match(app, /_devChatLogProgress\(\);/, 'журнал не подключён к циклу опроса');
+  const fn = app.slice(app.indexOf('function _devChatLogProgress'));
+  // v2.45.974: журнал ведётся по каждой задаче отдельно (_devChatTermSeen[id]) —
+  // раньше одна общая метка мешала строки разных чатов
+  assert.match(fn.slice(0, 1200), /lastIndexOf\(last\)/,
+    'нет диффа скользящего окна — строки будут дублироваться');
+  assert.match(fn.slice(0, 1200), /_devChatTermSeen\[id\]/,
+    'журнал должен вестись по задаче, а не одной общей меткой');
+});
+
+test('таймер задачи: считает от времени задачи, сброс когда всё закрыто', () => {
+  // v2.45.962: отсчёт от ts сообщения, а не от момента, когда вкладка увидела
+  // задачу — иначе открыл чат позже и таймер начинается с нуля
+  assert.match(app, /Date\.parse\(m\.ts\)/, 'таймер не берёт время задачи с сервера');
+  assert.match(app, /_devChatRunSince = \(!isNaN\(started\)/, 'нет запасного Date.now()');
+  assert.match(app, /if \(!running\) _devChatRunSince = null;/);
+});
+
+test('карточка работы: после дорисовки лента доводится до конца', () => {
+  // иначе на телефоне карточка встаёт под чипами и полем ввода — и кажется,
+  // что Клава ничего не делает
+  const fn = app.slice(app.indexOf('function _devChatTyping'));
+  assert.match(fn.slice(0, 1800), /const atBottom = feed\.scrollHeight/);
+  // v2.45.978: доводим через _devChatToBottom — мгновенно, минуя CSS smooth
+  assert.match(fn.slice(0, 1800), /if \(atBottom\) _devChatToBottom\(feed, false\);/);
+});

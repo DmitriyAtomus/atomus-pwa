@@ -1812,6 +1812,7 @@ const RADIO_STATIONS = [
   // Хиты / поп
   { id: 'hits',          name: 'Хит ФМ',           url: 'https://hitfm.hostingradio.ru/hitfm128.mp3' },
   { id: 'maximum',       name: 'Радио Maximum',    url: 'https://maximum.hostingradio.ru/maximum128.mp3' },
+  { id: 'retro_fm',      name: 'Ретро FM',         url: 'https://retro.hostingradio.ru:8014/retro320.mp3' },
   // Record
   { id: 'record',        name: 'Radio Record',     url: 'https://radiorecord.hostingradio.ru/rr_main96.aacp' },
   { id: 'record_teo',    name: 'Record · TEO',     url: 'https://radiorecord.hostingradio.ru/teo96.aacp' },
@@ -1845,9 +1846,10 @@ function _radioState() {
       playing: false,
       loading: false,
       volume: 0.7,
-      target: 'local',     // 'local' — играть здесь, 'tv' — на Око офиса (телевизор)
-      tvStationId: null,   // выбранная станция для ТВ
-      tvPlaying: false,    // считаем, что играет на ТВ
+      speakerVolume: 0.1,
+      target: 'local',          // 'local' — здесь, 'speaker' — рабочая колонка
+      speakerStationId: null,   // выбранная станция для рабочей колонки
+      speakerPlaying: false,
     };
     try {
       const saved = JSON.parse(localStorage.getItem(RADIO_STORAGE_KEY) || 'null');
@@ -1855,9 +1857,14 @@ function _radioState() {
       if (saved && typeof saved.volume === 'number') {
         window._radio.volume = Math.max(0, Math.min(1, saved.volume));
       }
-      // «Око офиса» убрано — радио всегда играет локально в СРМ, даже если в
-      // сохранённом состоянии остался target='tv'.
-      window._radio.target = 'local';
+      if (saved && typeof saved.speakerVolume === 'number') {
+        window._radio.speakerVolume = Math.max(0, Math.min(1, saved.speakerVolume));
+      }
+      if (saved && saved.target === 'speaker') window._radio.target = 'speaker';
+      if (saved && saved.speakerStationId) window._radio.speakerStationId = saved.speakerStationId;
+      if (saved && typeof saved.speakerPlaying === 'boolean') {
+        window._radio.speakerPlaying = saved.speakerPlaying;
+      }
     } catch (e) {}
   }
   return window._radio;
@@ -1873,9 +1880,11 @@ function _radioSave() {
     localStorage.setItem(RADIO_STORAGE_KEY, JSON.stringify({
       stationId:  s.stationId,
       volume:     s.volume,
+      speakerVolume: s.speakerVolume,
       wasPlaying: !!s.playing, // v2.43.77: для автозапуска после F5
       target:     s.target,
-      tvStationId: s.tvStationId,
+      speakerStationId: s.speakerStationId,
+      speakerPlaying: !!s.speakerPlaying,
     }));
   } catch (e) {}
 }
@@ -1885,29 +1894,30 @@ function renderSidebarRadio() {
   const btn = document.getElementById('sidebar-radio-btn');
   if (!btn) return;
   const s = _radioState();
-  const isTv = s.target === 'tv';
-  const playing = isTv ? s.tvPlaying : s.playing;
-  const curId = isTv ? s.tvStationId : s.stationId;
+  const isSpeaker = s.target === 'speaker';
+  const playing = isSpeaker ? s.speakerPlaying : s.playing;
+  const curId = isSpeaker ? s.speakerStationId : s.stationId;
   const station = curId ? _radioGetStation(curId) : null;
   btn.classList.toggle('playing', !!playing);
   const nameEl = document.getElementById('sidebar-radio-station');
-  if (nameEl) nameEl.textContent = (playing && station) ? (station.name + (isTv ? ' · Око офиса' : '')) : '';
+  if (nameEl) nameEl.textContent = (playing && station) ? (station.name + (isSpeaker ? ' · Колонка' : '')) : '';
 }
 
 // Рендер тела модалки (тёмная панель с управлением + список станций).
 function _renderRadioModalBody() {
   const s = _radioState();
-  const isTv = false;   // «Око офиса» убрано — радио слушаем только в СРМ
-  const curId = isTv ? s.tvStationId : s.stationId;
+  const isSpeaker = s.target === 'speaker';
+  const curId = isSpeaker ? s.speakerStationId : s.stationId;
   const station = curId ? _radioGetStation(curId) : null;
   const stationName = station ? station.name : 'Выберите волну';
-  const isPlaying = isTv ? s.tvPlaying : s.playing;
-  const isLoading = isTv ? false : s.loading;
+  const isPlaying = isSpeaker ? s.speakerPlaying : s.playing;
+  const isLoading = isSpeaker ? false : s.loading;
   const playIcon = isLoading ? 'ti-loader-2' : (isPlaying ? 'ti-player-pause-filled' : 'ti-player-play-filled');
   const labelHtml = isPlaying
-    ? '<span class="hr-live-dot"></span><i class="ti ti-broadcast"></i>' + (isTv ? 'На Око офиса' : 'В эфире')
+    ? '<span class="hr-live-dot"></span><i class="ti ti-broadcast"></i>' + (isSpeaker ? 'На рабочей колонке' : 'В эфире')
     : '<i class="ti ti-radio"></i>Радио';
-  const volPct = Math.round((s.volume || 0) * 100);
+  const activeVolume = isSpeaker ? s.speakerVolume : s.volume;
+  const volPct = Math.round(Math.max(0, Math.min(1, Number(activeVolume) || 0)) * 100);
   const volIcon = volPct === 0 ? 'ti-volume-off' : (volPct < 40 ? 'ti-volume-2' : 'ti-volume');
 
   let items = '';
@@ -1921,16 +1931,18 @@ function _renderRadioModalBody() {
              '</div>';
   });
 
-  const volumeHtml = isTv
-    ? '<div class="hr-volume" style="opacity:.75;font-size:13px;"><i class="ti ti-volume"></i>&nbsp;Громкость на Око офиса — тихо (10%)</div>'
-    : '<div class="hr-volume">' +
-        '<i class="ti ' + volIcon + '" id="hr-vol-icon"></i>' +
-        '<input type="range" min="0" max="100" value="' + volPct + '" oninput="setRadioVolume(this.value)">' +
-        '<div class="hr-vol-pct" id="hr-vol-pct">' + volPct + '%</div>' +
-      '</div>';
+  const volumeHtml = '<div class="hr-volume">' +
+      '<i class="ti ' + volIcon + '" id="hr-vol-icon"></i>' +
+      '<input type="range" min="0" max="100" value="' + volPct + '" aria-label="Громкость" oninput="setRadioVolume(this.value)">' +
+      '<div class="hr-vol-pct" id="hr-vol-pct">' + volPct + '%</div>' +
+    '</div>';
 
   return (
     '<div class="radio-modal-top' + (isLoading ? ' hr-loading' : '') + '">' +
+      '<div class="hr-output" role="group" aria-label="Куда включить радио">' +
+        '<button class="hr-output-btn' + (!isSpeaker ? ' active' : '') + '" onclick="setRadioTarget(\'local\')"><i class="ti ti-device-laptop"></i> Здесь</button>' +
+        '<button class="hr-output-btn' + (isSpeaker ? ' active' : '') + '" onclick="setRadioTarget(\'speaker\')"><i class="ti ti-speakerphone"></i> На колонку</button>' +
+      '</div>' +
       '<div class="hr-top">' +
         '<button class="hr-play" onclick="toggleRadioPlay()" title="' + (isPlaying ? 'Стоп' : 'Играть') + '">' +
           '<i class="ti ' + playIcon + '"></i>' +
@@ -1977,8 +1989,13 @@ function _radioEnsureAudio() {
 function setRadioVolume(v) {
   const s = _radioState();
   const pct = Math.max(0, Math.min(100, parseInt(v, 10) || 0));
-  s.volume = pct / 100;
-  if (s.audio) s.audio.volume = s.volume;
+  if (s.target === 'speaker') {
+    s.speakerVolume = pct / 100;
+    _queueSpeakerVolumeCommand();
+  } else {
+    s.volume = pct / 100;
+    if (s.audio) s.audio.volume = s.volume;
+  }
   _radioSave();
   // Обновляем только подпись и иконку, без полного перерендера — чтобы ползунок
   // не «прыгал» во время перетаскивания.
@@ -1991,15 +2008,27 @@ function setRadioVolume(v) {
   }
 }
 
+let _speakerVolumeTimer = null;
+function _queueSpeakerVolumeCommand() {
+  if (_speakerVolumeTimer) clearTimeout(_speakerVolumeTimer);
+  _speakerVolumeTimer = setTimeout(() => {
+    _speakerVolumeTimer = null;
+    _radioRemoteCommand('speaker', 'volume', null);
+  }, 180);
+}
+
 function toggleRadioPlay() {
   const s = _radioState();
-  if (s.target === 'tv') {
-    if (s.tvPlaying) {
-      s.tvPlaying = false; _radioSave(); _radioTvCommand('stop', null);
-      showToast('Радио на Око офиса остановлено', 'info');
-    } else if (s.tvStationId) {
-      const st = _radioGetStation(s.tvStationId);
-      if (st) { s.tvPlaying = true; _radioSave(); _radioTvCommand('play', st); }
+  if (s.target === 'speaker') {
+    if (s.speakerPlaying) {
+      s.speakerPlaying = false; _radioSave(); _radioRemoteCommand('speaker', 'stop', null);
+      showToast('Радио на колонке остановлено', 'info');
+    } else if (s.speakerStationId) {
+      const st = _radioGetStation(s.speakerStationId);
+      if (st) {
+        s.speakerPlaying = true; _radioSave(); _radioRemoteCommand('speaker', 'play', st);
+        showToast('Включаю «' + st.name + '» на колонке', 'success');
+      }
     }
     _refreshRadioModal(); renderSidebarRadio();
     return;
@@ -2030,10 +2059,10 @@ function selectRadioStation(id) {
   const station = _radioGetStation(id);
   if (!station) return;
   const s = _radioState();
-  if (s.target === 'tv') {
-    s.tvStationId = id; s.tvPlaying = true; _radioSave();
-    _radioTvCommand('play', station);
-    showToast('Включаю «' + station.name + '» на Око офиса', 'success');
+  if (s.target === 'speaker') {
+    s.speakerStationId = id; s.speakerPlaying = true; _radioSave();
+    _radioRemoteCommand('speaker', 'play', station);
+    showToast('Включаю «' + station.name + '» на колонке', 'success');
     _refreshRadioModal(); renderSidebarRadio();
     return;
   }
@@ -2050,29 +2079,54 @@ function selectRadioStation(id) {
   });
 }
 
-// Переключить, куда играть радио: 'local' (здесь) или 'tv' (Око офиса).
+// Переключить, куда играть радио: 'local' (здесь) или 'speaker' (рабочая колонка).
 function setRadioTarget(t) {
+  if (t !== 'local' && t !== 'speaker') return;
   const s = _radioState();
   if (s.target === t) return;
+  const wasLocalPlaying = s.target === 'local' && s.playing;
+  const wasSpeakerPlaying = s.target === 'speaker' && s.speakerPlaying;
+
+  if (t === 'speaker') {
+    if (!s.speakerStationId && s.stationId) s.speakerStationId = s.stationId;
+    if (s.audio && s.playing) { try { s.audio.pause(); } catch (e) {} }
+    if (wasLocalPlaying && s.speakerStationId) {
+      const station = _radioGetStation(s.speakerStationId);
+      if (station) {
+        s.speakerPlaying = true;
+        _radioRemoteCommand('speaker', 'play', station);
+        showToast('Радио переключено на рабочую колонку', 'success');
+      }
+    }
+  } else {
+    if (!s.stationId && s.speakerStationId) s.stationId = s.speakerStationId;
+    if (wasSpeakerPlaying) {
+      s.speakerPlaying = false;
+      _radioRemoteCommand('speaker', 'stop', null);
+    }
+  }
   s.target = t;
-  // При уходе на ТВ глушим локальный звук, чтобы не дублировать.
-  if (t === 'tv' && s.audio && s.playing) { try { s.audio.pause(); } catch (e) {} }
   _radioSave();
   _refreshRadioModal();
   renderSidebarRadio();
 }
 
-// Отправить команду радио на телевизор «Око офиса» (читает локальный поллер на офисном ПК).
-async function _radioTvCommand(action, station) {
+// Отправить команду локальному офисному поллеру с явным выходом звука.
+async function _radioRemoteCommand(target, action, station) {
   try {
+    const state = _radioState();
     await apiPost('/api/tv/radio', {
+      target:     target,
       action:     action,
       station_id: station ? station.id : null,
       name:       station ? station.name : '',
       url:        station ? station.url : '',
+      volume:     target === 'speaker'
+        ? Math.round(Math.max(0, Math.min(1, Number(state.speakerVolume) || 0)) * 100)
+        : null,
     });
   } catch (e) {
-    showToast('Не удалось отправить команду на Око офиса', 'error');
+    showToast('Не удалось отправить команду на рабочую колонку', 'error');
   }
 }
 
@@ -2107,6 +2161,7 @@ function closeRadioModal() {
 // тихо остаёмся на паузе, пользователь нажмёт play вручную.
 async function _radioBootResume() {
   const s = _radioState();
+  if (s.target === 'speaker') { renderSidebarRadio(); return; }
   if (!s.stationId) { renderSidebarRadio(); return; }
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(RADIO_STORAGE_KEY) || 'null'); } catch (e) {}
@@ -2584,8 +2639,7 @@ state.taskFormMode = 'new';
 state.taskForm = {
   title: '',
   description: '',
-  assignee_id: null,
-  assignee_name: '',
+  assignee_ids: [],
   deadline: '',
   priority: 'normal',
   source: '',
@@ -2784,10 +2838,13 @@ function renderTasksList(d) {
   const byWho = {};
   let noAss = 0;
   open.forEach(t => {
-    if (!t.assignee_id) { noAss++; return; }
-    const k = t.assignee_id;
-    if (!byWho[k]) byWho[k] = { id: k, name: t.assignee_name || ('#' + k), n: 0 };
-    byWho[k].n++;
+    const assignees = getTaskAssignees(t);
+    if (!assignees.length) { noAss++; return; }
+    assignees.forEach(emp => {
+      const k = Number(emp.id);
+      if (!byWho[k]) byWho[k] = { id: k, name: emp.name || emp.short_name || emp.full_name || ('#' + k), n: 0 };
+      byWho[k].n++;
+    });
   });
   const whoList = Object.values(byWho).sort((a, b) => b.n - a.n);
   if (whoList.length > 1 || noAss > 0) {
@@ -2807,8 +2864,9 @@ function renderTasksList(d) {
 
   // Фильтр по исполнителю
   let list = tasks;
-  if (state.tasksWho === 'none') list = tasks.filter(t => !t.assignee_id);
-  else if (state.tasksWho) list = tasks.filter(t => t.assignee_id === state.tasksWho);
+  if (state.tasksWho === 'none') list = tasks.filter(t => !getTaskAssignees(t).length);
+  else if (state.tasksWho) list = tasks.filter(t =>
+    getTaskAssignees(t).some(emp => Number(emp.id) === Number(state.tasksWho)));
 
   // Группировка по сроку
   const groups = { late: [], today: [], tomorrow: [], week: [], later: [], nodate: [], done: [] };
@@ -2879,7 +2937,8 @@ function renderTasksBoard(d) {
 function _renderTaskBoardCard(t) {
   const pri = t.priority || 'normal';
   const meta = [];
-  if (t.assignee_name) meta.push('<span><i class="ti ti-user"></i>' + escapeHtml(t.assignee_name) + '</span>');
+  const names = getTaskAssignees(t).map(emp => emp.name || emp.short_name || emp.full_name || '—');
+  if (names.length) meta.push('<span><i class="ti ti-users"></i>' + escapeHtml(names.join(', ')) + '</span>');
   if (t.deadline) {
     let cls = '';
     try {
@@ -2952,6 +3011,14 @@ async function _tasksQuickDone(ev, taskId) {
 
 // v2.45.661: строка задачи — вся суть в две-три строчки (статус, исполнитель,
 // срок с дельтой, источник, договор, возраст, кто поставил)
+function getTaskAssignees(t) {
+  if (t && Array.isArray(t.assignees) && t.assignees.length) return t.assignees;
+  if (t && t.assignee_id) {
+    return [{ id: t.assignee_id, name: t.assignee_name || '' }];
+  }
+  return [];
+}
+
 function renderTaskRow(t) {
   const isDone = t.status === 'done' || t.status === 'cancelled';
   const diff = _taskDayDiff(t.deadline);
@@ -2973,11 +3040,17 @@ function renderTaskRow(t) {
 
   // Строка 1: исполнитель + срок
   let line1 = '';
-  if (t.assignee_name) {
-    const colorIdx = (t.assignee_id || 0) % 8;
-    const initials = (typeof getInitials === 'function') ? getInitials(t.assignee_name) : '?';
-    line1 += '<span class="pkb-wl-avatar ac-' + colorIdx + ' tkr-ava">' + escapeHtml(initials) + '</span>' +
-      '<span class="tkr-nm">' + escapeHtml(t.assignee_name) + '</span>';
+  const taskAssignees = getTaskAssignees(t);
+  if (taskAssignees.length) {
+    const visible = taskAssignees.slice(0, 3);
+    line1 += '<span class="task-assignee-avatars">';
+    visible.forEach(emp => {
+      const colorIdx = (emp.id || 0) % 8;
+      const name = emp.name || emp.short_name || emp.full_name || '—';
+      const initials = (typeof getInitials === 'function') ? getInitials(name) : '?';
+      line1 += '<span class="pkb-wl-avatar ac-' + colorIdx + ' tkr-ava" title="' + escapeHtml(name) + '">' + escapeHtml(initials) + '</span>';
+    });
+    line1 += '</span><span class="tkr-nm">' + escapeHtml(taskAssignees.map(emp => emp.name || emp.short_name || emp.full_name || '—').join(', ')) + '</span>';
   } else if (!isDone) {
     line1 += '<span class="tkr-noass">исполнитель не назначен</span>';
   }
@@ -3135,7 +3208,9 @@ function renderTaskDetail(t) {
   document.getElementById('task-detail-title').textContent = t.title || '—';
   document.getElementById('task-detail-mob-title').textContent = t.title || 'Задача';
   const sub = [];
-  if (t.assignee_name) sub.push('Исполнитель: ' + t.assignee_name);
+  const taskAssignees = getTaskAssignees(t);
+  const assigneeNames = taskAssignees.map(emp => emp.name || emp.short_name || emp.full_name || '—');
+  if (assigneeNames.length) sub.push((assigneeNames.length > 1 ? 'Исполнители: ' : 'Исполнитель: ') + assigneeNames.join(', '));
   if (t.priority === 'urgent') sub.push('🔥 срочно');
   document.getElementById('task-detail-subtitle').textContent = sub.join(' · ') || '—';
 
@@ -3144,7 +3219,7 @@ function renderTaskDetail(t) {
   const myChatId = state.user && state.user.chat_id;
   const myEmpId = state.user && state.user.employee_id;
   const isCreator = t.creator_chat_id === myChatId;
-  const isAssignee = t.assignee_id === myEmpId;
+  const isAssignee = taskAssignees.some(emp => Number(emp.id) === Number(myEmpId));
   const canChangeStatus = canEdit || isCreator || isAssignee;
   const canEditFully = canEdit || isCreator;
 
@@ -3220,13 +3295,13 @@ function renderTaskDetail(t) {
 
   // Карточки-факты
   html += '<div class="task-facts-grid">';
-  // Исполнитель
+  // Исполнители
   html += '<div class="task-fact">' +
-            '<div class="task-fact-icon c-violet"><i class="ti ti-user"></i></div>' +
+            '<div class="task-fact-icon c-violet"><i class="ti ti-users"></i></div>' +
             '<div class="task-fact-body">' +
-              '<div class="task-fact-label">Исполнитель</div>' +
-              '<div class="task-fact-value' + (t.assignee_name ? '' : ' muted') + '">' +
-                escapeHtml(t.assignee_name || 'не назначен') + '</div>' +
+              '<div class="task-fact-label">Исполнители</div>' +
+              '<div class="task-fact-value' + (assigneeNames.length ? '' : ' muted') + '">' +
+                escapeHtml(assigneeNames.length ? assigneeNames.join(', ') : 'не назначены') + '</div>' +
             '</div></div>';
   // Дедлайн
   html += '<div class="task-fact">' +
@@ -3370,11 +3445,11 @@ function _saveTaskDraft() {
     if (state.taskFormMode === 'edit') return;  // черновики только для новой задачи
     const f = state.taskForm || {};
     const hasContent = (f.title && f.title.trim()) || (f.description && f.description.trim()) ||
-      f.assignee_id || f.deadline || (f.source && f.source.trim()) || f.contract_id;
+      (f.assignee_ids && f.assignee_ids.length) || f.deadline || (f.source && f.source.trim()) || f.contract_id;
     if (!hasContent) { localStorage.removeItem(TASK_DRAFT_KEY); return; }
     localStorage.setItem(TASK_DRAFT_KEY, JSON.stringify({
       title: f.title || '', description: f.description || '',
-      assignee_id: f.assignee_id || null, assignee_name: f.assignee_name || '',
+      assignee_ids: f.assignee_ids || [],
       deadline: f.deadline || '', priority: f.priority || 'normal',
       source: f.source || '', contract_id: f.contract_id || null,
       contract_label: f.contract_label || '', _ts: Date.now(),
@@ -3399,7 +3474,7 @@ function clearTaskDraft() {
 function discardTaskDraft() {
   clearTaskDraft();
   state.taskForm = {
-    title: '', description: '', assignee_id: null, assignee_name: '',
+    title: '', description: '', assignee_ids: [],
     deadline: '', priority: 'normal', source: '',
     contract_id: null, contract_label: '',
   };
@@ -3420,7 +3495,7 @@ function openNewTask() {
   state.taskFromContractId = null;
   state.taskFromContractLabel = '';
   state.taskForm = {
-    title: '', description: '', assignee_id: null, assignee_name: '',
+    title: '', description: '', assignee_ids: [],
     deadline: '', priority: 'normal', source: '',
     contract_id: preContractId, contract_label: preContractLabel,
   };
@@ -3431,7 +3506,9 @@ function openNewTask() {
     if (draft) {
       state.taskForm = {
         title: draft.title || '', description: draft.description || '',
-        assignee_id: draft.assignee_id || null, assignee_name: draft.assignee_name || '',
+        assignee_ids: Array.isArray(draft.assignee_ids)
+          ? draft.assignee_ids.map(Number).filter(Boolean)
+          : (draft.assignee_id ? [Number(draft.assignee_id)] : []),
         deadline: draft.deadline || '', priority: draft.priority || 'normal',
         source: draft.source || '',
         contract_id: draft.contract_id || null, contract_label: draft.contract_label || '',
@@ -3454,8 +3531,7 @@ async function openEditTask() {
     state.taskForm = {
       title: t.title || '',
       description: t.description || '',
-      assignee_id: t.assignee_id,
-      assignee_name: t.assignee_name || '',
+      assignee_ids: getTaskAssignees(t).map(emp => Number(emp.id)).filter(Boolean),
       deadline: t.deadline || '',
       priority: t.priority || 'normal',
       source: t.source || '',
@@ -3554,10 +3630,11 @@ function renderTaskForm() {
           '</div></div>';
   html += '</div>';
 
-  // Исполнитель + дедлайн
+  // Исполнители + дедлайн
   html += '<div class="sales-form-section">';
   html += '<div class="sales-form-row">';
-  html += '<div><label>Исполнитель</label>' + renderAssigneeSelect(f.assignee_id) + '</div>';
+  html += '<div><label>Исполнители <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(можно выбрать нескольких)</span></label>' +
+          '<div id="tf-assignees-picker">' + renderTaskAssigneePicker() + '</div></div>';
   html += '<div><label>Дедлайн <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально)</span></label>' +
           '<input type="date" id="tf-deadline" value="' + escapeHtml(f.deadline) + '"></div>';
   html += '</div>';
@@ -3617,16 +3694,6 @@ function renderTaskForm() {
   document.getElementById('tf-description').addEventListener('input', e => { state.taskForm.description = e.target.value; _saveTaskDraft(); });
   document.getElementById('tf-deadline').addEventListener('change', e => { state.taskForm.deadline = e.target.value; _saveTaskDraft(); });
   document.getElementById('tf-source').addEventListener('input', e => { state.taskForm.source = e.target.value; _saveTaskDraft(); });
-  const assigneeSel = document.getElementById('tf-assignee');
-  if (assigneeSel) {
-    assigneeSel.addEventListener('change', e => {
-      const v = e.target.value;
-      state.taskForm.assignee_id = v ? parseInt(v) : null;
-      const opt = assigneeSel.selectedOptions[0];
-      state.taskForm.assignee_name = opt ? opt.textContent : '';
-      _saveTaskDraft();
-    });
-  }
 }
 
 // v2.45.80: голосовой ввод текста в произвольное поле через Web Speech API.
@@ -3695,15 +3762,59 @@ function _voiceToField(fieldId, stateKey) {
   }
 }
 
-function renderAssigneeSelect(currentId) {
+function renderTaskAssigneePicker() {
   const list = cache.activeEmployees || [];
-  let html = '<select id="tf-assignee"><option value="">— не назначен —</option>';
+  const selectedIds = (state.taskForm && state.taskForm.assignee_ids || []).map(Number);
+  const selected = list.filter(emp => selectedIds.indexOf(Number(emp.id)) >= 0);
+  let html = '<div class="task-assignee-picker">';
+  if (selected.length) {
+    html += '<div class="task-assignee-selected">';
+    selected.forEach(emp => {
+      const name = emp.short_name || emp.full_name || '—';
+      html += '<button type="button" class="task-assignee-chip" onclick="toggleTaskAssignee(' + Number(emp.id) + ')" title="Убрать исполнителя">' +
+        '<i class="ti ti-user-check"></i>' + escapeHtml(name) + '<i class="ti ti-x"></i></button>';
+    });
+    html += '<button type="button" class="btn-link task-assignee-clear" onclick="clearTaskAssignees()">Очистить</button></div>';
+  } else {
+    html += '<div class="task-assignee-empty"><i class="ti ti-users"></i> Исполнители пока не выбраны</div>';
+  }
+  html += '<div class="task-assignee-options">';
   list.forEach(e => {
-    const sel = (e.id === currentId) ? ' selected' : '';
-    html += '<option value="' + e.id + '"' + sel + '>' + escapeHtml(e.short_name || e.full_name || '—') + '</option>';
+    const id = Number(e.id);
+    const isSelected = selectedIds.indexOf(id) >= 0;
+    const name = e.short_name || e.full_name || '—';
+    html += '<button type="button" class="task-assignee-option' + (isSelected ? ' selected' : '') + '" ' +
+      'role="checkbox" aria-checked="' + (isSelected ? 'true' : 'false') + '" onclick="toggleTaskAssignee(' + id + ')">' +
+      '<span class="task-assignee-check"><i class="ti ' + (isSelected ? 'ti-check' : 'ti-user-plus') + '"></i></span>' +
+      '<span>' + escapeHtml(name) + '</span></button>';
   });
-  html += '</select>';
+  if (!list.length) html += '<div class="task-assignee-empty">Активные сотрудники не найдены</div>';
+  html += '</div></div>';
   return html;
+}
+
+function refreshTaskAssigneePicker() {
+  const el = document.getElementById('tf-assignees-picker');
+  if (el) el.innerHTML = renderTaskAssigneePicker();
+}
+
+function toggleTaskAssignee(employeeId) {
+  if (!state.taskForm) return;
+  const id = Number(employeeId);
+  const ids = (state.taskForm.assignee_ids || []).map(Number).filter(Boolean);
+  const index = ids.indexOf(id);
+  if (index >= 0) ids.splice(index, 1);
+  else ids.push(id);
+  state.taskForm.assignee_ids = ids;
+  _saveTaskDraft();
+  refreshTaskAssigneePicker();
+}
+
+function clearTaskAssignees() {
+  if (!state.taskForm) return;
+  state.taskForm.assignee_ids = [];
+  _saveTaskDraft();
+  refreshTaskAssigneePicker();
 }
 
 function setTaskPriority(p) {
@@ -3733,7 +3844,7 @@ async function submitTaskForm() {
   const payload = {
     title: f.title.trim(),
     description: f.description.trim(),
-    assignee_id: f.assignee_id || null,
+    assignee_ids: (f.assignee_ids || []).map(Number).filter(Boolean),
     deadline: f.deadline || null,
     priority: f.priority || 'normal',
     source: f.source.trim(),
@@ -4443,7 +4554,34 @@ function _renderModelRow(m) {
 
 // ============ ЭТАП 32: Карточка модели с тех. картой ============
 
-async function openModelDetail(modelId) {
+function _contractBomSummary(configuration) {
+  const groups = ((configuration || {}).groups || []);
+  if (!groups.length) return '';
+  return groups.map(group => {
+    const facts = [];
+    if (group.power_kw != null) facts.push(_fmtQty(group.power_kw) + ' кВт');
+    if (group.voltage_v) facts.push(group.voltage_v + ' В');
+    if (group.phases) facts.push(group.phases + ' ф.');
+    return (group.group_name ? group.group_name + ': ' : '') +
+      (group.option_label || group.component_name || '—') +
+      (facts.length ? ' · ' + facts.join(' · ') : '');
+  }).join('; ');
+}
+
+function _renderOrderBomContext(context) {
+  if (!context || !context.itemId) return '';
+  const summary = _contractBomSummary(context.bom_configuration);
+  return '<div class="order-bom-context">' +
+    '<div class="order-bom-context-icon"><i class="ti ti-shopping-cart-check"></i></div>' +
+    '<div class="order-bom-context-main"><b>Комплектация именно этого заказа</b>' +
+      '<span>' + (summary ? escapeHtml(summary) : 'Вариант ещё не выбран') + '</span>' +
+      '<small>Стандарт модели при этом не изменяется.</small></div>' +
+    '<button class="btn btn-primary btn-small" onclick="openContractBomSelection(' + context.itemId + ',' + context.modelId + ')">' +
+      '<i class="ti ti-adjustments-horizontal"></i> ' + (summary ? 'Изменить для заказа' : 'Выбрать для заказа') + '</button>' +
+  '</div>';
+}
+
+async function openModelDetail(modelId, orderContext) {
   // ЭТАП 45 (v2.33.0): нужны актуальные поля модели (specs_json, image_path, prices, nc_code).
   // Грузим деталь напрямую через GET /api/models/{id}/bom — он только BOM, поля модели в нём нет.
   // Поэтому возьмём из cache.models, но если кэш устарел или нет поля — освежим.
@@ -4467,6 +4605,9 @@ async function openModelDetail(modelId) {
   // Пока что: используем поля что есть в m (m.specs_json, m.image_path, m.base_price...)
   // которых может не быть, и для отображения берём пусто.
   state._currentBomModelId = modelId;
+  state._modelOrderContext = orderContext || null;
+  const isOrderContext = !!state._modelOrderContext;
+  const canManageModel = canManageSales() && !isOrderContext;
 
   let overlay = document.getElementById('model-detail-modal');
   if (!overlay) {
@@ -4573,17 +4714,17 @@ async function openModelDetail(modelId) {
 
   // v2.43.86: кнопка «Изменить модель» теперь в шапке рядом с названием —
   // раньше она лежала среди BOM-кнопок и многие думали что это редактирование BOM.
-  const editBtn = canManageSales()
+  const editBtn = canManageModel
     ? '<button class="btn btn-secondary btn-small" onclick="openEditModelModal(' + modelId + ')" title="Изменить название, описание, исполнение"><i class="ti ti-edit"></i> Изменить модель</button>'
     : '';
   // v2.41.13: кнопка «Раздвоить» для choice-моделей (только директор/зам)
-  const splitBtn = (canManageSales() && m.exec_mode === 'choice')
+  const splitBtn = (canManageModel && m.exec_mode === 'choice')
     ? '<button class="btn btn-secondary btn-small" onclick="splitModelExecution(' + modelId + ')" title="Создать вторую модель — копию с пометкой AISI">' +
         '<i class="ti ti-arrows-split-2"></i> Раздвоить' +
       '</button>'
     : '';
   // v2.45.72: кнопка «Удалить модель» (soft-delete) — директор/зам
-  const deleteBtn = canManageSales()
+  const deleteBtn = canManageModel
     ? '<button class="btn btn-danger btn-small" onclick="confirmDeleteModel(' + modelId + ')" title="Деактивировать модель (старые сборки сохраняются)">' +
         '<i class="ti ti-trash"></i> Удалить модель' +
       '</button>'
@@ -4602,6 +4743,7 @@ async function openModelDetail(modelId) {
         '<button class="modal-close" onclick="closeModelDetail()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div style="overflow-y:auto;flex:1;padding:18px;">' +
+        _renderOrderBomContext(state._modelOrderContext) +
         sourceBadge +
         imgHtml +
         pricesHtml +
@@ -4611,15 +4753,15 @@ async function openModelDetail(modelId) {
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-top:1px solid var(--border);padding-top:14px;">' +
           '<h4 style="margin:0;font-size:15px;"><i class="ti ti-list-details"></i> Тех. карта (BOM)</h4>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-            (canManageSales() ?
+            (canManageModel ?
               '<button class="btn btn-secondary btn-small" onclick="openBomCopyFrom(' + modelId + ', ' + JSON.stringify(m.name || '').replace(/"/g, '&quot;') + ')" title="Скопировать тех.карту из другой модели">' +
                 '<i class="ti ti-copy"></i> Взять BOM' +
               '</button>' : '') +
-            (canManageSales() ?
+            (canManageModel ?
               '<button class="btn btn-secondary btn-small" onclick="openBomImportFromText(' + modelId + ', ' + JSON.stringify(m.name || '').replace(/"/g, '&quot;') + ')" title="Вставить BOM из Excel/текста">' +
                 '<i class="ti ti-clipboard-data"></i> Импорт BOM' +
               '</button>' : '') +
-            (canManageSales() ?
+            (canManageModel ?
               '<button class="btn btn-primary btn-small" onclick="openBomAddItem(' + modelId + ')">' +
                 '<i class="ti ti-plus"></i> Позиция' +
               '</button>' : '') +
@@ -4747,6 +4889,7 @@ function closeModelDetail() {
   const o = document.getElementById('model-detail-modal');
   if (o) o.classList.remove('visible');
   state._currentBomModelId = null;
+  state._modelOrderContext = null;
 }
 
 // ============================================================
@@ -5353,7 +5496,9 @@ async function openEditModelModal(modelId) {
           '<select id="em-work-type">' +
             '<option value="full_build"' + ((m.work_type || 'full_build') === 'full_build' ? ' selected' : '') + '>Полная сборка из материалов</option>' +
             '<option value="modify_purchased"' + (m.work_type === 'modify_purchased' ? ' selected' : '') + '>Модификация покупного товара</option>' +
+            '<option value="purchase_only"' + (m.work_type === 'purchase_only' ? ' selected' : '') + '>Заказываем готовым — без производства</option>' +
           '</select>' +
+          '<div class="form-hint">Для гибки и изготовления на стороне: склад резервируется по единственной позиции техкарты, а работа в цех не создаётся.</div>' +
         '</div>' +
       '</div>' +
       '<div class="modal-footer">' +
@@ -5931,10 +6076,8 @@ async function exportNomenclatureXlsx() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    // Имя файла — из заголовка Content-Disposition либо дефолтное
     const cd = r.headers.get('Content-Disposition') || '';
-    const match = cd.match(/filename="?([^"]+)"?/);
-    a.download = match ? match[1] : 'atom-crm-nomenclature.xlsx';
+    a.download = filenameFromCD(cd, 'atom-crm-nomenclature.xlsx');
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
@@ -5965,8 +6108,7 @@ async function exportBomReconciliationXlsx() {
     const a = document.createElement('a');
     a.href = url;
     const cd = r.headers.get('Content-Disposition') || '';
-    const match = cd.match(/filename="?([^"]+)"?/);
-    a.download = match ? match[1] : 'bom-reconciliation.xlsx';
+    a.download = filenameFromCD(cd, 'bom-reconciliation.xlsx');
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
@@ -6147,6 +6289,8 @@ async function openBomStagePicker(bomId) {
 async function loadModelBom(modelId) {
   const container = document.getElementById('bom-list');
   if (!container) return;
+  const orderContext = state._modelOrderContext || null;
+  const canManageModel = canManageSales() && !orderContext;
   try {
     await _ensureWorkStages();  // чтобы редактор BOM сразу показал список этапов
     const r = await apiGet('/api/models/' + modelId + '/bom');
@@ -6166,7 +6310,7 @@ async function loadModelBom(modelId) {
     state._currentBomModelId = modelId;
     // v2.45.229: панель массового выбора/удаления позиций BOM
     let html = '';
-    if (canManageSales()) {
+    if (canManageModel) {
       html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 2px 10px;flex-wrap:wrap;">' +
         '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-light);cursor:pointer;">' +
           '<input type="checkbox" id="bom-check-all" onchange="_bomToggleAll(this)" style="width:auto;"> выбрать все' +
@@ -6205,10 +6349,15 @@ async function loadModelBom(modelId) {
       const categoryPart = isModel
         ? '<span class="comp-cat-badge" style="background:#EAF4EE;color:#0A5B41;">Подсборка</span>'
         : (it.category_name ? '<span class="comp-cat-badge">' + escapeHtml(it.category_name) + '</span>' : '');
+      const selectionChip = it.selection_group_id
+        ? '<span class="bom-selection-chip"><i class="ti ti-adjustments-horizontal"></i>' +
+            escapeHtml(it.selection_group_name || 'Выбираемая позиция') + ' · ' +
+            (it.selection_options_count || 0) + ' вар.</span>'
+        : '';
       // v2.45.28: открываем редактор по bom_id — данные тянем из state, без эскейпинга
       const editCall = 'openBomEditItemById(' + it.id + ')';
       // v2.45.x: чип этапа прямо в строке — клик задаёт/меняет/создаёт этап
-      const stageChip = canManageSales()
+      const stageChip = canManageModel
         ? '<button class="bom-stage-chip' + (it.stage_id ? ' set' : '') + '" onclick="openBomStagePicker(' + it.id + ')" title="Этап производства — нажми, чтобы выбрать или создать">' +
             '<i class="ti ti-arrow-badge-right"></i>' + (it.stage_id ? escapeHtml(it.stage_name || 'этап') : 'этап') +
           '</button>'
@@ -6216,13 +6365,13 @@ async function loadModelBom(modelId) {
       return '<div class="bom-row">' +
         '<div class="bom-row-main">' +
           '<div class="bom-name">' +
-            (canManageSales() ? '<input type="checkbox" class="bom-check" data-bomid="' + it.id + '" onchange="_bomBulkUpdate()" style="width:auto;margin-right:8px;vertical-align:-2px;cursor:pointer;">' : '') +
+            (canManageModel ? '<input type="checkbox" class="bom-check" data-bomid="' + it.id + '" onchange="_bomBulkUpdate()" style="width:auto;margin-right:8px;vertical-align:-2px;cursor:pointer;">' : '') +
             displayName + skuPart +
             (it.is_critical ? ' <span class="bom-critical" title="Критичное">★</span>' : '') +
             stockBadge +
           '</div>' +
           '<div class="bom-meta">' +
-            categoryPart + stageChip +
+            categoryPart + stageChip + selectionChip +
             (it.comment ? ' · ' + escapeHtml(it.comment) : '') +
           '</div>' +
         '</div>' +
@@ -6230,15 +6379,18 @@ async function loadModelBom(modelId) {
           '<div class="bom-qty-lbl">' + escapeHtml(unitLbl) + ' / ед.</div></div>' +
         '<div class="bom-stock' + (lowFlag ? ' low' : '') + '"><div class="bom-stock-num">' + _fmtQty(have) + '</div>' +
           '<div class="bom-qty-lbl">в наличии</div></div>' +
-        (canManageSales() ?
+        (orderContext && it.selection_group_id ?
+          '<div class="bom-actions"><button class="btn btn-primary btn-small" onclick="openContractBomSelection(' + orderContext.itemId + ',' + modelId + ')" title="Выбрать этот ТЭН только для текущего заказа"><i class="ti ti-hand-click"></i> Для заказа</button></div>' :
+        (canManageModel ?
           '<div class="bom-actions">' +
             // v2.45.633: «Сопоставить со складом» — подобрать похожую складскую
             // позицию и привязать (тогда остаток/наличие синхронизируются). Для
             // компонентов, не для подсборок.
-            (!isModel ? '<button class="btn btn-secondary btn-small" onclick="openBomRelink(' + it.id + ', ' + JSON.stringify(it.component_name || '').replace(/"/g, '&quot;') + ', ' + modelId + ')" title="Сопоставить со складом (выбрать похожую позицию)"><i class="ti ti-arrows-exchange"></i></button>' : '') +
-            '<button class="btn btn-secondary btn-small" onclick="' + editCall + '" title="Изменить"><i class="ti ti-edit"></i></button>' +
+            (!isModel && !it.selection_group_id ? '<button class="btn btn-secondary btn-small" onclick="openBomRelink(' + it.id + ', ' + JSON.stringify(it.component_name || '').replace(/"/g, '&quot;') + ', ' + modelId + ')" title="Сопоставить со складом (выбрать похожую позицию)"><i class="ti ti-arrows-exchange"></i></button>' : '') +
+            (!isModel ? '<button class="btn btn-secondary btn-small" onclick="openBomVariantEditor(' + it.id + ')" title="Настроить выбираемые ТЭНы / варианты"><i class="ti ti-adjustments-horizontal"></i></button>' : '') +
+            (!it.selection_group_id ? '<button class="btn btn-secondary btn-small" onclick="' + editCall + '" title="Изменить"><i class="ti ti-edit"></i></button>' : '') +
             '<button class="btn btn-secondary btn-small" onclick="deleteBomItem(' + it.id + ',' + modelId + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
-          '</div>' : '<div></div>') +
+          '</div>' : '<div></div>')) +
       '</div>';
     };
 
@@ -6307,6 +6459,348 @@ async function bulkDeleteBomItems(modelId) {
   }
   showToast('Удалено: ' + ok + (fail ? ' · не удалось: ' + fail : ''), fail ? 'error' : 'success');
   loadModelBom(modelId);
+}
+
+// v2.45.912: настройка одной BOM-строки как обязательного выбора из нескольких
+// точных складских артикулов (основной сценарий — ТЭНы разной мощности).
+async function openBomVariantEditor(bomId) {
+  if (!cache.components) {
+    try { const r = await apiGet('/api/components'); cache.components = r.components || []; }
+    catch (e) { cache.components = []; }
+  }
+  let data;
+  try {
+    data = await apiGet('/api/bom/' + bomId + '/selection-group');
+  } catch (e) {
+    showToast('Не удалось загрузить варианты', 'error');
+    return;
+  }
+  const bom = data.bom || {};
+  const group = data.group || null;
+  const baseComponent = (cache.components || []).find(c => c.id === bom.component_id) || {};
+  const baseOption = {
+    id: null,
+    component_id: bom.component_id,
+    component_name: bom.component_name || baseComponent.name || '—',
+    component_sku: bom.component_sku || baseComponent.sku || '',
+    label: bom.component_name || baseComponent.name || '',
+    qty_required: Number(bom.qty_required || 1),
+    power_kw: null,
+    voltage_v: null,
+    phases: null,
+    is_default: true,
+  };
+  const variantOptions = group ? (group.options || []).map(o => Object.assign({}, o)) : [baseOption];
+  let defaultIndex = variantOptions.findIndex(o => !!o.is_default);
+  if (defaultIndex < 0 && variantOptions.length) defaultIndex = 0;
+  variantOptions.forEach((o, i) => { o.is_default = (i === defaultIndex); });
+  state._bomVariantEditor = {
+    bomId: bomId,
+    modelId: bom.model_id,
+    hasGroup: !!group,
+    name: group ? group.name : 'ТЭН',
+    is_required: group ? !!group.is_required : true,
+    options: variantOptions,
+  };
+  renderBomVariantEditor();
+}
+
+function renderBomVariantEditor() {
+  const st = state._bomVariantEditor;
+  if (!st) return;
+  let m = document.getElementById('bom-variant-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'bom-variant-modal';
+    m.className = 'modal-overlay';
+    m.style.zIndex = '10000';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  const rows = (st.options || []).map((o, i) => {
+    const defaultControl = o.is_default
+      ? '<button type="button" class="bom-variant-default-btn selected" aria-pressed="true" disabled>' +
+          '<i class="ti ti-circle-check-filled"></i> Стандарт модели</button>'
+      : '<button type="button" class="bom-variant-default-btn" aria-pressed="false" ' +
+          'onclick="setBomVariantDefault(' + i + ')"><i class="ti ti-circle"></i> Сделать стандартом модели</button>';
+    return '<div class="bom-variant-editor-row' + (o.is_default ? ' is-default' : '') + '">' +
+      '<div class="bom-variant-editor-head">' +
+        '<div><b>' + escapeHtml(o.component_name || '—') + '</b>' +
+          (o.component_sku ? '<div class="comp-sku">' + escapeHtml(o.component_sku) + '</div>' : '') + '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          defaultControl +
+          '<button type="button" class="icon-btn" onclick="removeBomVariantOption(' + i + ')" title="Убрать вариант" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bom-variant-editor-grid">' +
+        '<div><label>Подпись для выбора</label><input data-vindex="' + i + '" data-vfield="label" value="' + escapeHtml(o.label || '') + '" placeholder="1,0 кВт / 220 В"></div>' +
+        '<div><label>Кол-во</label><input type="number" min="0.01" step="0.01" data-vindex="' + i + '" data-vfield="qty_required" value="' + Number(o.qty_required || 1) + '"></div>' +
+        '<div><label>Мощность группы, кВт</label><input type="number" min="0" step="0.01" data-vindex="' + i + '" data-vfield="power_kw" value="' + (o.power_kw == null ? '' : Number(o.power_kw)) + '"></div>' +
+        '<div><label>Напряжение, В</label><input type="number" min="1" step="1" data-vindex="' + i + '" data-vfield="voltage_v" value="' + (o.voltage_v || '') + '"></div>' +
+        '<div><label>Фазы</label><input type="number" min="1" max="3" step="1" data-vindex="' + i + '" data-vfield="phases" value="' + (o.phases || '') + '"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:820px;max-height:90vh;display:flex;flex-direction:column;">' +
+      '<div class="modal-header"><h3><i class="ti ti-adjustments-horizontal"></i> Выбираемая позиция BOM</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'bom-variant-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
+      '<div style="padding:16px 18px;overflow:auto;">' +
+        '<div class="form-hint" style="margin-bottom:12px;"><b>Это настройка модели, а не текущего заказа.</b> Здесь задаются допустимые варианты и стандарт модели для плановых расчётов. Конкретный ТЭН заказа выбирается из позиции договора.</div>' +
+        '<div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-bottom:14px;">' +
+          '<div><label class="form-label">Название группы *</label><input id="bom-variant-group-name" class="form-input" value="' + escapeHtml(st.name || '') + '" placeholder="ТЭН"></div>' +
+          '<label style="display:flex;align-items:center;gap:7px;padding:10px 0;cursor:pointer;"><input id="bom-variant-required" type="checkbox" ' + (st.is_required ? 'checked' : '') + '> обязательный выбор</label>' +
+        '</div>' +
+        '<div id="bom-variant-rows">' + rows + '</div>' +
+        '<button type="button" class="btn btn-secondary" onclick="addBomVariantOption()"><i class="ti ti-plus"></i> Добавить другой ТЭН</button>' +
+      '</div>' +
+      '<div class="modal-footer" style="justify-content:space-between;">' +
+        '<div>' + (st.hasGroup ? '<button class="btn btn-secondary" onclick="deleteBomVariantConfiguration()" style="color:var(--danger);"><i class="ti ti-unlink"></i> Убрать выбор вариантов</button>' : '') + '</div>' +
+        '<div style="display:flex;gap:8px;"><button class="btn btn-secondary" onclick="document.getElementById(\'bom-variant-modal\').classList.remove(\'visible\')">Отмена</button>' +
+        '<button class="btn btn-primary" onclick="saveBomVariantConfiguration()"><i class="ti ti-check"></i> Сохранить варианты</button></div>' +
+      '</div></div>';
+  m.classList.add('visible');
+}
+
+function _captureBomVariantInputs() {
+  const st = state._bomVariantEditor;
+  if (!st) return;
+  document.querySelectorAll('#bom-variant-rows [data-vindex]').forEach(input => {
+    const index = parseInt(input.dataset.vindex);
+    const field = input.dataset.vfield;
+    if (!st.options[index]) return;
+    st.options[index][field] = input.value;
+  });
+  const name = document.getElementById('bom-variant-group-name');
+  const required = document.getElementById('bom-variant-required');
+  if (name) st.name = name.value;
+  if (required) st.is_required = required.checked;
+}
+
+function setBomVariantDefault(index) {
+  _captureBomVariantInputs();
+  const st = state._bomVariantEditor;
+  if (!st) return;
+  st.options.forEach((o, i) => { o.is_default = (i === index); });
+  renderBomVariantEditor();
+}
+
+function removeBomVariantOption(index) {
+  _captureBomVariantInputs();
+  const st = state._bomVariantEditor;
+  if (!st) return;
+  const wasDefault = !!(st.options[index] || {}).is_default;
+  st.options.splice(index, 1);
+  if (wasDefault && st.options.length) st.options[0].is_default = true;
+  renderBomVariantEditor();
+}
+
+function addBomVariantOption() {
+  _captureBomVariantInputs();
+  const st = state._bomVariantEditor;
+  if (!st) return;
+  state._bomPickerSelectHandler = function(component) {
+    if ((st.options || []).some(o => o.component_id === component.id)) {
+      showToast('Этот артикул уже добавлен', 'error');
+      return;
+    }
+    const first = st.options[0] || {};
+    st.options.push({
+      id: null,
+      component_id: component.id,
+      component_name: component.name || '—',
+      component_sku: component.sku || '',
+      label: component.name || '',
+      qty_required: Number(first.qty_required || 1),
+      power_kw: null,
+      voltage_v: first.voltage_v || null,
+      phases: first.phases || null,
+      is_default: !st.options.length,
+    });
+    renderBomVariantEditor();
+  };
+  openBomComponentPicker(st.modelId);
+}
+
+async function saveBomVariantConfiguration() {
+  _captureBomVariantInputs();
+  const st = state._bomVariantEditor;
+  if (!st) return;
+  if (!(st.name || '').trim()) { showToast('Укажите название группы', 'error'); return; }
+  if ((st.options || []).length < 2) { showToast('Добавьте минимум два варианта', 'error'); return; }
+  if (st.options.filter(o => !!o.is_default).length !== 1) {
+    showToast('Выберите один стандартный вариант', 'error');
+    return;
+  }
+  const payload = {
+    name: (st.name || '').trim(),
+    is_required: !!st.is_required,
+    options: st.options.map(o => ({
+      component_id: o.component_id,
+      label: (o.label || '').trim(),
+      qty_required: o.qty_required,
+      power_kw: o.power_kw,
+      voltage_v: o.voltage_v,
+      phases: o.phases,
+      is_default: !!o.is_default,
+    })),
+  };
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const response = await fetch(API_BASE + '/api/bom/' + st.bomId + '/selection-group', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) { showToast(body.message || 'Не удалось сохранить варианты', 'error'); return; }
+    showToast('Варианты комплектации сохранены', 'success');
+    document.getElementById('bom-variant-modal').classList.remove('visible');
+    cache.models = null;
+    await loadModelBom(st.modelId);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+async function deleteBomVariantConfiguration() {
+  const st = state._bomVariantEditor;
+  if (!st || !confirm('Убрать выбор вариантов? В техкарте останется стандартный артикул.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const response = await fetch(API_BASE + '/api/bom/' + st.bomId + '/selection-group', {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!response.ok) { showToast('Не удалось убрать варианты', 'error'); return; }
+    showToast('Оставлен стандартный артикул', 'success');
+    document.getElementById('bom-variant-modal').classList.remove('visible');
+    await loadModelBom(st.modelId);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// Точный ТЭН для одной позиции договора. В отличие от редактора выше это не
+// меняет стандарт модели: сохраняется неизменяемый снимок только в заказе.
+async function openContractBomSelection(itemId, modelId) {
+  let data;
+  try {
+    data = await apiGet('/api/contracts/items/' + itemId + '/bom-selection');
+  } catch (e) {
+    showToast((e && e.message) || 'Не удалось загрузить комплектацию заказа', 'error');
+    return;
+  }
+  const groups = data.groups || [];
+  if (!groups.length) {
+    showToast('У этой модели нет выбираемых вариантов ТЭНа', 'info');
+    return;
+  }
+  const selections = Object.assign({}, data.bom_selections || {});
+  groups.forEach(group => {
+    const savedId = Number(selections[group.id] || selections[String(group.id)] || 0);
+    if (savedId && (group.options || []).some(option => Number(option.id) === savedId)) {
+      selections[group.id] = savedId;
+      return;
+    }
+    delete selections[String(group.id)];
+    const standard = (group.options || []).find(option => option.is_default);
+    if (standard) selections[group.id] = standard.id;
+  });
+  state._contractBomSelector = {
+    itemId: itemId,
+    modelId: modelId,
+    contractId: data.contract_id,
+    groups: groups,
+    selections: selections,
+  };
+  renderContractBomSelection();
+}
+
+function selectContractBomOption(groupId, optionId) {
+  const st = state._contractBomSelector;
+  if (!st) return;
+  st.selections[groupId] = optionId;
+  renderContractBomSelection();
+}
+
+function renderContractBomSelection() {
+  const st = state._contractBomSelector;
+  if (!st) return;
+  let modal = document.getElementById('contract-bom-selection-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'contract-bom-selection-modal';
+    modal.className = 'modal-overlay';
+    modal.style.zIndex = '10020';
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
+    document.body.appendChild(modal);
+  }
+  let content = '';
+  let complete = true;
+  let totalPower = 0;
+  st.groups.forEach(group => {
+    const selectedId = Number(st.selections[group.id] || st.selections[String(group.id)] || 0);
+    if (group.is_required && !selectedId) complete = false;
+    content += '<div class="bom-config-group"><div class="bom-config-title"><span>' + escapeHtml(group.name || 'Вариант') + '</span>' +
+      (group.is_required ? '<span class="bom-config-required">выбор для заказа</span>' : '') + '</div><div class="bom-config-options">';
+    (group.options || []).forEach(option => {
+      const selected = Number(option.id) === selectedId;
+      if (selected && option.power_kw != null) totalPower += Number(option.power_kw || 0);
+      const facts = [];
+      if (option.power_kw != null) facts.push('<span class="bco-fact">' + _fmtQty(option.power_kw) + ' кВт</span>');
+      if (option.voltage_v) facts.push('<span class="bco-fact">' + option.voltage_v + ' В</span>');
+      if (option.phases) facts.push('<span class="bco-fact">' + option.phases + ' ф.</span>');
+      if (Number(option.qty_required || 1) !== 1) facts.push('<span class="bco-fact">' + _fmtQty(option.qty_required) + ' шт.</span>');
+      if (option.is_default) facts.push('<span class="bco-fact bco-default">стандарт модели</span>');
+      content += '<button type="button" class="bom-config-option' + (selected ? ' selected' : '') + '" onclick="selectContractBomOption(' + group.id + ',' + option.id + ')">' +
+        '<span class="bco-radio"></span><span class="bco-main"><span class="bco-label">' + escapeHtml(option.label || option.component_name || '—') + '</span>' +
+        '<span class="bco-component">' + escapeHtml(option.component_name || '') +
+          (option.component_sku ? ' · ' + escapeHtml(option.component_sku) : '') + '</span></span>' +
+        '<span class="bco-facts">' + facts.join('') + '</span></button>';
+    });
+    content += '</div></div>';
+  });
+  if (!complete) content += '<div class="bom-config-missing"><i class="ti ti-hand-click"></i> Выберите вариант в каждой обязательной группе.</div>';
+  else if (totalPower > 0) content += '<div class="bom-config-summary"><b>Итоговая мощность на изделие: ' + _fmtQty(totalPower) + ' кВт</b></div>';
+
+  modal.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:760px;max-height:90vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><div><h3 style="margin:0;"><i class="ti ti-adjustments-horizontal"></i> ТЭН для этого заказа</h3>' +
+      '<div class="form-hint" style="margin-top:5px;">Выбор сохранится только в позиции договора. Стандарт модели не изменится.</div></div>' +
+      '<button class="modal-close" onclick="document.getElementById(\'contract-bom-selection-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
+    '<div style="padding:16px 18px;overflow:auto;">' + content + '</div>' +
+    '<div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById(\'contract-bom-selection-modal\').classList.remove(\'visible\')">Отмена</button>' +
+      '<button class="btn btn-primary" onclick="saveContractBomSelection()"' + (complete ? '' : ' disabled') + '><i class="ti ti-check"></i> Сохранить для заказа</button></div></div>';
+  modal.classList.add('visible');
+}
+
+async function saveContractBomSelection() {
+  const st = state._contractBomSelector;
+  if (!st) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const response = await fetch(API_BASE + '/api/contracts/items/' + st.itemId + '/bom-selection', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ bom_selections: st.selections }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      showToast(body.message || 'Не удалось сохранить выбор для заказа', 'error');
+      return;
+    }
+    const modal = document.getElementById('contract-bom-selection-modal');
+    if (modal) modal.classList.remove('visible');
+    const context = {
+      itemId: st.itemId,
+      modelId: st.modelId,
+      contractId: st.contractId,
+      bom_configuration: body.bom_configuration || {},
+    };
+    const spec = state._specByContract && state._specByContract[st.contractId];
+    const item = spec && (spec.items || []).find(entry => entry.id === st.itemId);
+    if (item) item.bom_configuration = context.bom_configuration;
+    showToast('ТЭН сохранён только для этого заказа', 'success');
+    await openModelDetail(st.modelId, context);
+    if (st.contractId) loadContractItemsBlock(st.contractId);
+  } catch (e) {
+    showToast((e && e.message) || 'Ошибка соединения', 'error');
+  }
 }
 
 async function openBomAddItem(modelId) {
@@ -6494,6 +6988,7 @@ function openBomComponentPicker(modelId) {
 function closeBomComponentPicker() {
   const m = document.getElementById('bom-comp-picker-modal');
   if (m) m.classList.remove('visible');
+  state._bomPickerSelectHandler = null;
 }
 
 function renderBomComponentPicker() {
@@ -6557,6 +7052,14 @@ function toggleBomPickerGroup(cat) {
 function selectBomComponent(componentId) {
   const c = (cache.components || []).find(x => x.id === componentId);
   if (!c) return;
+  if (typeof state._bomPickerSelectHandler === 'function') {
+    const handler = state._bomPickerSelectHandler;
+    state._bomPickerSelectHandler = null;
+    const picker = document.getElementById('bom-comp-picker-modal');
+    if (picker) picker.classList.remove('visible');
+    handler(c);
+    return;
+  }
   state._bomSelectedComponentId = componentId;
   // Обновляем кнопку-picker в форме
   const btn = document.getElementById('bom-component-btn');
@@ -7092,6 +7595,7 @@ function openNewModelForm() {
         '<select id="nm-work-type" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:white;font-family:inherit;">' +
           '<option value="full_build">Полная сборка из материалов</option>' +
           '<option value="modify_purchased">Модификация покупного товара</option>' +
+          '<option value="purchase_only">Заказываем готовым — без производства</option>' +
         '</select>' +
       '</div>' +
       '<div style="padding:14px 18px;border-top:1px solid var(--border);background:var(--bg);">' +
@@ -7491,8 +7995,10 @@ function cancelNewAssembly() {
 function initNewAssemblyForm() {
   state.newAssembly = {
     model: null, execution: null, ipClass: null,
+    bomSelections: {}, bomConfigGroups: [],
     quantity: 1, workerIds: [], dateMode: 'today', customDate: null, comment: '',
     contractId: null,            // ЭТАП 15: ID договора (NULL = на склад)
+    contractItemId: null,        // точная позиция договора с выбранной комплектацией
     contractLabel: '',           // короткое описание для UI: «№12-Д · ООО Иванов»
     // ЭТАП 23: универсальные работы
     workType: 'assembly',        // assembly | repair | commissioning | installation | diagnostics | design | maintenance | other
@@ -7512,6 +8018,8 @@ function initNewAssemblyForm() {
   document.getElementById('date-input').value = '';
   document.getElementById('execution-section').style.display = 'none';
   document.getElementById('ip-section').style.display = 'none';
+  const bomOptionsSection = document.getElementById('bom-options-section');
+  if (bomOptionsSection) bomOptionsSection.style.display = 'none';
 
   document.getElementById('selected-model-display').innerHTML =
     '<div class="placeholder">Выберите модель…</div>';
@@ -7546,11 +8054,21 @@ async function _applyAssemblyPrefillIfAny() {
     if (!cache.models) {
       try { await ensureModelsLoaded(); } catch (e) {}
     }
+    let orderBomSelections = null;
+    if (pf.contract_item_id) {
+      try {
+        const orderBom = await apiGet('/api/contracts/items/' + pf.contract_item_id + '/bom-selection');
+        orderBomSelections = orderBom.bom_selections || null;
+        state.newAssembly.contractItemId = pf.contract_item_id;
+      } catch (e) {
+        // Вариант можно выбрать вручную в форме, если заказ ещё не настроен.
+      }
+    }
     // 1. Модель — если есть в кэше
     if (pf.model_id && cache.models && cache.models.models) {
       const model = cache.models.models.find(m => m.id === pf.model_id);
       if (model) {
-        selectModel(pf.model_id);
+        await selectModel(pf.model_id, orderBomSelections);
         // 2. Исполнение
         if (pf.execution) {
           setTimeout(() => {
@@ -7602,11 +8120,16 @@ function setWorkType(wt) {
   const execSec    = document.getElementById('execution-section');
   const ipSec      = document.getElementById('ip-section');
   const qtySec     = document.getElementById('quantity-section');
+  const bomOptionsSec = document.getElementById('bom-options-section');
   if (modelSec) modelSec.style.display = isAssembly ? '' : 'none';
   if (descSec)  descSec.style.display  = isAssembly ? 'none' : '';
   if (locSec)   locSec.style.display   = isAssembly ? 'none' : '';
   if (hoursSec) hoursSec.style.display = isAssembly ? 'none' : '';
   if (qtySec)   qtySec.style.display   = isAssembly ? '' : 'none';
+  if (bomOptionsSec) {
+    const hasGroups = !!(state.newAssembly.bomConfigGroups || []).length;
+    bomOptionsSec.style.display = (isAssembly && hasGroups) ? '' : 'none';
+  }
   // Для не-сборок прячем исполнение/IP даже если ранее выбраны
   if (!isAssembly) {
     if (execSec) execSec.style.display = 'none';
@@ -8084,13 +8607,18 @@ function toggleModelPickerGroup(dirId) {
   localStorage.setItem('modelpicker_groups_open', JSON.stringify(openMap));
 }
 
-function selectModel(modelId) {
+async function selectModel(modelId, presetBomSelections) {
   if (!cache.models) return;
   const model = cache.models.models.find(m => m.id === modelId);
   if (!model) return;
+  if (state.newAssembly.model && state.newAssembly.model.id !== modelId && typeof presetBomSelections === 'undefined') {
+    state.newAssembly.contractItemId = null;
+  }
   state.newAssembly.model = model;
   state.newAssembly.execution = null;
   state.newAssembly.ipClass = null;
+  state.newAssembly.bomSelections = {};
+  state.newAssembly.bomConfigGroups = [];
 
   const title = model.name + (model.extra ? ' · ' + model.extra : '');
   const dirName = (cache.models.directions.find(d => d.id === model.direction_id) || {}).name || '';
@@ -8127,7 +8655,106 @@ function selectModel(modelId) {
   document.querySelectorAll('#ip-section .chip-option').forEach(c => c.classList.remove('selected'));
 
   closeModelModal();
-  refreshBomPreview();  // ЭТАП 32: предпросмотр списания
+  await loadAssemblyBomConfiguration(model.id, presetBomSelections); // ТЭН/варианты
+}
+
+async function loadAssemblyBomConfiguration(modelId, presetBomSelections) {
+  const section = document.getElementById('bom-options-section');
+  const content = document.getElementById('bom-options-content');
+  if (!section || !content || !state.newAssembly || !state.newAssembly.model || state.newAssembly.model.id !== modelId) return;
+  section.style.display = 'none';
+  content.innerHTML = '<div class="loading-block" style="padding:12px;">Загружаем варианты…</div>';
+  try {
+    const data = await apiGet('/api/models/' + modelId + '/bom-configuration');
+    if (!state.newAssembly || !state.newAssembly.model || state.newAssembly.model.id !== modelId) return;
+    const groups = data.groups || [];
+    state.newAssembly.bomConfigGroups = groups;
+    state.newAssembly.bomSelections = {};
+    // Необязательная группа честно показывает в UI тот же default,
+    // который возьмёт backend, если пользователь его не менял.
+    groups.forEach(group => {
+      const presetId = Number((presetBomSelections || {})[group.id] || (presetBomSelections || {})[String(group.id)] || 0);
+      if (presetId && (group.options || []).some(option => Number(option.id) === presetId)) {
+        state.newAssembly.bomSelections[group.id] = presetId;
+        return;
+      }
+      if (group.is_required) return;
+      const defaultOption = (group.options || []).find(option => option.is_default);
+      if (defaultOption) state.newAssembly.bomSelections[group.id] = defaultOption.id;
+    });
+    if (!groups.length) {
+      section.style.display = 'none';
+      refreshBomPreview();
+      return;
+    }
+    section.style.display = '';
+    renderAssemblyBomConfiguration();
+    const previewSection = document.getElementById('bom-preview-section');
+    if (previewSection) previewSection.style.display = 'none';
+  } catch (e) {
+    section.style.display = '';
+    content.innerHTML = '<div class="bom-config-missing"><i class="ti ti-alert-triangle"></i> Не удалось загрузить варианты комплектации. Обновите страницу.</div>';
+  }
+}
+
+function _assemblyBomConfigurationComplete() {
+  const a = state.newAssembly || {};
+  const groups = a.bomConfigGroups || [];
+  return groups.every(g => !g.is_required || !!(a.bomSelections || {})[g.id]);
+}
+
+function selectAssemblyBomOption(groupId, optionId) {
+  if (!state.newAssembly) return;
+  state.newAssembly.bomSelections = state.newAssembly.bomSelections || {};
+  state.newAssembly.bomSelections[groupId] = optionId;
+  renderAssemblyBomConfiguration();
+  refreshBomPreview();
+}
+
+function renderAssemblyBomConfiguration() {
+  const content = document.getElementById('bom-options-content');
+  if (!content || !state.newAssembly) return;
+  const groups = state.newAssembly.bomConfigGroups || [];
+  const selections = state.newAssembly.bomSelections || {};
+  const assemblyQty = parseInt((document.getElementById('qty-input') || {}).value || 1) || 1;
+  let productPower = 0;
+  let selectedCount = 0;
+  let html = '';
+  groups.forEach(group => {
+    const selectedId = parseInt(selections[group.id] || 0);
+    html += '<div class="bom-config-group">' +
+      '<div class="bom-config-title"><span>' + escapeHtml(group.name || 'Вариант комплектации') + '</span>' +
+      (group.is_required ? '<span class="bom-config-required">нужно выбрать</span>' : '') + '</div>' +
+      '<div class="bom-config-options">';
+    (group.options || []).forEach(option => {
+      const selected = selectedId === option.id;
+      if (selected) {
+        selectedCount++;
+        if (option.power_kw != null) productPower += Number(option.power_kw || 0);
+      }
+      const facts = [];
+      if (option.power_kw != null) facts.push('<span class="bco-fact">' + _fmtQty(option.power_kw) + ' кВт</span>');
+      if (option.voltage_v) facts.push('<span class="bco-fact">' + option.voltage_v + ' В</span>');
+      if (option.phases) facts.push('<span class="bco-fact">' + option.phases + ' ф.</span>');
+      if (Number(option.qty_required || 1) !== 1) facts.push('<span class="bco-fact">' + _fmtQty(option.qty_required) + ' шт.</span>');
+      if (option.is_default) facts.push('<span class="bco-fact bco-default">стандарт</span>');
+      html += '<button type="button" class="bom-config-option' + (selected ? ' selected' : '') + '" onclick="selectAssemblyBomOption(' + group.id + ',' + option.id + ')">' +
+        '<span class="bco-radio"></span><span class="bco-main">' +
+          '<span class="bco-label">' + escapeHtml(option.label || option.component_name || '—') + '</span>' +
+          '<span class="bco-component">' + escapeHtml(option.component_name || '') +
+            (option.component_sku ? ' · ' + escapeHtml(option.component_sku) : '') +
+            ' · на складе ' + _fmtQty(option.component_qty || 0) + ' ' + escapeHtml(option.component_unit || 'шт.') + '</span>' +
+        '</span><span class="bco-facts">' + facts.join('') + '</span></button>';
+    });
+    html += '</div></div>';
+  });
+  if (selectedCount < groups.filter(g => g.is_required).length) {
+    html += '<div class="bom-config-missing"><i class="ti ti-hand-click"></i> Выберите вариант в каждой обязательной группе.</div>';
+  } else if (productPower > 0) {
+    html += '<div class="bom-config-summary"><b>Мощность на изделие: ' + _fmtQty(productPower) + ' кВт</b>' +
+      (assemblyQty > 1 ? '<br>На партию ' + assemblyQty + ' шт.: ' + _fmtQty(productPower * assemblyQty) + ' кВт' : '') + '</div>';
+  }
+  content.innerHTML = html;
 }
 
 // ЭТАП 32: предпросмотр автосписания со склада
@@ -8144,12 +8771,20 @@ async function _doBomPreview() {
 
   const model = state.newAssembly && state.newAssembly.model;
   if (!model) { section.style.display = 'none'; return; }
+  if ((state.newAssembly.bomConfigGroups || []).length && !_assemblyBomConfigurationComplete()) {
+    section.style.display = 'none';
+    return;
+  }
   const qtyInput = document.getElementById('qty-input');
   const quantity = parseInt((qtyInput && qtyInput.value) || 1);
   if (!quantity || quantity < 1) { section.style.display = 'none'; return; }
 
   try {
-    const data = await apiGet('/api/assemblies/preview-writeoff?model_id=' + model.id + '&quantity=' + quantity);
+    let previewUrl = '/api/assemblies/preview-writeoff?model_id=' + model.id + '&quantity=' + quantity;
+    if ((state.newAssembly.bomConfigGroups || []).length) {
+      previewUrl += '&bom_selections=' + encodeURIComponent(JSON.stringify(state.newAssembly.bomSelections || {}));
+    }
+    const data = await apiGet(previewUrl);
     state._lastBomPreview = data;
     if (!data.items || !data.items.length) {
       section.style.display = 'none';
@@ -8183,7 +8818,7 @@ async function _doBomPreview() {
       const shortCls = !it.enough ? (it.is_critical ? ' shortage-critical' : ' shortage-warn') : '';
       // Дефицитную складскую позицию (компонент) можно сопоставить вручную —
       // когда авто-матч указал не на ту складскую позицию (дубль/иная привязка).
-      const relinkBtn = (it.kind === 'component' && !it.enough && it.bom_id)
+      const relinkBtn = (it.kind === 'component' && !it.enough && it.bom_id && !it.selection_group_id)
         ? '<button class="bom-relink-btn" onclick="openBomRelink(' + it.bom_id + ', ' +
             JSON.stringify(it.component_name || '').replace(/"/g, '&quot;') + ')">' +
             '<i class="ti ti-arrows-exchange"></i> Сопоставить со складом</button>'
@@ -8481,7 +9116,9 @@ async function copyBomFrom(sourceId, sourceName) {
     const resp = await apiPost('/api/models/' + st.targetId + '/bom/copy-from', { source_model_id: sourceId });
     if (resp && resp.ok) {
       const c = resp.data || {};
-      showToast('Добавлено позиций: ' + (c.copied || 0) + (c.skipped ? ' (дублей пропущено: ' + c.skipped + ')' : ''), 'success');
+      showToast('Добавлено позиций: ' + (c.copied || 0) +
+        (c.groups_copied ? ' · групп вариантов: ' + c.groups_copied : '') +
+        (c.skipped ? ' (дублей пропущено: ' + c.skipped + ')' : ''), 'success');
       closeBomCopy();
       if (typeof loadModelBom === 'function') loadModelBom(st.targetId);
     } else {
@@ -8514,6 +9151,7 @@ function changeQty(delta) {
   input.value = v;
   state.newAssembly.quantity = v;
   document.getElementById('qty-minus').disabled = v <= 1;
+  renderAssemblyBomConfiguration();
   refreshBomPreview();
 }
 
@@ -8522,6 +9160,8 @@ document.getElementById('qty-input').addEventListener('input', function() {
   if (isNaN(v) || v < 1) v = 1;
   if (v > 1000) v = 1000;
   state.newAssembly.quantity = v;
+  renderAssemblyBomConfiguration();
+  refreshBomPreview();
 });
 
 document.getElementById('qty-input').addEventListener('blur', function() {
@@ -8589,6 +9229,12 @@ async function submitAssembly() {
     if (!a.model) { errEl.textContent = 'Выберите модель'; return; }
     if (a.model.exec_mode === 'choice' && !a.execution) { errEl.textContent = 'Укажите исполнение'; return; }
     if (a.model.needs_ip && !a.ipClass) { errEl.textContent = 'Укажите IP-класс'; return; }
+    if ((a.bomConfigGroups || []).length && !_assemblyBomConfigurationComplete()) {
+      errEl.textContent = 'Выберите ТЭН / вариант комплектации';
+      const configSection = document.getElementById('bom-options-section');
+      if (configSection) configSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
   } else {
     if (!a.description || !a.description.trim()) {
       errEl.textContent = (a.workType === 'installation') ? 'Опишите, что нужно сделать' : 'Опишите что было сделано';
@@ -8608,9 +9254,12 @@ async function submitAssembly() {
         model_id: a.model.id,
         qty: a.quantity || 1,
         contract_id: a.contractId || null,
-        execution_type: (a.model.exec_mode === 'choice' ? a.execution : null) || null,
+        contract_item_id: a.contractItemId || null,
+        execution_type: a.model.exec_mode === 'choice'
+          ? (a.execution === 'ne' ? 'stainless' : 'standard') : null,
         ip_rating: (a.model.needs_ip ? a.ipClass : null) || null,
         description: a.comment || null,
+        bom_selections: a.bomSelections || {},
       });
       if (!(r && r.ok)) {
         errEl.textContent = ((r && r.data) || {}).message || 'Не удалось поставить в очередь';
@@ -8654,10 +9303,12 @@ async function submitAssembly() {
     ip_class: isAssembly && a.model && a.model.needs_ip ? a.ipClass : null,
     comment: a.comment || '',
     contract_id: a.contractId || null,
+    contract_item_id: a.contractItemId || null,
     description: a.description || null,
     location: a.location || null,
     hours_spent: a.hours_spent || null,
     initial_status: initialStatus,
+    bom_selections: a.bomSelections || {},
   };
 
   btn.disabled = true;
@@ -9981,7 +10632,7 @@ function renderInstallFilesSection() {
     html += '<div class="install-files-grid">';
     files.forEach(x => {
       const f = x.f;
-      const url = API_BASE + '/api/contracts/chat/files/' + f.id;
+      const url = API_BASE + (f.url || '/api/contracts/chat/files/' + f.id);
       const name = f.original_name || (f.kind === 'photo' ? 'Фото' : f.kind === 'video' ? 'Видео' : 'Файл #' + f.id);
       const sub = (f.file_size ? Math.round(f.file_size / 1024) + ' КБ' : '') + (x.author ? ' · ' + x.author : '');
       if (f.kind === 'photo') {
@@ -10651,7 +11302,10 @@ function _renderReservationBadge(item) {
     } else {
       cls = 'r-none';
       icon = 'ti-circle-dashed';
-      txt = (item.model_id ? 'К сборке' : 'К закупке');
+      // v2.45.985: модель «заказываем на стороне» (purchase_only) мы не собираем —
+      // писать «К сборке» на монтажной балке было прямой дезинформацией цеха.
+      txt = (item.model_id && item.model_work_type !== 'purchase_only')
+        ? 'К сборке' : 'К закупке';
     }
     return ' <span class="spec-item-reservation ' + cls + '" title="' + escapeHtml(txt) + '">' +
       '<i class="ti ' + icon + '"></i>' + escapeHtml(txt) + '</span>';
@@ -10725,11 +11379,15 @@ function _openSaleProductFromSpec(productId, contractId) {
     contractId: contractId,
   });
 }
-function _openModelFromSpec(modelId, contractId) {
-  // openModelDetail — модалка, закрытие возвращает в текущий экран (договор)
-  // автоматически. Контекст пока не нужен, но оставляем функцию-обёртку
-  // на будущее (если придётся добавлять кнопку «Редактировать» с переходом).
-  openModelDetail(modelId);
+function _openModelFromSpec(modelId, contractId, itemId) {
+  const spec = state._specByContract && state._specByContract[contractId];
+  const item = spec && (spec.items || []).find(entry => entry.id === itemId);
+  openModelDetail(modelId, {
+    modelId: modelId,
+    contractId: contractId,
+    itemId: itemId,
+    bom_configuration: (item && item.bom_configuration) || {},
+  });
 }
 function _openComponentFromSpec(componentId, contractId) {
   if (typeof openComponentDetail === 'function') openComponentDetail(componentId);
@@ -10894,7 +11552,7 @@ function renderContractItemsBlock(contractId) {
           nameClickHandler = ' onclick="_openSaleProductFromSpec(' + it.sale_product_id + ',' + contractId + ')"';
           nameLinkClass = ' spec-item-name--link';
         } else if (it.model_id) {
-          nameClickHandler = ' onclick="_openModelFromSpec(' + it.model_id + ',' + contractId + ')"';
+          nameClickHandler = ' onclick="_openModelFromSpec(' + it.model_id + ',' + contractId + ',' + it.id + ')"';
           nameLinkClass = ' spec-item-name--link';
         } else if (it.component_id) {
           nameClickHandler = ' onclick="_openComponentFromSpec(' + it.component_id + ',' + contractId + ')"';
@@ -10908,6 +11566,10 @@ function renderContractItemsBlock(contractId) {
         let _sysChip = '';
         if (it.system_tag) {
           _sysChip = ' <span style="display:inline-block;font-size:10px;font-weight:700;color:#0E7490;background:rgba(14,116,144,0.10);padding:1px 7px;border-radius:6px;margin-left:4px;vertical-align:middle;" title="Относится к системе / объекту"><i class="ti ti-layout-grid" style="font-size:10px;vertical-align:-1px;"></i> ' + escapeHtml(it.system_tag) + '</span>';
+        }
+        const _orderBomSummary = _contractBomSummary(it.bom_configuration);
+        if (_orderBomSummary) {
+          _sysChip += ' <span class="spec-order-bom-chip" title="Точный вариант зафиксирован только для этой позиции договора"><i class="ti ti-bolt"></i> ' + escapeHtml(_orderBomSummary) + '</span>';
         }
         // v2.45.814: переключатель «Отгружать отдельной позицией» прямо в строке —
         // с явной галочкой, клик переключает без открытия формы
@@ -11235,12 +11897,21 @@ function renderSpecForm(contractId, existing) {
   html += '<div id="spec-search-results" class="spec-search-results" style="display:none;"></div>';
   html += '</div>';
   html += '</div>';
-  // Кол-во + ед.изм.
+  // Кол-во + ед.изм. Для счётных единиц нельзя получить 0,99 шт. стрелкой поля.
+  const qtyUnit = e.unit || 'шт.';
+  const qtyIsWhole = _specUnitRequiresWholeQty(qtyUnit);
+  const rawQty = Number(e.qty ?? 1);
+  const qtyValue = qtyIsWhole && Number.isFinite(rawQty)
+    ? Math.max(1, Math.round(rawQty))
+    : (e.qty ?? 1);
   html += '<div class="spec-form-field"><label>Кол-во *</label>' +
-          '<input type="number" id="spec-form-qty" value="' + (e.qty || 1) + '" min="0" step="0.01">' +
+          '<input type="number" id="spec-form-qty" value="' + qtyValue + '" min="' + (qtyIsWhole ? '1' : '0.01') +
+          '" step="' + (qtyIsWhole ? '1' : '0.01') + '" inputmode="' + (qtyIsWhole ? 'numeric' : 'decimal') +
+          '" onblur="_syncSpecQtyRules(true)">' +
           '</div>';
   html += '<div class="spec-form-field" style="grid-column: 2 / -1;"><label>Ед.изм.</label>' +
-          '<input type="text" id="spec-form-unit" value="' + escapeHtml(e.unit || 'шт.') + '" maxlength="30" list="spec-units">' +
+          '<input type="text" id="spec-form-unit" value="' + escapeHtml(qtyUnit) +
+          '" maxlength="30" list="spec-units" oninput="_syncSpecQtyRules(false)" onchange="_syncSpecQtyRules(true)">' +
           '<datalist id="spec-units">' +
             '<option value="шт.">' +
             '<option value="м">' +
@@ -11487,6 +12158,38 @@ function _specSearchSourceBadge(source) {
   return '';
 }
 
+// Счётные единицы в спецификации договора всегда целые. Дроби остаются
+// доступными для метров, площади, массы и объёма.
+function _specUnitRequiresWholeQty(unit) {
+  const normalized = String(unit || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[.\s]/g, '');
+  return [
+    'шт', 'штука', 'штуки', 'штук',
+    'компл', 'комплект', 'комплекта', 'комплектов',
+    'упак', 'упаковка', 'упаковки', 'упаковок',
+  ].includes(normalized);
+}
+
+function _syncSpecQtyRules(normalizeValue) {
+  const qtyInput = document.getElementById('spec-form-qty');
+  const unitInput = document.getElementById('spec-form-unit');
+  if (!qtyInput || !unitInput) return;
+
+  const whole = _specUnitRequiresWholeQty(unitInput.value);
+  qtyInput.min = whole ? '1' : '0.01';
+  qtyInput.step = whole ? '1' : '0.01';
+  qtyInput.inputMode = whole ? 'numeric' : 'decimal';
+
+  if (whole && normalizeValue) {
+    const value = Number(qtyInput.value);
+    if (Number.isFinite(value)) {
+      qtyInput.value = String(Math.max(1, Math.round(value)));
+    }
+  }
+}
+
 // v2.20.0: универсальный обработчик выбора из унифицированного поиска
 function selectUnifiedSpec(payloadStr) {
   let p;
@@ -11529,6 +12232,7 @@ function selectUnifiedSpec(payloadStr) {
   if (nm) nm.value = p.label || '';
   if (input) input.value = p.label || '';
   if (unitInput && p.unit && !unitInput.value) unitInput.value = p.unit;
+  _syncSpecQtyRules(false);
 
   if (results) results.style.display = 'none';
 
@@ -11596,6 +12300,20 @@ async function submitSpecForm(contractId, itemId) {
     showToast('Выберите позицию из каталога или впишите название вручную', 'error');
     return;
   }
+  const qtyInput = document.getElementById('spec-form-qty');
+  const unit = (document.getElementById('spec-form-unit').value || 'шт.').trim() || 'шт.';
+  const qty = Number(qtyInput && qtyInput.value);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    showToast('Количество должно быть больше нуля', 'error');
+    if (qtyInput) qtyInput.focus();
+    return;
+  }
+  if (_specUnitRequiresWholeQty(unit) && !Number.isInteger(qty)) {
+    showToast('Для «' + unit + '» укажите целое количество: 1, 2, 3…', 'error');
+    if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+    return;
+  }
+
   // ЭТАП 37: условные поля
   const execEl = document.getElementById('spec-form-execution-type');
   const ipEl = document.getElementById('spec-form-ip-rating');
@@ -11604,8 +12322,8 @@ async function submitSpecForm(contractId, itemId) {
     component_id: componentId,
     sale_product_id: saleProductId,
     name: name,
-    qty: parseFloat(document.getElementById('spec-form-qty').value) || 0,
-    unit: (document.getElementById('spec-form-unit').value || 'шт.').trim() || 'шт.',
+    qty: qty,
+    unit: unit,
     // execution_type / ip_rating — отправляем всегда, чтобы PATCH мог очистить
     execution_type: execEl ? (execEl.value || '') : '',
     ip_rating: ipEl ? (ipEl.value || '') : '',
@@ -11777,8 +12495,7 @@ async function downloadContractSpecDocx(contractId) {
     const a = document.createElement('a');
     a.href = url;
     const cd = r.headers.get('Content-Disposition') || '';
-    const match = cd.match(/filename="([^"]+)"/);
-    a.download = match ? match[1] : 'Спецификация.docx';
+    a.download = filenameFromCD(cd, 'Спецификация.docx');
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -11955,6 +12672,7 @@ async function loadNomTab(tab) {
         state._nomPicker.productionData = {
           models: (d && d.models) || [],
           directions: (d && d.directions) || [],
+          categories: (d && d.categories) || [],
         };
       } catch (e) {
         body.innerHTML = '<div class="nom-empty">Ошибка загрузки: ' + escapeHtml(String(e)) + '</div>';
@@ -12044,7 +12762,9 @@ function renderProductionTree() {
     if (!filter) return true;
     return (m.name || '').toLowerCase().includes(filter) ||
            (m.article || '').toLowerCase().includes(filter) ||
-           (m.extra || '').toLowerCase().includes(filter);
+           (m.extra || '').toLowerCase().includes(filter) ||
+           (m.subgroup_name || '').toLowerCase().includes(filter) ||
+           (m.category_name || '').toLowerCase().includes(filter);
   });
   if (!list.length) {
     body.innerHTML = '<div class="nom-empty"><i class="ti ti-search-off" style="font-size:24px; display:block; margin-bottom:6px;"></i>' +
@@ -12077,46 +12797,60 @@ function renderProductionTree() {
           bySg[s].items.push(m);
         } else noSg.push(m);
       });
-      // v2.45.681/684: длинные списки разбиваем на авто-серии по артикулу
-      // (ЩУ-001-…, ЩУ-002-…) — раскрываешь «001», потом «002», а не листаешь всё
-      function _seriesHtml(items, keyPrefix) {
+      // v2.45.913: внутри подгруппы показываем реальные категории
+      // из справочника. Раньше пикер сам выдумывал «Серию» из артикула,
+      // поэтому ЩУ-005.003 оказывался не в своей категории «ЩУ-005.000 АСУ».
+      function _categoryHtml(items, keyPrefix) {
         let out = '';
-        const bySer = {};
-        if (items.length > 15) {
-          items.forEach(m => {
-            const a = String(m.article || m.name || '').trim();
-            const seg = a.split(/[-–\s]+/).filter(Boolean);
-            const ser = seg.length >= 2 ? (seg[0] + '-' + seg[1]) : (seg[0] || 'Прочее');
-            (bySer[ser] = bySer[ser] || []).push(m);
-          });
+        const byCategory = {};
+        const withoutCategory = [];
+        items.forEach(m => {
+          if (!m.category_id) {
+            withoutCategory.push(m);
+            return;
+          }
+          const categoryId = String(m.category_id);
+          if (!byCategory[categoryId]) {
+            const fromDirectory = (d.categories || []).find(c => Number(c.id) === Number(m.category_id));
+            byCategory[categoryId] = {
+              id: m.category_id,
+              name: m.category_name || (fromDirectory && fromDirectory.name) || ('Категория #' + categoryId),
+              items: [],
+            };
+          }
+          byCategory[categoryId].items.push(m);
+        });
+        if (withoutCategory.length) {
+          out += '<div class="sp-tree-items">';
+          withoutCategory.forEach(m => { out += _prodPickItem(m, dirName); });
+          out += '</div>';
         }
-        const serNames = Object.keys(bySer).sort((a, b) => a.localeCompare(b, 'ru', { numeric: true }));
-        if (serNames.length > 1) {
-          serNames.forEach(ser => {
-            const sKey = keyPrefix + ':' + ser;
-            const sOpen = autoOpen || !!og[sKey];
-            out += '<div class="sp-tree-subgroup">' +
-              '<button type="button" class="sp-tree-toggle subgroup' + (sOpen ? ' open' : '') + '" onclick="toggleNomGroup(\'' + sKey.replace(/'/g, "\\'") + '\')">' +
+        Object.keys(byCategory)
+          .sort((a, b) => (byCategory[a].name || '').localeCompare(byCategory[b].name || '', 'ru', { numeric: true }))
+          .forEach(categoryId => {
+            const category = byCategory[categoryId];
+            const cKey = keyPrefix + ':cat:' + categoryId;
+            const cOpen = autoOpen || !!og[cKey];
+            out += '<div class="sp-tree-subgroup sp-tree-category">' +
+              '<button type="button" class="sp-tree-toggle subgroup category' + (cOpen ? ' open' : '') + '" onclick="toggleNomGroup(\'' + cKey + '\')">' +
                 '<i class="ti ti-chevron-right sp-tree-chev"></i>' +
-                '<span>Серия ' + escapeHtml(ser) + '</span>' +
-                '<span class="sp-tree-count subgroup">' + bySer[ser].length + '</span>' +
+                '<i class="ti ti-folder" style="font-size:14px;opacity:.65;"></i>' +
+                '<span>' + escapeHtml(category.name) + '</span>' +
+                '<span class="sp-tree-count subgroup">' + category.items.length + '</span>' +
               '</button>';
-            if (sOpen) {
+            if (cOpen) {
               out += '<div class="sp-tree-items">';
-              bySer[ser].forEach(m => { out += _prodPickItem(m, dirName); });
+              category.items.forEach(m => { out += _prodPickItem(m, dirName); });
               out += '</div>';
             }
             out += '</div>';
           });
-        } else {
-          out += '<div class="sp-tree-items">';
-          items.forEach(m => { out += _prodPickItem(m, dirName); });
-          out += '</div>';
-        }
         return out;
       }
       if (noSg.length) {
-        h += _seriesHtml(noSg, 'pser:' + dirId);
+        h += '<div class="sp-tree-items">';
+        noSg.forEach(m => { h += _prodPickItem(m, dirName); });
+        h += '</div>';
       }
       Object.keys(bySg).sort((a, b) => (bySg[a].name || '').localeCompare(bySg[b].name || '', 'ru')).forEach(s => {
         const sg = bySg[s];
@@ -12129,8 +12863,7 @@ function renderProductionTree() {
             '<span class="sp-tree-count subgroup">' + sg.items.length + '</span>' +
           '</button>';
         if (sOpen) {
-          // v2.45.684: серии и внутри подгруппы («Стандартные» → ЩУ-001, ЩУ-002…)
-          h += _seriesHtml(sg.items, 'pser:' + dirId + ':' + s);
+          h += _categoryHtml(sg.items, 'pcat:' + dirId + ':' + s);
         }
         h += '</div>';
       });
@@ -12331,6 +13064,7 @@ function pickNomSaleProduct(label, unit, saleProductId, categoryName) {
   if (nm) nm.value = label;
   if (search) search.value = label;
   if (unitEl && unit) unitEl.value = unit;
+  _syncSpecQtyRules(false);
   // ЭТАП 37: сохранить category для условного рендера полей
   state._specFormCtx = {
     kind: 'sale',
@@ -12359,6 +13093,7 @@ function pickNomComponent(componentId, label, unit, categoryName) {
   if (nm) nm.value = label;
   if (search) search.value = label;
   if (unitEl && unit) unitEl.value = unit;
+  _syncSpecQtyRules(false);
   // Контекст: для комплектующих категория из component_categories
   // (Воздухоохладители — единственная пересекающаяся с условным рендером)
   state._specFormCtx = {

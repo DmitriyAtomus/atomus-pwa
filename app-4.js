@@ -1714,7 +1714,7 @@ function renderHelpKnowledge() {
   html += '<div onclick="openIdeasModal()" style="cursor:pointer;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#EEF2FF,#F5F3FF);border:1px solid #C7D2FE;border-radius:14px;padding:14px 16px;margin-bottom:16px;">' +
       '<div style="font-size:26px;">💡</div>' +
       '<div style="flex:1;"><div style="font-weight:700;font-size:15px;">Идеи и доработки</div>' +
-        '<div style="font-size:12.5px;color:var(--text-light);">Расскажи ИИ, что улучшить в программе — он уточнит детали и оформит заявку разработчику.</div></div>' +
+        '<div style="font-size:12.5px;color:var(--text-light);">Расскажите Клоду, что улучшить в программе — он уточнит детали, оформит ТЗ и передаст директору.</div></div>' +
       '<i class="ti ti-chevron-right" style="color:var(--brand);"></i>' +
     '</div>';
   HELP_CATEGORIES.forEach(cat => {
@@ -1739,60 +1739,291 @@ function renderHelpCard(a) {
     '</div>';
 }
 
-// ============ Идеи / доработки (ИИ-ассистент) ============
+// ============ Идеи: чат сотрудника с Клодом ============
+// Раздел для всех сотрудников. Клод здесь работает ТОЛЬКО на чтение: смотрит
+// склад, производство и карту разделов, но договоры, суммы и зарплаты ему
+// закрыты (границы стоят на бэкенде, atomus/idea_agent.py). Вместе с человеком
+// он доводит идею до ТЗ; готовое ТЗ уезжает директору в ленту разработки
+// ПРЕДЛОЖЕНИЕМ — правка кода начинается только с его кнопки «Внедрить».
+// Вход в раздел — по паролю, который выдаёт директор.
 
-function openIdeasModal() {
-  let m = document.getElementById('ideas-modal');
-  if (!m) {
-    m = document.createElement('div');
-    m.id = 'ideas-modal';
-    m.className = 'modal-overlay';
-    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
-    document.body.appendChild(m);
+const IDEA_STATUS = {
+  open:     { label: 'черновик',   cls: 'is-open' },
+  ready:    { label: 'ТЗ готово',  cls: 'is-ready' },
+  sent:     { label: 'у директора', cls: 'is-sent' },
+  taken:    { label: 'в работе',   cls: 'is-taken' },
+  declined: { label: 'отложено',   cls: 'is-declined' },
+  done:     { label: 'сделано',    cls: 'is-done' },
+};
+
+// Старая точка входа из «Помощи» — теперь ведёт в раздел, а не в модалку.
+function openIdeasModal() { selectSidebarItem('ideas'); }
+
+async function loadIdeas() {
+  const body = document.getElementById('ideas-body');
+  if (!body) return;
+  state._ideas = state._ideas || {};
+  let st;
+  try { st = await apiGet('/api/ideas/state'); } catch (e) {
+    body.innerHTML = '<div class="empty-block"><i class="ti ti-cloud-off"></i>Нет связи с сервером</div>';
+    return;
   }
-  m.innerHTML =
-    '<div class="modal" onclick="event.stopPropagation()" style="max-width:560px;width:100%;display:flex;flex-direction:column;max-height:88vh;">' +
-      '<div class="modal-header"><h3>💡 Идеи и доработки</h3>' +
-        '<button class="modal-close" onclick="document.getElementById(\'ideas-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
-      '<div style="display:flex;gap:8px;padding:10px 16px 0;">' +
-        '<button class="btn btn-primary btn-small" onclick="ideasShowNew()"><i class="ti ti-bulb"></i> Предложить</button>' +
-        '<button class="btn btn-secondary btn-small" onclick="ideasShowList()"><i class="ti ti-list"></i> Заявки</button>' +
+  state._ideas.isDir = !!st.is_director;
+  state._ideas.name = st.name || '';
+  const keyBtn = document.getElementById('ideas-key-btn');
+  if (keyBtn) keyBtn.style.display = st.is_director ? '' : 'none';
+  if (!st.unlocked) { _ideasRenderLock(st); return; }
+  _ideasRenderShell();
+  await ideasLoadList();
+}
+
+function _ideasRenderLock(st) {
+  const body = document.getElementById('ideas-body');
+  body.innerHTML =
+    '<div class="ich-lock">' +
+      '<div class="ich-lock-ico"><i class="ti ti-lock"></i></div>' +
+      '<h3>Чат идей — под паролем</h3>' +
+      '<p>Здесь можно рассказать Клоду, что улучшить в программе: он уточнит детали, ' +
+        'оформит ТЗ и передаст директору. Пароль выдаёт директор.</p>' +
+      (st.has_password
+        ? '<div class="ich-lock-form">' +
+            '<input type="password" id="idea-pass" class="form-input" placeholder="Пароль" ' +
+              'autocomplete="off" onkeydown="if(event.key===\'Enter\')ideasUnlock()">' +
+            '<button class="btn btn-primary" onclick="ideasUnlock()"><i class="ti ti-login"></i> Войти</button>' +
+          '</div>' +
+          '<div class="ich-lock-err" id="idea-pass-err"></div>'
+        : '<div class="ich-lock-err">' + (st.is_director
+            ? 'Пароль ещё не задан. Нажмите ключ в шапке и задайте его — потом выдайте сотрудникам.'
+            : 'Директор ещё не задал пароль. Попросите его открыть доступ.') + '</div>') +
+    '</div>';
+  const inp = document.getElementById('idea-pass');
+  if (inp) inp.focus();
+}
+
+async function ideasUnlock() {
+  const inp = document.getElementById('idea-pass');
+  const err = document.getElementById('idea-pass-err');
+  if (!inp) return;
+  const password = (inp.value || '').trim();
+  if (!password) { inp.focus(); return; }
+  const r = await apiPost('/api/ideas/unlock', { password });
+  if (r.ok && r.data && r.data.ok) { inp.value = ''; loadIdeas(); return; }
+  if (err) err.textContent = (r.data && r.data.message) || 'Пароль не подходит';
+  inp.value = '';
+  inp.focus();
+}
+
+function _ideasRenderShell() {
+  const body = document.getElementById('ideas-body');
+  if (document.getElementById('ideas-feed')) return;   // уже собрано
+  body.innerHTML =
+    '<div class="ich" id="ideas-wrap">' +
+      '<aside class="ich-list" id="ideas-list">' +
+        '<button class="ich-new" onclick="ideasNew()"><i class="ti ti-plus"></i>Новая идея</button>' +
+        '<div class="ich-items" id="ideas-items"><div class="loading-block">Загружаем…</div></div>' +
+      '</aside>' +
+      '<div class="ich-main">' +
+        '<div class="ich-feed" id="ideas-feed"></div>' +
+        '<div class="ich-actions" id="ideas-actions"></div>' +
+        '<div class="ich-composer">' +
+          '<textarea id="idea-input" class="ich-input" rows="1" placeholder="Что улучшить в программе?" ' +
+            'oninput="ideasGrow(this)" onkeydown="ideasKey(event)"></textarea>' +
+          '<button class="ich-send" onclick="ideaSend()" title="Отправить (Enter)"><i class="ti ti-arrow-up"></i></button>' +
+        '</div>' +
+        '<div class="ich-hint">Клод только смотрит: код не правит, договоры и суммы не показывает. ' +
+          'Готовое ТЗ уходит директору — внедрять или нет, решает он.</div>' +
       '</div>' +
-      '<div id="ideas-body" style="flex:1;overflow-y:auto;padding:14px 16px;"></div>' +
-      '<div id="ideas-foot" style="padding:12px 16px;border-top:1px solid var(--border);"></div>' +
-    '</div>';
-  m.classList.add('visible');
-  ideasShowNew();
-}
-
-function ideasShowNew() {
-  state.ideaThreadId = null;
-  const body = document.getElementById('ideas-body');
-  const foot = document.getElementById('ideas-foot');
-  if (!body || !foot) return;
-  body.innerHTML = '<div id="ideas-chat" style="display:flex;flex-direction:column;gap:8px;">' +
-      '<div style="background:#F1F5F9;border-radius:10px;padding:8px 11px;font-size:13.5px;">Привет! Опиши, что хочешь улучшить или добавить в программе — я задам пару уточняющих вопросов и оформлю заявку разработчику.</div>' +
-    '</div>';
-  foot.innerHTML =
-    '<textarea id="idea-input" class="form-input" rows="2" placeholder="Напиши идею…" style="margin-bottom:8px;"></textarea>' +
-    '<div style="display:flex;gap:8px;">' +
-      '<button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="ideaSend()"><i class="ti ti-send"></i> Отправить</button>' +
-      '<button class="btn btn-secondary" id="idea-compile-btn" style="display:none;" onclick="ideaCompile()"><i class="ti ti-file-check"></i> Сформировать ТЗ</button>' +
     '</div>';
 }
 
-function _ideaAddMsg(role, text) {
-  const chat = document.getElementById('ideas-chat');
-  if (!chat) return null;
+function ideasToggleList() {
+  const wrap = document.getElementById('ideas-wrap');
+  if (wrap) wrap.classList.toggle('list-open');
+}
+
+async function ideasLoadList() {
+  let d;
+  try { d = await apiGet('/api/ideas'); } catch (e) { d = null; }
+  const items = document.getElementById('ideas-items');
+  if (!items) return;
+  const list = (d && d.ideas) || [];
+  state._ideas.list = list;
+  if (!list.length) {
+    items.innerHTML = '<div class="ich-empty">Пока пусто. Нажмите «Новая идея».</div>';
+    ideasNew();
+    return;
+  }
+  items.innerHTML = list.map(function (it) {
+    const st = IDEA_STATUS[it.status] || IDEA_STATUS.open;
+    const mine = !state._ideas.isDir || !it.author_name;
+    return '<button class="ich-item' + (it.id === state._ideas.current ? ' active' : '') +
+      '" onclick="ideasOpen(' + it.id + ')">' +
+      '<div class="ich-it-top"><span class="ich-it-title">' + escapeHtml(it.title || 'Идея') + '</span>' +
+        '<span class="ich-chip ' + st.cls + '">' + st.label + '</span></div>' +
+      '<div class="ich-it-sub">' + (mine ? '' : escapeHtml(it.author_name) + ' · ') +
+        escapeHtml(_ideasWhen(it.updated_at)) + '</div>' +
+      '</button>';
+  }).join('');
+  if (state._ideas.current) ideasOpen(state._ideas.current);
+  else ideasOpen(list[0].id);
+}
+
+function _ideasWhen(raw) {
+  if (!raw) return '';
+  const d = new Date(String(raw).replace(' ', 'T') + (String(raw).endsWith('Z') ? '' : 'Z'));
+  if (isNaN(d.getTime())) return String(raw).slice(0, 16);
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  return sameDay
+    ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+}
+
+function ideasNew() {
+  state._ideas = state._ideas || {};
+  state._ideas.current = null;
+  const feed = document.getElementById('ideas-feed');
+  const acts = document.getElementById('ideas-actions');
+  if (!feed) { _ideasRenderShell(); return ideasNew(); }
+  feed.innerHTML =
+    '<div class="ich-hello">' +
+      '<div class="ich-ava"><i class="ti ti-sparkles"></i></div>' +
+      '<div><b>Привет' + (state._ideas.name ? ', ' + escapeHtml(state._ideas.name) : '') + '!</b><br>' +
+      'Расскажите, что в программе мешает или чего не хватает. Я уточню детали, ' +
+      'посмотрю, как устроено сейчас, и вместе оформим ТЗ для директора.</div>' +
+    '</div>';
+  if (acts) acts.innerHTML = '';
+  document.querySelectorAll('.ich-item.active').forEach(function (el) { el.classList.remove('active'); });
+  const inp = document.getElementById('idea-input');
+  if (inp) { inp.value = ''; inp.focus(); }
+  const wrap = document.getElementById('ideas-wrap');
+  if (wrap) wrap.classList.remove('list-open');
+}
+
+async function ideasOpen(id) {
+  state._ideas = state._ideas || {};
+  state._ideas.current = id;
+  const feed = document.getElementById('ideas-feed');
+  if (!feed) return;
+  document.querySelectorAll('.ich-item').forEach(function (el) { el.classList.remove('active'); });
+  const wrap = document.getElementById('ideas-wrap');
+  if (wrap) wrap.classList.remove('list-open');
+  feed.innerHTML = '<div class="loading-block">Загружаем переписку…</div>';
+  let d;
+  try { d = await apiGet('/api/ideas/' + id); } catch (e) {
+    feed.innerHTML = '<div class="empty-block"><i class="ti ti-cloud-off"></i>Не удалось открыть</div>';
+    return;
+  }
+  const th = (d && d.thread) || {};
+  state._ideas.thread = th;
+  feed.innerHTML = '';
+  (th.messages || []).forEach(function (m) { _ideaAddMsg(m.role, m.text, m.created_at); });
+  if (th.spec_text) _ideaAddSpec(th.spec_text);
+  _ideasRenderActions(th);
+  _ideasScroll();
+  ideasLoadListSilent();
+}
+
+// Обновить только список (не трогая открытую переписку) — после отправки.
+async function ideasLoadListSilent() {
+  let d;
+  try { d = await apiGet('/api/ideas'); } catch (e) { return; }
+  state._ideas.list = (d && d.ideas) || [];
+  const items = document.getElementById('ideas-items');
+  if (!items || !state._ideas.list.length) return;
+  items.innerHTML = state._ideas.list.map(function (it) {
+    const st = IDEA_STATUS[it.status] || IDEA_STATUS.open;
+    const who = (state._ideas.isDir && it.author_name) ? escapeHtml(it.author_name) + ' · ' : '';
+    return '<button class="ich-item' + (it.id === state._ideas.current ? ' active' : '') +
+      '" onclick="ideasOpen(' + it.id + ')">' +
+      '<div class="ich-it-top"><span class="ich-it-title">' + escapeHtml(it.title || 'Идея') + '</span>' +
+        '<span class="ich-chip ' + st.cls + '">' + st.label + '</span></div>' +
+      '<div class="ich-it-sub">' + who + escapeHtml(_ideasWhen(it.updated_at)) + '</div>' +
+      '</button>';
+  }).join('');
+}
+
+function _ideasRenderActions(th) {
+  const acts = document.getElementById('ideas-actions');
+  if (!acts) return;
+  const status = th.status || 'open';
+  let h = '';
+  if (status === 'open' || status === 'ready') {
+    h += '<button class="btn btn-secondary btn-small" onclick="ideaCompile()">' +
+         '<i class="ti ti-file-check"></i> ' + (th.spec_text ? 'Пересобрать ТЗ' : 'Сформировать ТЗ') + '</button>';
+  }
+  if (th.spec_text && (status === 'open' || status === 'ready')) {
+    h += '<button class="btn btn-primary btn-small" onclick="ideaSubmit()">' +
+         '<i class="ti ti-send"></i> Отправить директору</button>';
+  }
+  if (status === 'sent') {
+    h += '<span class="ich-note"><i class="ti ti-clock"></i> ТЗ у директора — ждём решения</span>';
+    if (state._ideas.isDir) {
+      h += '<button class="btn btn-primary btn-small" onclick="ideaImplement(' + th.id + ')">' +
+           '<i class="ti ti-rocket"></i> Внедрить</button>' +
+           '<button class="btn btn-secondary btn-small" onclick="ideaDecline(' + th.id + ')">' +
+           '<i class="ti ti-clock-pause"></i> Не сейчас</button>';
+    }
+  }
+  if (status === 'taken') h += '<span class="ich-note"><i class="ti ti-rocket"></i> Взято в работу</span>';
+  if (status === 'declined') h += '<span class="ich-note"><i class="ti ti-clock-pause"></i> Отложено' +
+    (th.note ? ': ' + escapeHtml(th.note) : '') + '</span>';
+  if (status === 'done') h += '<span class="ich-note"><i class="ti ti-check"></i> Сделано</span>';
+  acts.innerHTML = h;
+}
+
+function _ideaFormat(text) {
+  // разметку ответов уже умеет лента Клавы — не плодим второй форматтер
+  if (typeof _devChatFormat === 'function') return _devChatFormat(text);
+  return escapeHtml(String(text || '')).replace(/\n/g, '<br>');
+}
+
+function _ideaAddMsg(role, text, when) {
+  const feed = document.getElementById('ideas-feed');
+  if (!feed) return null;
   const mine = role === 'user';
-  const div = document.createElement('div');
-  div.style.cssText = 'border-radius:10px;padding:8px 11px;font-size:13.5px;white-space:pre-wrap;word-break:break-word;' +
-    (mine ? 'background:var(--brand,#2563eb);color:#fff;align-self:flex-end;max-width:88%;' : 'background:#F1F5F9;max-width:92%;');
-  div.textContent = text;
-  chat.appendChild(div);
-  const body = document.getElementById('ideas-body');
-  if (body) body.scrollTop = body.scrollHeight;
-  return div;
+  const row = document.createElement('div');
+  row.className = 'ich-row' + (mine ? ' is-mine' : '');
+  if (!mine) {
+    const ava = document.createElement('div');
+    ava.className = 'ich-ava';
+    ava.innerHTML = '<i class="ti ti-sparkles"></i>';
+    row.appendChild(ava);
+  }
+  const bubble = document.createElement('div');
+  bubble.className = 'ich-bubble';
+  bubble.innerHTML = '<div class="ich-text">' + _ideaFormat(text) + '</div>' +
+    (when ? '<div class="ich-time">' + escapeHtml(_ideasWhen(when)) + '</div>' : '');
+  row.appendChild(bubble);
+  feed.appendChild(row);
+  _ideasScroll();
+  return bubble.querySelector('.ich-text');
+}
+
+function _ideaAddSpec(spec) {
+  const feed = document.getElementById('ideas-feed');
+  if (!feed) return;
+  const box = document.createElement('div');
+  box.className = 'ich-spec';
+  box.innerHTML =
+    '<div class="ich-spec-hd"><i class="ti ti-file-text"></i> Техническое задание</div>' +
+    '<div class="ich-spec-body">' + _ideaFormat(spec) + '</div>';
+  feed.appendChild(box);
+  _ideasScroll();
+}
+
+function _ideasScroll() {
+  const feed = document.getElementById('ideas-feed');
+  if (feed) feed.scrollTop = feed.scrollHeight;
+}
+
+function ideasGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+}
+
+function ideasKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ideaSend(); }
 }
 
 async function ideaSend() {
@@ -1801,91 +2032,163 @@ async function ideaSend() {
   const text = (inp.value || '').trim();
   if (!text) return;
   inp.value = '';
+  ideasGrow(inp);
   _ideaAddMsg('user', text);
-  const ph = _ideaAddMsg('assistant', '…');
+  const ph = _ideaAddMsg('assistant', 'думаю…');
   try {
     let d;
-    if (!state.ideaThreadId) {
+    if (!state._ideas.current) {
       const r = await apiPost('/api/ideas', { text });
       d = (r && r.data) || {};
-      if (d.thread_id) state.ideaThreadId = d.thread_id;
+      if (!r.ok) { if (ph) ph.textContent = d.message || 'Не отправилось'; return; }
+      if (d.thread_id) state._ideas.current = d.thread_id;
     } else {
-      const r = await apiPost('/api/ideas/' + state.ideaThreadId + '/message', { text });
+      const r = await apiPost('/api/ideas/' + state._ideas.current + '/message', { text });
       d = (r && r.data) || {};
+      if (!r.ok) { if (ph) ph.textContent = d.message || 'Не отправилось'; return; }
     }
-    if (ph) ph.textContent = d.reply || 'Принял.';
-    const cb = document.getElementById('idea-compile-btn');
-    if (cb && state.ideaThreadId) cb.style.display = '';
+    if (ph) ph.innerHTML = _ideaFormat(d.reply || 'Принял.');
+    _ideasScroll();
+    const th = state._ideas.thread || {};
+    _ideasRenderActions({ id: state._ideas.current, status: th.status || 'open',
+                          spec_text: th.spec_text });
+    ideasLoadListSilent();
   } catch (e) {
     if (ph) ph.textContent = 'Ошибка связи';
   }
 }
 
 async function ideaCompile() {
-  if (!state.ideaThreadId) { showToast('Сначала опиши идею', 'error'); return; }
+  const id = state._ideas.current;
+  if (!id) { showToast('Сначала опишите идею', 'error'); return; }
   showToast('Собираю ТЗ…', 'info');
-  try {
-    const r = await apiPost('/api/ideas/' + state.ideaThreadId + '/compile', {});
-    const d = (r && r.data) || {};
-    if (!r.ok || !d.ok) { showToast((d && d.message) || 'Не удалось собрать ТЗ', 'error'); return; }
-    _ideaAddMsg('assistant', 'Готово! Заявка оформлена и передана разработчику. Спасибо 🙌');
-    if (d.spec) _ideaAddMsg('assistant', d.spec);
-    const cb = document.getElementById('idea-compile-btn');
-    if (cb) cb.style.display = 'none';
-    showToast('ТЗ сохранено', 'success');
-  } catch (e) { showToast('Ошибка', 'error'); }
-}
-
-async function ideasShowList() {
-  const body = document.getElementById('ideas-body');
-  const foot = document.getElementById('ideas-foot');
-  if (!body) return;
-  if (foot) foot.innerHTML = '';
-  body.innerHTML = '<div style="color:var(--text-light);font-size:13px;">Загружаем…</div>';
-  let d;
-  try { d = await apiGet('/api/ideas'); } catch (e) { body.innerHTML = '<div style="color:var(--text-light);">Не удалось загрузить</div>'; return; }
-  const ideas = (d && d.ideas) || [];
-  const isDir = !!(d && d.is_director);
-  state._ideasCache = ideas;
-  if (!ideas.length) { body.innerHTML = '<div style="color:var(--text-light);font-size:13px;">Заявок пока нет. Нажми «Предложить» и опиши идею.</div>'; return; }
-  let h = '';
-  if (isDir) {
-    const ready = ideas.filter(x => x.status === 'ready' && x.spec_text);
-    if (ready.length) h += '<button class="btn btn-secondary btn-small" style="margin-bottom:10px;" onclick="ideasCopyAll()"><i class="ti ti-copy"></i> Скопировать все новые ТЗ (' + ready.length + ')</button>';
-  }
-  const stRu = { open: 'в работе с ИИ', ready: 'ТЗ готово', taken: 'взято в работу', done: 'сделано' };
-  ideas.forEach(it => {
-    h += '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">' +
-      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">' +
-        '<div style="font-weight:600;font-size:13.5px;">' + escapeHtml(it.title || 'Идея') + '</div>' +
-        '<span style="font-size:11px;color:var(--text-light);white-space:nowrap;">' + escapeHtml(stRu[it.status] || it.status) + '</span>' +
-      '</div>' +
-      '<div style="font-size:11.5px;color:var(--text-light);">' + escapeHtml(it.author_name || '') + '</div>' +
-      (it.spec_text
-        ? '<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:12.5px;color:var(--brand);">Показать ТЗ</summary>' +
-            '<pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;background:#F8FAFC;border-radius:8px;padding:8px;margin-top:6px;">' + escapeHtml(it.spec_text) + '</pre>' +
-            '<button class="btn btn-secondary btn-small" style="margin-top:6px;" onclick="ideaCopySpec(' + it.id + ')"><i class="ti ti-copy"></i> Скопировать ТЗ</button>' +
-          '</details>'
-        : '') +
-    '</div>';
+  const r = await apiPost('/api/ideas/' + id + '/compile', {});
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не удалось собрать ТЗ', 'error'); return; }
+  state._ideas.thread = Object.assign(state._ideas.thread || {}, {
+    id: id, status: 'ready', spec_text: d.spec,
   });
-  body.innerHTML = h;
+  _ideaAddSpec(d.spec || '');
+  _ideasRenderActions(state._ideas.thread);
+  ideasLoadListSilent();
+  showToast('ТЗ готово — проверьте и отправьте директору', 'success');
 }
 
-function _ideaClipboard(txt) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(txt).then(() => showToast('Скопировано')).catch(() => showToast('Скопируйте вручную'));
-  } else { showToast('Скопируйте вручную'); }
+async function ideaSubmit() {
+  const id = state._ideas.current;
+  if (!id) return;
+  const r = await apiPost('/api/ideas/' + id + '/submit', {});
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не ушло', 'error'); return; }
+  state._ideas.thread = Object.assign(state._ideas.thread || {}, { status: 'sent' });
+  _ideasRenderActions(state._ideas.thread);
+  ideasLoadListSilent();
+  showToast('ТЗ у директора', 'success');
 }
-function ideaCopySpec(id) {
-  const it = (state._ideasCache || []).find(x => x.id === id);
-  if (it && it.spec_text) _ideaClipboard(it.spec_text);
+
+// ============ Решение директора ============
+// Эти две функции зовёт и раздел «Идеи», и карточка ТЗ в ленте разработки.
+
+async function ideaImplement(id, comment) {
+  const note = comment !== undefined ? comment
+    : prompt('Правка к ТЗ перед внедрением (можно пусто):', '');
+  if (note === null) return;
+  const r = await apiPost('/api/ideas/' + id + '/implement', { comment: note || '' });
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не получилось', 'error'); return; }
+  showToast('Задача в ленте разработки', 'success');
+  if (state._ideas && state._ideas.current === id) ideasOpen(id);
+  const card = document.querySelector('[data-idea-card="' + id + '"]');
+  if (card) card.innerHTML = '<span class="ich-note"><i class="ti ti-rocket"></i> Внедряем — задача в очереди</span>';
 }
-function ideasCopyAll() {
-  const ready = (state._ideasCache || []).filter(x => x.status === 'ready' && x.spec_text);
-  if (!ready.length) { showToast('Нет готовых ТЗ', 'info'); return; }
-  const txt = ready.map((x, i) => '### Идея ' + (i + 1) + ' — ' + (x.title || '') + ' (автор: ' + (x.author_name || '') + ')\n' + x.spec_text).join('\n\n---\n\n');
-  _ideaClipboard(txt);
+
+async function ideaDecline(id) {
+  const note = prompt('Почему не сейчас? (увидит автор идеи)', '');
+  if (note === null) return;
+  const r = await apiPost('/api/ideas/' + id + '/decline', { note: note || '' });
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не получилось', 'error'); return; }
+  showToast('Автору написали', 'success');
+  if (state._ideas && state._ideas.current === id) ideasOpen(id);
+  const card = document.querySelector('[data-idea-card="' + id + '"]');
+  if (card) card.innerHTML = '<span class="ich-note"><i class="ti ti-clock-pause"></i> Отложено</span>';
+}
+
+// ============ Пароль и доступ (директор) ============
+
+async function ideasAdminDialog() {
+  let d;
+  try { d = await apiGet('/api/ideas/access'); } catch (e) { showToast('Только директору', 'error'); return; }
+  let m = document.getElementById('ideas-admin-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'ideas-admin-modal';
+    m.className = 'modal-overlay';
+    m.onclick = function (e) { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  const users = (d && d.users) || [];
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;width:100%;">' +
+      '<div class="modal-header"><h3><i class="ti ti-key"></i> Доступ к чату идей</h3>' +
+        '<button class="modal-close" onclick="document.getElementById(\'ideas-admin-modal\').classList.remove(\'visible\')">' +
+        '<i class="ti ti-x"></i></button></div>' +
+      '<div style="padding:14px 16px;">' +
+        '<label class="form-label">Пароль (его вы выдаёте сотрудникам)</label>' +
+        // значение ставим кодом ниже, а не в разметке: escapeHtml не трогает
+        // кавычки, и пароль с кавычкой сломал бы атрибут
+        '<input type="text" id="idea-admin-pass" class="form-input" placeholder="например, атом-идеи">' +
+        '<label style="display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px;">' +
+          '<input type="checkbox" id="idea-admin-reset"> Выгнать всех, кто вошёл по старому паролю' +
+        '</label>' +
+        '<button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="ideasSavePassword()">' +
+          '<i class="ti ti-check"></i> Сохранить</button>' +
+        '<div class="form-label" style="margin-top:16px;">Уже вошли (' + users.length + ')</div>' +
+        (users.length
+          ? '<div class="ich-access">' + users.map(function (u) {
+              return '<div class="ich-acc-row"><span>' + escapeHtml(u.name || ('чат ' + u.chat_id)) + '</span>' +
+                '<button class="btn btn-secondary btn-small" onclick="ideasRevoke(' + u.chat_id + ')">' +
+                '<i class="ti ti-user-off"></i> Убрать</button></div>';
+            }).join('') + '</div>'
+          : '<div style="font-size:13px;color:var(--text-light);">Пока никто.</div>') +
+        '<div style="font-size:12.5px;color:var(--text-light);margin-top:12px;">' +
+          'Выездным монтажникам раздел закрыт всегда, даже с паролем.</div>' +
+      '</div>' +
+    '</div>';
+  m.classList.add('visible');
+  const pass = document.getElementById('idea-admin-pass');
+  if (pass) pass.value = (d && d.password) || '';
+}
+
+async function ideasSavePassword() {
+  const inp = document.getElementById('idea-admin-pass');
+  const reset = document.getElementById('idea-admin-reset');
+  if (!inp) return;
+  const password = (inp.value || '').trim();
+  if (password.length < 4) { showToast('Пароль — минимум 4 знака', 'error'); return; }
+  const r = await apiPost('/api/ideas/access', { password: password, reset: !!(reset && reset.checked) });
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не сохранилось', 'error'); return; }
+  showToast('Пароль сохранён', 'success');
+  const m = document.getElementById('ideas-admin-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function ideasRevoke(chatId) {
+  try { await apiDelete('/api/ideas/access/' + chatId); } catch (e) { showToast('Не получилось', 'error'); return; }
+  showToast('Доступ убран', 'success');
+  ideasAdminDialog();
+}
+
+// Счётчик на пункте меню: сколько ТЗ ждут решения директора.
+async function ideasRefreshBadge() {
+  const badge = document.getElementById('ideas-badge');
+  if (!badge) return;
+  let d;
+  try { d = await apiGet('/api/ideas?status=sent'); } catch (e) { return; }
+  const n = ((d && d.ideas) || []).length;
+  badge.textContent = n ? String(n) : '';
+  badge.style.display = n ? '' : 'none';
 }
 
 function openHelpArticle(articleId) {
@@ -8155,7 +8458,7 @@ function renderDefectAssemblyList() {
   }
   list.innerHTML = items.slice(0, 100).map(s => {
     const wt = s.work_type && s.work_type !== 'assembly';
-    const wtLabel = wt ? ({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',other:'Прочее'}[s.work_type] || s.work_type) : '';
+    const wtLabel = wt ? ({repair:'Ремонт',commissioning:'Пусконаладка',installation:'Монтаж',diagnostics:'Диагностика',design:'Проектирование',maintenance:'ТО',reconfiguration:'Перекомплектация',other:'Прочее'}[s.work_type] || s.work_type) : '';
     const title = s.model_name || (wtLabel || 'Запись #' + s.id);
     const meta  = [
       s.model_article || '',
@@ -9107,6 +9410,7 @@ function _renderNotifications25(r) {
       else if (n.type === 'contract_published')   icon = 'ti-file-text';
       else if (n.type === 'assembly_created')     icon = 'ti-tool';
       else if (n.type === 'contract_shipped')     icon = 'ti-truck-delivery';
+      else if (n.type === 'supply_receipt_mismatch') icon = 'ti-scale';   // v2.45.1013
       const onClick = n.entity_type === 'defect'
         ? 'onNotif25GlobalClick(' + n.id + ',\'defect\',' + (n.entity_id || 0) + ')'
         : (n.entity_type === 'contract'
@@ -11899,6 +12203,9 @@ function renderSupplyInvoiceDetail(data) {
   const warnings = siParseWarnings(inv.ai_warnings);
   if (warnings.length) html += renderSiWarnings(warnings);
 
+  // v2.45.1013: сверка с заказами — только у оприходованной УПД
+  if (data.reconciliation) html += renderSiRecon(data.reconciliation, inv.id);
+
   // Сводка по местам назначения
   html += renderSiDestTiles(items);
 
@@ -11983,6 +12290,203 @@ function renderSiWarnings(warnings) {
   });
   html += '</div>';
   return html;
+}
+
+// ==== СВЕРКА ПРИЁМКИ С ЗАКАЗАМИ (v2.45.1013) ====
+// После оприходования УПД бэкенд отдаёт отчёт «заказ ↔ УПД ↔ что отметилось».
+// Раньше его половина (receipt_unmatched) приезжала в ответе confirm и молча
+// терялась: заказ мог остаться «получено частично», а узнавали случайно.
+// Карточка живёт прямо в приёмке; спорные строки разносятся кнопкой в ORD-N.
+
+function siFmtQty(n) {
+  const v = parseFloat(n);
+  if (!isFinite(v)) return '0';
+  return (Math.round(v * 1000) / 1000).toString().replace('.', ',');
+}
+
+function renderSiRecon(recon, invId) {
+  if (!recon || !recon.counts) return '';
+  const c = recon.counts || {};
+  const unmatched = recon.unmatched || [];
+  const short = recon.short || [];
+  const matched = recon.matched || [];
+  const partial = matched.filter(m => m.partial);
+  const okAll = !!recon.ok;
+
+  let html = '<div class="si-recon' + (okAll ? ' ok' : '') + '" id="si-recon-card">';
+
+  // Шапка: итог одной строкой
+  html += '<div class="si-recon-head">';
+  html +=   '<div class="si-recon-title">';
+  html +=     '<i class="ti ' + (okAll ? 'ti-checks' : 'ti-alert-triangle') + '"></i>';
+  html +=     'Сверка с заказами';
+  html +=   '</div>';
+  html +=   '<button class="pkb-btn" style="padding:4px 10px;font-size:12px;" onclick="reloadSiRecon(' + invId + ')"><i class="ti ti-refresh"></i>Пересчитать</button>';
+  html += '</div>';
+
+  const orders = (recon.orders || []).map(o => o.order_label).join(', ');
+  html += '<div class="si-recon-sum">';
+  if (okAll) {
+    html += 'Всё сошлось: ' + (c.matched || 0) + ' из ' + (c.accepted_lines || 0) + ' строк разнесено' +
+            (orders ? (' по ' + escapeHtml(orders)) : '') + ', заказ закрыт полностью.';
+  } else {
+    const bits = [];
+    if (c.matched)   bits.push('разнесено ' + c.matched + ' из ' + (c.accepted_lines || 0));
+    if (c.unmatched) bits.push('<b>не разнесено ' + c.unmatched + '</b>');
+    if (partial.length) bits.push('<b>частично ' + partial.length + '</b>');
+    if (c.short)     bits.push('<b>заказ ждёт ещё ' + c.short + '</b>');
+    html += bits.join(' · ') + (orders ? (' · ' + escapeHtml(orders)) : '');
+  }
+  html += '</div>';
+
+  // --- Не разнесено: строка УПД никуда не легла ---
+  if (unmatched.length) {
+    html += '<div class="si-recon-group bad">';
+    html +=   '<div class="si-recon-group-title"><i class="ti ti-arrow-move-right"></i>Не разнесено по заказам · ' + unmatched.length + '</div>';
+    unmatched.forEach(u => html += siReconLineRow(invId, u, true));
+    html += '</div>';
+  }
+
+  // --- Разнесено частично ---
+  if (partial.length) {
+    html += '<div class="si-recon-group warn">';
+    html +=   '<div class="si-recon-group-title"><i class="ti ti-progress"></i>Разнесено частично · ' + partial.length + '</div>';
+    partial.forEach(m => html += siReconLineRow(invId, m, true));
+    html += '</div>';
+  }
+
+  // --- Заказ ждёт ещё (недобор по позициям затронутых заказов) ---
+  if (short.length) {
+    html += '<div class="si-recon-group warn">';
+    html +=   '<div class="si-recon-group-title"><i class="ti ti-hourglass"></i>Заказ ждёт ещё · ' + short.length + '</div>';
+    short.forEach(s => {
+      html += '<div class="si-recon-row">';
+      html +=   '<div class="si-recon-row-main">';
+      html +=     '<div class="si-recon-name">' + escapeHtml(s.si_name || '—') + '</div>';
+      html +=     '<div class="si-recon-meta"><span class="si-recon-ord">' + escapeHtml(s.order_label || '') + '</span> · заказано ' +
+                    siFmtQty(s.qty) + ', получено ' + siFmtQty(s.received) + '</div>';
+      html +=   '</div>';
+      html +=   '<div class="si-recon-qty short">−' + siFmtQty(s.remaining) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // --- Разнесено (свёрнуто) ---
+  const okLines = matched.filter(m => !m.partial);
+  if (okLines.length) {
+    html += '<div class="si-recon-group good">';
+    html +=   '<div class="si-recon-group-title" onclick="siReconToggle(\'si-recon-ok\')" style="cursor:pointer;">' +
+                '<i class="ti ti-check"></i>Разнесено по заказам · ' + okLines.length +
+                '<span class="si-recon-toggle" id="si-recon-ok-toggle">показать</span></div>';
+    html +=   '<div id="si-recon-ok" style="display:none;">';
+    okLines.forEach(m => {
+      const tgt = (m.targets || []).map(t => t.order_label + ' · ' + (t.si_name || '') + ' ×' + siFmtQty(t.qty)).join('; ');
+      html += '<div class="si-recon-row">';
+      html +=   '<div class="si-recon-row-main">';
+      html +=     '<div class="si-recon-name">' + escapeHtml(m.name || m.name_raw || '—') + '</div>';
+      html +=     '<div class="si-recon-meta">→ ' + escapeHtml(tgt || '—') + '</div>';
+      html +=   '</div>';
+      html +=   '<div class="si-recon-qty">' + siFmtQty(m.qty) + '</div>';
+      html += '</div>';
+    });
+    html +=   '</div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// Строка УПД, которую надо (до)разнести: имя, сколько осталось и кнопка выбора заказа
+function siReconLineRow(invId, line, withAssign) {
+  const left = (line.remaining !== undefined) ? line.remaining : line.qty;
+  const boxId = 'si-recon-cands-' + line.invoice_item_id;
+  let html = '<div class="si-recon-row">';
+  html +=   '<div class="si-recon-row-main">';
+  html +=     '<div class="si-recon-name">' + escapeHtml(line.name || line.name_raw || '—') + '</div>';
+  html +=     '<div class="si-recon-meta">в накладной ' + siFmtQty(line.qty) + ' ' + escapeHtml(line.unit || 'шт') +
+                (line.allocated ? (' · разнесено ' + siFmtQty(line.allocated)) : '') +
+                ' · <b>осталось ' + siFmtQty(left) + '</b></div>';
+  html +=   '</div>';
+  if (withAssign) {
+    html += '<button class="pkb-btn" style="padding:5px 10px;font-size:12px;white-space:nowrap;" ' +
+            'onclick="siReconToggle(\'' + boxId + '\')"><i class="ti ti-arrow-move-right"></i>Разнести</button>';
+  }
+  html += '</div>';
+
+  if (withAssign) {
+    const cands = line.candidates || [];
+    html += '<div class="si-recon-cands" id="' + boxId + '" style="display:none;">';
+    if (!cands.length) {
+      html += '<div class="si-recon-cands-empty">Открытых позиций заказов у этого поставщика нет. ' +
+              'Заведите позицию в заказе — или строка просто пришла сверх заказа.</div>';
+    } else {
+      cands.forEach(cd => {
+        html += '<button class="si-recon-cand' + (cd.likely ? ' likely' : '') + '" ' +
+                'onclick="siReconAssign(' + invId + ',' + line.invoice_item_id + ',' + cd.order_item_id + ')">' +
+                '<span class="si-recon-ord">' + escapeHtml(cd.order_label || '') + '</span>' +
+                '<span class="si-recon-cand-name">' + escapeHtml(cd.si_name || '') + '</span>' +
+                '<span class="si-recon-cand-left">ждёт ' + siFmtQty(cd.remaining) + '</span>' +
+                (cd.likely ? '<span class="si-recon-cand-hit">похоже</span>' : '') +
+                '</button>';
+      });
+    }
+    html += '</div>';
+  }
+  return html;
+}
+
+function siReconToggle(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : '';
+  const t = document.getElementById(id + '-toggle');
+  if (t) t.textContent = open ? 'показать' : 'скрыть';
+}
+
+// «Разнести в ORD-N»: закрываем позицию заказа этой строкой УПД
+async function siReconAssign(invId, invoiceItemId, orderItemId) {
+  try {
+    const r = await apiPost('/api/supply/invoices/' + invId + '/reconcile/assign', {
+      invoice_item_id: invoiceItemId,
+      order_item_id: orderItemId,
+    });
+    if (!r.ok) {
+      showToast('Не разнеслось: ' + ((r.data && r.data.message) || ('HTTP ' + r.status)), 'error');
+      return;
+    }
+    const a = (r.data && r.data.assigned) || {};
+    showToast('Разнесено в ' + (a.order_label || 'заказ') + ' · ' + siFmtQty(a.qty) + ' шт', 'success');
+    siApplyRecon(invId, r.data && r.data.reconciliation);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+async function reloadSiRecon(invId) {
+  try {
+    const r = await apiGet('/api/supply/invoices/' + invId + '/reconciliation');
+    siApplyRecon(invId, r && r.reconciliation);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+// Перерисовать только карточку сверки, не трогая таблицу позиций
+function siApplyRecon(invId, recon) {
+  if (!recon) return;
+  if (siState.currentData) siState.currentData.reconciliation = recon;
+  const card = document.getElementById('si-recon-card');
+  if (!card) {
+    if (siState.currentInvoiceId === invId) loadSupplyInvoiceDetail(invId);
+    return;
+  }
+  const wrap = document.createElement('div');
+  wrap.innerHTML = renderSiRecon(recon, invId);
+  const fresh = wrap.firstElementChild;
+  if (fresh) card.replaceWith(fresh);
 }
 
 function renderSiDestTiles(items) {
@@ -12717,7 +13221,17 @@ async function confirmSupplyInvoice(invoiceId) {
     if (rep.refused)      parts.push('отказов: ' + rep.refused);
     if (rep.expense)      parts.push('списано: ' + rep.expense);
     if (rep.no_match)     parts.push('без оприходования: ' + rep.no_match);
-    showToast('Накладная оприходована' + (parts.length ? ' · ' + parts.join(', ') : ''), 'success');
+    // v2.45.1013: сверка с заказами — если что-то не сошлось, говорим сразу
+    const recon = (r.data && r.data.reconciliation) || null;
+    if (recon && !recon.ok) {
+      const rc = recon.counts || {};
+      const rb = [];
+      if (rc.unmatched) rb.push('не разнесено ' + rc.unmatched);
+      if (rc.short)     rb.push('заказ ждёт ещё ' + rc.short);
+      showToast('Оприходована, но сверка не сошлась: ' + rb.join(', ') + ' — смотри карточку сверки', 'error');
+    } else {
+      showToast('Накладная оприходована' + (parts.length ? ' · ' + parts.join(', ') : ''), 'success');
+    }
     loadSupplyInvoiceDetail(invoiceId);  // покажет финальный статус
   } catch (e) {
     showToast('Ошибка: ' + (e.message || e), 'error');
@@ -14283,7 +14797,7 @@ function _renderMontageChatMsgs(r) {
     var author = m.author_name || (isMine ? 'Я' : 'Сотрудник');
     var filesHtml = '';
     (m.files || []).forEach(function (f) {
-      var url = API_BASE + '/api/contracts/chat/files/' + f.id;
+      var url = API_BASE + (f.url || '/api/contracts/chat/files/' + f.id);
       if (f.kind === 'photo') {
         filesHtml += '<a href="' + url + '" target="_blank" class="imc-img"><img src="' + url + '" loading="lazy"></a>';
       } else if (f.kind === 'video') {
@@ -15105,6 +15619,7 @@ async function openTeamChat(cid) {
   if (side) side.innerHTML = '';
   document.getElementById('tchat-messages').innerHTML = '<div class="loading-block">Загружаем…</div>';
   document.getElementById('team-chat-modal').classList.add('visible');
+  _wireTeamChatFileDrop();
   await loadTeamChatMeta(cid);
   renderTeamSide();
   await loadTeamChat(cid);
@@ -15119,6 +15634,8 @@ async function openTeamChat(cid) {
 
 function closeTeamChat() {
   document.getElementById('team-chat-modal').classList.remove('visible');
+  const dropZone = document.getElementById('tchat-drop-zone');
+  if (dropZone) dropZone.classList.remove('is-file-dragging');
   if (_tchatRefreshTimer) { clearInterval(_tchatRefreshTimer); _tchatRefreshTimer = null; }
   _tchatCurrentId = null;
   _tchatPendingFiles = [];
@@ -15204,7 +15721,7 @@ function _renderTeamMessageFiles(files) {
   if (!files || !files.length) return '';
   let html = '<div class="cchat-msg-files">';
   files.forEach(f => {
-    const url = API_BASE + '/api/team-chats/messages/files/' + f.id;
+    const url = API_BASE + (f.url || '/api/team-chats/messages/files/' + f.id);
     if (f.kind === 'photo') {
       html += '<a href="' + url + '" target="_blank" class="cchat-file-img"><img src="' + url + '" alt=""></a>';
     } else if (f.kind === 'video') {
@@ -15222,6 +15739,51 @@ function _renderTeamMessageFiles(files) {
 }
 
 // ---------- Файлы к сообщению ----------
+function _wireTeamChatFileDrop() {
+  const zone = document.getElementById('tchat-drop-zone');
+  if (!zone || zone.dataset.fileDropWired === '1') return;
+  zone.dataset.fileDropWired = '1';
+  let dragDepth = 0;
+  const isFileDrag = (e) => {
+    const types = e.dataTransfer && e.dataTransfer.types;
+    return !!types && Array.prototype.indexOf.call(types, 'Files') !== -1;
+  };
+  const clearDragState = () => {
+    dragDepth = 0;
+    zone.classList.remove('is-file-dragging');
+  };
+  zone.addEventListener('dragenter', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth += 1;
+    zone.classList.add('is-file-dragging');
+  });
+  zone.addEventListener('dragover', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  zone.addEventListener('dragleave', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) zone.classList.remove('is-file-dragging');
+  });
+  zone.addEventListener('drop', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    clearDragState();
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    onTeamChatFilesSelected(files);
+    showToast('Файлы добавлены — нажмите «Отправить»', 'success');
+  });
+}
+
 function onTeamChatFilesSelected(files) {
   if (!files || !files.length) return;
   for (let i = 0; i < files.length; i++) {
@@ -15627,9 +16189,13 @@ function _paintOpenCalcModal(opts) {
     m.onclick = (e) => { if (e.target === m) closePaintCalcModal(); };
     document.body.appendChild(m);
   }
+  // Чип показывает и код, и цвет словом: «RAL 9016» ничего не говорит, «белый» говорит.
   const chips = PAINT_RAL_PRESETS.map(r =>
-    '<button type="button" class="storage-quick" onclick="_paintSetRal(&quot;' + r + '&quot;)">' + r + '</button>'
-  ).join('');
+    '<button type="button" class="storage-quick ral-chip" title="' + escapeHtml(_ralLabel(r)) + '" ' +
+      'onclick="_paintSetRal(&quot;' + r + '&quot;)">' +
+      '<span class="ral-dot" style="background:' + (_ralHex(r) || '#CBD5E1') + '"></span>' + r +
+      '<span class="ral-chip-name">' + escapeHtml(_ralName(r)) + '</span>' +
+    '</button>').join('');
 
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:460px;">' +
@@ -15648,7 +16214,9 @@ function _paintOpenCalcModal(opts) {
           '<input type="text" id="paint-ral" maxlength="60" placeholder="RAL 9016" value="' +
             escapeHtml(opts.ral || '') + '">' +
           '<div class="storage-quick-row">' + chips + '</div>' +
-          '<div class="paint-ral-hint">Цех считает по цвету: другой RAL — другая загрузка и другой ценник. ' +
+          '<div class="paint-ral-hint">Ходовые: <b>9016</b> и <b>9003</b> — белый, <b>7035</b> — светло-серый ' +
+            '(щиты и шкафы), <b>9005</b> — чёрный. Полная палитра с названиями откроется по кнопке цвета ' +
+            'внутри расчёта.<br>Цех считает по цвету: другой RAL — другая загрузка и другой ценник. ' +
             'Если цвет ещё не согласован, оставьте пустым — в ведомости будет видно, что он не указан.</div>' +
         '</div>' +
         '<div class="modal-actions">' +
@@ -15832,10 +16400,13 @@ function renderPaintCalcDetail(c) {
         : '') +
       '<button class="btn btn-secondary btn-small" onclick="paintManualOpen(' + c.id + ')">' +
         '<i class="ti ti-plus"></i> Своя деталь</button>' +
-      '<button class="btn btn-secondary btn-small" onclick="openPaintRalPicker(' + c.id + ', null, &quot;' +
+      '<button class="btn btn-secondary btn-small ral-head-btn" ' +
+        'title="Выбрать цвет: белый, серый, чёрный или код RAL" ' +
+        'onclick="openPaintRalPicker(' + c.id + ', null, &quot;' +
         escapeHtml(c.ral || '') + '&quot;)">' +
         (c.ral ? '<span class="ral-dot" style="background:' + (_ralHex(c.ral) || '#CBD5E1') + '"></span>' +
-                 escapeHtml(c.ral)
+                 escapeHtml(c.ral) +
+                 (_ralName(c.ral) ? '<span class="ral-btn-name">' + escapeHtml(_ralName(c.ral)) + '</span>' : '')
                : '<i class="ti ti-palette"></i> Цвет не указан') + '</button>' +
       '<button class="btn btn-primary btn-small" onclick="openPaintVedomost(' + c.id + ')">' +
         '<i class="ti ti-file-type-pdf"></i> Ведомость PDF</button>' +
@@ -15958,10 +16529,12 @@ function renderPaintCalcDetail(c) {
         '<td class="pd-mat-cell"><button class="pd-mat-btn" onclick="openPaintMaterialPicker(' +
           it.calc_id + ',' + it.id + ',&quot;' + escapeHtml(it.material || '') + '&quot;)">' +
           escapeHtml(it.material || 'указать') + '</button></td>' +
-        '<td><button class="pd-ral-btn" onclick="openPaintRalPicker(' + it.calc_id + ',' + it.id + ',&quot;' +
+        '<td><button class="pd-ral-btn" title="Выбрать цвет: белый, серый, чёрный или код RAL" ' +
+          'onclick="openPaintRalPicker(' + it.calc_id + ',' + it.id + ',&quot;' +
           escapeHtml(it.ral || '') + '&quot;)">' +
           (it.ral ? '<span class="ral-dot" style="background:' + (_ralHex(it.ral) || '#CBD5E1') + '"></span>' +
-                    escapeHtml(it.ral)
+                    escapeHtml(it.ral) +
+                    (_ralName(it.ral) ? '<span class="ral-btn-name">' + escapeHtml(_ralName(it.ral)) + '</span>' : '')
                   : '<span class="pd-dim">выбрать</span>') + '</button></td>' +
         '<td>' + Number(it.net_area_m2 || 0).toFixed(4) + '</td>' +
         '<td>' + Number(it.paint_per_part_m2 || 0).toFixed(4) + '</td>' +
@@ -16232,7 +16805,12 @@ async function paintManualOpen(calcId) {
             '<option value="' + escapeHtml(x.value) + '">' + escapeHtml(x.label) + '</option>').join('') +
           '</datalist></div>' +
         '<div class="form-group" style="flex:1;margin:0;"><label class="form-label">Цвет RAL</label>' +
-          '<input class="form-input" id="pm-ral" placeholder="напр. RAL 9016"></div>' +
+          '<input class="form-input" id="pm-ral" list="pm-ral-list" ' +
+            'placeholder="белый / серый / RAL 9016" autocomplete="off">' +
+          // список с названиями: можно начать набирать «сер» и выбрать из подсказки
+          '<datalist id="pm-ral-list">' + RAL_CATALOG.map(r =>
+            '<option value="' + r.c + '">' + escapeHtml(r.n) + '</option>').join('') +
+          '</datalist></div>' +
       '</div>' +
     '</div>' +
     '<div class="modal-footer">' +
@@ -16404,38 +16982,56 @@ async function deletePaintCalc(calcId) {
 // Цех красит по цвету и по циклу подготовки, поэтому и то и другое должно
 // выбираться из списка, а не набиваться руками с опечатками.
 
+// Порядок и группы — как спрашивает цех: сначала белые, потом серые, потом
+// чёрные, цветные в конце. Поле g даёт и заголовок группы, и слово для поиска:
+// набрал «серый» — остались только серые.
 const RAL_CATALOG = [
-  { c: 'RAL 1013', h: '#E3D9C6', n: 'жемчужно-белый' },
-  { c: 'RAL 1014', h: '#DDC49A', n: 'слоновая кость' },
-  { c: 'RAL 1015', h: '#E6D2B5', n: 'светлая слоновая кость' },
-  { c: 'RAL 1018', h: '#F3E03B', n: 'цинково-жёлтый' },
-  { c: 'RAL 2004', h: '#E75B12', n: 'оранжевый' },
-  { c: 'RAL 3000', h: '#AB2524', n: 'огненно-красный' },
-  { c: 'RAL 3020', h: '#CC0605', n: 'транспортный красный' },
-  { c: 'RAL 5005', h: '#1E2460', n: 'сигнальный синий' },
-  { c: 'RAL 5012', h: '#0B71B4', n: 'голубой' },
-  { c: 'RAL 5015', h: '#1761AB', n: 'небесно-синий' },
-  { c: 'RAL 5017', h: '#063971', n: 'транспортный синий' },
-  { c: 'RAL 6018', h: '#57A639', n: 'жёлто-зелёный' },
-  { c: 'RAL 6029', h: '#00874A', n: 'мятно-зелёный' },
-  { c: 'RAL 7004', h: '#969992', n: 'сигнальный серый' },
-  { c: 'RAL 7016', h: '#293133', n: 'антрацитово-серый' },
-  { c: 'RAL 7024', h: '#474A51', n: 'графитовый серый' },
-  { c: 'RAL 7035', h: '#D7D7D7', n: 'светло-серый' },
-  { c: 'RAL 7040', h: '#9DA1AA', n: 'серое окно' },
-  { c: 'RAL 7042', h: '#8D948D', n: 'серый транспорт A' },
-  { c: 'RAL 8017', h: '#442F29', n: 'шоколадно-коричневый' },
-  { c: 'RAL 9001', h: '#E9E0D2', n: 'кремово-белый' },
-  { c: 'RAL 9003', h: '#F4F4F4', n: 'сигнальный белый' },
-  { c: 'RAL 9005', h: '#0A0A0A', n: 'чёрный янтарь' },
-  { c: 'RAL 9006', h: '#A5A5A5', n: 'бело-алюминиевый' },
-  { c: 'RAL 9007', h: '#8F8F8F', n: 'тёмный алюминий' },
-  { c: 'RAL 9010', h: '#F1ECE1', n: 'чисто-белый' },
-  { c: 'RAL 9011', h: '#27292B', n: 'графитово-чёрный' },
-  { c: 'RAL 9016', h: '#F6F6F6', n: 'транспортный белый' },
-  { c: 'RAL 9017', h: '#1E1E1E', n: 'транспортный чёрный' },
-  { c: 'RAL 9018', h: '#C5C7C4', n: 'папирусно-белый' },
+  { c: 'RAL 9016', h: '#F6F6F6', n: 'транспортный белый', g: 'Белые' },
+  { c: 'RAL 9003', h: '#F4F4F4', n: 'сигнальный белый', g: 'Белые' },
+  { c: 'RAL 9010', h: '#F1ECE1', n: 'чисто-белый', g: 'Белые' },
+  { c: 'RAL 9002', h: '#DDDED4', n: 'серо-белый', g: 'Белые' },
+  { c: 'RAL 9001', h: '#E9E0D2', n: 'кремово-белый', g: 'Белые' },
+  { c: 'RAL 9018', h: '#C5C7C4', n: 'папирусно-белый', g: 'Белые' },
+  { c: 'RAL 1013', h: '#E3D9C6', n: 'жемчужно-белый', g: 'Белые' },
+  { c: 'RAL 1014', h: '#DDC49A', n: 'слоновая кость', g: 'Белые' },
+  { c: 'RAL 1015', h: '#E6D2B5', n: 'светлая слоновая кость', g: 'Белые' },
+  { c: 'RAL 7035', h: '#D7D7D7', n: 'светло-серый', g: 'Серые' },
+  { c: 'RAL 7047', h: '#C8C8C7', n: 'телегрей 4, светлый', g: 'Серые' },
+  { c: 'RAL 7038', h: '#B4B8B0', n: 'агатовый серый', g: 'Серые' },
+  { c: 'RAL 7032', h: '#B5B0A1', n: 'галечно-серый', g: 'Серые' },
+  { c: 'RAL 9006', h: '#A5A5A5', n: 'бело-алюминиевый', g: 'Серые' },
+  { c: 'RAL 7040', h: '#9DA1AA', n: 'серое окно', g: 'Серые' },
+  { c: 'RAL 7004', h: '#969992', n: 'сигнальный серый', g: 'Серые' },
+  { c: 'RAL 9007', h: '#8F8F8F', n: 'тёмный алюминий', g: 'Серые' },
+  { c: 'RAL 7042', h: '#8D948D', n: 'серый транспорт A', g: 'Серые' },
+  { c: 'RAL 7024', h: '#474A51', n: 'графитовый серый', g: 'Серые' },
+  { c: 'RAL 7016', h: '#293133', n: 'антрацитово-серый', g: 'Серые' },
+  { c: 'RAL 9005', h: '#0A0A0A', n: 'чёрный янтарь', g: 'Чёрные' },
+  { c: 'RAL 9011', h: '#27292B', n: 'графитово-чёрный', g: 'Чёрные' },
+  { c: 'RAL 9017', h: '#1E1E1E', n: 'транспортный чёрный', g: 'Чёрные' },
+  { c: 'RAL 1018', h: '#F3E03B', n: 'цинково-жёлтый', g: 'Цветные' },
+  { c: 'RAL 2004', h: '#E75B12', n: 'оранжевый', g: 'Цветные' },
+  { c: 'RAL 3000', h: '#AB2524', n: 'огненно-красный', g: 'Цветные' },
+  { c: 'RAL 3020', h: '#CC0605', n: 'транспортный красный', g: 'Цветные' },
+  { c: 'RAL 5005', h: '#1E2460', n: 'сигнальный синий', g: 'Цветные' },
+  { c: 'RAL 5012', h: '#0B71B4', n: 'голубой', g: 'Цветные' },
+  { c: 'RAL 5015', h: '#1761AB', n: 'небесно-синий', g: 'Цветные' },
+  { c: 'RAL 5017', h: '#063971', n: 'транспортный синий', g: 'Цветные' },
+  { c: 'RAL 6018', h: '#57A639', n: 'жёлто-зелёный', g: 'Цветные' },
+  { c: 'RAL 6029', h: '#00874A', n: 'мятно-зелёный', g: 'Цветные' },
+  { c: 'RAL 8017', h: '#442F29', n: 'шоколадно-коричневый', g: 'Цветные' },
 ];
+
+function _ralName(code) {
+  const r = RAL_CATALOG.find(x => x.c === (code || '').trim());
+  return r ? r.n : '';
+}
+
+// «RAL 9016 · транспортный белый» — код для цеха, слово для человека.
+function _ralLabel(code) {
+  const n = _ralName(code);
+  return n ? (code + ' · ' + n) : (code || '');
+}
 
 function _ralHex(code) {
   const r = RAL_CATALOG.find(x => x.c === (code || '').trim());
@@ -16469,13 +17065,31 @@ function openPaintRalPicker(calcId, itemId, current) {
   const onCell = itemId
     ? (code) => '_pickRal(' + calcId + ',' + itemId + ',&quot;' + code + '&quot;)'
     : (code) => '_ralSelect(&quot;' + code + '&quot;)';
-  const cells = RAL_CATALOG.map(r =>
-    '<button type="button" class="ral-cell' + (r.c === current ? ' active' : '') + '" ' +
-      'data-ral="' + r.c + '" onclick="' + onCell(r.c) + '">' +
-      '<span class="ral-swatch" style="background:' + r.h + '"></span>' +
-      '<span class="ral-code">' + r.c + '</span>' +
-      '<span class="ral-name">' + escapeHtml(r.n) + '</span>' +
-    '</button>').join('');
+  // Цвета сгруппированы (белые / серые / чёрные / цветные) и подписаны по-русски:
+  // код RAL наизусть никто не помнит, а «серый» и «белый» помнят все.
+  const groups = [];
+  RAL_CATALOG.forEach(r => {
+    let g = groups.find(x => x.name === r.g);
+    if (!g) { g = { name: r.g, rows: [] }; groups.push(g); }
+    g.rows.push(r);
+  });
+  const cells = groups.map(g =>
+    '<div class="ral-group" data-group="' + escapeHtml(g.name) + '">' +
+      '<div class="ral-group-title">' + escapeHtml(g.name) + '</div>' +
+      '<div class="ral-grid">' + g.rows.map(r =>
+        '<button type="button" class="ral-cell' + (r.c === current ? ' active' : '') + '" ' +
+          'data-ral="' + r.c + '" ' +
+          'data-search="' + escapeHtml((r.c + ' ' + r.n + ' ' + r.g).toLowerCase()) + '" ' +
+          'title="' + escapeHtml(r.c + ' — ' + r.n) + '" ' +
+          'onclick="' + onCell(r.c) + '">' +
+          '<span class="ral-swatch" style="background:' + r.h + '"></span>' +
+          '<span class="ral-text">' +
+            '<span class="ral-code">' + r.c + '</span>' +
+            '<span class="ral-name">' + escapeHtml(r.n) + '</span>' +
+          '</span>' +
+        '</button>').join('') +
+      '</div>' +
+    '</div>').join('');
 
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:620px;">' +
@@ -16489,7 +17103,12 @@ function openPaintRalPicker(calcId, itemId, current) {
           '<div class="mat-lead">Выберите цвет партии и нажмите «Применить ко всем» — ' +
           'он ляжет на все позиции. Отдельные детали потом можно перекрасить поштучно ' +
           'в своей строке.</div>') +
-        '<div class="ral-grid">' + cells + '</div>' +
+        '<input type="text" id="ral-search" class="ral-search" autocomplete="off" ' +
+          'placeholder="Найти: серый, белый, чёрный или код RAL" ' +
+          'oninput="_ralFilter(this.value)">' +
+        '<div id="ral-groups">' + cells + '</div>' +
+        '<div class="ral-empty" id="ral-empty" style="display:none;">' +
+          'Ничего не нашлось — впишите код вручную ниже.</div>' +
         '<div class="form-group" style="margin-top:14px;">' +
           '<label>Или впишите код вручную</label>' +
           '<input type="text" id="ral-manual" maxlength="60" placeholder="RAL 7038" value="' +
@@ -16516,6 +17135,24 @@ function openPaintRalPicker(calcId, itemId, current) {
 function closeRalPicker() {
   const m = document.getElementById('ral-picker-modal');
   if (m) m.classList.remove('visible');
+}
+
+// Поиск по коду и по русскому названию: «сер» оставит серые, «9016» — один цвет.
+function _ralFilter(q) {
+  const s = (q || '').trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll('#ral-groups .ral-group').forEach(g => {
+    let inGroup = 0;
+    g.querySelectorAll('.ral-cell').forEach(el => {
+      const ok = !s || (el.dataset.search || '').indexOf(s) >= 0;
+      el.style.display = ok ? '' : 'none';
+      if (ok) inGroup++;
+    });
+    g.style.display = inGroup ? '' : 'none';
+    shown += inGroup;
+  });
+  const e = document.getElementById('ral-empty');
+  if (e) e.style.display = shown ? 'none' : '';
 }
 
 // Клик по цвету в режиме «на весь расчёт»: только запоминаем выбор
@@ -16730,10 +17367,54 @@ async function loadMfg() {
     state.mfgSections = (r && r.sections) || [];
     state.mfgCurrentItem = null;
     renderMfg();
+    // Переход из дефицита производственной работы: после загрузки дерева
+    // открываем точное изделие и выделяем весь недостающий комплект.
+    const pending = state._mfgPendingOpen;
+    if (pending) {
+      state._mfgPendingOpen = null;
+      await _mfgOpenProductionSelection(pending);
+    }
   } catch (e) {
     box.innerHTML = '<div class="empty-block">Не удалось загрузить: ' +
       escapeHtml(String((e && e.message) || e)) + '</div>';
   }
+}
+
+// v2.45.919: прямой маршрут «работа → комплект корпуса».
+function openMfgFromProduction(itemId, encodedParts) {
+  let parts = [];
+  try { parts = JSON.parse(decodeURIComponent(encodedParts || '')) || []; } catch (e) {}
+  if (!itemId || !parts.length) {
+    showToast('Не удалось определить состав корпуса', 'error');
+    return;
+  }
+  state._mfgPendingOpen = { itemId: Number(itemId), parts: parts };
+  if (typeof closeProductionWorkDetail === 'function') closeProductionWorkDetail();
+  selectSection('production');
+  selectSidebarItem('mfg');
+}
+
+async function _mfgOpenProductionSelection(pending) {
+  await openMfgItem(Number(pending.itemId));
+  const it = state.mfgCurrentItem;
+  if (!it || Number(it.id) !== Number(pending.itemId)) return;
+  state.mfgCurrentSection = it.section_id || state.mfgCurrentSection;
+  const known = new Set((it.parts || []).map(p => Number(p.id)));
+  const sel = _mfgSelMap(it);
+  Object.keys(sel).forEach(k => delete sel[k]);
+  const qtyByPart = {};
+  (pending.parts || []).forEach(row => {
+    const pid = Number(row.part_id);
+    if (!known.has(pid)) return;
+    sel[pid] = true;
+    qtyByPart[pid] = Math.max(Number(row.qty) || 1, 1);
+  });
+  state._mfgOrderPrefill = { itemId: Number(it.id), qtyByPart: qtyByPart };
+  renderMfgItem(it);
+  const count = Object.keys(qtyByPart).length;
+  showToast('Корпус открыт: выделено ' + count + ' ' +
+    (count === 1 ? 'позиция' : (count < 5 ? 'позиции' : 'позиций')) +
+    ' — сформируйте один заказ', 'success');
 }
 
 function _mfgTree() {
@@ -17098,6 +17779,7 @@ async function mfgOrdersJournal() {
 function _mfgJournalRender(filter) {
   const main = document.getElementById('mfg-main');
   if (!main) return;
+  state._mfgOrderScreen = 'journal';
   state._mfgJournalFilter = filter || state._mfgJournalFilter || 'all';
   const f = state._mfgJournalFilter;
   const all = state._mfgJournal || [];
@@ -17130,9 +17812,13 @@ function _mfgJournalRender(filter) {
         '<span class="pdx-st ' + st[0] + '" title="Нажми, чтобы сменить статус" ' +
           'onclick="mfgJournalStatus(' + o.id + ',\'' + o.status + '\')">' + st[1] + '</span>' +
         '<span class="dt">' + (dt ? dt.slice(8, 10) + '.' + dt.slice(5, 7) : '') + '</span>' +
+        (o.can_resend ? '<button class="mo-resend" data-mfg-resend="' + o.id + '" ' +
+          'onclick="mfgResendOrderFiles(' + o.id + ')"><i class="ti ti-mail-forward"></i> Дослать PDF</button>' : '') +
         '<i class="ti ti-download dl" title="Скачать архив заказа" ' +
           'onclick="mfgJournalArchive(' + o.id + ',\'' +
           escapeHtml(String(o.zip_name || '').replace(/'/g, '')) + '\')"></i>' +
+        '<i class="ti ti-trash mo-delete" title="Удалить заказ из архива" ' +
+          'onclick="mfgDeleteOrder(' + o.id + ')"></i>' +
       '</div>';
     });
   }
@@ -17172,6 +17858,76 @@ async function mfgJournalArchive(orderId, name) {
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 
+async function mfgResendOrderFiles(orderId) {
+  const all = (state._mfgJournal || []).concat(
+    ((state.mfgCurrentItem || {}).orders || []));
+  const order = all.find(o => Number(o.id) === Number(orderId)) || {};
+  const number = order.doc_number || ('З-' + orderId);
+  if (!window.confirm('Дослать поставщику исправленный архив заказа ' + number +
+      ' с чертежами гибки PDF?')) return;
+  const buttons = Array.from(document.querySelectorAll('[data-mfg-resend="' + orderId + '"]'));
+  buttons.forEach(btn => {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader"></i> Отправляем…';
+  });
+  try {
+    const r = await apiPost('/api/mfg/orders/' + orderId + '/resend-files', {});
+    const j = (r && r.data) || {};
+    if (!(r && r.ok && j.ok)) {
+      showToast(j.message || 'Не удалось дослать файлы', 'error');
+      return;
+    }
+    showToast('✉ ' + (j.doc_number || number) + ': исправленный архив дослан, PDF — ' +
+      (j.pdf_count || 0), 'success');
+    if (j.missing && j.missing.length) {
+      showToast('В архиве остаются замечания: ' + j.missing.join('; '), 'error');
+    }
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  } finally {
+    buttons.forEach(btn => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-mail-forward"></i> Дослать PDF';
+    });
+  }
+}
+
+async function mfgDeleteOrder(orderId) {
+  const all = (state._mfgJournal || []).concat(
+    ((state.mfgCurrentItem || {}).orders || []));
+  const order = all.find(o => Number(o.id) === Number(orderId)) || {};
+  const number = order.doc_number || ('З-' + orderId);
+  if (!window.confirm('Удалить заказ ' + number + ' из архива изготовления?\n\n' +
+      'Письмо поставщику и связанная закупка не отменятся.')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/mfg/orders/' + orderId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    let j = {};
+    try { j = await r.json(); } catch (e) {}
+    if (!r.ok || !j.ok) {
+      showToast(j.message || 'Не удалось удалить заказ из архива', 'error');
+      return;
+    }
+    state._mfgJournal = (state._mfgJournal || []).filter(
+      o => Number(o.id) !== Number(orderId));
+    if (state.mfgCurrentItem) {
+      state.mfgCurrentItem.orders = (state.mfgCurrentItem.orders || []).filter(
+        o => Number(o.id) !== Number(orderId));
+    }
+    if (state._mfgOrderScreen === 'item' && state.mfgCurrentItem) {
+      renderMfgItem(state.mfgCurrentItem);
+    } else {
+      _mfgJournalRender();
+    }
+    showToast(number + ' удалён из архива изготовления', 'success');
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  }
+}
+
 async function openMfgItem(id) {
   const main = document.getElementById('mfg-main');
   if (main) main.innerHTML = '<div class="loading-block">Открываем изделие…</div>';
@@ -17200,12 +17956,37 @@ async function openMfgItem(id) {
   }
 }
 
-// PDF детали ищем по обозначению в имени файла (чертёж «AG-02.000.001 Кожух.pdf»)
+// PDF детали ищем по обозначению, названию или имени исходного DXF.
 function _mfgPartPdf(it, p) {
-  const d = String(p.designation || '').trim().toLowerCase();
-  if (!d) return null;
-  return (it.files || []).find(f => f.kind === 'pdf' &&
-    String(f.file_name || '').toLowerCase().indexOf(d) >= 0) || null;
+  // В CAD, ведомости и имени PDF одно обозначение часто записано по-разному:
+  // КИД-10.000.001 / КИД10.000.001 / КИД 10-000-001. Сравнение исходных
+  // строк давало ложное «чертёж не найден», хотя PDF лежал в той же карточке.
+  const pdfs = (it.files || []).filter(f => f.kind === 'pdf' &&
+    !String(f.file_name || '').toUpperCase().includes('СБ'));
+  const d = _mfgDesignationKey(p.designation);
+  if (d) {
+    const byDesignation = pdfs.filter(f => _mfgDesignationKey(f.file_name).includes(d));
+    if (byDesignation.length === 1) return byDesignation[0];
+  }
+  const nameKey = value => String(value || '')
+    .replace(/\.[^.]+$/, '')
+    .replace(/\([^)]*(?:лист|мм|сталь|aisi|оцинк)[^)]*\)/gi, ' ')
+    .normalize('NFKC').toLowerCase().replace(/ё/g, 'е')
+    .replace(/[^0-9a-zа-я]+/g, '');
+  const keys = Array.from(new Set([nameKey(p.name), nameKey(p.source_file)]))
+    .filter(key => key.length >= 6);
+  const scored = pdfs.map(file => {
+    const fk = nameKey(file.file_name);
+    const score = keys.reduce((best, key) => Math.max(best,
+      fk === key ? 3 : ((fk.includes(key) || key.includes(fk)) ? 2 : 0)), 0);
+    return { file, score };
+  }).filter(x => x.score > 0);
+  if (scored.length) {
+    const best = Math.max(...scored.map(x => x.score));
+    const matched = scored.filter(x => x.score === best);
+    if (matched.length === 1) return matched[0].file;
+  }
+  return null;
 }
 function _mfgView() {
   try {
@@ -17232,6 +18013,74 @@ function _mfgSelMap(it) {
   }
   return state._mfgSel;
 }
+function _mfgOrderPartQty(it, part) {
+  const prefill = state._mfgOrderPrefill;
+  if (prefill && Number(prefill.itemId) === Number(it.id) &&
+      prefill.qtyByPart && prefill.qtyByPart[part.id] != null) {
+    return Math.max(Number(prefill.qtyByPart[part.id]) || 1, 1);
+  }
+  return Math.max(Number(part.qty) || 1, 1);
+}
+function _mfgOrderKitCount(it, parts) {
+  const prefill = state._mfgOrderPrefill;
+  if (!prefill || Number(prefill.itemId) !== Number(it.id) || !prefill.qtyByPart) return 1;
+  const ratios = (parts || []).map(p => {
+    const total = Number(prefill.qtyByPart[p.id]);
+    const perKit = Math.max(Number(p.qty) || 1, 1);
+    return Number.isFinite(total) && total > 0 ? total / perKit : NaN;
+  });
+  if (!ratios.length || ratios.some(x => !Number.isFinite(x))) return 1;
+  const kits = Math.round(ratios[0]);
+  return kits >= 1 && ratios.every(x => Math.abs(x - kits) < 0.001) ? kits : 1;
+}
+function _mfgOrderAutoSubject(it, positions, pieces) {
+  return 'Атомус Групп — заказ на изготовление ' + (it.designation || '') +
+    ' (' + positions + ' поз., ' + pieces + ' шт)';
+}
+function _mfgOrderRefreshSummary(updateSubject) {
+  const rows = Array.from(document.querySelectorAll('#mfg-order-modal .mo-row'));
+  const pieces = rows.reduce((sum, row) => {
+    const input = row.querySelector('.mo-qty');
+    return sum + Math.max(parseInt((input || {}).value, 10) || 1, 1);
+  }, 0);
+  const positionsBox = document.getElementById('mo-total-positions');
+  const piecesBox = document.getElementById('mo-total-pieces');
+  if (positionsBox) positionsBox.textContent = String(rows.length);
+  if (piecesBox) piecesBox.textContent = String(pieces);
+  if (updateSubject) {
+    const subject = document.getElementById('mo-subject');
+    const it = state.mfgCurrentItem || {};
+    if (subject) {
+      const previousAuto = subject.dataset.autoSubject || '';
+      const nextAuto = _mfgOrderAutoSubject(it, rows.length, pieces);
+      if (!subject.value || subject.value === previousAuto) subject.value = nextAuto;
+      subject.dataset.autoSubject = nextAuto;
+    }
+  }
+}
+function mfgOrderSetKits(value) {
+  const kits = Math.min(Math.max(parseInt(value, 10) || 1, 1), 999);
+  const kitInput = document.getElementById('mo-kit-count');
+  if (kitInput) kitInput.value = String(kits);
+  document.querySelectorAll('#mfg-order-modal .mo-row').forEach(row => {
+    const perKit = Math.max(Number(row.dataset.unitQty) || 1, 1);
+    const qty = row.querySelector('.mo-qty');
+    if (qty) qty.value = String(Math.max(Math.round(perKit * kits), 1));
+  });
+  _mfgOrderRefreshSummary(true);
+}
+function mfgOrderKitStep(delta) {
+  const input = document.getElementById('mo-kit-count');
+  mfgOrderSetKits((parseInt((input || {}).value, 10) || 1) + Number(delta || 0));
+}
+function mfgOrderQtyChanged() {
+  _mfgOrderRefreshSummary(true);
+}
+function mfgOrderRemovePart(icon) {
+  const row = icon && icon.closest ? icon.closest('.mo-row') : null;
+  if (row) row.remove();
+  _mfgOrderRefreshSummary(true);
+}
 function mfgTogglePart(partId) {
   const it = state.mfgCurrentItem;
   if (!it) return;
@@ -17244,6 +18093,7 @@ function mfgSelParts(mode) {
   if (!it) return;
   const sel = _mfgSelMap(it);
   Object.keys(sel).forEach(k => delete sel[k]);
+  if (mode === 'none') state._mfgOrderPrefill = null;
   if (mode === 'all') (it.parts || []).forEach(p => { sel[p.id] = true; });
   renderMfgItem(it);
 }
@@ -17261,7 +18111,9 @@ async function mfgOrderOpen(itemId) {
     state._mfgSups = d.suppliers || [];
   } catch (e) { state._mfgSups = state._mfgSups || []; }
   const sups = state._mfgSups;
-  const pieces = chosen.reduce((a, p) => a + (p.qty || 1), 0);
+  const pieces = chosen.reduce((a, p) => a + _mfgOrderPartQty(it, p), 0);
+  const kitCount = _mfgOrderKitCount(it, chosen);
+  const autoSubject = _mfgOrderAutoSubject(it, chosen.length, pieces);
   state._mfgSupSel = null;
   let m = document.getElementById('mfg-order-modal');
   if (m) m.remove();
@@ -17274,13 +18126,27 @@ async function mfgOrderOpen(itemId) {
       escapeHtml(it.designation || it.name || '') + '</h3>' +
       '<button class="icon-btn" onclick="document.getElementById(\'mfg-order-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
     '<div class="modal-body" style="overflow-y:auto;display:flex;flex-direction:column;gap:12px;">' +
+      '<div class="mo-kitbar">' +
+        '<div class="mo-kit-copy"><b>Количество комплектов</b>' +
+          '<span>Нормы каждой выбранной детали умножатся автоматически</span></div>' +
+        '<div class="mo-kit-stepper">' +
+          '<button type="button" onclick="mfgOrderKitStep(-1)" title="Уменьшить">−</button>' +
+          '<input type="number" min="1" max="999" id="mo-kit-count" value="' + kitCount + '" ' +
+            'oninput="mfgOrderSetKits(this.value)" aria-label="Количество комплектов">' +
+          '<button type="button" onclick="mfgOrderKitStep(1)" title="Увеличить">+</button>' +
+        '</div>' +
+        '<div class="mo-kit-total"><b><span id="mo-total-positions">' + chosen.length + '</span> поз. · ' +
+          '<span id="mo-total-pieces">' + pieces + '</span> шт.</b><span>в заказе</span></div>' +
+      '</div>' +
       '<div><div class="mo-sec">СОСТАВ ЗАКАЗА — ШТУКИ МОЖНО ПОПРАВИТЬ</div>' +
-        chosen.map(p => '<div class="mo-row" data-part="' + p.id + '">' +
+        chosen.map(p => '<div class="mo-row" data-part="' + p.id + '" data-unit-qty="' +
+          Math.max(Number(p.qty) || 1, 1) + '">' +
           '<span class="ds">' + escapeHtml(p.designation || '—') + '</span>' +
           '<span class="nm">' + escapeHtml(p.name || '') + '</span>' +
-          '<input type="number" min="1" value="' + (p.qty || 1) + '" class="mo-qty">' +
+          '<input type="number" min="1" value="' + _mfgOrderPartQty(it, p) + '" class="mo-qty" ' +
+            'oninput="mfgOrderQtyChanged()">' +
           '<span class="un">шт</span>' +
-          '<i class="ti ti-x rm" title="Убрать из заказа" onclick="this.parentNode.remove()"></i>' +
+          '<i class="ti ti-x rm" title="Убрать из заказа" onclick="mfgOrderRemovePart(this)"></i>' +
         '</div>').join('') + '</div>' +
       '<div><div class="mo-sec">МАТЕРИАЛ ЗАКАЗА</div>' +
         '<div class="pdx-mode" id="mo-mat">' +
@@ -17303,9 +18169,8 @@ async function mfgOrderOpen(itemId) {
           '<button class="btn btn-secondary" onclick="mfgSupsOpen()" title="Справочник поставщиков"><i class="ti ti-settings"></i></button>' +
         '</div></div>' +
       '<div class="form-group" style="margin:0;"><label class="form-label">Тема письма</label>' +
-        '<input class="form-input" id="mo-subject" value="' +
-        escapeHtml('Атомус Групп — заказ на изготовление ' + (it.designation || '') +
-          ' (' + chosen.length + ' поз., ' + pieces + ' шт)') + '"></div>' +
+        '<input class="form-input" id="mo-subject" data-auto-subject="' + escapeHtml(autoSubject) +
+          '" value="' + escapeHtml(autoSubject) + '"></div>' +
       '<div class="form-group" style="margin:0;"><label class="form-label">Текст письма</label>' +
         '<textarea class="form-input" id="mo-body" rows="4">Добрый день! Просим изготовить детали по вложению: раскрой DXF, гибка по PDF, количество в ведомости. Материал и толщина указаны в ведомости. О сроках сообщите ответным письмом.</textarea></div>' +
     '</div>' +
@@ -17607,6 +18472,7 @@ async function mfgSupAdd() {
 }
 
 function renderMfgItem(it) {
+  state._mfgOrderScreen = 'item';
   const main = document.getElementById('mfg-main');
   if (!main || !it) return;
   _mfgDisposeStepThumbs();
@@ -17752,8 +18618,12 @@ function renderMfgItem(it) {
         '<span class="pdx-st ' + st[0] + '" title="Нажми, чтобы сменить статус" ' +
           'onclick="mfgOrderStatus(' + o.id + ',\'' + o.status + '\')">' + st[1] + '</span>' +
         '<span class="dt">' + (dt ? dt.slice(8, 10) + '.' + dt.slice(5, 7) : '') + '</span>' +
+        (o.can_resend ? '<button class="mo-resend" data-mfg-resend="' + o.id + '" ' +
+          'onclick="mfgResendOrderFiles(' + o.id + ')"><i class="ti ti-mail-forward"></i> Дослать PDF</button>' : '') +
         '<i class="ti ti-download dl" title="Скачать архив заказа" ' +
           'onclick="mfgOrderArchive(' + o.id + ',\'' + escapeHtml(String(o.zip_name || '').replace(/'/g, '')) + '\')"></i>' +
+        '<i class="ti ti-trash mo-delete" title="Удалить заказ из архива" ' +
+          'onclick="mfgDeleteOrder(' + o.id + ')"></i>' +
       '</div>';
     });
   }
@@ -17831,8 +18701,8 @@ function renderMfgItem(it) {
   // липкая панель заказа
   const selParts = parts.filter(p => _mfgSelMap(it)[p.id]);
   if (selParts.length) {
-    const pieces = selParts.reduce((a, p) => a + (p.qty || 1), 0);
-    const mass = selParts.reduce((a, p) => a + (p.mass_kg || 0) * (p.qty || 1), 0);
+    const pieces = selParts.reduce((a, p) => a + _mfgOrderPartQty(it, p), 0);
+    const mass = selParts.reduce((a, p) => a + (p.mass_kg || 0) * _mfgOrderPartQty(it, p), 0);
     h += '<div class="pdx-batch">' +
       '<span style="font-size:20px;">🏭</span>' +
       '<div><div class="n">Заказ на изготовление: ' + selParts.length + ' ' +
@@ -18140,6 +19010,23 @@ function _mfgStepFile(fileId) {
 
 async function _mfgStepDrawingContext(item) {
   if (!item) return item;
+
+  // STEP нередко догружают в уже открытую карточку. Перед созданием 3D-сцены
+  // перечитываем изделие, иначе просмотрщик остаётся со старым массивом files и
+  // не видит PDF, которые на сервере уже есть.
+  try {
+    const fresh = await apiGet('/api/mfg/items/' + item.id);
+    if (fresh && Number(fresh.id) === Number(item.id)) {
+      item = fresh;
+      if (state.mfgCurrentItem &&
+          Number(state.mfgCurrentItem.id) === Number(fresh.id)) {
+        state.mfgCurrentItem = fresh;
+      }
+    }
+  } catch (_) {
+    // 3D продолжит работать с текущими данными даже при кратком обрыве сети.
+  }
+
   const ownFiles = item.files || [];
   const ownParts = item.parts || [];
   if (ownParts.length && ownFiles.some(file => file.kind === 'pdf')) return item;

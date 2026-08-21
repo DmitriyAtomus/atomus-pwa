@@ -6,6 +6,7 @@ const test = require('node:test');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(__dirname, '..', 'app-1.js'), 'utf8');
 const app3 = fs.readFileSync(path.join(__dirname, '..', 'app-3.js'), 'utf8');
+const app4 = fs.readFileSync(path.join(__dirname, '..', 'app-4.js'), 'utf8');
 const css = fs.readFileSync(path.join(__dirname, '..', 'app.css'), 'utf8');
 const serviceWorker = fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8');
 const version = JSON.parse(
@@ -36,6 +37,35 @@ test('чат расчёта показывает прикреплённые фа
   const end = app3.indexOf('async function calcChatSend', start);
   assert.ok(start >= 0 && end > start, 'Найден загрузчик чата расчёта');
   assert.match(app3.slice(start, end), /_renderTeamMessageFiles\(m\.files \|\| \[\]\)/);
+});
+
+test('в чат расчёта можно выбрать и перетащить файлы', () => {
+  assert.match(app3, /id="calc-chat-file-input"/);
+  assert.match(app3, /class="calc-attach-btn"/);
+  assert.match(app3, /function _wireCalcChatFileDrop\(pane\)/);
+  assert.match(app3, /addEventListener\('dragenter'/);
+  assert.match(app3, /addEventListener\('drop'/);
+  assert.match(app3, /_calcChatFilesSelected\(files\)/);
+  assert.match(app3, /new FormData\(\)/);
+  assert.match(css, /\.calcs-pane\.is-file-dragging \.calc-drop-overlay/);
+});
+
+test('в командный чат можно перетащить файлы мышью', () => {
+  assert.match(html, /id="tchat-drop-zone"/);
+  assert.match(html, /id="tchat-drop-overlay"/);
+  assert.match(app4, /function _wireTeamChatFileDrop\(\)/);
+  assert.match(app4, /addEventListener\('dragenter'/);
+  assert.match(app4, /addEventListener\('drop'/);
+  assert.match(app4, /onTeamChatFilesSelected\(files\)/);
+  assert.match(css, /\.tchat-main\.is-file-dragging \.tchat-drop-overlay/);
+});
+
+test('в чат договора можно перетащить файлы мышью', () => {
+  assert.match(html, /id="cchat-drop-zone"/);
+  assert.match(html, /id="cchat-drop-overlay"/);
+  assert.match(app, /function _wireContractChatFileDrop\(\)/);
+  assert.match(app, /onContractChatFilesSelected\(files\)/);
+  assert.match(css, /\.contract-chat-modal\.is-file-dragging \.tchat-drop-overlay/);
 });
 
 test('длинный чат расчёта прокручивается внутри панели', () => {
