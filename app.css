@@ -23371,6 +23371,16 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .lt-dir-i .tx b { display: block; font-size: 13px; }
 .lt-dir-i .tx small { font-size: 11.5px; color: var(--text-light); }
 .lt-dir-form { display: flex; flex-direction: column; gap: 7px; }
+/* v2.46.017: выбор места, куда уже ездили */
+.lt-row-ops { display: flex; gap: 2px; align-items: start; }
+.lt-place-i { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 10px; margin-bottom: 6px; border: 1px solid var(--border); border-radius: 10px; background: #fff; cursor: pointer; }
+.lt-place-i:hover { border-color: #93C5FD; background: #F5F9FF; }
+.lt-place-i .ic { font-size: 15px; flex: none; }
+.lt-place-i .tx { flex: 1; min-width: 0; }
+.lt-place-i .tx b { display: block; font-size: 13px; color: var(--text); }
+.lt-place-i .tx small { display: block; font-size: 11.5px; color: var(--text-light); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lt-place-i > .ti { color: var(--success); font-size: 15px; flex: none; }
+#lt-place-q { margin-bottom: 10px; }
 .lt-dir-coords { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 @media (max-width: 700px) {
   .lt-new-row { grid-template-columns: 1fr; }
