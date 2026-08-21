@@ -62,12 +62,13 @@ test('статусы дозапрашиваются только пока ест
 test('версия и кэш подняты вместе', () => {
   // Не пиним конкретный номер (он растёт с каждым релизом) — проверяем,
   // что app-1.js, sw.js и version.json согласованы между собой.
-  const appNum = (app.match(/const APP_VERSION = "v2\.45\.(\d+)"/) || [])[1];
+  const appVersion = (app.match(/const APP_VERSION = "v(\d+\.\d+\.\d+)"/) || [])[1];
   const swNum = (serviceWorker.match(/const CACHE_VERSION = 'atomus-v1\.8\.(\d+)'/) || [])[1];
-  const verNum = (String(version.version).match(/v2\.45\.(\d+)/) || [])[1];
-  assert.ok(appNum, 'APP_VERSION не найден в app-1.js');
-  assert.equal(swNum, appNum, 'CACHE_VERSION в sw.js не совпадает с APP_VERSION');
-  assert.equal(verNum, appNum, 'version.json не совпадает с APP_VERSION');
+  assert.ok(appVersion, 'APP_VERSION не найден в app-1.js');
+  assert.equal(swNum, appVersion.split('.').pop(),
+    'CACHE_VERSION в sw.js не совпадает с APP_VERSION');
+  assert.equal(String(version.version), 'v' + appVersion,
+    'version.json не совпадает с APP_VERSION');
 });
 
 test('лента не рисует сообщение дважды при одновременных тиках', () => {

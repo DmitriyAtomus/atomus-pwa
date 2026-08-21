@@ -4,8 +4,22 @@ const API_BASE = window.location.origin;
 const API_DIRECT_FALLBACK = 'https://worker-production-9b70.up.railway.app';
 const _atomusNativeFetch = window.fetch.bind(window);
 
-// v2.45.836: Vercel Security Checkpoint может отвечать HTML 403 на API-запросы,
-// когда компьютер работает через VPN. В этом единственном случае повторяем
+async function _isVercelSecurityResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/html')) return true;
+  if (!contentType.includes('application/json')) return false;
+  try {
+    const payload = await response.clone().json();
+    // Наш API всегда отдаёт error строкой. Объект здесь присылает защитный
+    // слой Vercel, и такой ответ нужно повторить напрямую в Railway.
+    return !!(payload && typeof payload.error === 'object');
+  } catch (_) {
+    return false;
+  }
+}
+
+// v2.46.028: Vercel Security Checkpoint может отвечать HTML или JSON 403 на
+// API-запросы, когда компьютер работает через VPN. В этом случае повторяем
 // запрос напрямую в Railway. Без VPN основной same-origin прокси остаётся
 // приоритетным, поэтому офисные сети с недоступным Railway продолжают работать.
 window.fetch = async function atomusApiFetch(input, init) {
@@ -18,8 +32,8 @@ window.fetch = async function atomusApiFetch(input, init) {
     requestUrl.pathname.startsWith('/api/');
 
   const response = await _atomusNativeFetch(input, init);
-  const contentType = response.headers.get('content-type') || '';
-  if (!isProxiedApi || response.status !== 403 || !contentType.includes('text/html')) {
+  if (!isProxiedApi || response.status !== 403 ||
+      !(await _isVercelSecurityResponse(response))) {
     return response;
   }
 
@@ -29,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.1032";
+const APP_VERSION = "v2.46.028";
 const APP_VERSION_DATE = "21.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -258,6 +272,32 @@ function yesterdayIso() {
 
 // ============ API ============
 
+function formatApiErrorMessage(value, fallback) {
+  const seen = [];
+  function read(v, depth) {
+    if (depth > 4 || v === null || v === undefined) return '';
+    if (typeof v === 'string') return v.trim();
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    if (typeof v !== 'object') return '';
+    if (seen.indexOf(v) >= 0) return '';
+    seen.push(v);
+    if (Array.isArray(v)) {
+      return v.map(item => read(item, depth + 1)).filter(Boolean).join('; ');
+    }
+    const keys = ['message', 'msg', 'detail', 'error', 'reason', 'title', 'code'];
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(v, key)) {
+        const text = read(v[key], depth + 1);
+        if (text) return text;
+      }
+    }
+    return '';
+  }
+  const text = read(value, 0);
+  if (text) return text;
+  return fallback === undefined ? 'Ошибка' : String(fallback);
+}
+
 async function apiPost(path, body) {
   const token = localStorage.getItem(TOKEN_KEY);
   const headers = { 'Content-Type': 'application/json' };
@@ -285,7 +325,7 @@ async function apiPatch(path, body) {
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const msg = (data && (data.message || data.error)) || ('HTTP ' + response.status);
+    const msg = formatApiErrorMessage(data, 'HTTP ' + response.status);
     throw new Error(msg);
   }
   return data;
@@ -404,7 +444,7 @@ try {
 
 function setStatus(msg, type) {
   const el = document.getElementById('login-status');
-  el.textContent = msg || '';
+  el.textContent = formatApiErrorMessage(msg, '');
   el.className = 'status' + (type ? ' ' + type : '');
 }
 
@@ -419,7 +459,7 @@ async function submitCode() {
   try {
     const r = await apiPost('/api/auth/code', { code });
     if (!r.ok) {
-      setStatus(r.data.message || r.data.error || 'Ошибка', 'error');
+      setStatus(formatApiErrorMessage(r.data, 'Ошибка'), 'error');
       btn.disabled = false;
       return;
     }
@@ -468,7 +508,7 @@ async function submitPassword() {
   try {
     const r = await apiPost('/api/auth/password', { password });
     if (!r.ok) {
-      setStatus(r.data.message || r.data.error || 'Неверный пароль', 'error');
+      setStatus(formatApiErrorMessage(r.data, 'Неверный пароль'), 'error');
       btn.disabled = false;
       // Стираем поле чтобы не дать перебирать вслепую
       if (input) { input.value = ''; input.focus(); }
