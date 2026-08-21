@@ -18723,7 +18723,12 @@
 /* v2.45.325: Атом Электрика (AtomCAD) — полноэкранный встроенный инструмент проектирования щитов */
 .atomcad-screen { padding: 0 !important; }
 .atomcad-frame { display: block; width: 100%; border: 0; background: #0E1217; height: calc(100vh - 60px); }
-.app.mobile-layout .atomcad-frame { height: calc(100vh - 200px); min-height: 360px; }
+.app.mobile-layout .atomcad-frame { height: calc(100vh - 224px); min-height: 360px; }
+/* dvh — реальная высота окна телефона: с 100vh низ модуля уезжал под таб-бар */
+.app.mobile-layout .atomcad-frame { height: calc(100dvh - 224px); }
+/* на телефоне над модулем и так две полосы CRM — свою шапку раздела ужимаем */
+.app.mobile-layout .atomcad-screen .screen-header { margin-top: 2px; padding-top: 6px; padding-bottom: 6px; }
+.app.mobile-layout .atomcad-screen .screen-header h2 { font-size: 15px; }
 /* ============ v2.45.344: утреннее окно мастеру — отметка % готовности ============ */
 .mp-overlay {
   position: fixed; inset: 0; z-index: 200000;
@@ -24884,7 +24889,7 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
   .ich-list-btn { display: inline-flex; }
 }
 
-/* ============ v2.46.029: вид «Атомус × Матрица» для чата с Клавой ============ */
+/* ============ v2.46.031: вид «Атомус × Матрица» для чата с Клавой ============ */
 /* Механика матричная — цифровой дождь фоном, строчная развёртка ЭЛТ, виньетка и
    стекло, — но цвета наши: тёмно-синяя подложка #0A1B2E, бренд-синий #5B8FC7 и
    фиолетовый Клавы #8B7BF0. Зелёного неона нет. Формы не тронуты: шапка-строка,

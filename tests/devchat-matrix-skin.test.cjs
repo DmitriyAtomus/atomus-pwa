@@ -9,7 +9,7 @@ const js = fs.readFileSync(path.join(root, 'app-1.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
-const skinCss = css.slice(css.indexOf('/* ============ v2.46.029: вид «Атомус × Матрица»'));
+const skinCss = css.slice(css.indexOf('/* ============ v2.46.031: вид «Атомус × Матрица»'));
 
 test('кнопка вида есть и на экране чата, и в шторке', () => {
   assert.equal((html.match(/onclick="devChatSkinToggle\(\)"/g) || []).length, 2);

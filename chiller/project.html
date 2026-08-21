@@ -775,6 +775,131 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
   background:var(--panel2)}
 .tk-act .btn{flex:1}
 @media(max-width:900px){.frow>.lb{min-width:100%;margin-bottom:-2px}}
+/* ═══════════════ ТЕЛЕФОН: одна колонка, шторки, жесты (v2.46.029) ═══════════════
+   На узком экране каталог и спецификация уезжают в шторки снизу, сцена занимает
+   весь экран, панель вида и кнопки детали крутятся вбок. Класс .mob вешает JS
+   по ширине окна — состояние шторок держится на нём же. */
+#mbar,#mmenu,#msh,.mgrab,#schz{display:none}
+body.mob #app{grid-template-rows:44px 1fr auto}
+body.mob footer{display:none}
+body.mob header{gap:7px;padding:0 8px}
+body.mob .logo,body.mob .proto{display:none}
+body.mob header .back:not(#bFS){display:none}
+body.mob #bFS{margin-left:auto!important;padding:6px 9px;font-size:14px;line-height:1}
+body.mob #fsTxt{display:none}
+body.mob .pname:not(#projName){display:none}
+body.mob #projName{margin-left:auto;max-width:40vw;font-size:12px}
+body.mob .mtab{padding:6px 13px;font-size:12.5px}
+/* сцена во весь экран, колонки — шторки снизу */
+body.mob #mid{display:block;position:relative;overflow:hidden}
+body.mob #vwrap{position:absolute;inset:0}
+body.mob #mid>.col{position:absolute;left:0;right:0;top:auto;bottom:0;height:78%;z-index:18;
+  border-right:0;border-left:0;border-top:1px solid var(--line2);border-radius:15px 15px 0 0;
+  transform:translateY(102%);transition:transform .2s ease;box-shadow:0 -16px 40px rgba(0,0,0,.55)}
+body.mob.sh-cat #mid>.col.cat,body.mob.sh-spec #mid>#right{transform:none}
+body.mob #mid>.col{height:82%}
+body.mob .col .note{display:none}
+body.mob .col .ph{padding:7px 12px}
+/* разделы — лентой вбок, иначе четыре ряда чипов съедают пол-шторки */
+body.mob .col .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:7px}
+body.mob .col .chips::-webkit-scrollbar{display:none}
+body.mob .col .chip{flex:0 0 auto}
+body.mob #right{display:flex}
+body.mob #msh{display:block;position:fixed;inset:0;z-index:17;background:rgba(3,8,16,.62)}
+body.mob #msh.up{z-index:29}
+body.mob:not(.sh-cat):not(.sh-spec):not(.mm) #msh{display:none}
+/* ручка шторки: за неё же её и стягивают вниз */
+body.mob .mgrab{display:flex;align-items:center;height:26px;flex:none;position:relative;
+  touch-action:none;user-select:none}
+.mgrab i{position:absolute;left:50%;top:8px;transform:translateX(-50%);width:40px;height:4px;
+  border-radius:2px;background:var(--line2)}
+.mgrab span{display:none}
+.mgrab b{margin-left:auto;color:var(--dim);font-size:17px;font-weight:400;line-height:1;
+  padding:0 13px;cursor:pointer}
+/* нижняя панель */
+body.mob #mbar{display:flex;align-items:stretch;background:#081426;border-top:1px solid var(--line);
+  height:54px;padding-bottom:env(safe-area-inset-bottom,0px)}
+#mbar .mb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  font-size:10px;color:var(--dim);cursor:pointer;user-select:none;position:relative}
+#mbar .mb i{font-style:normal;line-height:0;display:block}
+#mbar .mb i svg{width:21px;height:21px;display:block}
+#mbar .mb.on{color:var(--ice)}
+#mbar .mb .lb{display:flex;align-items:center;gap:4px}
+#mbar .mb .cnt{font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+/* лист «Ещё» */
+body.mob #mmenu{position:fixed;left:0;right:0;bottom:54px;z-index:30;display:none;flex-direction:column;
+  background:var(--panel);border-top:1px solid var(--line2);border-radius:15px 15px 0 0;
+  padding:6px 8px 10px;max-height:76%;overflow-y:auto;
+  box-shadow:0 -16px 40px rgba(0,0,0,.55)}
+body.mob.mm #mmenu{display:flex}
+#mmenu .mi{display:flex;align-items:center;gap:12px;padding:12px 13px;border-radius:10px;
+  font-size:13.5px;color:var(--ink);cursor:pointer}
+#mmenu .mi:active{background:var(--panel2)}
+#mmenu .mi i{font-style:normal;width:20px;text-align:center;color:var(--ice);font-size:15px}
+#mmenu .mi.off{opacity:.4}
+#mmenu .mh{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+  padding:9px 13px 3px}
+/* панель вида — выезжает по кнопке, а не висит поверх машины */
+body.mob .vbar{display:none;position:absolute;left:8px;right:8px;bottom:8px;top:auto;z-index:12;
+  gap:6px;background:rgba(8,20,36,.96);border:1px solid var(--line2);border-radius:12px;padding:9px}
+body.mob.sh-view .vbar{display:flex}
+body.mob.sh-view #selbar{display:none}   /* панель вида и кнопки детали не спорят за низ */
+body.mob .vb{font-size:12px;padding:7px 11px}
+body.mob #hint{display:none}
+/* кнопки выделенной детали — одной строкой с прокруткой вбок */
+body.mob #selbar{left:6px;right:6px;bottom:6px;transform:none;flex-wrap:nowrap;padding:7px;gap:7px;
+  overflow-x:auto;justify-content:flex-start;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+body.mob #selbar::-webkit-scrollbar{display:none}
+body.mob #selbar>*{flex:0 0 auto}
+body.mob #selbar button{padding:8px 12px;font-size:12px}
+body.mob #selbar .nm{max-width:34vw}
+body.mob #selbar .z{display:none}
+/* плавающие панели по ширине экрана */
+body.mob #pos,body.mob #mnt{left:6px;right:6px;bottom:6px;transform:none;width:auto;max-width:none;
+  min-width:0;max-height:70%;overflow-y:auto}
+body.mob #partsBox{left:6px;right:6px;top:8px;width:auto;max-height:58%}
+body.mob #nofit{top:8px;bottom:auto;left:6px;right:6px;transform:none;max-width:none}
+body.mob #nofit span{white-space:normal}
+body.mob #toast{bottom:72px}
+body.mob #ctx,body.mob #rpick{max-width:calc(100vw - 12px)}
+/* схема: пальцами приближается, кнопки масштаба под рукой */
+body.mob #swrap{-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
+body.mob #schSvg{width:calc(100% * var(--sz,1));max-width:none}
+body.mob .sch-chips{padding:8px 10px 2px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+body.mob .sch-chips::-webkit-scrollbar{display:none}
+body.mob .sch-chips span{flex:0 0 auto}
+body.mob .sch-note{font-size:11px;padding:6px 10px;line-height:1.4}
+body.mob #vwrap.schm #schz{display:flex;position:absolute;right:8px;bottom:48px;z-index:12;
+  flex-direction:column;gap:6px}
+#schz b{display:flex;align-items:center;justify-content:center;width:38px;height:38px;
+  font-size:17px;font-weight:400;color:var(--ink);background:rgba(8,20,36,.94);
+  border:1px solid var(--line2);border-radius:10px;cursor:pointer;user-select:none}
+#schz b:active{border-color:var(--ice2);color:var(--ice)}
+/* каталог во весь экран на телефоне */
+body.mob .nom-top{flex-wrap:wrap;padding:8px 10px;gap:7px}
+body.mob .nom-top b{font-size:12.5px}
+body.mob .nom-q{min-width:100%;order:5;padding:7px 11px}
+body.mob .nom-q kbd{display:none}
+body.mob .nom-nav{width:134px;padding:8px 5px}
+body.mob .nom-nav .sr{font-size:11px;padding:6px 5px;white-space:normal;line-height:1.25}
+body.mob .nom-nav .sr small{padding-left:4px;flex:none}
+body.mob .nom-grid{grid-template-columns:1fr;padding:10px 10px 84px}
+body.mob .ncard .ph2{height:78px}
+/* ландшафт телефона: по высоте всего ~390 px — режем всё, что можно */
+@media(max-height:520px){
+  body.mob #app{grid-template-rows:40px 1fr auto}
+  body.mob #mid>.col{height:92%}
+  body.mob .col .ph{display:none}
+  body.mob .search{margin:7px 10px 6px}
+  body.mob #mbar{height:46px}
+  body.mob #mbar .mb{font-size:9.5px}
+  body.mob #mbar .mb i svg{width:18px;height:18px}
+  body.mob #mmenu{bottom:46px;max-height:88%}
+  body.mob #mmenu .mi{padding:9px 13px;font-size:13px}
+}
+/* окна-карточки: до самых краёв, чтобы влезал текст */
+body.mob .flt-card,body.mob .tk-card,body.mob .mdz-card,body.mob .pov-card,
+body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none;max-height:88vh}
 </style></head><body>
 <div id="app">
   <header>
@@ -797,7 +922,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
   </header>
 
   <div id="mid">
-    <div class="col">
+    <div class="col cat">
       <div class="ph">База 3D <span class="m" id="catCnt"></span><span id="nomOpen" title="Каталог во весь экран · Ctrl+K">⛶ каталог</span></div>
       <div class="search" id="qBox"><span style="color:var(--faint)">⌕</span><input id="q"
         placeholder="название, артикул, R404A, 1/2&quot;…" autocomplete="off"><span class="qx" id="qClr" title="Очистить · Esc">✕</span></div>
@@ -815,6 +940,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
       <div class="vbar">
         <div class="vb" data-v="iso">Изометрия</div><div class="vb" data-v="front">Спереди</div>
         <div class="vb" data-v="top">Сверху</div>
+        <div class="vb" id="bFit" title="Вписать машину в экран">⤢ Вписать</div>
         <div class="vb" id="bGrid">Сетка 100 мм</div>
         <div class="vb" id="bParts" style="display:none">Детали</div>
         <div class="vb" id="bPorts" title="Подписи патрубков: выкл · у выделенной · у всех">Патрубки</div>
@@ -831,6 +957,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
         <span><i style="background:#6fd3a5"></i>уравнивание</span></div>
       <div id="hint" class="min"><b>? как управлять</b><div class="hb">ЛКМ по полу — вращение · деталь — тащи мышью<br>корпус сквозной — за панелью берётся деталь; по пустой панели — сам корпус (тащится вторым нажатием)<br>ПКМ по детали — меню · по фону — панорама · колесо — зум<br>PgUp/PgDn — выше/ниже · Del — убрать<br>G — точные координаты и углы (шаг 1 мм / 1°)<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>метка «+» на патрубке — свободное присоединение: жми и выбирай, что поставить<br>оттуда же «⇄ протянуть трубу» — ткни во второй патрубок, трасса ляжет по осям</div></div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
+      <div id="schz"><b data-sz="1" title="Крупнее">+</b><b data-sz="-1" title="Мельче">−</b><b data-sz="0" title="Во всю ширину">↺</b></div>
       <div id="swrap">
         <div id="schChips" class="sch-chips"></div>
         <svg id="schSvg" viewBox="0 0 900 722"></svg>
@@ -944,7 +1071,17 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
     <span id="fMode"></span>
     <span class="save" id="fSave"></span>
   </footer>
+
+  <!-- нижняя панель телефона: каталог, состав, вид, ещё -->
+  <div id="mbar">
+    <div class="mb" data-sh="cat"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></i><span class="lb">Каталог</span></div>
+    <div class="mb" data-sh="spec"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1.2"/><circle cx="4" cy="12" r="1.2"/><circle cx="4" cy="18" r="1.2"/></svg></i><span class="lb">Состав<span class="cnt" id="mbCnt"></span></span></div>
+    <div class="mb" data-sh="view"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 20.5 8v8L12 20.5 3.5 16V8z"/><path d="M12 3.5V12l8.5-4M12 12 3.5 8M12 12v8.5"/></svg></i><span class="lb">Вид</span></div>
+    <div class="mb" data-sh="more"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></i><span class="lb">Ещё</span></div>
+  </div>
 </div>
+<div id="msh"></div>
+<div id="mmenu"></div>
 <div id="toast"></div>
 
 <!-- ===================== чат по чиллерам ===================== -->
@@ -1172,7 +1309,7 @@ const ZONE_SHORT={dis:'нагнетание',suc:'всасывание',ppk:'П�
 /* цвет детали из пакета: '#1A1D21' у крашеных, иначе исходная сталь */
 const partCol=p=>{const c=p&&p.col?parseInt(String(p.col).replace('#',''),16):NaN;
   return isNaN(c)?C_BODY:c;};
-let renderer,scene,camera,grid;
+let renderer,scene,camera,grid,glLost=false;
 let target=new THREE.Vector3(0,0,300),theta=-0.95,phi=1.15,dist=3200,dMin=400,dMax=12000;
 const placed=[];   // {uid,id,obj,d}
 let sel=null,uidSeq=1;
@@ -1192,13 +1329,69 @@ function initGL(){
   const c=new THREE.DirectionalLight(0xffffff,.22);c.position.set(300,900,-500);scene.add(c);
   grid=new THREE.GridHelper(6000,60,0x2c4058,0x16263a);grid.rotation.x=Math.PI/2;scene.add(grid);
   scene.add(portGrp);portsBtn();rotBtn();
+  /* контекст WebGL на телефоне браузер отбирает (вкладка ушла в фон, мало памяти).
+     three.js его восстанавливает сам, но кадр надо пересобрать — обнуляем размер,
+     чтобы следующий tick пересчитал его заново. */
+  cv.addEventListener('webglcontextlost',()=>{glLost=true;});
+  cv.addEventListener('webglcontextrestored',()=>{glLost=false;cv.width=0;});
   bindCtl(cv);tick();
 }
+/* туман задавали числами под монитор (4200…12000). На телефоне кадр узкий, камера
+   для «вписать» отходит вдвое дальше — и машина начинала таять в фоне. Держим
+   туман от камеры: машина всегда чистая, размывается только даль сетки. */
+function fogSync(){
+  if(!scene||!scene.fog)return;
+  const n=Math.max(2000,dist*1.15);
+  scene.fog.near=n;scene.fog.far=Math.max(n+4000,dist*3.2);
+}
+/* v2.46.029: «вписать» — машина целиком в кадре. Камера стояла на фиксированном
+   удалении, и на телефоне (узкий кадр, объектив 35°) собранный чиллер уезжал
+   в угол сетки: приходилось искать его пальцем. Считаем габарит сцены и
+   отходим ровно настолько, чтобы он влез и по высоте, и по ширине. */
+function camFitBox(){
+  const bb=new THREE.Box3();
+  placed.forEach(p=>{try{p.obj.traverse(o=>{
+    if(o.isMesh&&o.visible)bb.expandByObject(o);});}catch(e){}});
+  return bb;
+}
+function camFit(){
+  if(!placed.length||!camera)return;
+  const bb=camFitBox();
+  if(bb.isEmpty())return;
+  const c=new THREE.Vector3(),sz=new THREE.Vector3();
+  bb.getCenter(c);bb.getSize(sz);
+  target.copy(c);
+  const r=Math.max(sz.x,sz.y,sz.z,300)*0.5*1.18;
+  const vf=camera.fov*Math.PI/360;                       // половина вертикального угла
+  const hf=Math.atan(Math.tan(vf)*(camera.aspect||1));   // и горизонтального — по кадру
+  dist=Math.max(dMin,Math.min(dMax,r/Math.sin(Math.max(0.05,Math.min(vf,hf)))));
+}
+/* меши деталей приезжают из базы уже после того, как проект «открыт»: пока их
+   нет, габарит сцены пустой. Поэтому подгоняем кадр несколько раз подряд —
+   пока габарит не перестанет расти или пока пользователь не тронул сцену. */
+let camTouched=false,_fitPrev=-1;
+function camFitSoon(n){
+  n=n||0;
+  if(n&&camTouched)return;
+  camFit();
+  const bb=camFitBox();
+  const sz=bb.isEmpty()?0:bb.getSize(new THREE.Vector3()).length();
+  if(n<24&&(sz<1||Math.abs(sz-_fitPrev)>1)){_fitPrev=sz;setTimeout(()=>camFitSoon(n+1),350);}
+}
+/* v2.46.030: чёрная сцена на телефоне. Размер кадра сверялся ТОЛЬКО по ширине:
+   стоило один раз попасть на кадр с нулевой высотой (страница ещё раскладывается,
+   шторка, поворот, скрытая вкладка «Схема») — camera.aspect уходил в Infinity,
+   а второй раз его не считали, потому что ширина не менялась. Сцена оставалась
+   чёрной навсегда, хотя детали в составе есть. Сверяем обе стороны и не рисуем
+   кадр нулевого размера. */
 function tick(){
   requestAnimationFrame(tick);
-  const cv=$('#cv'),w=cv.clientWidth,h=cv.clientHeight;
-  if(cv.width!==Math.round(w*renderer.getPixelRatio())){
+  const cv=$('#cv'),w=cv.clientWidth,h=cv.clientHeight,pr=renderer.getPixelRatio();
+  if(w>0&&h>0&&(cv.width!==Math.round(w*pr)||cv.height!==Math.round(h*pr)
+                ||!isFinite(camera.aspect)||camera.aspect<=0)){
     renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+  if(!w||!h||glLost)return;
+  fogSync();
   camera.position.set(target.x+dist*Math.sin(phi)*Math.cos(theta),
                       target.y+dist*Math.sin(phi)*Math.sin(theta),
                       target.z+dist*Math.cos(phi));
@@ -1257,7 +1450,19 @@ function bindCtl(cv){
   let mode=null,last=null,dragOff=null,dragSnap=null;   // dragSnap — снимок до перетаскивания
   let rmb=null,lpT=null;                                // rmb — где нажали правую; lpT — долгое касание
   const lpOff=()=>{if(lpT){clearTimeout(lpT);lpT=null;}};
+  /* v2.46.029: на телефоне нет ни колеса, ни правой кнопки — их заменяют два
+     пальца: щипок меняет расстояние до машины, протяг двумя — панорама. */
+  const tps=new Map();let pin=null;
+  const tpMid=()=>{const a=[...tps.values()];
+    return {x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2,d:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)};};
   cv.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='touch'){
+      tps.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if(tps.size===2){mode=null;dragSnap=null;lpOff();cv.classList.remove('drag');
+        pin=tpMid();return;}
+      if(tps.size>2)return;
+    }
+    camTouched=true;
     cv.setPointerCapture(e.pointerId);last={x:e.clientX,y:e.clientY};
     if(e.button===2){mode='pan';rmb={x:e.clientX,y:e.clientY};return;}
     const hit=pickItem(e);
@@ -1288,6 +1493,14 @@ function bindCtl(cv){
     else{mode='orbit';}
   });
   cv.addEventListener('pointermove',e=>{
+    if(e.pointerType==='touch'&&tps.has(e.pointerId)){
+      tps.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if(tps.size>=2&&pin){
+        const m=tpMid();
+        if(m.d>4&&pin.d>4)dist=Math.max(dMin,Math.min(dMax,dist*pin.d/m.d));
+        pan(m.x-pin.x,m.y-pin.y);pin=m;return;
+      }
+    }
     if(!mode)return;
     const dx=e.clientX-last.x,dy=e.clientY-last.y;last={x:e.clientX,y:e.clientY};
     if(lpT&&(Math.abs(dx)>3||Math.abs(dy)>3))lpOff();
@@ -1302,7 +1515,9 @@ function bindCtl(cv){
       checkCollisions();save();posFill();
     }
   });
-  const off=()=>{
+  const off=e=>{
+    if(e&&e.pointerId!=null)tps.delete(e.pointerId);
+    if(tps.size<2)pin=null;
     if(mode==='item')pipeAfterDrag();   // отпустили узел — что стало с трубой
     mode=null;dragSnap=null;lpOff();cv.classList.remove('drag');};
   cv.addEventListener('pointerup',off);cv.addEventListener('pointercancel',off);
@@ -1315,11 +1530,12 @@ function bindCtl(cv){
     if(!hit){ctxClose();return;}          // по фону — только панорама, меню не нужно
     select(hit);ctxOpen(hit,e.clientX,e.clientY);
   });
-  cv.addEventListener('wheel',e=>{e.preventDefault();
+  cv.addEventListener('wheel',e=>{e.preventDefault();camTouched=true;
     dist=Math.max(dMin,Math.min(dMax,dist*(1+Math.sign(e.deltaY)*0.11)));},{passive:false});
   const V={iso:[-0.95,1.15],front:[-1.5708,1.5708],top:[-1.5708,0.05]};
   document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{
     const v=V[b.dataset.v];theta=v[0];phi=v[1];});
+  $('#bFit').onclick=()=>{camTouched=false;_fitPrev=-1;camFitSoon(0);};
   $('#bGrid').onclick=()=>{grid.visible=!grid.visible;
     $('#bGrid').classList.toggle('on',grid.visible);};
   $('#bGrid').classList.add('on');
@@ -5000,6 +5216,7 @@ function refresh(){
     const it=placed.find(p=>p.id===row.dataset.id&&p!==sel)||placed.find(p=>p.id===row.dataset.id);
     if(it)select(it);});
   $('#hCnt').textContent=placed.length+' '+plural(placed.length);
+  {const mc=$('#mbCnt');if(mc)mc.textContent=placed.length||'';}
   $('#fCnt').textContent=placed.length+' '+plural(placed.length)+' · '+rows.length+' наим.';
   // общий габарит по сцене
   if(placed.length){
@@ -6216,6 +6433,7 @@ function setMode(m){
   /* лист схемы — на весь экран: гасим слои сцены и закрываем всё, что открыто
      поверх неё (меню ПКМ, выбор ответной части, панель координат) */
   $('#vwrap').classList.toggle('schm',m==='sch');
+  document.body.classList.toggle('sch',m==='sch');
   if(m==='sch'){ctxClose();rotPickClose();hideMnt();posHide();renderSchema();}
 }
 $('#tab3d').onclick=()=>setMode('3d');
@@ -7599,4 +7817,128 @@ function chGrow(el){
   refresh();
   chatArm();     /* чат по чиллерам — если он этому пользователю доступен */
 })();
+
+/* ═══════════ ТЕЛЕФОН: шторки, нижняя панель, лист «Ещё» (v2.46.029) ═══════════
+   Раздел открывают с телефона, а раскладка была рассчитана на монитор: каталог
+   съедал полэкрана, спецификация пряталась совсем, кнопки не помещались в шапку.
+   Узкий экран получает свой режим: сцена во весь экран, а каталог, состав и
+   ракурсы приезжают шторками снизу по нижней панели. */
+/* телефон — это и «узко», и «низко»: в ландшафте ширина за 760, но по высоте
+   там 390 px, и трёхколоночная раскладка снова становится нечитаемой */
+const MOBQ=matchMedia('(max-width:760px),(max-height:520px) and (pointer:coarse)');
+const mobOn=()=>document.body.classList.contains('mob');
+function shSet(n){
+  const b=document.body;
+  ['sh-cat','sh-spec','sh-view','mm'].forEach(c=>b.classList.remove(c));
+  if(n==='more')b.classList.add('mm'); else if(n)b.classList.add('sh-'+n);
+  $('#msh').classList.toggle('up',n==='more');
+  document.querySelectorAll('#mbar .mb').forEach(x=>x.classList.toggle('on',x.dataset.sh===n));
+}
+const shClose=()=>shSet(null);
+/* ручка шторки: за неё её и стягивают вниз */
+function mobGrab(col,title){
+  if(!col||col.querySelector('.mgrab'))return;
+  const g=document.createElement('div');
+  g.className='mgrab';g.innerHTML='<i></i><span>'+title+'</span><b>✕</b>';
+  col.insertBefore(g,col.firstChild);
+  g.querySelector('b').onclick=shClose;
+  let y0=null;
+  g.addEventListener('pointerdown',e=>{y0=e.clientY;try{g.setPointerCapture(e.pointerId);}catch(_){}});
+  g.addEventListener('pointermove',e=>{if(y0!=null&&e.clientY-y0>44){y0=null;shClose();}});
+  const up=()=>{y0=null;};
+  g.addEventListener('pointerup',up);g.addEventListener('pointercancel',up);
+}
+mobGrab(document.querySelector('#mid>.col.cat'),'База 3D · каталог');
+mobGrab($('#right'),'Спецификация проекта');
+
+/* «Ещё» — то, что на мониторе живёт кнопками в шапке */
+const MMI=[
+  ['⛶','Во весь экран','#bFS'],
+  ['⛁','Проекты Атом Чиллер','#bProjects'],
+  ['◫','Бак водяного контура','#bTank'],
+  ['⌗','Подбор фильтра-осушителя','#bFlt'],
+  ['💬','Чат по чиллерам','#chatBtn'],
+  ['⛶','Каталог во весь экран','#nomOpen'],
+  ['✦','Расставить по функциям','#bAuto'],
+  ['⤓','Собрать по схеме','#bFromSch'],
+  ['→','BOM · чертёж сборки','#bBom'],
+  ['✕','Очистить сцену','#bClear'],
+  ['←','Вернуться в базу 3D','index.html']
+];
+function mmBuild(){
+  const el=$('#mmenu'),vis=[];
+  MMI.forEach(r=>{
+    if(r[2][0]!=='#'){vis.push(r);return;}
+    const b=$(r[2]);
+    if(b&&b.style.display!=='none')vis.push(r);   /* чат есть не у всех */
+  });
+  el.innerHTML='<div class="mh">Ещё</div>'+vis.map((r,i)=>
+    '<div class="mi" data-i="'+i+'"><i>'+r[0]+'</i>'+r[1]+'</div>').join('');
+  el.querySelectorAll('.mi').forEach(mi=>{
+    const t=vis[+mi.dataset.i][2];
+    mi.onclick=()=>{shClose();
+      if(t[0]!=='#'){location.href=t;return;}
+      const x=$(t);if(x)x.click();};
+  });
+}
+$('#mbar').onclick=e=>{
+  const b=e.target.closest('.mb');if(!b)return;
+  const n=b.dataset.sh,cls=n==='more'?'mm':'sh-'+n;
+  if(document.body.classList.contains(cls)){shClose();return;}
+  if(n==='view'&&document.body.classList.contains('sch')){
+    toast('Ракурсы — на вкладке «Компоновка»');return;}
+  if(n==='more')mmBuild();
+  shSet(n);
+};
+$('#msh').onclick=shClose;
+/* выбрал деталь — шторка уезжает, видно, что встало в машину */
+$('#cat').addEventListener('click',()=>{if(mobOn())setTimeout(shClose,80);});
+$('#spec').addEventListener('click',e=>{if(mobOn()&&e.target.closest('.sr'))setTimeout(shClose,80);});
+document.querySelectorAll('#right .acts .btn').forEach(b=>
+  b.addEventListener('click',()=>{if(mobOn())shClose();}));
+$('#cv').addEventListener('pointerdown',()=>{
+  if(document.body.classList.contains('sh-view'))shClose();},true);
+addEventListener('keydown',e=>{if(e.key==='Escape'&&mobOn())shClose();});
+
+/* масштаб схемы: пальцами и кнопками — лист А1 на экране телефона иначе не прочесть */
+let SCHZ=1;
+function schZoom(v){
+  SCHZ=v===0?1:Math.max(1,Math.min(5,+(SCHZ+v*0.5).toFixed(2)));
+  $('#swrap').style.setProperty('--sz',SCHZ);
+}
+$('#schz').onclick=e=>{const b=e.target.closest('b');if(b)schZoom(+b.dataset.sz);};
+(function(){
+  const sw=$('#swrap'),d2=e=>Math.hypot(e.touches[0].clientX-e.touches[1].clientX,
+                                        e.touches[0].clientY-e.touches[1].clientY);
+  let d0=null,z0=1;
+  sw.addEventListener('touchstart',e=>{if(e.touches.length===2){d0=d2(e);z0=SCHZ;}},{passive:true});
+  sw.addEventListener('touchmove',e=>{
+    if(e.touches.length===2&&d0>4){e.preventDefault();
+      SCHZ=Math.max(1,Math.min(5,z0*d2(e)/d0));sw.style.setProperty('--sz',SCHZ);}},{passive:false});
+  const end=()=>{d0=null;};
+  sw.addEventListener('touchend',end);sw.addEventListener('touchcancel',end);
+})();
+
+/* сама смена режима */
+const EMPTY_PC=$('#empty').innerHTML;
+const EMPTY_MOB='<div class="in"><b>Сцена пустая</b><br>Нажми «Каталог» внизу —<br>'+
+  'деталь встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>'+
+  'Начни с корпуса.</div>';
+const mobWant=()=>MOBQ.matches||(navigator.maxTouchPoints>0&&innerHeight<=560);
+function mobSync(){
+  const on=mobWant();
+  if(on===mobOn())return;
+  document.body.classList.toggle('mob',on);
+  $('#empty').innerHTML=on?EMPTY_MOB:EMPTY_PC;
+  if(!on)shClose();
+  /* кадр стал другой — вписываем заново, если человек ещё не крутил сам */
+  setTimeout(()=>{try{if(!camTouched)camFit();}catch(e){}},300);
+
+}
+/* меши едут вразнобой, и загрузка проекта может не «дозавершиться» из-за одной
+   позиции — поэтому кадр ловим отдельным циклом, а не в конце openProject */
+setTimeout(()=>{try{camFitSoon(0);}catch(e){}},1200);
+addEventListener('resize',mobSync);
+if(MOBQ.addEventListener)MOBQ.addEventListener('change',mobSync);
+mobSync();
 </script></body></html>
