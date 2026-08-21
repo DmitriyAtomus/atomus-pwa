@@ -373,11 +373,16 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 .rotb i{display:flex;align-items:center;justify-content:center;width:22px;height:22px;flex:0 0 22px;
   border-radius:50%;background:var(--cc);color:#14213a;font-style:normal;font-size:15px;font-weight:700;
   line-height:1}
-.rotb span{font-size:10.5px;color:var(--cc2);letter-spacing:.2px}
+.rotb b{font-size:10.5px;color:var(--cc2);font-weight:600;letter-spacing:.2px;text-transform:lowercase}
+.rotb span{font-size:10.5px;color:var(--faint);letter-spacing:.2px}
 .rotb:hover{background:rgba(14,30,52,.96);filter:brightness(1.15)}
+/* патрубок свободен, но ответной части в базе нет: метка на месте (иначе это
+   читается как поломка), только тусклая и без пульса */
+.rotb.dry{opacity:.5;animation:none;border-style:dashed}
+.rotb.dry i{background:transparent;color:var(--cc);border:1px dashed var(--cc)}
 @keyframes rotpulse{0%,100%{box-shadow:0 0 0 4px rgba(255,255,255,.07)}
   50%{box-shadow:0 0 0 9px rgba(255,255,255,.03)}}
-@media(max-width:900px){.rotb span{display:none}}
+@media(max-width:900px){.rotb span{display:none}}   /* на телефоне остаётся имя патрубка */
 #rpick{position:fixed;z-index:43;display:none;flex-direction:column;width:274px;max-width:calc(100vw - 16px);
   max-height:70vh;background:rgba(8,20,36,.97);border:1px solid var(--line2);border-radius:10px;padding:6px;
   box-shadow:0 18px 40px rgba(0,0,0,.6);backdrop-filter:blur(8px);user-select:none}
@@ -2172,10 +2177,12 @@ function inchMm(t){
     const f=p.split('/');v+=f.length===2?(+f[0]/+f[1]):(+p||0);});
   return v*25.4;
 }
-/* Свободные патрубки сцены: наружная часть, ещё никем не занятая, и в базе
-   есть чем её закрыть. Некого предложить — метки нет, чтобы не звать в
-   пустой список. */
-function rotFree(){
+/* Свободные патрубки сцены: наружная часть, ещё никем не занятая. Раньше
+   патрубок, под который в базе нечего поставить, метки не получал вовсе — и
+   выглядело это как поломка: «на нагнетании нет плюса». Теперь метка стоит на
+   каждом свободном патрубке, а сколько к нему подходит, лежит рядом (n):
+   пусто — метка гаснет и по клику честно говорит, что в базе нечего взять. */
+function rotFree(withEmpty){
   const out=[];
   placed.forEach(it=>{
     (it.zn||[]).forEach((z,i)=>{
@@ -2183,8 +2190,9 @@ function rotFree(){
       if(!c||!c.sex||rotTaken(it,i))return;
       /* этим патрубком деталь сама сидит на аппарате — он занят */
       if(it.link&&it.link.mount==='rot'&&it.link.pzi===i)return;
-      if(!mates(c).length)return;
-      out.push({it:it,zi:i,z:z,c:c});
+      const n=mates(c).length;
+      if(!n&&!withEmpty)return;
+      out.push({it:it,zi:i,z:z,c:c,n:n});
     });
   });
   return out;
@@ -2195,23 +2203,51 @@ function rotRebuild(){
   rotBtn();
   if(!ROTS)return;
   const box=$('#rots');
-  let list=rotFree();
+  /* глухие патрубки (ответной части в базе нет) показываем только у
+     выделенной детали: иначе сцена зарастает метками, по которым нечего
+     выбрать. Выделил насос — видишь все его патрубки и понимаешь, почему на
+     одном выбора нет. */
+  let list=rotFree(true).filter(f=>f.n||f.it===sel);
   /* сцена в метках читается плохо: много аппаратов — оставляем патрубки
      выделенной детали, остальные вернутся, когда выделишь их */
   if(list.length>24&&sel&&list.some(f=>f.it===sel))list=list.filter(f=>f.it===sel);
   list.forEach(f=>{
     const el=document.createElement('div');
-    el.className='rotb';
-    const col=CT_COL[f.c.t]||CT_COL.odf;
-    el.style.setProperty('--cc',col[0]);el.style.setProperty('--cc2',col[1]);
-    el.innerHTML='<i>+</i><span></span>';
-    el.querySelector('span').textContent=f.c.txt;
-    el.title=f.z.name+' · '+f.c.txt+' — выбрать, что поставить ('+
-      mates(f.c).length+' в базе)';
+    el.className='rotb'+(f.n?'':' dry');
+    /* цвет метки — по среде, как у подписи патрубка: нагнетание красное,
+       всасывание голубое. По типу присоединения красили раньше, и у насоса
+       обе метки выходили одинаково зелёными — какая из них нагнетание,
+       понять было нельзя. Среды у зоны нет (фитинг, отвод) — красим по типу
+       присоединения, как прежде. */
+    const zc=ZONE_CSS[f.z.kind],col=CT_COL[f.c.t]||CT_COL.odf;
+    el.style.setProperty('--cc',zc||col[0]);
+    el.style.setProperty('--cc2',zc||col[1]);
+    el.innerHTML='<i></i><b></b><span></span>';
+    el.querySelector('i').textContent=f.n?'+':'·';
+    /* имя патрубка на самой метке: «нагнетание · резьба G1». Без него на
+       насосе стояли два одинаковых плюса «резьба G1». */
+    el.querySelector('b').textContent=portWord(f.z);
+    el.querySelector('span').textContent=f.n?f.c.txt:f.c.txt+' · нет в базе';
+    el.title=f.z.name+' · '+f.c.txt+(f.n?' — выбрать, что поставить ('+f.n+
+      ' в базе)':' — в базе пока нет ответной части');
     el.onclick=ev=>{ev.stopPropagation();rotPick(f.it,f.zi,ev.clientX,ev.clientY);};
     box.appendChild(el);
     rotBadges.push({el:el,it:f.it,loc:rotSeatLocal(f.z)});
   });
+}
+/* Что написать на метке. Имя патрубка с завода бывает говорящим
+   («НАГНЕТАНИЕ G1», «ВХОД ГАЗА») — берём его без размера. А бывает, что завод
+   назвал патрубок его же присоединением («ПАЙКА 1/2" ODF», «РОТОЛОК 1"-14
+   UNS») — тогда на метке одно и то же дважды, и вместо имени пишем среду:
+   нагнетание, всасывание. */
+const PORT_DUMB=/^(пайка|ротолок|резьба|фланец|патрубок|штуцер|отбортовка|порт)$/;
+function portWord(z){
+  /* из имени оставляем только русские слова: «ВСАСЫВАНИЕ G1» → «всасывание»,
+     «ВХОД ГАЗА» → «вход газа», обозначение резьбы и так стоит рядом */
+  const s=String(z.name||'').toLowerCase().split(/[\s,]+/)
+    .filter(w=>/^[а-яё]{2,}$/.test(w)).join(' ');
+  if(!s||PORT_DUMB.test(s))return ZONE_SHORT[z.kind]||s||'патрубок';
+  return s;
 }
 /* метка держится на патрубке: деталь тащат или крутят — метка едет за ней */
 const _rb=new THREE.Vector3();
