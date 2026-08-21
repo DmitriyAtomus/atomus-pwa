@@ -24888,3 +24888,235 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
   .ich-bubble { max-width: 88%; }
   .ich-list-btn { display: inline-flex; }
 }
+
+/* ============ v2.46.031: вид «Атомус × Матрица» для чата с Клавой ============ */
+/* Механика матричная — цифровой дождь фоном, строчная развёртка ЭЛТ, виньетка и
+   стекло, — но цвета наши: тёмно-синяя подложка #0A1B2E, бренд-синий #5B8FC7 и
+   фиолетовый Клавы #8B7BF0. Зелёного неона нет. Формы не тронуты: шапка-строка,
+   плитка-аватар, пузыри 16/16/16/6, композер 18 px.
+   Работает только в чате с Клавой (класс dchat-mx на body) — на экране «Клава»,
+   «Кодя» и в плавающей шторке. Остальная CRM остаётся светлой. */
+body.dchat-mx {
+  --mx-deep: #0A1B2E;                    /* подложка — наш тёмно-синий */
+  --mx-brand: #5B8FC7;                   /* бренд-синий: дождь и обводки */
+  --mx-klava: #8B7BF0;                   /* фиолетовый Клавы: акценты */
+  --mx-ink: #E6EFFA;
+  --mx-mute: rgba(198,216,238,.66);
+  --mx-line: rgba(91,143,199,.3);
+  --mx-glass: rgba(18,42,70,.58);
+}
+
+/* ---- фон: дождь, развёртка, виньетка (полотно вешает _dcMxRainAdd) ---- */
+/* Размер и смещение ставит _dcMxFit в пикселях — растягивать по inset нельзя,
+   иначе полотно и высота колонки начинают тянуть друг друга. */
+body.dchat-mx .dchat-mxbg {
+  position: absolute; left: 0; top: 0; width: 1px; height: 1px;
+  z-index: 0; overflow: hidden; pointer-events: none;
+}
+body.dchat-mx .dchat-mxbg canvas { position: absolute; inset: 0; opacity: .58; }
+body.dchat-mx .dchat-mxbg .scan {
+  position: absolute; inset: 0; opacity: .4;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,.3) 0 1px, transparent 1px 3px);
+}
+body.dchat-mx .dchat-mxbg .vig {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 42%, transparent 38%, rgba(2,10,20,.72) 100%);
+}
+/* Содержимое чата всегда над фоном. Поднимаем поимённо: скопом
+   (`> *:not(.dchat-mxbg)`) сюда попадала и кнопка «в конец переписки», которой
+   position: absolute нужен, чтобы висеть в углу ленты. */
+body.dchat-mx .dchat-mxhost { position: relative; }
+body.dchat-mx .dchat-mxhost > :is(.dchat-feed, .dchat-composer, .dchat-drawer-head, .dchat-list) {
+  position: relative; z-index: 1;
+}
+body.dchat-mx .dchat-mxhost > .dchat-jump { z-index: 2; }
+/* position здесь не трогаем: на телефоне экран чата прибит к вьюпорту
+   (position: fixed), а `:is()` с #devchat-drawer внутри перебивал бы это по
+   весу селектора — лента распрямлялась во всю переписку и композер уезжал. */
+body.dchat-mx .screen[data-screen="devchat"],
+body.dchat-mx #devchat-drawer {
+  background: var(--mx-deep) !important;
+  color: var(--mx-ink);
+}
+body.dchat-mx #devchat-drawer { border-left: 1px solid var(--mx-line) !important; }
+/* Внутренние обёртки чата рисовали свой светлый фон и накрывали дождь. */
+body.dchat-mx :is(.content-inner.dchat, .dchat-main, .dchat-feed, .dchat-composer,
+                  .dchat-chips, .dchat-files) {
+  background: transparent !important;
+}
+body.dchat-mx .dchat-backdrop.show { background: rgba(4,14,26,.6); }
+
+/* ---- шапка: наш градиент #2D5F8B остаётся, только садится на тёмное ---- */
+body.dchat-mx [data-screen="devchat"] .page-header.dchat-topbar,
+body.dchat-mx .dchat-drawer-head {
+  background: linear-gradient(135deg, rgba(45,95,139,.96), rgba(23,54,86,.9)) !important;
+  border-bottom: 1px solid var(--mx-line);
+  box-shadow: 0 8px 26px rgba(2,10,20,.55);
+}
+body.dchat-mx [data-screen="devchat"] .dchat-hd-id h1,
+body.dchat-mx .dchat-drawer-head b {
+  color: #fff; letter-spacing: .4px; text-shadow: 0 0 14px rgba(139,123,240,.45);
+}
+body.dchat-mx [data-screen="devchat"] .dchat-topbar .dchat-status { color: rgba(255,255,255,.8); }
+/* плитка-аватар — та же фиолетовая, только со свечением */
+body.dchat-mx .dchat-hd-ava {
+  box-shadow: 0 0 18px rgba(139,123,240,.55), inset 0 0 14px rgba(139,123,240,.25);
+}
+body.dchat-mx .dchat-hd-ava i { border-color: #17364F; }
+
+/* ---- сообщения ---- */
+body.dchat-mx .dchat-ava { box-shadow: 0 0 16px rgba(139,123,240,.45); }
+/* ответ Клавы — тёмное стекло с фиолетовой чертой слева */
+body.dchat-mx .dchat-bubble {
+  background: var(--mx-glass); color: var(--mx-ink);
+  border: 1px solid var(--mx-line); border-left: 2px solid var(--mx-klava);
+  box-shadow: inset 0 0 24px rgba(91,143,199,.07), 0 8px 24px rgba(2,10,20,.45);
+  backdrop-filter: blur(3px);
+}
+/* своё сообщение — наш синий пузырь, как был, только со свечением */
+body.dchat-mx .dchat-row.is-mine .dchat-bubble {
+  background: linear-gradient(135deg, #2D5F8B, #3E76A8);
+  border: 1px solid rgba(139,171,209,.5); color: #fff;
+  box-shadow: 0 0 20px rgba(91,143,199,.28), 0 8px 24px rgba(2,10,20,.45);
+}
+body.dchat-mx .dchat-text code {
+  background: rgba(91,143,199,.2); color: #CFE1F7;
+}
+body.dchat-mx .dchat-text pre {
+  background: rgba(2,12,24,.6); border: 1px solid var(--mx-line); color: var(--mx-ink);
+}
+body.dchat-mx .dchat-text a { color: #9DC4EE; }
+body.dchat-mx .dchat-meta { color: var(--mx-mute); }
+body.dchat-mx .dchat-chip { background: rgba(139,123,240,.24); color: #DAD3FF; }
+body.dchat-mx .dchat-file { background: rgba(91,143,199,.16); color: var(--mx-ink); }
+body.dchat-mx .dchat-img { border: 1px solid var(--mx-line); box-shadow: 0 0 20px rgba(91,143,199,.18); }
+body.dchat-mx .dchat-day span {
+  background: rgba(18,42,70,.82); border: 1px solid var(--mx-line); color: var(--mx-mute);
+}
+body.dchat-mx .dchat-older {
+  background: rgba(91,143,199,.14); color: #CFE1F7; border: 1px solid var(--mx-line);
+}
+body.dchat-mx .dchat-typing .bubble { background: var(--mx-glass); border: 1px solid var(--mx-line); }
+body.dchat-mx .dchat-typing .bubble i { background: var(--mx-klava); box-shadow: 0 0 8px var(--mx-klava); }
+
+/* карточка живого макета — та же кнопка «Посмотреть» */
+body.dchat-mx .dchat-art {
+  background: rgba(18,42,70,.8); border: 1px dashed rgba(139,123,240,.6); color: var(--mx-ink);
+}
+body.dchat-mx .dchat-art i { color: var(--mx-klava); }
+body.dchat-mx .dchat-art .go {
+  background: var(--mx-klava); color: #fff; box-shadow: 0 0 14px rgba(139,123,240,.5);
+}
+
+/* карточка работы — единственный янтарный акцент, чтобы цеплять глаз */
+body.dchat-mx .dchat-work {
+  background: rgba(48,36,12,.72); border: 1px solid rgba(224,160,32,.45);
+  box-shadow: inset 0 0 24px rgba(224,160,32,.08), 0 8px 24px rgba(2,10,20,.45);
+}
+body.dchat-mx .dchat-work .wk-hd { color: #F5C542; }
+body.dchat-mx .dchat-work .wk-hd .dot { background: #F5C542; box-shadow: 0 0 8px #F5C542; }
+body.dchat-mx .dchat-work .wk-now { color: var(--mx-ink); }
+body.dchat-mx .dchat-work .wk-bar { background: rgba(224,160,32,.2); }
+body.dchat-mx :is(.dchat-work .wk-act button, .dchat-res .rs-act a, .dchat-res .rs-act button) {
+  background: rgba(91,143,199,.14); border: 1px solid var(--mx-line); color: var(--mx-ink);
+}
+body.dchat-mx :is(.dchat-work .wk-act button.pri, .dchat-res .rs-act a.pri) {
+  background: #2D5F8B; border-color: rgba(139,171,209,.6); color: #fff;
+  box-shadow: 0 0 14px rgba(91,143,199,.4);
+}
+body.dchat-mx .dchat-res { border-top-color: var(--mx-line); }
+body.dchat-mx .dchat-res .rs-f { color: var(--mx-ink); }
+body.dchat-mx .dchat-res .rs-f .pl { color: #6EE7A0; }
+body.dchat-mx .dchat-res .rs-f .mn { color: #FF8A7A; }
+
+/* ---- пустая лента ---- */
+body.dchat-mx .dchat-empty { color: var(--mx-mute); }
+body.dchat-mx .dchat-empty h3 { color: var(--mx-ink); }
+body.dchat-mx .dchat-empty .ico { box-shadow: 0 0 26px rgba(139,123,240,.5); }
+body.dchat-mx :is(.dchat-quick button, .dchat-chips button) {
+  background: rgba(18,42,70,.78); border: 1px solid var(--mx-line); color: var(--mx-ink);
+}
+body.dchat-mx :is(.dchat-quick button, .dchat-chips button):hover {
+  border-color: var(--mx-klava); color: #fff; box-shadow: 0 0 14px rgba(139,123,240,.3);
+}
+body.dchat-mx .dchat-chips button i { opacity: .9; color: #9DC4EE; }
+body.dchat-mx .dchat-chips button.acc {
+  background: rgba(139,123,240,.22); border-color: rgba(139,123,240,.7); color: #DAD3FF;
+}
+
+/* ---- поле ввода ---- */
+body.dchat-mx .dchat-box {
+  background: rgba(18,42,70,.82); border: 1px solid var(--mx-line);
+  box-shadow: inset 0 0 26px rgba(91,143,199,.07);
+  backdrop-filter: blur(3px);
+}
+body.dchat-mx .dchat-box:focus-within {
+  border-color: var(--mx-klava);
+  box-shadow: 0 0 0 3px rgba(139,123,240,.18), 0 0 24px rgba(139,123,240,.22);
+}
+body.dchat-mx .dchat-input { color: var(--mx-ink); caret-color: var(--mx-klava); }
+body.dchat-mx .dchat-input::placeholder { color: rgba(198,216,238,.42); }
+body.dchat-mx .dchat-attach {
+  background: rgba(18,42,70,.9); border-color: var(--mx-line); color: var(--mx-ink);
+}
+body.dchat-mx .dchat-attach:hover { background: rgba(91,143,199,.18); color: #fff; }
+/* кнопка отправки и микрофон — наш синий, только со свечением */
+body.dchat-mx :is(.dchat-send, .dchat-mic) { box-shadow: 0 0 18px rgba(91,143,199,.45); }
+body.dchat-mx .dchat-hint { color: rgba(198,216,238,.4); }
+body.dchat-mx .dchat-jump {
+  background: rgba(18,42,70,.92); color: #CFE1F7; border: 1px solid var(--mx-line);
+  box-shadow: 0 0 18px rgba(91,143,199,.35);
+}
+body.dchat-mx .dchat-att { background: rgba(18,42,70,.85); border: 1px solid var(--mx-line); color: var(--mx-ink); }
+body.dchat-mx .dchat-files .dchat-att .rm { color: var(--mx-mute); }
+body.dchat-mx .dchat-drop .dcd-zone {
+  background: rgba(10,27,46,.94); border-color: var(--mx-klava); color: #DAD3FF;
+}
+body.dchat-mx .dchat-drop .dcd-zone span { color: var(--mx-mute); }
+body.dchat-mx .dchat-drop .dcd-go { border-color: #6EE7A0; color: #6EE7A0; }
+
+/* ---- кнопки шапки ---- */
+body.dchat-mx :is(.dchat-eye, .dchat-full-btn, .dchat-list-btn, [data-screen="devchat"] .back-btn) {
+  background: rgba(255,255,255,.14) !important; color: #fff !important;
+}
+body.dchat-mx :is(.dchat-eye, .dchat-full-btn, .dchat-list-btn):hover {
+  background: rgba(255,255,255,.26) !important;
+}
+
+/* ---- панель чатов ---- */
+body.dchat-mx .dchat-list { border-right: 1px solid var(--mx-line); }
+body.dchat-mx :is(.dcl-new, .dcl-icon, .dcl-search input, .dcl-tab) {
+  background: rgba(18,42,70,.78) !important; border: 1px solid var(--mx-line) !important;
+  color: var(--mx-ink) !important;
+}
+body.dchat-mx .dcl-search i { color: var(--mx-mute); }
+body.dchat-mx .dcl-tab.is-on {
+  background: #2D5F8B !important; border-color: rgba(139,171,209,.6) !important; color: #fff !important;
+}
+body.dchat-mx .dcl-item { color: var(--mx-ink); }
+body.dchat-mx .dcl-item:hover { background: rgba(91,143,199,.12); }
+body.dchat-mx .dcl-item.is-on { background: rgba(139,123,240,.2); }
+body.dchat-mx .dcl-item .t { color: var(--mx-ink); }
+body.dchat-mx :is(.dcl-item .p, .dcl-item .m) { color: var(--mx-mute); }
+body.dchat-mx .dcl-menu { background: #12243A; border: 1px solid var(--mx-line); }
+body.dchat-mx .dcl-menu button { color: var(--mx-ink); }
+body.dchat-mx .dcl-menu button:hover { background: rgba(91,143,199,.16); }
+body.dchat-mx .loading-block { color: var(--mx-mute); }
+
+/* кнопка вида: тем же ростом, что «глаз» и «развернуть» */
+.dchat-skin-btn {
+  width: 34px; height: 34px; border-radius: 10px; border: none; cursor: pointer; flex: none;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 17px;
+  background: rgba(255,255,255,.14); color: #fff; transition: background .15s ease;
+}
+.dchat-skin-btn:hover { background: rgba(255,255,255,.26); }
+body.dchat-mx .dchat-skin-btn.is-on { box-shadow: 0 0 14px rgba(139,123,240,.5); }
+@media (max-width: 760px) { .dchat-skin-btn { width: 32px; height: 32px; } }
+
+/* полноэкранный режим — та же тёмная подложка, а не светлый фон CRM */
+body.dchat-mx.dchat-fullscreen [data-screen="devchat"] { background: var(--mx-deep); }
+
+/* Кому анимация мешает — остаётся тёмная тема без дождя. */
+@media (prefers-reduced-motion: reduce) {
+  body.dchat-mx .dchat-mxbg canvas { display: none; }
+}

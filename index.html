@@ -976,6 +976,10 @@
             </button>
             <!-- Разворачивает ленту на всё окно: шелл CRM ограничен 1400px,
                  на широком мониторе чат иначе живёт узкой колонкой. -->
+            <!-- v2.46.031: вид чата — «Атомус × Матрица» и обычный светлый -->
+            <button class="dchat-skin-btn" onclick="devChatSkinToggle()" title="Матрица: цифровой дождь в наших цветах">
+              <i class="ti ti-binary-tree"></i>
+            </button>
             <button class="dchat-full-btn" id="devchat-full-btn" onclick="devChatToggleFull()"
                     title="Развернуть на всё окно (F11 не нужен, Esc — свернуть)">
               <i class="ti ti-maximize"></i>
@@ -9026,7 +9030,10 @@ function _ccReset() {
     <i class="ti ti-message-code" style="font-size:19px;"></i>
     <b>Клава</b>
     <span id="devchat-drawer-context" class="ctx"></span>
-    <button class="icon-btn" style="margin-left:auto;" onclick="devChatToggleDrawer()" title="Закрыть">
+    <button class="dchat-skin-btn" style="margin-left:auto;" onclick="devChatSkinToggle()" title="Матрица: цифровой дождь в наших цветах">
+      <i class="ti ti-binary-tree"></i>
+    </button>
+    <button class="icon-btn" onclick="devChatToggleDrawer()" title="Закрыть">
       <i class="ti ti-x"></i>
     </button>
   </div>
