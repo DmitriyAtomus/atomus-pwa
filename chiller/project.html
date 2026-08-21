@@ -1309,7 +1309,7 @@ const ZONE_SHORT={dis:'нагнетание',suc:'всасывание',ppk:'П�
 /* цвет детали из пакета: '#1A1D21' у крашеных, иначе исходная сталь */
 const partCol=p=>{const c=p&&p.col?parseInt(String(p.col).replace('#',''),16):NaN;
   return isNaN(c)?C_BODY:c;};
-let renderer,scene,camera,grid;
+let renderer,scene,camera,grid,glLost=false;
 let target=new THREE.Vector3(0,0,300),theta=-0.95,phi=1.15,dist=3200,dMin=400,dMax=12000;
 const placed=[];   // {uid,id,obj,d}
 let sel=null,uidSeq=1;
@@ -1329,7 +1329,20 @@ function initGL(){
   const c=new THREE.DirectionalLight(0xffffff,.22);c.position.set(300,900,-500);scene.add(c);
   grid=new THREE.GridHelper(6000,60,0x2c4058,0x16263a);grid.rotation.x=Math.PI/2;scene.add(grid);
   scene.add(portGrp);portsBtn();rotBtn();
+  /* контекст WebGL на телефоне браузер отбирает (вкладка ушла в фон, мало памяти).
+     three.js его восстанавливает сам, но кадр надо пересобрать — обнуляем размер,
+     чтобы следующий tick пересчитал его заново. */
+  cv.addEventListener('webglcontextlost',()=>{glLost=true;});
+  cv.addEventListener('webglcontextrestored',()=>{glLost=false;cv.width=0;});
   bindCtl(cv);tick();
+}
+/* туман задавали числами под монитор (4200…12000). На телефоне кадр узкий, камера
+   для «вписать» отходит вдвое дальше — и машина начинала таять в фоне. Держим
+   туман от камеры: машина всегда чистая, размывается только даль сетки. */
+function fogSync(){
+  if(!scene||!scene.fog)return;
+  const n=Math.max(2000,dist*1.15);
+  scene.fog.near=n;scene.fog.far=Math.max(n+4000,dist*3.2);
 }
 /* v2.46.029: «вписать» — машина целиком в кадре. Камера стояла на фиксированном
    удалении, и на телефоне (узкий кадр, объектив 35°) собранный чиллер уезжал
@@ -1365,11 +1378,20 @@ function camFitSoon(n){
   const sz=bb.isEmpty()?0:bb.getSize(new THREE.Vector3()).length();
   if(n<24&&(sz<1||Math.abs(sz-_fitPrev)>1)){_fitPrev=sz;setTimeout(()=>camFitSoon(n+1),350);}
 }
+/* v2.46.030: чёрная сцена на телефоне. Размер кадра сверялся ТОЛЬКО по ширине:
+   стоило один раз попасть на кадр с нулевой высотой (страница ещё раскладывается,
+   шторка, поворот, скрытая вкладка «Схема») — camera.aspect уходил в Infinity,
+   а второй раз его не считали, потому что ширина не менялась. Сцена оставалась
+   чёрной навсегда, хотя детали в составе есть. Сверяем обе стороны и не рисуем
+   кадр нулевого размера. */
 function tick(){
   requestAnimationFrame(tick);
-  const cv=$('#cv'),w=cv.clientWidth,h=cv.clientHeight;
-  if(cv.width!==Math.round(w*renderer.getPixelRatio())){
+  const cv=$('#cv'),w=cv.clientWidth,h=cv.clientHeight,pr=renderer.getPixelRatio();
+  if(w>0&&h>0&&(cv.width!==Math.round(w*pr)||cv.height!==Math.round(h*pr)
+                ||!isFinite(camera.aspect)||camera.aspect<=0)){
     renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+  if(!w||!h||glLost)return;
+  fogSync();
   camera.position.set(target.x+dist*Math.sin(phi)*Math.cos(theta),
                       target.y+dist*Math.sin(phi)*Math.sin(theta),
                       target.z+dist*Math.cos(phi));
