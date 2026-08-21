@@ -757,7 +757,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
     <button class="back" id="bFlt" style="margin-left:8px"
           title="Подобрать фильтр-осушитель по мощности и хладагенту">⌗ Подбор</button>
   <button class="back" id="bTank" style="margin-left:8px"
-          title="Бак водяного контура: выбрать структуру, задать размеры и поставить в компоновку">◫ Бак</button>
+          title="Бак водяного контура: прямоугольный сварной из нержавейки — задать размеры и поставить в компоновку">◫ Бак</button>
   <button class="back" id="bProjects" style="margin-left:8px">⛁ Проекты</button>
     <a class="back" href="index.html" style="margin-left:8px">← База 3D</a>
   </header>
@@ -872,7 +872,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
         <button id="bRoof" style="display:none"
                 title="Собрать верхний узел: конденсатор — внутрь, под крышку, на четыре уголка М6; вентилятор — в проём крышки на четыре М6">⌂ Верхний узел</button>
         <button id="bTankEd" style="display:none"
-                title="Пересчитать бак: структура, размеры, лист, патрубки">✎ Размеры бака</button>
+                title="Пересчитать бак: размеры, лист, патрубки">✎ Размеры бака</button>
         <button id="bPos" title="Точные координаты и углы (G)">⌖ Координаты</button>
         <button id="bSwap" style="display:none" title="Поставить на этот патрубок другую деталь">⇄ Заменить</button>
         <button id="bRot" title="Повернуть вокруг вертикали (R)">⟳ 90°</button>
@@ -1005,26 +1005,20 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 </div></div>
 <div id="tnk"><div class="flt-card tk-card">
   <div class="pov-h"><span id="tkHd">◫ Бак из нержавейки</span>
-    <span class="sub">конструктор · структура и размеры свои</span><span class="x" id="tkX">✕</span></div>
+    <span class="sub">прямоугольный сварной · размеры свои</span><span class="x" id="tkX">✕</span></div>
   <div class="flt-body">
-    <div class="frow"><span class="lb">Структура</span><div class="chips" id="tkKind"></div></div>
-    <div class="frow" id="tkRowR"><span class="lb">Размеры, мм</span>
+    <div class="frow"><span class="lb">Размеры, мм</span>
       <input class="tk-in" type="number" id="tkL" step="10" inputmode="decimal"><span class="tk-x">×</span>
       <input class="tk-in" type="number" id="tkB" step="10" inputmode="decimal"><span class="tk-x">×</span>
       <input class="tk-in" type="number" id="tkH" step="10" inputmode="decimal">
       <span class="fhint">длина × ширина × высота, наружные</span></div>
-    <div class="frow" id="tkRowC"><span class="lb" id="tkDlb">Ø и высота, мм</span>
-      <input class="tk-in" type="number" id="tkD" step="10" inputmode="decimal">
-      <span class="tk-x">Ø</span>
-      <input class="tk-in" type="number" id="tkHC" step="10" inputmode="decimal">
-      <span class="fhint" id="tkHlb">высота</span></div>
     <div class="frow"><span class="lb">Лист</span><div class="chips" id="tkS"></div></div>
     <div class="frow"><span class="lb">Марка стали</span><div class="chips" id="tkMark"></div></div>
     <div class="frow"><span class="lb">Крышка</span><div class="chips" id="tkLid"></div></div>
-    <div class="frow" id="tkRowPart"><span class="lb">Перегородка</span>
+    <div class="frow"><span class="lb">Перегородка</span>
       <div class="chips" id="tkPart"></div>
       <span class="fhint">делит бак на подачу и обратку</span></div>
-    <div class="frow" id="tkRowOver"><span class="lb">Перелив</span><div class="chips" id="tkOver"></div></div>
+    <div class="frow"><span class="lb">Перелив</span><div class="chips" id="tkOver"></div></div>
     <div class="frow"><span class="lb">Изоляция</span><div class="chips" id="tkIns"></div>
       <span class="fhint">+ обшивка нерж 0,5 мм</span></div>
     <div class="frow"><span class="lb">Опоры</span><div class="chips" id="tkLeg"></div>
@@ -3922,7 +3916,7 @@ function projPayload(){
                                              face:p.link.face||'pan',
                                              zi:p.link.zi,pzi:p.link.pzi,
                                              roll:p.link.roll}:null,
-                                tk:isTank(p.d)?p.d.tk:undefined,   // бак: структура и размеры
+                                tk:isTank(p.d)?p.d.tk:undefined,   // бак: размеры и исполнение
                                 pl:isPipeSeg(p)?pipeLen(p):undefined,
                                 sch:p.sch||undefined,   // v2.46.017: позиция схемы
                                 off:(p.off&&p.off.length)?p.off:undefined})),
@@ -5162,17 +5156,13 @@ function fltClose(){$('#flt').classList.remove('on');}
 /* ═══ бак водяного контура: конструктор (v2.46.014) ═══
    Бак мы варим сами, из нержавейки, и размеры у него каждый раз свои — типовой
    ряд из базы (gen_tank.py, 100…1000 л) под проект не подходит. Поэтому бак
-   здесь не позиция базы, а деталь проекта: структура и размеры лежат в самом
-   проекте (поле tk у детали), геометрия строится тут же — лист, борт, опоры,
-   патрубки. Отсюда же считается раскрой: площадь листа, масса пустого и
-   залитого бака, буферная способность в киловаттах. */
+   здесь не позиция базы, а деталь проекта: размеры лежат в самом проекте
+   (поле tk у детали), геометрия строится тут же — лист, борт, опоры, патрубки.
+   Отсюда же считается раскрой: площадь листа, масса пустого и залитого бака,
+   буферная способность в киловаттах.
+   Структура одна — прямоугольный сварной: цилиндры мы не катаем (v2.46.020). */
 
-const TK_KIND=[
-  ['rect','Прямоугольный','сварной из листа, борт по периметру'],
-  ['cyl' ,'Цилиндр вертикальный','плоское дно'],
-  ['cone','Цилиндр с конусом','дно 45° — сливается насухо'],
-  ['horz','Цилиндр горизонтальный','на двух сёдлах'],
-];
+const TK_DESC='сварной из листа, борт по периметру';
 const TK_MARK=[['304','AISI 304'],['316','AISI 316L'],['430','AISI 430']];
 const TK_MARKN={'304':'AISI 304 (08Х18Н10) — вода, гликоль',
                 '316':'AISI 316L (03Х17Н14М2) — пищевой, солевой раствор',
@@ -5186,7 +5176,7 @@ const TK_RHO=7.9;          // нержавейка, кг на м² при тол
 const TK_PROF=2.5;         // труба профильная 40×40×2 нерж, кг/м
 const TK_C=4.19, TK_TAU=180, TK_DT=4;   // вода, спиральный компрессор, перепад на баке
 
-const TKD={k:'rect',L:800,B:600,H:700,D:600,s:1.5,mark:'304',lid:'none',
+const TKD={L:800,B:600,H:700,s:1.5,mark:'304',lid:'none',
            part:0,ins:0,leg:'adj',legH:120,du:32,over:1,ull:60};
 let TKP=Object.assign({},TKD);
 let tkEdit=null;           // uid бака, который правим (иначе — новый)
@@ -5196,97 +5186,58 @@ const tkG2=v=>(Math.round(v*100)/100).toString().replace('.',',');
 const tkNum=(v,dflt)=>{const x=parseFloat(String(v).replace(',','.'));
   return isFinite(x)?x:dflt;};
 const isTank=d=>!!(d&&d.tk);
+/* бак из старого проекта мог быть цилиндром — приводим к коробке по
+   описанному габариту, чтобы он открывался и считался как все */
+function tkNorm(P){
+  P=Object.assign({},TKD,P);
+  if(P.k&&P.k!=='rect'){
+    const D=Math.max(200,P.D||600);
+    if(P.k==='horz'){P.B=D;P.H=D;}else{P.L=D;P.B=D;}
+  }
+  delete P.k;delete P.D;
+  return P;
+}
 
 /* ── раскрой и цифры ─────────────────────────────────────────────────────── */
-/* Каждая строка раскроя — заготовка под лазер: как её кладут на лист.
-   Круглые детали идут описанным квадратом — так их и заказывают. */
+/* Каждая строка раскроя — заготовка под лазер: как её кладут на лист. */
 function tkCalc(P){
-  const s=P.s, R=P.D/2, cut=[], add=(nm,w,h,n,round)=>cut.push({nm,w,h,n:n||1,round:!!round});
-  let Vw=0, Vf=0, dims=[0,0,0], prof=0;
+  const s=P.s, cut=[], add=(nm,w,h,n)=>cut.push({nm,w,h,n:n||1});
   const legH=P.leg==='none'?0:P.legH;
-  if(P.k==='rect'){
-    const li=P.L-2*s, bi=P.B-2*s, hw=P.H-s-P.ull;      // внутри и рабочая высота
-    Vw=li*bi*hw/1e6; Vf=li*bi*(P.H-s)/1e6;
-    add('Дно',P.L,P.B,1);
-    add('Стенка продольная',P.L,P.H,2);
-    add('Стенка торцевая',bi,P.H,2);
-    if(P.lid!=='none')add('Крышка',P.L,P.B,1);
-    if(P.part)add('Перегородка',bi,P.H-s-P.ull,1);
-    prof+=2*(P.L+P.B)/1000;                            // обвязка борта
-    dims=[P.L,P.B,P.H+legH];
-  }else if(P.k==='cyl'||P.k==='cone'){
-    const ri=R-s, hw=P.H-s-P.ull;
-    Vw=Math.PI*ri*ri*hw/1e6; Vf=Math.PI*ri*ri*(P.H-s)/1e6;
-    add('Обечайка (развёртка)',Math.round(Math.PI*P.D),P.H,1);
-    add('Крышка круглая',P.D,P.D,P.lid!=='none'?1:0,true);
-    if(P.k==='cone'){
-      const rl=P.du/2+15, hc=R-rl;                     // конус 45°
-      const l=Math.sqrt(hc*hc+(R-rl)*(R-rl));
-      const Vc=Math.PI*hc*(ri*ri+ri*rl+rl*rl)/3/1e6;
-      Vw+=Vc; Vf+=Vc;
-      add('Конус (развёртка сектора)',Math.round(Math.PI*(R+rl)),Math.round(l),1);
-      dims=[P.D,P.D,P.H+hc+legH];
-    }else{
-      add('Дно круглое',P.D,P.D,1,true);
-      dims=[P.D,P.D,P.H+legH];
-    }
-    prof+=Math.PI*P.D/1000;                            // кольцо жёсткости по борту
-  }else{                                               // горизонтальный
-    const ri=R-s;
-    Vf=Math.PI*ri*ri*P.L/1e6; Vw=Vf*0.9;               // заполнение 90 %
-    add('Обечайка (развёртка)',Math.round(Math.PI*P.D),P.L,1);
-    add('Днище',P.D,P.D,2,true);
-    add('Седло',300,Math.round(P.D*0.5),2);
-    dims=[P.L,P.D,P.D+legH];
-  }
+  const li=P.L-2*s, bi=P.B-2*s, hw=P.H-s-P.ull;        // внутри и рабочая высота
+  const Vw=li*bi*hw/1e6, Vf=li*bi*(P.H-s)/1e6;
+  add('Дно',P.L,P.B,1);
+  add('Стенка продольная',P.L,P.H,2);
+  add('Стенка торцевая',bi,P.H,2);
+  if(P.lid!=='none')add('Крышка',P.L,P.B,1);
+  if(P.part)add('Перегородка',bi,P.H-s-P.ull,1);
+  let prof=2*(P.L+P.B)/1000;                           // обвязка борта
+  const dims=[P.L,P.B,P.H+legH];
   if(P.leg==='adj')prof+=4*legH/1000;
   if(P.leg==='frame')prof+=(2*(dims[0]+dims[1])+4*legH)/1000;
-  /* площадь листа: круглые заготовки — по кругу (столько металла в детали),
-     а в раскрое их всё равно кладут квадратом — это видно в строке */
-  const area=cut.reduce((a,c)=>a+c.n*(c.round?Math.PI*c.w*c.w/4:c.w*c.h)/1e6,0);
+  const area=cut.reduce((a,c)=>a+c.n*c.w*c.h/1e6,0);
   const mass=area*s*TK_RHO+prof*TK_PROF;
-  const ins=P.ins?tkInsArea(P,dims)*(0.5*TK_RHO+P.ins*0.0011):0;   // обшивка 0,5 + утеплитель
+  const ins=P.ins?tkInsArea(P)*(0.5*TK_RHO+P.ins*0.0011):0;   // обшивка 0,5 + утеплитель
   const kw=Vw*TK_C*TK_DT/TK_TAU;
   return {cut,area,prof,mass:mass+ins,massIns:ins,Vw,Vf,dims,legH,
           massFull:mass+ins+Vw,kw};
 }
 /* площадь обшивки: боковые стенки и верх, дно не закрываем */
-function tkInsArea(P,dims){
-  if(P.k==='rect')return (2*(P.L+P.B)*P.H+P.L*P.B)/1e6;
-  if(P.k==='horz')return (Math.PI*P.D*P.L+Math.PI*P.D*P.D/2)/1e6;
-  return (Math.PI*P.D*P.H+Math.PI*P.D*P.D/4)/1e6;
+function tkInsArea(P){
+  return (2*(P.L+P.B)*P.H+P.L*P.B)/1e6;
 }
 
 /* ── патрубки: одни и те же точки для геометрии и для присоединений ─────── */
 function tkPorts(P){
-  const c=tkCalc(P), z0=c.legH, R=P.D/2, od=P.du+10, aux=26;
+  const c=tkCalc(P), z0=c.legH, od=P.du+10, aux=26;
   const G=du=>'G'+({25:'1',32:'1 1/4',40:'1 1/2',50:'2'}[du]||'1');
   const out=[];
   const put=(nm,kind,p,dir,d,du)=>out.push({nm,kind,p,dir,od:d,du,conn:G(du)});
-  if(P.k==='rect'){
-    const hTop=z0+P.H-140, hBot=z0+120;
-    put('ВХОД ОБРАТКИ','dis',[0,P.B/2,hTop],[0,1,0],od,P.du);
-    put('ВЫХОД К МАШИНЕ','suc',[0,-P.B/2,hBot],[0,-1,0],od,P.du);
-    put('СЛИВ','eq',[P.L/2,0,z0+60],[1,0,0],aux,25);
-    if(P.over)put('ПЕРЕЛИВ','eq',[-P.L/2,0,z0+P.H-70],[-1,0,0],aux+6,32);
-    if(P.lid!=='none')put('ВОЗДУШНИК','ppk',[P.L/2-120,-P.B/2+120,z0+P.H],[0,0,1],aux,25);
-  }else if(P.k==='horz'){
-    const zc=z0+R;
-    put('ВХОД ОБРАТКИ','dis',[-P.L/2+150,0,zc+R],[0,0,1],od,P.du);
-    put('ВЫХОД К МАШИНЕ','suc',[P.L/2-150,0,zc-R],[0,0,-1],od,P.du);
-    put('СЛИВ','eq',[0,0,zc-R],[0,0,-1],aux,25);
-    put('ВОЗДУШНИК','ppk',[0,0,zc+R],[0,0,1],aux,25);
-    put('ГИЛЬЗА ДАТЧИКА','eq',[0,-R,zc],[0,-1,0],aux,25);
-  }else{
-    const hTop=z0+P.H-140, hBot=z0+130, cone=P.k==='cone';
-    const zc=cone?z0+(R-(P.du/2+15)):z0;               // конус приподнимает обечайку
-    put('ВХОД ОБРАТКИ','dis',[0,R,zc+P.H-140],[0,1,0],od,P.du);
-    put('ВЫХОД К МАШИНЕ','suc',[0,-R,zc+130],[0,-1,0],od,P.du);
-    put(cone?'СЛИВ ИЗ КОНУСА':'СЛИВ','eq',cone?[0,0,z0]:[R,0,zc+60],
-        cone?[0,0,-1]:[1,0,0],cone?P.du+10:aux,cone?P.du:25);
-    if(P.lid!=='none')put('ВОЗДУШНИК','ppk',[0,0,zc+P.H],[0,0,1],aux,25);
-    put('ГИЛЬЗА ДАТЧИКА','eq',[-R,0,zc+P.H/2],[-1,0,0],aux,25);
-  }
+  const hTop=z0+P.H-140, hBot=z0+120;
+  put('ВХОД ОБРАТКИ','dis',[0,P.B/2,hTop],[0,1,0],od,P.du);
+  put('ВЫХОД К МАШИНЕ','suc',[0,-P.B/2,hBot],[0,-1,0],od,P.du);
+  put('СЛИВ','eq',[P.L/2,0,z0+60],[1,0,0],aux,25);
+  if(P.over)put('ПЕРЕЛИВ','eq',[-P.L/2,0,z0+P.H-70],[-1,0,0],aux+6,32);
+  if(P.lid!=='none')put('ВОЗДУШНИК','ppk',[P.L/2-120,-P.B/2+120,z0+P.H],[0,0,1],aux,25);
   return out;
 }
 
@@ -5296,26 +5247,10 @@ const tkMat=(x,y,z,q)=>new THREE.Matrix4().compose(new THREE.Vector3(x,y,z),
   q||new THREE.Quaternion(),new THREE.Vector3(1,1,1));
 const tkCylZ=(rt,rb,h,seg,open)=>{
   const g=new THREE.CylinderGeometry(rt,rb,h,seg||32,1,!!open);g.rotateX(Math.PI/2);return g;};
-/* вывернуть грани наизнанку — так видно внутреннюю сторону стенки */
-function tkFlip(g){
-  g=g.index?g.toNonIndexed():g;
-  const a=g.getAttribute('position').array;
-  for(let i=0;i<a.length;i+=9)for(let k=0;k<3;k++){
-    const t=a[i+3+k];a[i+3+k]=a[i+6+k];a[i+6+k]=t;}
-  return g;
-}
 function tkAdd(acc,g,mi,m){
   g=g.index?g.toNonIndexed():g;
   if(m)g.applyMatrix4(m);
   acc.push({mi,arr:g.getAttribute('position').array});
-}
-/* стенка с толщиной: наружная и внутренняя поверхности плюс торцы.
-   Радиусы верха и низа разные — этим же куском строится конус дна. */
-function tkShell(acc,mi,Rt,rt,Rb,rb,h,z){
-  tkAdd(acc,tkCylZ(Rt,Rb,h,36,true),mi,tkMat(0,0,z+h/2));
-  tkAdd(acc,tkFlip(tkCylZ(rt,rb,h,36,true)),mi,tkMat(0,0,z+h/2));
-  tkAdd(acc,new THREE.RingGeometry(rt,Rt,36),mi,tkMat(0,0,z+h));
-  tkAdd(acc,tkFlip(new THREE.RingGeometry(rb,Rb,36)),mi,tkMat(0,0,z));
 }
 function tkMuff(acc,mi,p,dir,od,len){
   const v=V3(dir).normalize();
@@ -5347,88 +5282,41 @@ const TK_PART=[
 const TK_MI={};TK_PART.forEach((p,i)=>TK_MI[p.key]=i);
 
 function tkBuild(P){
-  const acc=[], c=tkCalc(P), s=P.s, z0=c.legH, R=P.D/2, B=TK_MI;
-  const legW=40;
-  if(P.k==='rect'){
-    const L=P.L,W=P.B,H=P.H;
-    tkAdd(acc,new THREE.BoxGeometry(L,W,s),B.body,tkMat(0,0,z0+s/2));
-    tkAdd(acc,new THREE.BoxGeometry(s,W,H-s),B.body,tkMat(-(L-s)/2,0,z0+s+(H-s)/2));
-    tkAdd(acc,new THREE.BoxGeometry(s,W,H-s),B.body,tkMat( (L-s)/2,0,z0+s+(H-s)/2));
-    tkAdd(acc,new THREE.BoxGeometry(L-2*s,s,H-s),B.body,tkMat(0,-(W-s)/2,z0+s+(H-s)/2));
-    tkAdd(acc,new THREE.BoxGeometry(L-2*s,s,H-s),B.body,tkMat(0, (W-s)/2,z0+s+(H-s)/2));
-    /* обвязка борта: без неё стенка тонкого листа «играет» */
-    const zb=z0+H-20;
-    [[-L/2+20,0],[L/2-20,0]].forEach(([x])=>tkTube(acc,B.body,[x,-W/2+20,zb],[x,W/2-20,zb],40));
-    [[-W/2+20],[W/2-20]].forEach(([y])=>tkTube(acc,B.body,[-L/2+20,y,zb],[L/2-20,y,zb],40));
-    if(P.lid!=='none')tkAdd(acc,new THREE.BoxGeometry(L,W,s),B.lid,tkMat(0,0,z0+H+s/2));
-    if(P.part)tkAdd(acc,new THREE.BoxGeometry(s,W-2*s,H-s-P.ull),B.part,
-      tkMat(0,0,z0+s+(H-s-P.ull)/2));
-    if(P.ins){
-      const t=P.ins+1;
-      tkAdd(acc,new THREE.BoxGeometry(t,W+2*t,H),B.ins,tkMat(-(L+t)/2,0,z0+H/2));
-      tkAdd(acc,new THREE.BoxGeometry(t,W+2*t,H),B.ins,tkMat( (L+t)/2,0,z0+H/2));
-      tkAdd(acc,new THREE.BoxGeometry(L,t,H),B.ins,tkMat(0,-(W+t)/2,z0+H/2));
-      tkAdd(acc,new THREE.BoxGeometry(L,t,H),B.ins,tkMat(0, (W+t)/2,z0+H/2));
-    }
-    if(P.leg==='adj')[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy])=>{
-      const x=sx*(L/2-70),y=sy*(W/2-70);
-      tkTube(acc,B.leg,[x,y,0],[x,y,z0],legW);
-      tkAdd(acc,tkCylZ(32,32,12,16),B.leg,tkMat(x,y,6));
-    });
-    if(P.leg==='frame'){
-      const x1=-L/2+30,x2=L/2-30,y1=-W/2+30,y2=W/2-30;
-      [[x1,y1],[x2,y1],[x1,y2],[x2,y2]].forEach(([x,y])=>tkTube(acc,B.leg,[x,y,0],[x,y,z0],legW));
-      [[y1],[y2]].forEach(([y])=>tkTube(acc,B.leg,[x1,y,z0-25],[x2,y,z0-25],40));
-      [[x1],[x2]].forEach(([x])=>tkTube(acc,B.leg,[x,y1,z0-25],[x,y2,z0-25],40));
-    }
-  }else if(P.k==='horz'){
-    const L=P.L,zc=z0+R;
-    const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),new THREE.Vector3(1,0,0));
-    const g1=tkCylZ(R,R,L,36,true),g2=tkFlip(tkCylZ(R-s,R-s,L,36,true));
-    tkAdd(acc,g1,B.body,tkMat(0,0,zc,q));
-    tkAdd(acc,g2,B.body,tkMat(0,0,zc,q));
-    [[-1],[1]].forEach(([k])=>{
-      const g=tkCylZ(R,R,s,36);
-      tkAdd(acc,g,B.body,tkMat(k*(L/2-s/2),0,zc,q));
-    });
-    if(P.ins){
-      const t=P.ins+1;
-      tkAdd(acc,tkCylZ(R+t,R+t,L,36,true),B.ins,tkMat(0,0,zc,q));
-      tkAdd(acc,tkFlip(tkCylZ(R+1,R+1,L,36,true)),B.ins,tkMat(0,0,zc,q));
-    }
-    if(P.leg!=='none')[[-1],[1]].forEach(([k])=>{
-      const x=k*(L/2-160);
-      tkAdd(acc,new THREE.BoxGeometry(120,P.D*0.8,z0+R*0.25),B.leg,
-        tkMat(x,0,(z0+R*0.25)/2));
-    });
-  }else{
-    const cone=P.k==='cone', rl=P.du/2+15, hc=cone?(R-rl):0, zc=z0+hc;
-    if(cone){
-      tkShell(acc,B.body,R,R-s,rl,rl-s,hc,z0);           // конус: снизу узкий
-      tkMuff(acc,B.aux,[0,0,z0],[0,0,-1],P.du+10,70);
-    }else{
-      tkAdd(acc,tkCylZ(R,R,s,36),B.body,tkMat(0,0,z0+s/2));
-    }
-    tkShell(acc,B.body,R,R-s,R,R-s,P.H,zc);
-    tkTube(acc,B.body,[-R+20,0,zc+P.H-20],[R-20,0,zc+P.H-20],40);
-    if(P.lid!=='none')tkAdd(acc,tkCylZ(R,R,s,36),B.lid,tkMat(0,0,zc+P.H+s/2));
-    if(P.ins){
-      const t=P.ins+1;
-      tkAdd(acc,tkCylZ(R+t,R+t,P.H,36,true),B.ins,tkMat(0,0,zc+P.H/2));
-      tkAdd(acc,tkFlip(tkCylZ(R+1,R+1,P.H,36,true)),B.ins,tkMat(0,0,zc+P.H/2));
-    }
-    if(P.leg!=='none')[0,1,2].forEach(i=>{
-      const a=Math.PI/2+i*2*Math.PI/3, x=R*0.74*Math.cos(a), y=R*0.74*Math.sin(a);
-      tkTube(acc,B.leg,[x,y,0],[x,y,z0+(cone?hc*0.5:20)],legW);
-      tkAdd(acc,tkCylZ(32,32,12,16),B.leg,tkMat(x,y,6));
-    });
+  const acc=[], c=tkCalc(P), s=P.s, z0=c.legH, B=TK_MI;
+  const legW=40, L=P.L, W=P.B, H=P.H;
+  tkAdd(acc,new THREE.BoxGeometry(L,W,s),B.body,tkMat(0,0,z0+s/2));
+  tkAdd(acc,new THREE.BoxGeometry(s,W,H-s),B.body,tkMat(-(L-s)/2,0,z0+s+(H-s)/2));
+  tkAdd(acc,new THREE.BoxGeometry(s,W,H-s),B.body,tkMat( (L-s)/2,0,z0+s+(H-s)/2));
+  tkAdd(acc,new THREE.BoxGeometry(L-2*s,s,H-s),B.body,tkMat(0,-(W-s)/2,z0+s+(H-s)/2));
+  tkAdd(acc,new THREE.BoxGeometry(L-2*s,s,H-s),B.body,tkMat(0, (W-s)/2,z0+s+(H-s)/2));
+  /* обвязка борта: без неё стенка тонкого листа «играет» */
+  const zb=z0+H-20;
+  [[-L/2+20,0],[L/2-20,0]].forEach(([x])=>tkTube(acc,B.body,[x,-W/2+20,zb],[x,W/2-20,zb],40));
+  [[-W/2+20],[W/2-20]].forEach(([y])=>tkTube(acc,B.body,[-L/2+20,y,zb],[L/2-20,y,zb],40));
+  if(P.lid!=='none')tkAdd(acc,new THREE.BoxGeometry(L,W,s),B.lid,tkMat(0,0,z0+H+s/2));
+  if(P.part)tkAdd(acc,new THREE.BoxGeometry(s,W-2*s,H-s-P.ull),B.part,
+    tkMat(0,0,z0+s+(H-s-P.ull)/2));
+  if(P.ins){
+    const t=P.ins+1;
+    tkAdd(acc,new THREE.BoxGeometry(t,W+2*t,H),B.ins,tkMat(-(L+t)/2,0,z0+H/2));
+    tkAdd(acc,new THREE.BoxGeometry(t,W+2*t,H),B.ins,tkMat( (L+t)/2,0,z0+H/2));
+    tkAdd(acc,new THREE.BoxGeometry(L,t,H),B.ins,tkMat(0,-(W+t)/2,z0+H/2));
+    tkAdd(acc,new THREE.BoxGeometry(L,t,H),B.ins,tkMat(0, (W+t)/2,z0+H/2));
+  }
+  if(P.leg==='adj')[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy])=>{
+    const x=sx*(L/2-70),y=sy*(W/2-70);
+    tkTube(acc,B.leg,[x,y,0],[x,y,z0],legW);
+    tkAdd(acc,tkCylZ(32,32,12,16),B.leg,tkMat(x,y,6));
+  });
+  if(P.leg==='frame'){
+    const x1=-L/2+30,x2=L/2-30,y1=-W/2+30,y2=W/2-30;
+    [[x1,y1],[x2,y1],[x1,y2],[x2,y2]].forEach(([x,y])=>tkTube(acc,B.leg,[x,y,0],[x,y,z0],legW));
+    [[y1],[y2]].forEach(([y])=>tkTube(acc,B.leg,[x1,y,z0-25],[x2,y,z0-25],40));
+    [[x1],[x2]].forEach(([x])=>tkTube(acc,B.leg,[x,y1,z0-25],[x,y2,z0-25],40));
   }
   /* муфты патрубков — по тем же точкам, что уходят в присоединения */
-  tkPorts(P).forEach(pt=>{
-    if(P.k==='cone'&&/СЛИВ/.test(pt.nm))return;         // слив из конуса уже построен
-    tkMuff(acc,B[pt.kind==='dis'?'dis':pt.kind==='suc'?'suc':'aux'],
-           pt.p,pt.dir,pt.od,70);
-  });
+  tkPorts(P).forEach(pt=>tkMuff(acc,B[pt.kind==='dis'?'dis':pt.kind==='suc'?'suc':'aux'],
+                                pt.p,pt.dir,pt.od,70));
   return tkPack(acc);
 }
 /* сборка в одну геометрию: по группе на деталь, пустые детали выкидываем */
@@ -5456,8 +5344,9 @@ function tkPack(acc){
 const TK_CACHE=new Map();
 function tkGeoOf(d){
   if(!TK_CACHE.has(d.id)){
-    const g=tkBuild(d.tk);
-    g.userData.zones=d._zn||tkZones(d.tk);
+    const P=tkNorm(d.tk);
+    const g=tkBuild(P);
+    g.userData.zones=d._zn||tkZones(P);
     TK_CACHE.set(d.id,g);
   }
   return TK_CACHE.get(d.id);
@@ -5466,14 +5355,10 @@ function tkGeoOf(d){
 /* ── позиция проекта: имя, характеристики, зоны присоединений ───────────── */
 function tkName(P){
   const c=tkCalc(P);
-  const g=P.k==='rect'?(P.L+'×'+P.B+'×'+P.H)
-        :P.k==='horz'?('Ø'+P.D+'×'+P.L)
-        :('Ø'+P.D+'×'+P.H);
-  return 'Бак '+g+' · '+Math.round(c.Vw)+' л';
+  return 'Бак '+P.L+'×'+P.B+'×'+P.H+' · '+Math.round(c.Vw)+' л';
 }
 function tkId(P){
-  return 'TANK-'+P.k.toUpperCase()+'-'+
-    (P.k==='rect'?[P.L,P.B,P.H].join('x'):P.k==='horz'?[P.D,P.L].join('x'):[P.D,P.H].join('x'))+
+  return 'TANK-RECT-'+[P.L,P.B,P.H].join('x')+
     '-'+String(P.s).replace('.','')+'-'+P.mark+
     (P.lid!=='none'?'-L':'')+(P.part?'-P':'')+(P.ins?'-I'+P.ins:'')+'-'+P.du;
 }
@@ -5489,13 +5374,12 @@ function tkZones(P){
 }
 /* карточка позиции: то же, что увидит цех — раскрой построчно */
 function tkModel(P){
-  P=Object.assign({},TKD,P);
+  P=tkNorm(P);
   const c=tkCalc(P), nm=tkName(P);
-  const kn=(TK_KIND.find(k=>k[0]===P.k)||TK_KIND[0]);
   const cut=c.cut.filter(r=>r.n>0);
   const specs=[
     ['Обозначение',tkId(P)],
-    ['Структура',kn[1]+' — '+kn[2]],
+    ['Структура','Прямоугольный, '+TK_DESC],
     ['Габарит корпуса (Д × Ш × В)',c.dims.map(Math.round).join(' × ')+
       ' мм — без вылета патрубков'],
     ['Рабочий объём',tkG(c.Vw)+' л'],
@@ -5514,14 +5398,14 @@ function tkModel(P){
     ['Держит машину до',tkG(c.kw)+' кВт (вода, ΔT 4 К, пауза 180 с)'],
   ];
   return {
-    id:tkId(P),name:nm,brand:'Атомус',kind:'бак водяного контура, '+kn[1].toLowerCase(),
+    id:tkId(P),name:nm,brand:'Атомус',kind:'бак водяного контура, прямоугольный',
     section:'vessels',sub:'tank',ready:true,tk:P,
     tags:[Math.round(c.Vw)+' л',TK_MARK.find(m=>m[0]===P.mark)[1],
           'лист '+tkG2(P.s)+' мм',tkG(c.mass)+' кг'],
     specs,
     geom:{rows:[['Начало координат','низ опор, центр бака в плане; ось бака — Z'],
                 ['Раскрой',cut.map(r=>r.nm+' '+Math.round(r.w)+'×'+Math.round(r.h)+
-                  (r.n>1?' — '+r.n+' шт':'')+(r.round?' (круг, лист квадратом)':'')).join('; ')]],
+                  (r.n>1?' — '+r.n+' шт':'')).join('; ')]],
           conn:tkPorts(P).map(p=>p.nm.toLowerCase()+' '+p.conn).join(', '),
           ports:tkPorts(P).map(p=>p.nm.toLowerCase()+' '+p.conn),
           bolt:[0,0],bolt_plane:'none',
@@ -5543,7 +5427,6 @@ function tkChips(box,list,key,cb){
     (cb||tkDraw)();});
 }
 function tkDraw(){
-  tkChips('#tkKind',TK_KIND.map(k=>[k[0],k[1]]),'k');
   tkChips('#tkS',TK_S.map(v=>[v,tkG2(v)+' мм']),'s');
   tkChips('#tkMark',TK_MARK,'mark');
   tkChips('#tkLid',TK_LID,'lid');
@@ -5552,22 +5435,14 @@ function tkDraw(){
   tkChips('#tkDu',TK_DU.map(v=>[v,'Ду'+v]),'du');
   tkChips('#tkPart',[[0,'нет'],[1,'есть']],'part');
   tkChips('#tkOver',[[0,'нет'],[1,'есть']],'over');
-  const rect=TKP.k==='rect', horz=TKP.k==='horz';
-  $('#tkRowR').style.display=rect?'':'none';
-  $('#tkRowC').style.display=rect?'none':'';
-  $('#tkRowPart').style.display=rect?'':'none';
-  $('#tkRowOver').style.display=rect?'':'none';
-  $('#tkDlb').textContent=horz?'Ø и длина, мм':'Ø и высота, мм';
-  $('#tkHlb').textContent=horz?'длина':'высота';
   $('#tkL').value=TKP.L;$('#tkB').value=TKP.B;$('#tkH').value=TKP.H;
-  $('#tkD').value=TKP.D;$('#tkHC').value=horz?TKP.L:TKP.H;
   $('#tkLegH').value=TKP.legH;
   $('#tkLegR').style.display=TKP.leg==='none'?'none':'';
-  const c=tkCalc(TKP), kn=TK_KIND.find(k=>k[0]===TKP.k);
+  const c=tkCalc(TKP);
   const cut=c.cut.filter(r=>r.n>0);
   $('#tkOut').innerHTML=
     '<div class="tk-sum"><b>'+esc(tkName(TKP))+'</b>'+
-    '<span>'+esc(kn[2])+'</span></div>'+
+    '<span>'+esc(TK_DESC)+'</span></div>'+
     '<div class="tk-fig">'+
       tkCell('Рабочий объём',tkG(c.Vw)+' л')+
       tkCell('Полный',tkG(c.Vf)+' л')+
@@ -5580,11 +5455,11 @@ function tkDraw(){
     '<div class="tk-h">Раскрой · лист '+TK_MARK.find(m=>m[0]===TKP.mark)[1]+' '+tkG2(TKP.s)+' мм</div>'+
     '<table class="tk-t">'+cut.map(r=>
       '<tr><td>'+esc(r.nm)+'</td><td class="a">'+Math.round(r.w)+' × '+Math.round(r.h)+
-      (r.round?' <i>круг</i>':'')+'</td><td class="i">'+r.n+' шт</td></tr>').join('')+
+      '</td><td class="i">'+r.n+' шт</td></tr>').join('')+
       (c.prof?'<tr><td>Профиль 40×40×2 — борт и опоры</td><td class="a">'+tkG(c.prof)+
         ' м</td><td class="i">'+tkG(c.prof*TK_PROF)+' кг</td></tr>':'')+
       (c.massIns?'<tr><td>Изоляция '+TKP.ins+' мм и обшивка 0,5 мм</td><td class="a">'+
-        tkG2(tkInsArea(TKP,c.dims))+' м²</td><td class="i">'+tkG(c.massIns)+' кг</td></tr>':'')+
+        tkG2(tkInsArea(TKP))+' м²</td><td class="i">'+tkG(c.massIns)+' кг</td></tr>':'')+
     '</table>'+
     '<div class="tk-note">Буфер считаем по V = Q·τ/(c·ρ·ΔT): вода 4,19 кДж/(кг·К), '+
     'пауза между пусками 180 с (спираль), перепад на баке 4 К. Раскрой — заготовки '+
@@ -5593,18 +5468,15 @@ function tkDraw(){
 }
 const tkCell=(k,v)=>'<div class="c"><i>'+esc(k)+'</i><b>'+esc(v)+'</b></div>';
 function tkFields(){
-  const horz=TKP.k==='horz';
   TKP.L=Math.max(200,tkNum($('#tkL').value,TKP.L));
   TKP.B=Math.max(200,tkNum($('#tkB').value,TKP.B));
-  TKP.H=Math.max(200,tkNum(horz?$('#tkH').value:$('#tkHC').value,TKP.H));
-  TKP.D=Math.max(200,tkNum($('#tkD').value,TKP.D));
-  if(horz)TKP.L=Math.max(200,tkNum($('#tkHC').value,TKP.L));
+  TKP.H=Math.max(200,tkNum($('#tkH').value,TKP.H));
   TKP.legH=Math.max(0,tkNum($('#tkLegH').value,TKP.legH));
   tkDraw();
 }
 function tkOpen(it){
   tkEdit=null;
-  if(it&&isTank(it.d)){tkEdit=it.uid;TKP=Object.assign({},TKD,it.d.tk);}
+  if(it&&isTank(it.d)){tkEdit=it.uid;TKP=tkNorm(it.d.tk);}
   $('#tnk').classList.add('on');
   $('#tkHd').textContent=tkEdit?'◫ Размеры бака':'◫ Бак из нержавейки';
   tkDraw();
@@ -5638,7 +5510,7 @@ $('#tkX').onclick=tkClose;
 $('#tkAddB').onclick=tkPut;
 $('#tkReset').onclick=()=>{TKP=Object.assign({},TKD);tkDraw();};
 $('#tnk').onclick=e=>{if(e.target.id==='tnk')tkClose();};
-['tkL','tkB','tkH','tkD','tkHC','tkLegH'].forEach(id=>{
+['tkL','tkB','tkH','tkLegH'].forEach(id=>{
   const el=$('#'+id);if(el)el.oninput=tkFields;});
 $('#bTankEd').onclick=()=>sel&&isTank(sel.d)&&tkOpen(sel);
 
