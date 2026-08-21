@@ -26154,6 +26154,51 @@ function logiViewSwitch(v) {
   loadLogisticsPickups();
 }
 
+// v2.46.015: точка рейса — не только «забрать». Ключи те же, что на бэкенде
+// (logi_trips.POINT_ACTIONS): забрать / отвезти / оплатить / документы /
+// встреча / посмотреть / просто заехать.
+const _LT_ACTIONS = [
+  ['pickup',  'Забрать',    '📦', 'Забрал'],
+  ['deliver', 'Отвезти',    '🚚', 'Отвёз'],
+  ['pay',     'Оплатить',   '💳', 'Оплатил'],
+  ['docs',    'Документы',  '✍️', 'Подписал'],
+  ['meet',    'Встреча',    '🤝', 'Съездил'],
+  ['look',    'Посмотреть', '👀', 'Посмотрел'],
+  ['other',   'Заехать',    '📍', 'Сделал'],
+];
+function _ltAct(k) {
+  return _LT_ACTIONS.find(a => a[0] === k) || _LT_ACTIONS[0];
+}
+function _ltActOptions(sel) {
+  return _LT_ACTIONS.map(a => '<option value="' + a[0] + '"' +
+    (a[0] === (sel || 'pickup') ? ' selected' : '') + '>' + a[2] + ' ' + a[1] +
+    '</option>').join('');
+}
+// Своя точка: что сделать, куда заехать, комментарий. Одинаково в «Новом
+// рейсе» и в допланировании — чтобы поля не расходились.
+function _ltCustomRowHtml(act) {
+  return '<div class="lt-custom-row">' +
+    '<select class="form-input" data-f="action">' + _ltActOptions(act) + '</select>' +
+    '<input class="form-input" placeholder="Куда / к кому заехать" data-f="title">' +
+    '<button class="icon-btn" title="Убрать" ' +
+      'onclick="this.closest(\'.lt-custom-row\').remove()"><i class="ti ti-x"></i></button>' +
+    '<input class="form-input full" placeholder="Адрес — на карту встанет сам" data-f="address">' +
+    '<input class="form-input full" placeholder="Комментарий: что сделать, что взять с собой" data-f="note">' +
+  '</div>';
+}
+// Собрать свои точки из формы: пустые строки без названия пропускаем.
+function _ltCollectCustom(sel) {
+  const out = [];
+  document.querySelectorAll(sel + ' .lt-custom-row').forEach(row => {
+    const val = f => ((row.querySelector('[data-f="' + f + '"]') || {}).value || '').trim();
+    const t = val('title');
+    if (!t) return;
+    out.push({ title: t, address: val('address'), note: val('note'),
+      action: val('action') || 'pickup', source_kind: 'custom' });
+  });
+  return out;
+}
+
 const _LT_STATUS = {
   draft:       { t: 'Черновик',          cls: 'wait', ic: 'ti-pencil' },
   sent:        { t: 'Отправлен курьеру', cls: 'run',  ic: 'ti-send' },
@@ -26263,9 +26308,12 @@ async function logiTripNew() {
         'Привязка: курьер один раз пишет нашему боту в MAX «я курьер Фамилия».</div>' +
       '<div class="lt-new-sec"><i class="ti ti-package-import"></i> Что сейчас ждёт забора <span id="lt-pool-cnt"></span></div>' +
       '<div id="lt-pool"><div class="loading-block">Собираем со всех перевозчиков…</div></div>' +
-      '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Свои точки</div>' +
+      '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Свои точки — куда заехать и что сделать</div>' +
       '<div id="lt-custom"></div>' +
       '<button class="btn btn-secondary btn-sm" onclick="ltCustomAdd()"><i class="ti ti-plus"></i> Добавить точку</button>' +
+      '<div class="lt-hint"><i class="ti ti-info-circle"></i> Точку можно завести самому: выбери дело ' +
+        '(забрать, отвезти, оплатить, документы, просто заехать), впиши адрес и комментарий. ' +
+        'Всё это уйдёт водителю в MAX, в задачу и на ТВ в цеху.</div>' +
     '</div>' +
     '<div class="modal-footer">' +
       '<button class="btn btn-secondary" onclick="document.getElementById(\'lt-new-modal\').remove()">Отмена</button>' +
@@ -26293,16 +26341,12 @@ async function logiTripNew() {
   }
 }
 
-function ltCustomAdd() {
-  const box = document.getElementById('lt-custom');
+function ltCustomAdd(boxId) {
+  const box = document.getElementById(boxId || 'lt-custom');
   if (!box) return;
-  const row = document.createElement('div');
-  row.className = 'lt-custom-row';
-  row.innerHTML = '<input class="form-input" placeholder="Что забрать / у кого" data-f="title">' +
-    '<input class="form-input" placeholder="Адрес — на карту встанет сам" data-f="address">' +
-    '<button class="icon-btn" onclick="this.parentNode.remove()" title="Убрать"><i class="ti ti-x"></i></button>';
-  box.appendChild(row);
-  const inp = row.querySelector('input');
+  box.insertAdjacentHTML('beforeend', _ltCustomRowHtml('pickup'));
+  const row = box.lastElementChild;
+  const inp = row && row.querySelector('[data-f="title"]');
   if (inp) inp.focus();
 }
 
@@ -26320,11 +26364,7 @@ async function logiTripCreate() {
     if (p) points.push({ title: p.title, address: p.address, lat: p.lat, lon: p.lon,
       source_kind: p.source_kind, source_id: p.source_id, note: p.sub || '' });
   });
-  document.querySelectorAll('#lt-custom .lt-custom-row').forEach(row => {
-    const t = (row.querySelector('[data-f="title"]') || {}).value || '';
-    const a = (row.querySelector('[data-f="address"]') || {}).value || '';
-    if (t.trim()) points.push({ title: t.trim(), address: a.trim(), source_kind: 'custom' });
-  });
+  _ltCollectCustom('#lt-custom').forEach(pt => points.push(pt));
   if (!points.length) { showToast('Отметь хотя бы одну точку', 'error'); return; }
   if (btn) { btn.disabled = true; btn.innerHTML = 'Собираем…'; }
   try {
@@ -26398,18 +26438,25 @@ function _ltTripRender(trip) {
   html += '<div class="lt-pts">' + pts.map((p, i) => {
     const st = p.status || 'pending';
     const ic = st === 'done' ? '<i class="ti ti-check"></i>' : (st === 'problem' ? '<i class="ti ti-alert-triangle"></i>' : (i + 1));
+    const act = _ltAct(p.action);
+    const own = !p.source_id;  // своя точка — её можно поправить
     return '<div class="lt-pt ' + st + '">' +
       '<span class="n">' + ic + '</span>' +
-      '<span class="tx"><b>' + escapeHtml(p.title || '') + '</b>' +
+      '<span class="tx"><b>' +
+        (act[0] !== 'pickup' ? '<span class="lt-act">' + act[2] + ' ' + act[1] + '</span> ' : '') +
+        escapeHtml(p.title || '') + '</b>' +
         '<small>' + escapeHtml(p.address || '—') +
-        (p.status_note ? ' · <i>' + escapeHtml(p.status_note) + '</i>' : '') + '</small></span>' +
+        (p.status_note ? ' · <i>' + escapeHtml(p.status_note) + '</i>' : '') + '</small>' +
+        (p.note ? '<em class="lt-cmt"><i class="ti ti-message-2"></i> ' + escapeHtml(p.note) + '</em>' : '') +
+      '</span>' +
       // v2.45.906: ETA — заполняется, когда OSRM посчитает маршрут
       (st === 'pending' ? '<span class="lt-eta" id="lt-eta-' + p.id + '"></span>' : '') +
       (activeSt
         ? '<span class="ops">' +
           (i > 0 ? '<button class="icon-btn" onclick="ltPtMove(' + p.id + ',-1)" title="Выше"><i class="ti ti-arrow-up"></i></button>' : '') +
           (i < pts.length - 1 ? '<button class="icon-btn" onclick="ltPtMove(' + p.id + ',1)" title="Ниже"><i class="ti ti-arrow-down"></i></button>' : '') +
-          (st !== 'done' ? '<button class="icon-btn ok" onclick="ltPtStatus(' + p.id + ',\'done\')" title="Забрал"><i class="ti ti-check"></i></button>' : '') +
+          (own ? '<button class="icon-btn" onclick="ltPtEdit(' + p.id + ')" title="Поправить точку"><i class="ti ti-pencil"></i></button>' : '') +
+          (st !== 'done' ? '<button class="icon-btn ok" onclick="ltPtStatus(' + p.id + ',\'done\')" title="' + act[3] + '"><i class="ti ti-check"></i></button>' : '') +
           (st === 'pending' ? '<button class="icon-btn warn" onclick="ltPtStatus(' + p.id + ',\'problem\')" title="Проблема"><i class="ti ti-alert-triangle"></i></button>' : '') +
           (st !== 'pending' ? '<button class="icon-btn" onclick="ltPtStatus(' + p.id + ',\'pending\')" title="Вернуть в ожидание"><i class="ti ti-rotate"></i></button>' : '') +
           (trip.status === 'draft' ? '<button class="icon-btn" onclick="ltPtDel(' + p.id + ')" title="Убрать из рейса"><i class="ti ti-x"></i></button>' : '') +
@@ -26473,6 +26520,64 @@ async function ltPtStatus(pid, st) {
     if (r && r.ok) { _ltTripRender(r.data); loadLogisticsPickups(); }
     else showToast('Не удалось обновить точку', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// v2.46.015: поправить свою точку — дело, адрес, комментарий
+function ltPtEdit(pid) {
+  const trip = window._ltTrip;
+  if (!trip) return;
+  const p = (trip.points || []).find(x => Number(x.id) === Number(pid));
+  if (!p) return;
+  let m = document.getElementById('lt-pt-edit');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'lt-pt-edit';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
+    '<div class="modal-header"><h3><i class="ti ti-pencil"></i> Точка ' + Number(p.seq || 0) + '</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'lt-pt-edit\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body">' +
+      '<div class="lt-dir-form">' +
+        '<select class="form-input" id="lt-pe-act">' + _ltActOptions(p.action) + '</select>' +
+        '<input class="form-input" id="lt-pe-title" placeholder="Куда / к кому заехать">' +
+        '<input class="form-input" id="lt-pe-addr" placeholder="Адрес">' +
+        '<textarea class="form-input" id="lt-pe-note" rows="2" placeholder="Комментарий: что сделать, что взять с собой"></textarea>' +
+      '</div>' +
+      '<div class="lt-hint"><i class="ti ti-info-circle"></i> Поменял адрес — координаты найдутся заново. ' +
+        'Рейс уже у водителя? Нажми потом «Отправить ещё раз».</div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'lt-pt-edit\').remove()">Отмена</button>' +
+      '<button class="btn btn-primary" id="lt-pe-go" onclick="ltPtEditSave(' + Number(pid) + ')"><i class="ti ti-check"></i> Сохранить</button>' +
+    '</div></div>';
+  document.body.appendChild(m);
+  // значения ставим полями, а не атрибутами: в названии бывают кавычки
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  set('lt-pe-title', p.title);
+  set('lt-pe-addr', p.address);
+  set('lt-pe-note', p.note);
+}
+
+async function ltPtEditSave(pid) {
+  const trip = window._ltTrip;
+  if (!trip) return;
+  const v = (id) => ((document.getElementById(id) || {}).value || '').trim();
+  const title = v('lt-pe-title');
+  if (!title) { showToast('Впиши, куда заехать', 'error'); return; }
+  const btn = document.getElementById('lt-pe-go');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await apiPatch('/api/logistics/trips/' + trip.id + '/points/' + pid,
+      { title, address: v('lt-pe-addr'), note: v('lt-pe-note'), action: v('lt-pe-act') });
+    const m = document.getElementById('lt-pt-edit');
+    if (m) m.remove();
+    _ltTripRender(r);
+    showToast('Точка обновлена', 'success');
+  } catch (e) {
+    showToast('Не удалось сохранить точку', 'error');
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function ltPtDel(pid) {
@@ -26801,12 +26906,9 @@ async function ltPtAddOpen() {
     '<div class="modal-body" style="overflow-y:auto;">' +
       '<div class="lt-new-sec"><i class="ti ti-package-import"></i> Из ожидающих забора</div>' +
       '<div id="lt-add-pool"><div class="loading-block">Смотрим, что ждёт…</div></div>' +
-      '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Своя точка</div>' +
-      '<div class="lt-custom-row">' +
-        '<input class="form-input" id="lt-add-title" placeholder="Что забрать / у кого">' +
-        '<input class="form-input" id="lt-add-addr" placeholder="Адрес — на карту встанет сам">' +
-        '<span></span>' +
-      '</div>' +
+      '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Свои точки — куда заехать и что сделать</div>' +
+      '<div id="lt-add-custom">' + _ltCustomRowHtml('pickup') + '</div>' +
+      '<button class="btn btn-secondary btn-sm" onclick="ltCustomAdd(\'lt-add-custom\')"><i class="ti ti-plus"></i> Ещё точка</button>' +
     '</div>' +
     '<div class="modal-footer">' +
       '<button class="btn btn-secondary" onclick="document.getElementById(\'lt-add-modal\').remove()">Отмена</button>' +
@@ -26845,9 +26947,7 @@ async function ltPtAddGo() {
     if (p) points.push({ title: p.title, address: p.address, lat: p.lat, lon: p.lon,
       source_kind: p.source_kind, source_id: p.source_id, note: p.sub || '' });
   });
-  const t = ((document.getElementById('lt-add-title') || {}).value || '').trim();
-  const a = ((document.getElementById('lt-add-addr') || {}).value || '').trim();
-  if (t) points.push({ title: t, address: a, source_kind: 'custom' });
+  _ltCollectCustom('#lt-add-custom').forEach(pt => points.push(pt));
   if (!points.length) { showToast('Отметь груз или впиши свою точку', 'error'); return; }
   const btn = document.getElementById('lt-add-go');
   if (btn) btn.disabled = true;
