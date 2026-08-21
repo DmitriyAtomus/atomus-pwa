@@ -29,7 +29,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.45.1029";
+const APP_VERSION = "v2.45.1030";
 const APP_VERSION_DATE = "21.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1436,7 +1436,7 @@ function renderProfile() {
   const devFab = document.getElementById('devchat-fab');
   if (devFab) devFab.style.display = isDirector ? '' : 'none';
 
-  // «Идеи» — чат с Клодом для всех сотрудников. Выездным монтажникам пункт не
+  // «Идеи» — чат с Клавой для всех сотрудников. Выездным монтажникам пункт не
   // показываем: бэкенд им закрыт даже с паролем, кнопка только путала бы.
   const navIdeas = document.getElementById('sb-ideas');
   if (navIdeas) {
@@ -1891,7 +1891,7 @@ function runScreenLoader(screenName) {
   // v2.45.788: карточки предприятия (реквизиты юрлиц)
   if (screenName === 'supply-company-cards') loadCompanyCards();
   if (screenName === 'supply-catalog')      loadSupplyCatalog();
-  // Идеи: чат сотрудника с Клодом (только чтение, ТЗ уходит директору)
+  // Идеи: чат сотрудника с Клавой (только чтение, ТЗ уходит директору)
   if (screenName === 'ideas')               loadIdeas();
   // Помощь
   if (screenName === 'help-knowledge')      loadHelpKnowledge();
@@ -2551,7 +2551,7 @@ function _devChatRender(msg) {
   return wrap;
 }
 
-// ТЗ, которое сотрудник собрал с Клодом в разделе «Идеи». Приезжает в ленту
+// ТЗ, которое сотрудник собрал с Клавой в разделе «Идеи». Приезжает в ленту
 // автором `idea` и БЕЗ статуса: очередь агента берёт только сообщения автора
 // `user` со статусом `new`, поэтому само по себе оно ничего не запускает.
 // «Внедрить» ставит задачу, «Не сейчас» пишет автору причину.
