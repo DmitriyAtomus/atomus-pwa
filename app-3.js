@@ -26472,7 +26472,8 @@ async function logiTripNew() {
         '</select></label>' +
       '</div>' +
       '<div class="lt-hint" style="margin-top:6px;"><i class="ti ti-info-circle"></i> «✓ MAX» — чек-лист придёт курьеру лично. ' +
-        'Привязка: курьер один раз пишет нашему боту в MAX «я курьер Фамилия».</div>' +
+        'Привязка: курьер пишет нашему боту в MAX «я курьер Фамилия» — или директор вписывает его MAX ID ' +
+        'в карточке сотрудника. Без привязки чек-лист уйдёт директору.</div>' +
       '<div class="lt-new-sec"><i class="ti ti-package-import"></i> Что сейчас ждёт забора <span id="lt-pool-cnt"></span></div>' +
       '<div id="lt-pool"><div class="loading-block">Собираем со всех перевозчиков…</div></div>' +
       '<div class="lt-new-sec"><i class="ti ti-map-pin-plus"></i> Свои точки — куда заехать и что сделать</div>' +
