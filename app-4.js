@@ -15886,9 +15886,13 @@ function _paintOpenCalcModal(opts) {
     m.onclick = (e) => { if (e.target === m) closePaintCalcModal(); };
     document.body.appendChild(m);
   }
+  // Чип показывает и код, и цвет словом: «RAL 9016» ничего не говорит, «белый» говорит.
   const chips = PAINT_RAL_PRESETS.map(r =>
-    '<button type="button" class="storage-quick" onclick="_paintSetRal(&quot;' + r + '&quot;)">' + r + '</button>'
-  ).join('');
+    '<button type="button" class="storage-quick ral-chip" title="' + escapeHtml(_ralLabel(r)) + '" ' +
+      'onclick="_paintSetRal(&quot;' + r + '&quot;)">' +
+      '<span class="ral-dot" style="background:' + (_ralHex(r) || '#CBD5E1') + '"></span>' + r +
+      '<span class="ral-chip-name">' + escapeHtml(_ralName(r)) + '</span>' +
+    '</button>').join('');
 
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:460px;">' +
@@ -15907,7 +15911,9 @@ function _paintOpenCalcModal(opts) {
           '<input type="text" id="paint-ral" maxlength="60" placeholder="RAL 9016" value="' +
             escapeHtml(opts.ral || '') + '">' +
           '<div class="storage-quick-row">' + chips + '</div>' +
-          '<div class="paint-ral-hint">Цех считает по цвету: другой RAL — другая загрузка и другой ценник. ' +
+          '<div class="paint-ral-hint">Ходовые: <b>9016</b> и <b>9003</b> — белый, <b>7035</b> — светло-серый ' +
+            '(щиты и шкафы), <b>9005</b> — чёрный. Полная палитра с названиями откроется по кнопке цвета ' +
+            'внутри расчёта.<br>Цех считает по цвету: другой RAL — другая загрузка и другой ценник. ' +
             'Если цвет ещё не согласован, оставьте пустым — в ведомости будет видно, что он не указан.</div>' +
         '</div>' +
         '<div class="modal-actions">' +
@@ -16091,10 +16097,13 @@ function renderPaintCalcDetail(c) {
         : '') +
       '<button class="btn btn-secondary btn-small" onclick="paintManualOpen(' + c.id + ')">' +
         '<i class="ti ti-plus"></i> Своя деталь</button>' +
-      '<button class="btn btn-secondary btn-small" onclick="openPaintRalPicker(' + c.id + ', null, &quot;' +
+      '<button class="btn btn-secondary btn-small ral-head-btn" ' +
+        'title="Выбрать цвет: белый, серый, чёрный или код RAL" ' +
+        'onclick="openPaintRalPicker(' + c.id + ', null, &quot;' +
         escapeHtml(c.ral || '') + '&quot;)">' +
         (c.ral ? '<span class="ral-dot" style="background:' + (_ralHex(c.ral) || '#CBD5E1') + '"></span>' +
-                 escapeHtml(c.ral)
+                 escapeHtml(c.ral) +
+                 (_ralName(c.ral) ? '<span class="ral-btn-name">' + escapeHtml(_ralName(c.ral)) + '</span>' : '')
                : '<i class="ti ti-palette"></i> Цвет не указан') + '</button>' +
       '<button class="btn btn-primary btn-small" onclick="openPaintVedomost(' + c.id + ')">' +
         '<i class="ti ti-file-type-pdf"></i> Ведомость PDF</button>' +
@@ -16217,10 +16226,12 @@ function renderPaintCalcDetail(c) {
         '<td class="pd-mat-cell"><button class="pd-mat-btn" onclick="openPaintMaterialPicker(' +
           it.calc_id + ',' + it.id + ',&quot;' + escapeHtml(it.material || '') + '&quot;)">' +
           escapeHtml(it.material || 'указать') + '</button></td>' +
-        '<td><button class="pd-ral-btn" onclick="openPaintRalPicker(' + it.calc_id + ',' + it.id + ',&quot;' +
+        '<td><button class="pd-ral-btn" title="Выбрать цвет: белый, серый, чёрный или код RAL" ' +
+          'onclick="openPaintRalPicker(' + it.calc_id + ',' + it.id + ',&quot;' +
           escapeHtml(it.ral || '') + '&quot;)">' +
           (it.ral ? '<span class="ral-dot" style="background:' + (_ralHex(it.ral) || '#CBD5E1') + '"></span>' +
-                    escapeHtml(it.ral)
+                    escapeHtml(it.ral) +
+                    (_ralName(it.ral) ? '<span class="ral-btn-name">' + escapeHtml(_ralName(it.ral)) + '</span>' : '')
                   : '<span class="pd-dim">выбрать</span>') + '</button></td>' +
         '<td>' + Number(it.net_area_m2 || 0).toFixed(4) + '</td>' +
         '<td>' + Number(it.paint_per_part_m2 || 0).toFixed(4) + '</td>' +
@@ -16491,7 +16502,12 @@ async function paintManualOpen(calcId) {
             '<option value="' + escapeHtml(x.value) + '">' + escapeHtml(x.label) + '</option>').join('') +
           '</datalist></div>' +
         '<div class="form-group" style="flex:1;margin:0;"><label class="form-label">Цвет RAL</label>' +
-          '<input class="form-input" id="pm-ral" placeholder="напр. RAL 9016"></div>' +
+          '<input class="form-input" id="pm-ral" list="pm-ral-list" ' +
+            'placeholder="белый / серый / RAL 9016" autocomplete="off">' +
+          // список с названиями: можно начать набирать «сер» и выбрать из подсказки
+          '<datalist id="pm-ral-list">' + RAL_CATALOG.map(r =>
+            '<option value="' + r.c + '">' + escapeHtml(r.n) + '</option>').join('') +
+          '</datalist></div>' +
       '</div>' +
     '</div>' +
     '<div class="modal-footer">' +
@@ -16663,38 +16679,56 @@ async function deletePaintCalc(calcId) {
 // Цех красит по цвету и по циклу подготовки, поэтому и то и другое должно
 // выбираться из списка, а не набиваться руками с опечатками.
 
+// Порядок и группы — как спрашивает цех: сначала белые, потом серые, потом
+// чёрные, цветные в конце. Поле g даёт и заголовок группы, и слово для поиска:
+// набрал «серый» — остались только серые.
 const RAL_CATALOG = [
-  { c: 'RAL 1013', h: '#E3D9C6', n: 'жемчужно-белый' },
-  { c: 'RAL 1014', h: '#DDC49A', n: 'слоновая кость' },
-  { c: 'RAL 1015', h: '#E6D2B5', n: 'светлая слоновая кость' },
-  { c: 'RAL 1018', h: '#F3E03B', n: 'цинково-жёлтый' },
-  { c: 'RAL 2004', h: '#E75B12', n: 'оранжевый' },
-  { c: 'RAL 3000', h: '#AB2524', n: 'огненно-красный' },
-  { c: 'RAL 3020', h: '#CC0605', n: 'транспортный красный' },
-  { c: 'RAL 5005', h: '#1E2460', n: 'сигнальный синий' },
-  { c: 'RAL 5012', h: '#0B71B4', n: 'голубой' },
-  { c: 'RAL 5015', h: '#1761AB', n: 'небесно-синий' },
-  { c: 'RAL 5017', h: '#063971', n: 'транспортный синий' },
-  { c: 'RAL 6018', h: '#57A639', n: 'жёлто-зелёный' },
-  { c: 'RAL 6029', h: '#00874A', n: 'мятно-зелёный' },
-  { c: 'RAL 7004', h: '#969992', n: 'сигнальный серый' },
-  { c: 'RAL 7016', h: '#293133', n: 'антрацитово-серый' },
-  { c: 'RAL 7024', h: '#474A51', n: 'графитовый серый' },
-  { c: 'RAL 7035', h: '#D7D7D7', n: 'светло-серый' },
-  { c: 'RAL 7040', h: '#9DA1AA', n: 'серое окно' },
-  { c: 'RAL 7042', h: '#8D948D', n: 'серый транспорт A' },
-  { c: 'RAL 8017', h: '#442F29', n: 'шоколадно-коричневый' },
-  { c: 'RAL 9001', h: '#E9E0D2', n: 'кремово-белый' },
-  { c: 'RAL 9003', h: '#F4F4F4', n: 'сигнальный белый' },
-  { c: 'RAL 9005', h: '#0A0A0A', n: 'чёрный янтарь' },
-  { c: 'RAL 9006', h: '#A5A5A5', n: 'бело-алюминиевый' },
-  { c: 'RAL 9007', h: '#8F8F8F', n: 'тёмный алюминий' },
-  { c: 'RAL 9010', h: '#F1ECE1', n: 'чисто-белый' },
-  { c: 'RAL 9011', h: '#27292B', n: 'графитово-чёрный' },
-  { c: 'RAL 9016', h: '#F6F6F6', n: 'транспортный белый' },
-  { c: 'RAL 9017', h: '#1E1E1E', n: 'транспортный чёрный' },
-  { c: 'RAL 9018', h: '#C5C7C4', n: 'папирусно-белый' },
+  { c: 'RAL 9016', h: '#F6F6F6', n: 'транспортный белый', g: 'Белые' },
+  { c: 'RAL 9003', h: '#F4F4F4', n: 'сигнальный белый', g: 'Белые' },
+  { c: 'RAL 9010', h: '#F1ECE1', n: 'чисто-белый', g: 'Белые' },
+  { c: 'RAL 9002', h: '#DDDED4', n: 'серо-белый', g: 'Белые' },
+  { c: 'RAL 9001', h: '#E9E0D2', n: 'кремово-белый', g: 'Белые' },
+  { c: 'RAL 9018', h: '#C5C7C4', n: 'папирусно-белый', g: 'Белые' },
+  { c: 'RAL 1013', h: '#E3D9C6', n: 'жемчужно-белый', g: 'Белые' },
+  { c: 'RAL 1014', h: '#DDC49A', n: 'слоновая кость', g: 'Белые' },
+  { c: 'RAL 1015', h: '#E6D2B5', n: 'светлая слоновая кость', g: 'Белые' },
+  { c: 'RAL 7035', h: '#D7D7D7', n: 'светло-серый', g: 'Серые' },
+  { c: 'RAL 7047', h: '#C8C8C7', n: 'телегрей 4, светлый', g: 'Серые' },
+  { c: 'RAL 7038', h: '#B4B8B0', n: 'агатовый серый', g: 'Серые' },
+  { c: 'RAL 7032', h: '#B5B0A1', n: 'галечно-серый', g: 'Серые' },
+  { c: 'RAL 9006', h: '#A5A5A5', n: 'бело-алюминиевый', g: 'Серые' },
+  { c: 'RAL 7040', h: '#9DA1AA', n: 'серое окно', g: 'Серые' },
+  { c: 'RAL 7004', h: '#969992', n: 'сигнальный серый', g: 'Серые' },
+  { c: 'RAL 9007', h: '#8F8F8F', n: 'тёмный алюминий', g: 'Серые' },
+  { c: 'RAL 7042', h: '#8D948D', n: 'серый транспорт A', g: 'Серые' },
+  { c: 'RAL 7024', h: '#474A51', n: 'графитовый серый', g: 'Серые' },
+  { c: 'RAL 7016', h: '#293133', n: 'антрацитово-серый', g: 'Серые' },
+  { c: 'RAL 9005', h: '#0A0A0A', n: 'чёрный янтарь', g: 'Чёрные' },
+  { c: 'RAL 9011', h: '#27292B', n: 'графитово-чёрный', g: 'Чёрные' },
+  { c: 'RAL 9017', h: '#1E1E1E', n: 'транспортный чёрный', g: 'Чёрные' },
+  { c: 'RAL 1018', h: '#F3E03B', n: 'цинково-жёлтый', g: 'Цветные' },
+  { c: 'RAL 2004', h: '#E75B12', n: 'оранжевый', g: 'Цветные' },
+  { c: 'RAL 3000', h: '#AB2524', n: 'огненно-красный', g: 'Цветные' },
+  { c: 'RAL 3020', h: '#CC0605', n: 'транспортный красный', g: 'Цветные' },
+  { c: 'RAL 5005', h: '#1E2460', n: 'сигнальный синий', g: 'Цветные' },
+  { c: 'RAL 5012', h: '#0B71B4', n: 'голубой', g: 'Цветные' },
+  { c: 'RAL 5015', h: '#1761AB', n: 'небесно-синий', g: 'Цветные' },
+  { c: 'RAL 5017', h: '#063971', n: 'транспортный синий', g: 'Цветные' },
+  { c: 'RAL 6018', h: '#57A639', n: 'жёлто-зелёный', g: 'Цветные' },
+  { c: 'RAL 6029', h: '#00874A', n: 'мятно-зелёный', g: 'Цветные' },
+  { c: 'RAL 8017', h: '#442F29', n: 'шоколадно-коричневый', g: 'Цветные' },
 ];
+
+function _ralName(code) {
+  const r = RAL_CATALOG.find(x => x.c === (code || '').trim());
+  return r ? r.n : '';
+}
+
+// «RAL 9016 · транспортный белый» — код для цеха, слово для человека.
+function _ralLabel(code) {
+  const n = _ralName(code);
+  return n ? (code + ' · ' + n) : (code || '');
+}
 
 function _ralHex(code) {
   const r = RAL_CATALOG.find(x => x.c === (code || '').trim());
@@ -16728,13 +16762,31 @@ function openPaintRalPicker(calcId, itemId, current) {
   const onCell = itemId
     ? (code) => '_pickRal(' + calcId + ',' + itemId + ',&quot;' + code + '&quot;)'
     : (code) => '_ralSelect(&quot;' + code + '&quot;)';
-  const cells = RAL_CATALOG.map(r =>
-    '<button type="button" class="ral-cell' + (r.c === current ? ' active' : '') + '" ' +
-      'data-ral="' + r.c + '" onclick="' + onCell(r.c) + '">' +
-      '<span class="ral-swatch" style="background:' + r.h + '"></span>' +
-      '<span class="ral-code">' + r.c + '</span>' +
-      '<span class="ral-name">' + escapeHtml(r.n) + '</span>' +
-    '</button>').join('');
+  // Цвета сгруппированы (белые / серые / чёрные / цветные) и подписаны по-русски:
+  // код RAL наизусть никто не помнит, а «серый» и «белый» помнят все.
+  const groups = [];
+  RAL_CATALOG.forEach(r => {
+    let g = groups.find(x => x.name === r.g);
+    if (!g) { g = { name: r.g, rows: [] }; groups.push(g); }
+    g.rows.push(r);
+  });
+  const cells = groups.map(g =>
+    '<div class="ral-group" data-group="' + escapeHtml(g.name) + '">' +
+      '<div class="ral-group-title">' + escapeHtml(g.name) + '</div>' +
+      '<div class="ral-grid">' + g.rows.map(r =>
+        '<button type="button" class="ral-cell' + (r.c === current ? ' active' : '') + '" ' +
+          'data-ral="' + r.c + '" ' +
+          'data-search="' + escapeHtml((r.c + ' ' + r.n + ' ' + r.g).toLowerCase()) + '" ' +
+          'title="' + escapeHtml(r.c + ' — ' + r.n) + '" ' +
+          'onclick="' + onCell(r.c) + '">' +
+          '<span class="ral-swatch" style="background:' + r.h + '"></span>' +
+          '<span class="ral-text">' +
+            '<span class="ral-code">' + r.c + '</span>' +
+            '<span class="ral-name">' + escapeHtml(r.n) + '</span>' +
+          '</span>' +
+        '</button>').join('') +
+      '</div>' +
+    '</div>').join('');
 
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:620px;">' +
@@ -16748,7 +16800,12 @@ function openPaintRalPicker(calcId, itemId, current) {
           '<div class="mat-lead">Выберите цвет партии и нажмите «Применить ко всем» — ' +
           'он ляжет на все позиции. Отдельные детали потом можно перекрасить поштучно ' +
           'в своей строке.</div>') +
-        '<div class="ral-grid">' + cells + '</div>' +
+        '<input type="text" id="ral-search" class="ral-search" autocomplete="off" ' +
+          'placeholder="Найти: серый, белый, чёрный или код RAL" ' +
+          'oninput="_ralFilter(this.value)">' +
+        '<div id="ral-groups">' + cells + '</div>' +
+        '<div class="ral-empty" id="ral-empty" style="display:none;">' +
+          'Ничего не нашлось — впишите код вручную ниже.</div>' +
         '<div class="form-group" style="margin-top:14px;">' +
           '<label>Или впишите код вручную</label>' +
           '<input type="text" id="ral-manual" maxlength="60" placeholder="RAL 7038" value="' +
@@ -16775,6 +16832,24 @@ function openPaintRalPicker(calcId, itemId, current) {
 function closeRalPicker() {
   const m = document.getElementById('ral-picker-modal');
   if (m) m.classList.remove('visible');
+}
+
+// Поиск по коду и по русскому названию: «сер» оставит серые, «9016» — один цвет.
+function _ralFilter(q) {
+  const s = (q || '').trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll('#ral-groups .ral-group').forEach(g => {
+    let inGroup = 0;
+    g.querySelectorAll('.ral-cell').forEach(el => {
+      const ok = !s || (el.dataset.search || '').indexOf(s) >= 0;
+      el.style.display = ok ? '' : 'none';
+      if (ok) inGroup++;
+    });
+    g.style.display = inGroup ? '' : 'none';
+    shown += inGroup;
+  });
+  const e = document.getElementById('ral-empty');
+  if (e) e.style.display = shown ? 'none' : '';
 }
 
 // Клик по цвету в режиме «на весь расчёт»: только запоминаем выбор
