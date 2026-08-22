@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.033";
+const APP_VERSION = "v2.46.035";
 const APP_VERSION_DATE = "22.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2565,6 +2565,9 @@ function _devChatRender(msg) {
   // единственный способ превратить предложение в задачу.
   const idea = _devChatIdeaCard(msg);
   if (idea) bubble.insertBefore(idea, bubble.querySelector('.dchat-meta'));
+  // ТЗ разобрано по полкам — сплошной текст прячем: он в карточке весь, слово
+  // в слово, и показывается кнопкой «ТЗ текстом».
+  if (idea && msg.meta.idea.card) bubble.classList.add('is-idea-card');
 
   (msg.files || []).forEach(function (f) {
     if ((f.content_type || '').indexOf('image/') === 0) {
@@ -2604,13 +2607,90 @@ function _devChatIdeaCard(msg) {
   box.innerHTML =
     '<div class="di-who"><i class="ti ti-bulb"></i>' +
       escapeHtml(idea.author || 'сотрудник') + ' предлагает</div>' +
+    ideaSpecCardHtml(idea.card) +
     '<div class="di-act">' +
       '<button type="button" class="ok" onclick="ideaImplement(' + Number(idea.id) + ')">' +
         '<i class="ti ti-rocket"></i>Внедрить</button>' +
       '<button type="button" onclick="ideaDecline(' + Number(idea.id) + ')">' +
         '<i class="ti ti-clock-pause"></i>Не сейчас</button>' +
+      (idea.card ? '<button type="button" class="txt" onclick="ideaSpecTextToggle(this)">' +
+        '<i class="ti ti-file-text"></i>ТЗ текстом</button>' : '') +
     '</div>';
   return box;
+}
+
+// Полки ТЗ: те же ключи и те же названия, что собирает бэкенд
+// (`idea_agent.SPEC_SHELVES`) — карточка и текст ТЗ об одном и том же.
+// Первые две раскрыты: по ним и решают «стоит ли», остальное — по требованию.
+const IDEA_SHELVES = [
+  { key: 'why',       title: 'Что мешает сейчас',        icon: 'ti-alert-triangle', open: true },
+  { key: 'screen',    title: 'Что меняется на экране',   icon: 'ti-device-desktop', open: true },
+  { key: 'inside',    title: 'Что меняется внутри',      icon: 'ti-settings' },
+  { key: 'out',       title: 'Границы: чего НЕ делаем',  icon: 'ti-border-none' },
+  { key: 'check',     title: 'Как проверить, что готово', icon: 'ti-checkbox' },
+  { key: 'questions', title: 'Открытые вопросы',         icon: 'ti-help-circle' },
+];
+
+// Разбор ТЗ по полкам: шапка «стоит ли» (раздел, размер, польза) и полки.
+// Карточки может не быть — ТЗ старое или модель ответила текстом; тогда
+// возвращаем пусто, и в ленте остаётся сплошной текст, как раньше.
+function ideaSpecCardHtml(card) {
+  if (!card || typeof card !== 'object') return '';
+  const chips = [];
+  if (card.section) {
+    chips.push('<span class="di-chip"><i class="ti ti-map-pin"></i>' +
+      escapeHtml(card.section) + '</span>');
+  }
+  // размер — только из своего списка: он идёт в class, чужая строка там лишняя
+  const size = ['XS', 'S', 'M', 'L'].indexOf(String(card.size || '').toUpperCase()) >= 0
+    ? String(card.size).toUpperCase() : '';
+  if (size) {
+    chips.push('<span class="di-chip is-size sz-' + size.toLowerCase() + '">' + size +
+      (card.hours ? ' · ~' + Number(card.hours) + ' ч' : '') + '</span>');
+  }
+  if (card.mockup) {
+    chips.push('<span class="di-chip is-mock"><i class="ti ti-photo-check"></i>макет согласован</span>');
+  }
+  let html = '';
+  if (card.title) html += '<div class="di-title">' + escapeHtml(card.title) + '</div>';
+  if (chips.length) html += '<div class="di-chips">' + chips.join('') + '</div>';
+  if (card.benefit) {
+    html += '<div class="di-benefit"><i class="ti ti-clock-hour-4"></i>' +
+      escapeHtml(card.benefit) + '</div>';
+  }
+  const shelves = IDEA_SHELVES.map(function (sh) {
+    const points = Array.isArray(card[sh.key]) ? card[sh.key].filter(Boolean) : [];
+    if (!points.length) return '';
+    return '<div class="di-shelf' + (sh.open ? ' is-open' : '') + '">' +
+      '<button type="button" class="di-sh-hd" onclick="ideaShelfToggle(this)">' +
+        '<i class="ti ' + sh.icon + '"></i>' +
+        '<span class="nm">' + escapeHtml(sh.title) + '</span>' +
+        '<span class="cnt">' + points.length + '</span>' +
+        '<i class="ti ti-chevron-down chv"></i>' +
+      '</button>' +
+      '<ul class="di-sh-bd">' + points.map(function (p) {
+        return '<li>' + escapeHtml(String(p)) + '</li>';
+      }).join('') + '</ul>' +
+    '</div>';
+  }).join('');
+  // Пустых полок не бывает у настоящего ТЗ, но если приехала одна шапка —
+  // показываем её и не рисуем пустую гармошку.
+  if (shelves) html += '<div class="di-shelves">' + shelves + '</div>';
+  return html;
+}
+
+function ideaShelfToggle(btn) {
+  const shelf = btn.closest('.di-shelf');
+  if (shelf) shelf.classList.toggle('is-open');
+}
+
+// «ТЗ текстом» — тот же текст, что уедет агенту задачей: иногда его хочется
+// прочитать сплошняком или скопировать целиком.
+function ideaSpecTextToggle(btn) {
+  const bubble = btn.closest('.dchat-bubble');
+  if (!bubble) return;
+  const shown = bubble.classList.toggle('show-idea-text');
+  btn.innerHTML = '<i class="ti ti-file-text"></i>' + (shown ? 'Свернуть текст' : 'ТЗ текстом');
 }
 
 // Итог работы Клавы: список тронутых файлов с +/− и кнопки «Открыть PR» и

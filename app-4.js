@@ -1948,7 +1948,7 @@ async function ideasOpen(id) {
   (th.messages || []).forEach(function (m) {
     _ideaAddMsg(m.role, m.text, m.created_at, m.files);
   });
-  if (th.spec_text) _ideaAddSpec(th.spec_text);
+  if (th.spec_text) _ideaAddSpec(th.spec_text, th.spec_card);
   _ideasRenderActions(th);
   _ideasScroll();
   ideasLoadListSilent();
@@ -2101,14 +2101,19 @@ function ideasOpenMockup(url, name) {
   window.open(API_BASE + url, '_blank', 'noopener');
 }
 
-function _ideaAddSpec(spec) {
+// Сотрудник видит ТЗ ровно так же, как увидит директор: те же полки, тот же
+// разбор — чтобы правки он заметил до отправки, а не после.
+function _ideaAddSpec(spec, card) {
   const feed = document.getElementById('ideas-feed');
   if (!feed) return;
   const box = document.createElement('div');
-  box.className = 'ich-spec';
+  box.className = 'ich-spec' + (card ? ' has-card' : '');
+  const shelves = (card && typeof ideaSpecCardHtml === 'function') ? ideaSpecCardHtml(card) : '';
   box.innerHTML =
     '<div class="ich-spec-hd"><i class="ti ti-file-text"></i> Техническое задание</div>' +
-    '<div class="ich-spec-body">' + _ideaFormat(spec) + '</div>';
+    (shelves
+      ? '<div class="dchat-idea ich-spec-card">' + shelves + '</div>'
+      : '<div class="ich-spec-body">' + _ideaFormat(spec) + '</div>');
   feed.appendChild(box);
   _ideasScroll();
 }
@@ -2347,9 +2352,9 @@ async function ideaCompile(skipMockup) {
   const d = (r && r.data) || {};
   if (!r.ok || !d.ok) { showToast(d.message || 'Не удалось собрать ТЗ', 'error'); return; }
   state._ideas.thread = Object.assign(state._ideas.thread || {}, {
-    id: id, status: 'ready', spec_text: d.spec,
+    id: id, status: 'ready', spec_text: d.spec, spec_card: d.card || null,
   });
-  _ideaAddSpec(d.spec || '');
+  _ideaAddSpec(d.spec || '', d.card || null);
   _ideasRenderActions(state._ideas.thread);
   ideasLoadListSilent();
   showToast('ТЗ готово — проверьте и отправьте директору', 'success');
