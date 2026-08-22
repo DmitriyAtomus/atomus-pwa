@@ -24831,13 +24831,55 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
 .dchat-idea { margin-top: 10px; border-top: 1px solid rgba(15,30,60,.08); padding-top: 9px; }
 .dchat-idea .di-who { display: flex; align-items: center; gap: 6px; font-size: 12px;
   font-weight: 700; color: #4338CA; margin-bottom: 8px; }
-.dchat-idea .di-act { display: flex; gap: 8px; }
+.dchat-idea .di-act { display: flex; flex-wrap: wrap; gap: 8px; }
 .dchat-idea .di-act button { flex: 1; display: inline-flex; align-items: center; justify-content: center;
   gap: 6px; padding: 8px 10px; border-radius: 10px; cursor: pointer; font-size: 12.5px; font-weight: 700;
   border: 1px solid var(--border-strong, #DDE5F0); background: #fff; color: var(--text-mid); }
 .dchat-idea .di-act button.ok { background: linear-gradient(135deg, #2D5F8B, #234C71);
   border-color: transparent; color: #fff; }
 .dchat-idea .di-act button:hover { filter: brightness(.97); }
+.dchat-idea .di-act button { min-width: 104px; }   /* три кнопки в узкой ленте: лишняя переносится, а не сплющивается в буквы */
+.dchat-idea .di-act button.txt { flex: 0 0 auto; }
+
+/* ---- ТЗ по полкам: шапка «стоит ли» и свёрнутые полки ----
+   Текст ТЗ в сообщении тот же самый, поэтому по умолчанию он спрятан —
+   открывается кнопкой «ТЗ текстом». */
+.dchat-bubble.is-idea-card > .dchat-text { display: none; }
+.dchat-bubble.is-idea-card.show-idea-text > .dchat-text { display: block;
+  margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed rgba(15,30,60,.12); }
+.dchat-idea .di-title { font-size: 14.5px; font-weight: 800; color: var(--text-dark);
+  line-height: 1.3; margin-bottom: 7px; }
+.dchat-idea .di-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.dchat-idea .di-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px;
+  font-weight: 700; padding: 3px 8px; border-radius: 999px; background: #EEF2F8;
+  color: var(--text-mid); }
+.dchat-idea .di-chip i { font-size: 13px; }
+.dchat-idea .di-chip.is-size { background: #E8F1FB; color: #2D5F8B; }
+.dchat-idea .di-chip.is-size.sz-m { background: #FFF3E0; color: #B26A00; }
+.dchat-idea .di-chip.is-size.sz-l { background: #FDE8E8; color: #C0392B; }
+.dchat-idea .di-chip.is-mock { background: #EAF7EE; color: #2E7D46; }
+.dchat-idea .di-benefit { display: flex; align-items: flex-start; gap: 6px; font-size: 12.5px;
+  color: #2E7D46; background: #F3FAF5; border-radius: 10px; padding: 7px 9px; margin-bottom: 9px; }
+.dchat-idea .di-benefit i { font-size: 15px; flex: 0 0 auto; margin-top: 1px; }
+.dchat-idea .di-shelves { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.dchat-idea .di-shelf { border: 1px solid var(--border); border-radius: 10px; background: #fff;
+  overflow: hidden; }
+.dchat-idea .di-sh-hd { width: 100%; display: flex; align-items: center; gap: 7px; padding: 8px 10px;
+  background: none; border: 0; cursor: pointer; text-align: left; font-size: 12.5px;
+  font-weight: 700; color: var(--text-dark); }
+.dchat-idea .di-sh-hd i { font-size: 15px; color: var(--text-light); }
+.dchat-idea .di-sh-hd .nm { flex: 1; min-width: 0; }
+.dchat-idea .di-sh-hd .cnt { font-size: 11px; font-weight: 700; color: var(--text-light);
+  background: #EEF2F8; border-radius: 999px; padding: 1px 7px; }
+.dchat-idea .di-sh-hd .chv { transition: transform .15s ease; }
+.dchat-idea .di-shelf.is-open .di-sh-hd .chv { transform: rotate(180deg); }
+.dchat-idea .di-sh-bd { display: none; margin: 0; padding: 0 12px 9px 30px; }
+.dchat-idea .di-shelf.is-open .di-sh-bd { display: block; }
+.dchat-idea .di-sh-bd li { font-size: 12.5px; line-height: 1.45; color: var(--text-mid);
+  margin: 3px 0; }
+/* Те же полки сотруднику в «Идеях» — там карточка живёт без пузыря ленты */
+.ich-spec .ich-spec-card { margin-top: 0; border-top: 0; padding-top: 0; }
+.ich-spec .ich-spec-card .di-shelves { margin-bottom: 0; }
 
 /* ---- v2.46.024: скриншоты и файлы в чате идей ---- */
 /* Картинка в пузыре — самый частый случай: сотрудник показывает экран. Держим

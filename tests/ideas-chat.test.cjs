@@ -173,3 +173,44 @@ test('макет в переписке — живая страница, а не 
     assert.ok(css.includes(cls), 'нет стиля ' + cls);
   }
 });
+
+// v2.46.035: ТЗ приезжает разобранным по полкам
+test('карточка ТЗ рисует шапку «стоит ли» и полки', () => {
+  const ctx = {
+    escapeHtml: (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'),
+  };
+  const src = app1.slice(app1.indexOf('const IDEA_SHELVES'),
+                         app1.indexOf('function ideaShelfToggle'));
+  vm.createContext(ctx);
+  vm.runInContext(src + '\n;globalThis.render = ideaSpecCardHtml;', ctx);
+
+  const html = ctx.render({
+    title: 'Кнопка остатков', section: 'Склад → Приёмка', size: 'S', hours: 4,
+    benefit: 'экономит 40 минут в неделю', mockup: true,
+    why: ['остатки видно только в другом разделе'],
+    screen: ['кнопка «Остатки» в шапке'],
+    check: ['открыть приёмку и нажать'],
+  });
+  assert.match(html, /di-title">Кнопка остатков/);
+  assert.match(html, /Склад → Приёмка/);
+  assert.match(html, /sz-s">S · ~4 ч/);
+  assert.match(html, /макет согласован/);
+  // первые две полки открыты, остальные свёрнуты
+  assert.match(html, /di-shelf is-open[\s\S]*Что мешает сейчас/);
+  assert.match(html, /<div class="di-shelf">[\s\S]*Как проверить/);
+  // пустых полок нет
+  assert.doesNotMatch(html, /Открытые вопросы/);
+  // размер не из своего списка в class не попадает
+  assert.doesNotMatch(ctx.render({ title: 'т', why: ['п'], size: 'огромный' }), /sz-/);
+  // без карточки — пусто, в ленте останется текст ТЗ
+  assert.equal(ctx.render(null), '');
+});
+
+test('текст ТЗ прячется, когда есть полки, и открывается кнопкой', () => {
+  assert.match(app1, /if \(idea && msg\.meta\.idea\.card\) bubble\.classList\.add\('is-idea-card'\)/);
+  assert.match(app1, /function ideaSpecTextToggle/);
+  assert.match(css, /\.dchat-bubble\.is-idea-card > \.dchat-text \{ display: none; \}/);
+  // те же полки видит сотрудник в «Идеях»
+  assert.match(app4, /_ideaAddSpec\(th\.spec_text, th\.spec_card\)/);
+  assert.match(app4, /ideaSpecCardHtml/);
+});
