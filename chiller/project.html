@@ -5104,6 +5104,7 @@ const PULL_MIN=25;         // ближе этого патрубки счита�
 const PULL_LEAD=120;       // место перед П-образным разворотом: труба + вылет отвода
 const PULL_DETOUR_STEP=40; // шаг поиска следующей свободной поперечной плоскости
 const PULL_DETOUR_MAX=1200;// дальше трассу не раздуваем — просим переставить узел
+const PULL_FRAME_CLEAR=30; // радиус PP-R Ø40 + монтажный зазор до металла корпуса
 /* В заводском STEP резьбовых угольников Ø40 вертикальная ось раструба дальше
    25 мм от начала координат. Сканер базы её пропустил и вместо неё записал
    служебную цилиндрическую грань в -X — труба садилась в наружную стенку
@@ -5264,21 +5265,62 @@ function pullRoute(a,b){
    до первой свободной; если оба конца внутри корпуса, наружу за панель не
    уходим. У прямой, Г- и Z-трассы без дополнительных отводов обхода нет —
    лучше отказ с названием помехи, чем красная труба сквозь компрессор. */
+/* Отрезок оси задевает габарит детали корпуса с зазором. Для тонкой панели
+   проверка «сколько миллиметров оси внутри меша» не годится: лист толщиной
+   2 мм надо остановить сразу, а не после 24 мм прохода сквозь аппарат. */
+function pullSegBox(A,B,box,pad){
+  const q=box.clone().expandByScalar(pad||0),d=B.clone().sub(A);let lo=0,hi=1;
+  for(const k of ['x','y','z']){
+    if(Math.abs(d[k])<1e-9){if(A[k]<q.min[k]||A[k]>q.max[k])return false;continue;}
+    let u=(q.min[k]-A[k])/d[k],v=(q.max[k]-A[k])/d[k];if(u>v){const z=u;u=v;v=z;}
+    if(u>lo)lo=u;if(v<hi)hi=v;if(lo>hi)return false;
+  }
+  return hi>=0&&lo<=1;
+}
+function pullFrameHit(pts){
+  const frames=placed.filter(p=>roleOf(p.d)==='frame');
+  for(let f=0;f<frames.length;f++){
+    const fr=frames[f],geo=fr.obj&&fr.obj.geometry;
+    if(!geo||!geo.userData||!geo.userData.parts)continue;
+    const boxes=framePartBoxes(fr);if(!boxes)continue;
+    const PT=geo.userData.parts,ms=Array.isArray(fr.obj.material)?fr.obj.material:[fr.obj.material];
+    for(let j=0;j<boxes.length;j++){
+      if(ms[j]&&ms[j].visible===false)continue;       // снятая панель проходу не мешает
+      for(let i=0;i+1<pts.length;i++)if(pullSegBox(pts[i],pts[i+1],boxes[j],PULL_FRAME_CLEAR))
+        return {uid:fr.uid,d:{name:'корпус · '+((PT[j]&&PT[j].name)||'деталь корпуса')}};
+    }
+  }
+  return null;
+}
 function pullRouteHit(a,b,pts){
   if(typeof placed==='undefined'||!placed||!placed.length)return null;
   const skip=new Set();if(a.it)skip.add(a.it.uid);if(b.it)skip.add(b.it.uid);
   const obst=placed.filter(p=>!skip.has(p.uid)&&!HIT_SKIP.has(roleOf(p.d)));
   for(let i=0;i+1<pts.length;i++)for(let j=0;j<obst.length;j++)
     if(pipeAxisCuts(pts[i],pts[i+1],obst[j]))return obst[j];
-  return null;
+  return pullFrameHit(pts);
+}
+function pullEndRoot(it){
+  let p=it,n=0;
+  while(p&&p.link&&p.link.to&&n++<20){
+    const host=placed.find(x=>x.uid===p.link.to);if(!host)break;p=host;
+  }
+  return p;
+}
+function pullInternalEnds(a,b,outer){
+  const A=pullEndRoot(a.it),B=pullEndRoot(b.it);
+  if(A&&B)return INSIDE.has(roleOf(A.d))&&INSIDE.has(roleOf(B.d));
+  return outer.containsPoint(a.p)&&outer.containsPoint(b.p);
 }
 function pullRouteInside(a,b,pts){
   if(typeof placed==='undefined'||!placed||
      !placed.some(p=>roleOf(p.d)==='frame'))return true;
   const outer=site();
-  /* Наружные патрубки и обвязку бака не загоняем обратно в корпус. */
-  if(!outer.containsPoint(a.p)||!outer.containsPoint(b.p))return true;
-  const inner=siteIn().clone().expandByScalar(-8);
+  /* Наружную обвязку бака не загоняем обратно. Связанные с насосами и другим
+     внутренним оборудованием фитинги прослеживаем по цепочке до аппарата. */
+  if(!pullInternalEnds(a,b,outer))return true;
+  for(let i=0;i<pts.length;i++)if(!outer.containsPoint(pts[i]))return false;
+  const inner=siteIn().clone().expandByScalar(-PULL_FRAME_CLEAR);
   if(inner.isEmpty())return true;
   for(let i=1;i+1<pts.length;i++)if(!inner.containsPoint(pts[i]))return false;
   return true;
@@ -5306,7 +5348,8 @@ function pullRouteClear(a,b,rt){
       '; переставь узел или выбери другой патрубок'};
   }
   const who=first&&first.d&&first.d.name;
-  return {err:'трасса '+rt.kind+' проходит сквозь '+(who?('«'+who+'»'):'оборудование')+
+  return {err:'трасса '+rt.kind+(inside?' проходит сквозь ':' выходит за внутренний габарит ')+
+    (who?('«'+who+'»'):(inside?'оборудование':'корпуса'))+
     ' — переставь узел или добавь обход'};
 }
 /* Прямой отрезок трубы в базе: две зоны вдоль своей оси X. */

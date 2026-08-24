@@ -28,6 +28,7 @@ function section(from, to) {
 function stand(items, geoms) {
   const code = section('const CT_NAME=', 'function rotClear()') +
                section('function meshTris(p){', '/* ═══ v2.45.1011: упор') +
+               section('function framePartBoxes(fr){', '/* треугольники детали корпуса') +
                section('const PIPE_RAY_MAX=', 'function checkPipes(){') +
                section('const PULL_TOL=', 'async function pullPut(');
   const ctx = {
@@ -40,7 +41,12 @@ function stand(items, geoms) {
     roleOf: d => d.section === 'frames' ? 'frame' :
       (d.section === 'compressors' ? 'comp' : (d.section === 'pipe' ? 'pipe' : 'floor')),
     HIT_SKIP: new Set(['frame', 'vibro', 'pipe']),
+    INSIDE: new Set(['comp', 'recv', 'sep', 'evap', 'pump', 'line', 'instr', 'panel', 'floor']),
   };
+  ctx.SITE_OUTER = new THREE.Box3(V(-100, -100, -100), V(1400, 500, 500));
+  ctx.SITE_INNER = new THREE.Box3(V(-50, -50, -50), V(1350, 450, 450));
+  ctx.site = () => ctx.SITE_OUTER.clone();
+  ctx.siteIn = () => ctx.SITE_INNER.clone();
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(code, ctx);
@@ -57,6 +63,13 @@ function boxObstacle(name, center, size) {
                              new THREE.MeshBasicMaterial());
   obj.position.copy(center);obj.updateMatrixWorld(true);
   return { uid: 'obstacle-' + name, d: { name, section: 'compressors' }, obj, zn: [] };
+}
+function boxFrame(name, center, size) {
+  const obj = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z),
+                             new THREE.MeshBasicMaterial());
+  obj.geometry.userData.parts = obj.geometry.groups.map(() => ({ name }));
+  obj.position.copy(center);obj.updateMatrixWorld(true);
+  return { uid: 'frame-' + name, d: { name: 'Корпус', section: 'frames' }, obj, zn: [] };
 }
 
 test('оси смотрят друг в друга — трасса прямая, из одного отрезка', () => {
@@ -197,6 +210,31 @@ test('прямая трасса сквозь аппарат не создаёт�
   S.placed.push(boxObstacle('компрессор', V(250, 0, 0), V(100, 100, 100)));
   const route = S.pullRouteClear(a, b, S.pullRoute(a, b));
   assert.match(route.err, /прямая проходит сквозь «компрессор»/);
+});
+
+test('трасса считает панель и балку корпуса препятствием с монтажным зазором', () => {
+  const S = stand();
+  const a = port(V(0, 0, 0), V(1, 0, 0));
+  const b = port(V(600, 300, 0), V(1, 0, 0));
+  S.placed.push(boxFrame('стойка', V(720, 150, 0), V(120, 120, 120)));
+  const baseRoute = S.pullRoute(a, b);
+  assert.match(S.pullRouteHit(a, b, baseRoute.pts).d.name, /корпус · стойка/);
+
+  const route = S.pullRouteClear(a, b, baseRoute);
+  assert.equal(route.err, undefined);
+  assert.equal(route.detour, 120);                   // зазор 30 мм: X=840 — первая свобода
+  assert.equal(S.pullRouteHit(a, b, route.pts), null);
+});
+
+test('обход компрессора не выбирается, если поперечина выйдет из корпуса', () => {
+  const S = stand();
+  const a = port(V(0, 0, 0), V(1, 0, 0));
+  const b = port(V(600, 300, 0), V(1, 0, 0));
+  S.SITE_INNER.max.x = 760;                         // после зазора предел оси X=730
+  S.placed.push(boxFrame('дальняя панель', V(-80, 400, 400), V(10, 10, 10)));
+  S.placed.push(boxObstacle('компрессор', V(720, 150, 0), V(120, 120, 120)));
+  const route = S.pullRouteClear(a, b, S.pullRoute(a, b));
+  assert.match(route.err, /свободной П-образной трассы внутри корпуса нет/);
 });
 
 test('угловой резьбовой фитинг не принимается за прямой переход трубы', () => {
