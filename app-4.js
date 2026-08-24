@@ -1837,7 +1837,11 @@ function _ideasRenderShell() {
         '<button class="ich-new" onclick="ideasNew()"><i class="ti ti-plus"></i>Новая идея</button>' +
         '<div class="ich-items" id="ideas-items"><div class="loading-block">Загружаем…</div></div>' +
       '</aside>' +
-      '<div class="ich-main">' +
+      '<div class="ich-main" id="ideas-main">' +
+        '<div class="ich-drop-target" id="idea-drop-target" aria-hidden="true">' +
+          '<div class="ich-drop-card"><i class="ti ti-file-upload"></i>' +
+            '<b>Отпустите файлы здесь</b><span>Они прикрепятся к сообщению</span></div>' +
+        '</div>' +
         '<div class="ich-feed" id="ideas-feed"></div>' +
         '<div class="ich-actions" id="ideas-actions"></div>' +
         '<div class="ich-picked" id="idea-picked"></div>' +
@@ -1853,10 +1857,12 @@ function _ideasRenderShell() {
         '</div>' +
         '<div class="ich-hint">Порядок: обсудили → «Показать макет» → поправили словами → ' +
           '«Согласовать макет» → «Сформировать ТЗ». Скриншот можно вставить из буфера (Ctrl+V) — ' +
-          'Клава его видит. Код она не правит, договоры и суммы не показывает. ' +
+          'или просто перетащить файл в окно чата — Клава его увидит. ' +
+          'Код она не правит, договоры и суммы не показывает. ' +
           'Готовое ТЗ уходит директору — внедрять или нет, решает он.</div>' +
       '</div>' +
     '</div>';
+  ideasBindDrop();
 }
 
 function ideasToggleList() {
@@ -2192,6 +2198,55 @@ function ideasPaste(e) {
   if (!imgs.length) return;      // обычный текст вставляется как обычно
   e.preventDefault();
   _ideasAddPicked(imgs);
+}
+
+function _ideasTransferHasFiles(transfer) {
+  if (!transfer) return false;
+  const types = Array.prototype.slice.call(transfer.types || []);
+  return types.indexOf('Files') >= 0 || !!(transfer.files && transfer.files.length);
+}
+
+// Файл можно бросить в любое место переписки — он прикрепится к сообщению,
+// но не отправится сам: человек успевает дописать, что именно нужно посмотреть.
+function ideasBindDrop() {
+  const host = document.getElementById('ideas-main');
+  if (!host || host.dataset.ideaDropBound === '1') return;
+  host.dataset.ideaDropBound = '1';
+  let depth = 0;
+
+  function hide() {
+    depth = 0;
+    host.classList.remove('is-file-dragging');
+  }
+
+  host.addEventListener('dragenter', function (e) {
+    if (!_ideasTransferHasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    depth += 1;
+    host.classList.add('is-file-dragging');
+  });
+  host.addEventListener('dragover', function (e) {
+    if (!_ideasTransferHasFiles(e.dataTransfer)) return;
+    e.preventDefault();       // иначе браузер откроет файл вместо прикрепления
+    e.dataTransfer.dropEffect = 'copy';
+    host.classList.add('is-file-dragging');
+  });
+  host.addEventListener('dragleave', function () {
+    depth = Math.max(0, depth - 1);
+    if (!depth) host.classList.remove('is-file-dragging');
+  });
+  host.addEventListener('drop', function (e) {
+    if (!_ideasTransferHasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    const files = Array.prototype.slice.call(e.dataTransfer.files || []);
+    hide();
+    if (!files.length) return;
+    _ideasAddPicked(files);
+    const input = document.getElementById('idea-input');
+    if (input) input.focus();
+    showToast(files.length === 1 ? 'Файл прикреплён' : 'Прикреплено файлов: ' + files.length,
+              'success');
+  });
 }
 
 function ideasDropPicked(i) {
