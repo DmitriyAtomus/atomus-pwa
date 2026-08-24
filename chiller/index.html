@@ -387,8 +387,8 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
     <div class="hcount"><b id="cReady">0</b> моделей выпущено<br><span id="cAll">0</span> позиций в базе</div>
     <button id="chatBtn" class="fsbtn" onclick="toggleChat()" style="display:none"
             title="Чат по чиллерам">💬 <span id="chatTxt">Чат</span></button>
-    <button id="pickBtn" class="fsbtn" onclick="pickOpen()"
-            title="Подобрать фильтр-осушитель по мощности и хладагенту">⌗ <span>Подбор</span></button>
+    <!-- v2.46.051: кнопка «Подбор» из витрины убрана — подбор фильтра живёт
+         в конструкторе (Проект), где фильтр и ставят; pickOpen() остаётся. -->
     <a class="fsbtn" href="project.html" style="text-decoration:none"
        title="Прототип конструктора: собери машину из моделей базы">⚙ <span>Проект</span></a>
     <button id="fsBtn" class="fsbtn" onclick="toggleFS()"
