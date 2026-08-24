@@ -1222,6 +1222,30 @@ async function fillUserThumbs(){
     }
   }finally{_uthBusy=false;}
 }
+async function userReconvert(mid){
+  const d=DATA.find(x=>x.id==='user:'+mid);
+  if(!d)return;
+  if(!confirm('Пересобрать модель из STEP?\nСборка разрежется на детали (их можно будет скрывать), но ориентация вернётся к исходной — потом повернёшь заново кнопками.'))return;
+  try{
+    if(typeof toast==='function')toast('Пересобираю…');
+    const r=await fetch(U.index().replace('/index','/user-models/'+mid+'/reconvert'),
+      {method:'POST',headers:AUTH});
+    const m=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(m.message||m.error||('HTTP '+r.status));
+    const g=GEOMS[d.g];
+    if(g){g.url=m.mesh_url;g._mesh=null;g.bb=m.bbox||{};}
+    d._uthumb=m.thumb_url||d._uthumb;
+    const sz=(m.bbox&&m.bbox.size)||[];
+    const dims=sz.length===3?sz.map(v=>Math.round(+v||0)).join(' × ')+' мм':'габарит из STEP';
+    d.tags=[dims,'STEP → мм'];
+    d.specs=d.specs.map(s=>s[0]==='Габарит'?['Габарит',dims]:
+      (s[0]==='Треугольников'?['Треугольников',String(m.triangle_count||0)]:s));
+    openDet(d.id);
+    UTH.delete(mid);
+    try{const u=await userThumbMake(d);if(u)UTH.set(mid,u);
+      document.querySelectorAll('img[data-uth="'+mid+'"]').forEach(im=>im.src=u);}catch(e){}
+  }catch(err){alert('Пересборка не удалась: '+(err.message||err));}
+}
 async function userOrient(mid,rot){
   const d=DATA.find(x=>x.id==='user:'+mid);
   if(!d)return;
@@ -1729,7 +1753,11 @@ function side(d){
       <button onclick="userOrient('${d._uid}','y90')" title="Крен вбок">Y 90°</button>
       <button onclick="userOrient('${d._uid}','z90')" title="Поворот вокруг вертикали">Z 90°</button>
     </div>
-    <div class="note">Жми, пока модель не встанет правильно: поворот сохраняется в базе — корпус будет стоять так везде, и в конструкторе тоже.</div>`:''}
+    <div class="note">Жми, пока модель не встанет правильно: поворот сохраняется в базе — корпус будет стоять так везде, и в конструкторе тоже.</div>
+    <div class="dl" style="margin-top:8px">
+      <button onclick="userReconvert('${d._uid}')" title="Пересобрать модель из исходного STEP: сборка разрежется на детали — их можно будет скрывать (панели, крышки)">⚙ Пересобрать с деталями</button>
+    </div>
+    <div class="note">Для корпусов, загруженных до появления деталей. Пересборка вернёт исходную ориентацию из STEP — потом поверни заново.</div>`:''}
     <div class="hr"></div>
     <div class="warn">${d.geom.lod}</div>`;
 }
