@@ -98,6 +98,59 @@ test('к сообщению можно приложить файл и встав
   assert.match(shell, /onchange="ideasPickFiles\(this\)"/);
   assert.match(shell, /onpaste="ideasPaste\(event\)"/);
   assert.match(shell, /id="idea-picked"/);
+  assert.match(shell, /id="idea-drop-target"/);
+  assert.match(shell, /ideasBindDrop\(\)/);
+});
+
+test('файл можно перетащить в чат, он прикрепляется без автоотправки', () => {
+  const handlers = {};
+  const classes = new Set();
+  const added = [];
+  let focused = 0;
+  let sent = 0;
+  const host = {
+    dataset: {},
+    classList: {
+      add(c) { classes.add(c); },
+      remove(c) { classes.delete(c); },
+    },
+    addEventListener(name, fn) { handlers[name] = fn; },
+  };
+  const ctx = {
+    Array, Math,
+    document: {
+      getElementById(id) {
+        if (id === 'ideas-main') return host;
+        if (id === 'idea-input') return { focus() { focused += 1; } };
+        return null;
+      },
+    },
+    _ideasAddPicked(files) { added.push(...files); },
+    showToast() {},
+    ideaSend() { sent += 1; },
+  };
+  const start = app4.indexOf('function _ideasTransferHasFiles');
+  const end = app4.indexOf('function ideasDropPicked', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  vm.createContext(ctx);
+  vm.runInContext(app4.slice(start, end) + '\n;globalThis.bind = ideasBindDrop;', ctx);
+  ctx.bind();
+
+  const file = { name: 'образец.xlsx', size: 1000, type: 'application/vnd.ms-excel' };
+  const event = {
+    dataTransfer: { types: ['Files'], files: [file], dropEffect: '' },
+    preventDefault() {},
+  };
+  handlers.dragenter(event);
+  assert.equal(classes.has('is-file-dragging'), true);
+  handlers.drop(event);
+
+  assert.deepEqual(added, [file]);
+  assert.equal(classes.has('is-file-dragging'), false);
+  assert.equal(focused, 1);
+  assert.equal(sent, 0);
+  assert.match(css, /\.ich-main\.is-file-dragging \.ich-drop-target/);
 });
 
 test('пределы вложений проверяются ДО загрузки', () => {
