@@ -5835,6 +5835,13 @@
   .sup-status-pill.ord-received          { background: #E8F5E9; color: var(--success); }
   .sup-status-pill.ord-cancelled         { background: #F4F4F5; color: var(--text-faint); }
 
+  /* v2.46.040: тег назначения счёта — кликом ищет все заказы с этой пометкой */
+  .sup-status-pill.sup-ord-tag {
+    background: #FEF3C7; color: #92400E; font-weight: 700;
+    cursor: pointer; border: 1px solid transparent;
+  }
+  .sup-status-pill.sup-ord-tag:hover { border-color: #FCD34D; filter: brightness(0.97); }
+
   /* Pill kind (material/product) */
   .sup-kind-pill {
     padding: 2px 8px;

@@ -2484,11 +2484,12 @@
               </div>
             </div>
           </div>
-          <!-- v2.45.x: поиск по заказам — поставщик/ИНН/№/номенклатура/примечание -->
+          <!-- v2.45.x: поиск по заказам — поставщик/ИНН/№/номенклатура/примечание,
+               с v2.46.040 — и по тегу назначения («за что платили») -->
           <div style="margin:8px 0 4px;position:relative;max-width:560px;">
             <i class="ti ti-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-light);pointer-events:none;"></i>
             <input type="search" id="sup-ord-search" autocomplete="off"
-              placeholder="Поиск: поставщик, ИНН, № заказа/счёта, номенклатура, примечание…"
+              placeholder="Поиск: тег назначения, поставщик, ИНН, № заказа/счёта, номенклатура…"
               oninput="onSupplyOrdSearch(this.value)"
               style="width:100%;box-sizing:border-box;padding:9px 12px 9px 34px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--bg);">
           </div>
