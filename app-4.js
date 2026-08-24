@@ -14362,6 +14362,20 @@ function _scheduleSharedInvoiceIntake() {
       try { history.replaceState({}, '', window.location.pathname); } catch (_) {}
     }
   } catch (_) {}
+  // v2.46.039: вкладка открыта средним кликом — забираем отложенное действие
+  // (лежит в localStorage этого же браузера, в адресе только короткий ключ).
+  try {
+    const _midK = new URLSearchParams(window.location.search).get('mid');
+    if (_midK && /^[A-Za-z0-9]+$/.test(_midK)) {
+      const _midRaw = localStorage.getItem('atomus_mid_' + _midK);
+      localStorage.removeItem('atomus_mid_' + _midK);
+      if (_midRaw) {
+        const _midData = JSON.parse(_midRaw);
+        if (Date.now() - (_midData.ts || 0) < 120000) window._midAction = _midData;
+      }
+      history.replaceState({}, '', window.location.pathname);
+    }
+  } catch (_) {}
   // Обычный flow
   const token = localStorage.getItem(TOKEN_KEY);
   if (token) showApp();
