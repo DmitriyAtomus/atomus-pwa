@@ -1138,7 +1138,7 @@ function userItem(m){
       ['Треугольников',String(m.triangle_count||0)],['Единицы STEP',m.source_unit||'не определены']],
     geom:{bolt:[0,0],bolt_plane:'none',rows:[['Роль в компоновке','корпус'],['Координаты','нормализованы в мм']],
       ports:[],pcol:[],conn:'',lod:'Пользовательская модель: геометрия из загруженного STEP, патрубки не размечены.'},
-    _ustep:m.step_url,_ufile:m.original_filename||'model.step'};
+    _ustep:m.step_url,_ufile:m.original_filename||'model.step',_uid:m.id};
 }
 async function mergeUserModels(){
   if(!API)return 0;
@@ -1152,6 +1152,25 @@ async function mergeUserModels(){
     });
     return n;
   }catch(e){return 0;}
+}
+async function userOrient(mid,rot){
+  const d=DATA.find(x=>x.id==='user:'+mid);
+  if(!d)return;
+  try{
+    const r=await fetch(U.index().replace('/index','/user-models/'+mid+'/orient'),
+      {method:'POST',headers:Object.assign({'Content-Type':'application/json'},AUTH),
+       body:JSON.stringify({rot:rot})});
+    const m=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(m.message||m.error||('HTTP '+r.status));
+    // обновляем позицию в каталоге и сбрасываем кэш меша
+    const g=GEOMS[d.g];
+    if(g){g.url=m.mesh_url;g._mesh=null;g.bb=m.bbox||{};}
+    const sz=(m.bbox&&m.bbox.size)||[];
+    const dims=sz.length===3?sz.map(v=>Math.round(+v||0)).join(' × ')+' мм':'габарит из STEP';
+    d.tags=[dims,'STEP → мм'];
+    d.specs=d.specs.map(s=>s[0]==='Габарит'?['Габарит',dims]:s);
+    openDet(d.id);          // карточка перерисуется уже повернутым мешем
+  }catch(err){alert('Поворот не применился: '+(err.message||err));}
 }
 $('#upBtn').onclick=()=>$('#upFile').click();
 $('#upFile').addEventListener('change',async e=>{
@@ -1629,6 +1648,15 @@ function side(d){
     <div class="st">Файлы</div>
     <div class="dl"><button class="pri" id="dlStep">Скачать STEP</button>
       <button>STL</button><button>Чертёж</button></div>
+    ${d._uid?`<div class="hr"></div>
+    <div class="st">Ориентация</div>
+    <div class="dl">
+      <button onclick="userOrient('${d._uid}','x180')" title="Перевернуть вверх ногами">⟲ 180°</button>
+      <button onclick="userOrient('${d._uid}','x90')" title="Завал вперёд-назад">X 90°</button>
+      <button onclick="userOrient('${d._uid}','y90')" title="Крен вбок">Y 90°</button>
+      <button onclick="userOrient('${d._uid}','z90')" title="Поворот вокруг вертикали">Z 90°</button>
+    </div>
+    <div class="note">Жми, пока модель не встанет правильно: поворот сохраняется в базе — корпус будет стоять так везде, и в конструкторе тоже.</div>`:''}
     <div class="hr"></div>
     <div class="warn">${d.geom.lod}</div>`;
 }
