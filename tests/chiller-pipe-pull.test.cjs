@@ -184,6 +184,28 @@ test('угловой резьбовой фитинг не принимается
   assert.ok(!ids.includes(angle.id), 'угольник ошибочно попал в прямые переходы');
 });
 
+test('у резьбового угольника Ø40 PP-R зона переносится с бока на настоящий выход', () => {
+  const id = 'VTp.752.0.04006', g = 'ppr-' + id;
+  const items = [{ id, g, ready: true, section: 'pipe', sub: 'ppr',
+    name: 'Угольник с переходом на внутреннюю резьбу 40 × 1"' }];
+  const geoms = { [g]: { bb: { lo: [-64, -27.5, -26.8], hi: [13.5, 27.5, 50.5] }, zn: [
+    { name: 'РЕЗЬБА 1" внутренняя', od: 53.5, p0: [0, 0, 0], dir: [1, 0, 0],
+      tip: [17.2, 0, 0], ctype: 'thr', sex: 'f', conn: 'G1', seat: 13.5 },
+    // Ошибочная заводская зона указывает в -X — прямо в наружную стенку колена.
+    { name: 'ПОД СВАРКУ Ø40', od: 53.5, p0: [0, 0, 0], dir: [-1, 0, 0],
+      tip: [-17.2, 0, 0], ctype: 'ppr', sex: 'f', conn: 'Ø40 сварка PP-R', seat: 64 },
+  ] } };
+  const S = stand(items, geoms);
+  S.fixPprTurnPorts();
+  const z = geoms[g].zn[1];
+  // Индекс 1 сохраняется: уже собранная связь pzi=1 после обновления сама
+  // пересядет с боковой грани на верхний раструб.
+  assert.deepEqual(Array.from(z.p0), [-36.5, 0, 0]);
+  assert.deepEqual(Array.from(z.dir), [0, 0, 1]);
+  assert.equal(z.seat, 50.5);
+  assert.equal(z.conn, 'Ø40 сварка PP-R');
+});
+
 test('в углу нужен отвод: нет отвода под этот диаметр — трасса не строится', () => {
   const S = stand();
   const c = S.connOf(zn('VTp.751.0.025')[0]);

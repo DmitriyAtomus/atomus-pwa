@@ -33,11 +33,11 @@ test('меш покупной позиции сохраняет группы с�
 });
 
 test('цвета сред те же, что в базе 3D, и деталь получает пять материалов', () => {
-  assert.match(page, /const C_BODY=0x8d959d,C_COPPER=0xb87333/);
+  assert.match(page, /const C_BODY=0x8d959d,C_COPPER=0xb87333,C_PPR=0xf4f5f2/);
   assert.match(page, /const C_DIS=0xd94f3d,C_SUC=0x3d8fd9,C_PPK=0xC9A227,C_EQ=0x4FBF8B/);
   assert.match(page, /const ZONE_COL=\[C_BODY,C_DIS,C_SUC,C_PPK,C_EQ\]/);
-  assert.match(page, /const modelCol=d=>d&&d\.sub==='copper'\?C_COPPER:C_BODY/);
-  assert.match(page, /ZONE_COL\.map\(\(c,i\)=>mk\(i&&PORTS\?c:base,true\)\)/);
+  assert.match(page, /const modelCol=d=>d&&d\.sub==='copper'\?C_COPPER:\(d&&d\.sub==='ppr'\?C_PPR:C_BODY\)/);
+  assert.match(page, /ZONE_COL\.map\(\(c,i\)=>mk\(i&&PORTS\?c:base,d\.sub!=='ppr'\)\)/);
   // патрубок остаётся сталью по блеску, а не выглядит крашеным
   assert.match(page, /const mk=\(c,steel\)=>new THREE\.MeshStandardMaterial/);
 });

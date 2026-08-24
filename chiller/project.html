@@ -1588,7 +1588,7 @@ $('#umAdd').onclick=async()=>{if(!UM.d||$('#umAdd').classList.contains('off'))re
   previewCanvas.addEventListener('wheel',e=>{e.preventDefault();UM.dist=Math.max(10,UM.dist*(1+Math.sign(e.deltaY)*.1));},{passive:false});})();
 
 /* ═══ сцена: z вверх, как в базе ═══ */
-const C_BODY=0x8d959d,C_COPPER=0xb87333;
+const C_BODY=0x8d959d,C_COPPER=0xb87333,C_PPR=0xf4f5f2;
 /* цвета патрубков — те же, что в базе 3D: нагнетание красное, всасывание
    голубое, порт предохранительного клапана золотой, уравнивание зелёное */
 const C_DIS=0xd94f3d,C_SUC=0x3d8fd9,C_PPK=0xC9A227,C_EQ=0x4FBF8B;
@@ -1601,7 +1601,7 @@ const partCol=p=>{const c=p&&p.col?parseInt(String(p.col).replace('#',''),16):Na
 /* Параметрическая медная номенклатура приезжает отдельным подразделом.
    Её тело должно оставаться медным, когда подсветка патрубков выключена;
    иначе труба выглядела как серая сталь и в сцене её не отличить. */
-const modelCol=d=>d&&d.sub==='copper'?C_COPPER:C_BODY;
+const modelCol=d=>d&&d.sub==='copper'?C_COPPER:(d&&d.sub==='ppr'?C_PPR:C_BODY);
 let renderer,scene,camera,grid,glLost=false;
 let target=new THREE.Vector3(0,0,300),theta=-0.95,phi=1.15,dist=3200,dMin=120,dMax=12000;
 const placed=[];   // {uid,id,obj,d}
@@ -2367,7 +2367,7 @@ async function addItem(d,at,rot,tilt,roll){
   const base=modelCol(d);
   const mat=PT?PT.map(x=>mk(x.col))
              :(geo.userData.zoneMats
-               ?ZONE_COL.map((c,i)=>mk(i&&PORTS?c:base,true))
+               ?ZONE_COL.map((c,i)=>mk(i&&PORTS?c:base,d.sub!=='ppr'))
                :mk(base,base===C_BODY||base===C_COPPER));
   pushHist('добавление детали');           // v2.45.996: шаг истории — до появления детали
   const obj=new THREE.Mesh(geo,mat);
@@ -5094,6 +5094,26 @@ function pipeSetSel(L){
 const PULL_TOL=6;          // на столько осям позволено разойтись, мм
 const PULL_MIN=25;         // ближе этого патрубки считаем стоящими встык
 const PULL_LEAD=120;       // место перед П-образным разворотом: труба + вылет отвода
+/* В заводском STEP резьбовых угольников Ø40 вертикальная ось раструба дальше
+   25 мм от начала координат. Сканер базы её пропустил и вместо неё записал
+   служебную цилиндрическую грань в -X — труба садилась в наружную стенку
+   колена. Исправляем индекс до загрузки проекта и сохраняем номер зоны 1:
+   уже сохранённые связи pzi=1 сами пересядут на настоящий выход. */
+const PPR_TURN_PORTS={
+  'VTp.752.0.04006':{x:-36.5,z:50.5},
+  'VTp.753.0.04006':{x:-36.5,z:50.5}
+};
+function fixPprTurnPorts(){
+  (DATA||[]).forEach(d=>{
+    const f=PPR_TURN_PORTS[d.id],g=f&&GEOMS&&GEOMS[d.g],zs=g&&g.zn;
+    if(!f||!zs||zs.length<2)return;
+    zs[1]=Object.assign({},zs[1],{
+      kind:'suc',name:'ПОД СВАРКУ Ø40',od:54,p0:[f.x,0,0],dir:[0,0,1],
+      r:29,t0:20.5,t1:52,tip:[f.x,0,61],ctype:'ppr',sex:'f',
+      conn:'Ø40 сварка PP-R',seat:f.z
+    });
+  });
+}
 let PULL=null;             // откуда тянем: {it,zi}
 let PULL_INFO={ok:0,bad:0,why:''};
 const pullOn=()=>!!PULL;
@@ -9165,7 +9185,7 @@ function chGrow(el){
     $('#cat').innerHTML='<div style="padding:14px 6px;font-size:12px;color:var(--bad)">База не отдалась ('+e.message+').<br>Открой прототип из CRM (Производство → Атом Чиллер), чтобы был токен.</div>';
     return;
   }
-  DATA=ix.items;GEOMS=ix.geoms;SECTIONS=ix.sections;secNames();
+  DATA=ix.items;GEOMS=ix.geoms;SECTIONS=ix.sections;secNames();fixPprTurnPorts();
   VER=(ix.version||ix.built||'').replace(/[^0-9a-zA-Z]/g,'');
   await loadUserModels();
   drawCat();   /* чипы разделов, подразделов и брендов рисует сам каталог */
