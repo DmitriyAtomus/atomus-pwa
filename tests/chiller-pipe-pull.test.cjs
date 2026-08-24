@@ -260,6 +260,28 @@ test('угловой резьбовой фитинг не принимается
   assert.ok(!ids.includes(angle.id), 'угольник ошибочно попал в прямые переходы');
 });
 
+test('тройник с двумя соосными выходами не принимается за прямую муфту', () => {
+  const items = structuredClone(base.items);
+  const geoms = structuredClone(base.geoms);
+  const straight = items.find(d => d.id === 'VTp.708.0.02004');
+  const tee = {
+    ...straight,
+    id: 'VTp.730.0.020',
+    g: 'ppr-VTp.730.0.020',
+    name: 'Тройник PP-R 20',
+  };
+  items.push(tee);
+  /* Даже двух соосных зон достаточно старому алгоритму, чтобы принять
+     тройник за переход. Название обязано отсечь ответвление раньше. */
+  geoms[tee.g] = structuredClone(geoms[straight.g]);
+  const S = stand(items, geoms);
+  const c = { t: 'thr', size: 'G1/2', sex: 'm', txt: 'резьба G1/2' };
+  const tc = { t: 'ppr', size: 20, sex: 'm', txt: 'Ø20 сварка PP-R' };
+  const ids = S.pullAdapters(c, tc).map(x => x.d.id);
+  assert.ok(ids.includes(straight.id), 'прямой переход должен остаться доступен');
+  assert.ok(!ids.includes(tee.id), 'тройник ошибочно попал в прямые переходы');
+});
+
 test('у резьбового угольника Ø40 PP-R зона переносится с бока на настоящий выход', () => {
   const id = 'VTp.752.0.04006', g = 'ppr-' + id;
   const items = [{ id, g, ready: true, section: 'pipe', sub: 'ppr',

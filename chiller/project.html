@@ -4559,6 +4559,9 @@ function rotPick(host,zi,x,y,cur,opt){
   select(cur||host);              // при замене выделенной остаётся сама деталь
   let list=mates(c);
   if(opt&&opt.kind==='elbow')list=list.filter(m=>routePlainElbow(m.d));
+  if(opt&&opt.kind==='coupling')list=list.filter(m=>routePlainCoupling(m.d));
+  if(opt&&opt.kind==='tee')list=list.filter(m=>routeTee(m.d));
+  if(opt&&opt.kind==='more')list=list.filter(m=>!routeTee(m.d));
   if(opt&&opt.kind==='tube')list=list.filter(m=>m.d.section==='pipe'&&/труб/i.test(m.d.name||''));
   const box=$('#rpick');
   box.innerHTML='<div class="hd"><b></b><span></span></div>'+
@@ -4567,7 +4570,10 @@ function rotPick(host,zi,x,y,cur,opt){
     '<div class="rl"></div><div class="nt"></div>';
   const pull=box.querySelector('.pl');
   if(pull)pull.onclick=()=>{rotPickClose();pullStart(host,zi);};
-  const mode=opt&&opt.kind==='elbow'?'Отвод 90°':(opt&&opt.kind==='tube'?'Продолжить трубой':'');
+  const mode=opt&&opt.kind==='elbow'?'Отвод 90°':
+    (opt&&opt.kind==='coupling'?'Прямо через муфту':
+      (opt&&opt.kind==='tee'?'Ответвление тройником':
+        (opt&&opt.kind==='tube'?'Продолжить трубой':'')));
   box.querySelector('.hd b').textContent=(mode?(mode+' · '):(cur?'Заменить на патрубке · ':''))+c.txt+
     (list.length?(' · подходит '+list.length):'');
   box.querySelector('.hd span').textContent=z.name+' · '+host.d.brand+' '+host.d.name+
@@ -4575,7 +4581,9 @@ function rotPick(host,zi,x,y,cur,opt){
   const rl=box.querySelector('.rl');
   if(!list.length){
     box.querySelector('.nt').textContent=mode
-      ?('В базе нет совместимого '+(opt.kind==='elbow'?'отвода 90°':'отрезка трубы')+
+      ?('В базе нет совместимого '+(opt.kind==='elbow'?'отвода 90°':
+        (opt.kind==='coupling'?'проходной муфты':
+          (opt.kind==='tee'?'тройника':'отрезка трубы')))+
         ' под это присоединение.')
       :('В базе нет ответной части под это присоединение — напиши в чате, добавлю в базу 3D.');
   }else{
@@ -4613,6 +4621,10 @@ function rotPick(host,zi,x,y,cur,opt){
        'спецификации. Крен вокруг оси сохранится. Ctrl+Z вернёт как было.'
       :opt&&opt.kind==='elbow'
        ?'После установки выбери стрелкой сторону отвода и продолжи трассу трубой.'
+      :opt&&opt.kind==='coupling'
+       ?'Муфта встанет соосно. После установки продолжи трассу следующим отрезком трубы.'
+      :opt&&opt.kind==='tee'
+       ?'После установки выбери направление боковой ветви и продолжи трубой любой выход.'
       :opt&&opt.kind==='tube'
        ?'Труба сядет на выход фитинга. Длину потяни за круглую ручку на свободном конце.'
       :'Деталь сядет на патрубок и дальше поедет вместе с аппаратом. '+
@@ -5125,7 +5137,7 @@ function pipeSetSel(L){
   if(was)toast('Длина задана вручную — авто-длина по патрубкам снята');
 }
 
-/* ═══ v2.46.046: ручной конструктор медной и PP-R трассы ═══
+/* ═══ v2.46.048: ручной конструктор медной и PP-R трассы ═══
    Выделенная труба получает круглую ручку на дальнем торце: тащишь вдоль оси
    — меняется настоящая длина отрезка, всё посаженное на конце едет следом.
    Там же лежит следующий шаг сборки: совместимый отвод 90°, четыре стороны
@@ -5140,11 +5152,17 @@ function routeTurn90(d){
    Резьбовой переходной угол остаётся доступен через «Другая деталь…», но не
    обрывает случайно трассу резьбой вместо следующего отрезка. */
 const routePlainElbow=d=>routeTurn90(d)&&!/переход|резьб/i.test((d&&d.name)||'');
+/* Прямое продолжение трубы делается только штатной проходной муфтой.
+   Переходные, резьбовые и разъёмные соединения остаются в общем каталоге —
+   они не должны подменять обычную муфту одним случайным кликом. */
+const routePlainCoupling=d=>!!(d&&d.section==='pipe'&&/муфт|соединител/i.test(d.name||'')&&
+  !/переход|редукц|резьб|американ|разъ[её]м/i.test(d.name||''));
+const routeTee=d=>!!(d&&d.section==='pipe'&&/тройник/i.test(d.name||''));
 const routeChildAt=(it,zi)=>placed.find(p=>p.link&&p.link.mount==='rot'&&
   p.link.to===it.uid&&p.link.zi===zi)||null;
 /* Рабочий выход детали. У трубы это торец напротив посадочного; у отвода —
    второй настоящий раструб из elbowPair, а не служебная грань его корпуса. */
-function routeEnd(it){
+function routeEnds(it){
   if(!it||!it.zn||!it.zn.length)return null;
   const own=it.link&&it.link.mount==='rot'?it.link.pzi:null;
   let ids=[];
@@ -5154,14 +5172,20 @@ function routeEnd(it){
   }
   if(!ids.length)ids=it.zn.map((z,i)=>i).filter(i=>i!==own);
   const good=ids.map(i=>({zi:i,z:zoneAt(it,i)})).filter(q=>q.z&&q.z.p0&&q.z.dir&&connOf(q.z));
-  if(!good.length)return null;
+  if(!good.length)return [];
+  good.forEach(q=>{q.it=it;q.c=connOf(q.z);q.child=routeChildAt(it,q.zi);q.taken=!!q.child;});
+  return good;
+}
+function routeEnd(it){
+  const good=routeEnds(it);if(!good||!good.length)return null;
   /* В старой связи pzi мог не сохраниться. Занятый дальний конец в таком
      случае узнаётся по сидящей на нём детали; иначе берём последний торец. */
   const q=good.find(x=>routeChildAt(it,x.zi))||good[good.length-1];
-  q.it=it;q.c=connOf(q.z);q.child=routeChildAt(it,q.zi);q.taken=!!q.child;return q;
+  return q;
 }
 const routeFreeEnd=it=>{const q=routeEnd(it);return q&&!q.taken?q:null;};
-const routePart=it=>!!(it&&it.d&&it.d.section==='pipe'&&(isPipeSeg(it)||routeTurn90(it.d)));
+const routePart=it=>!!(it&&it.d&&it.d.section==='pipe'&&
+  (isPipeSeg(it)||routeTurn90(it.d)||routePlainCoupling(it.d)||routeTee(it.d)));
 function routeWorldEnd(it,q){it.obj.updateMatrixWorld(true);
   return rotSeatLocal(q.z).applyMatrix4(it.obj.matrixWorld);}
 function routeWorldDir(it,q){return zDir(q.z).applyQuaternion(it.obj.quaternion).normalize();}
@@ -5183,13 +5207,14 @@ function routeRollButtons(it,q){
   const A=zDir(hz).applyQuaternion(host.obj.quaternion).normalize();
   const P=routeWorldEnd(it,q),D=routeWorldDir(it,q),cur=it.link.roll||0;
   const active=((Math.round(cur/(Math.PI/2))%4)+4)%4*90;
-  return '<div class="rdirs"><em>сторона отвода</em>'+[0,90,180,270].map(v=>{
+  return '<div class="rdirs"><em>'+(routeTee(it.d)?'сторона ответвления':'сторона отвода')+
+    '</em>'+[0,90,180,270].map(v=>{
     const d=D.clone().applyAxisAngle(A,v*Math.PI/180-cur),ar=routeArrow(P,d);
     return '<button data-rroll="'+v+'" class="'+(v===active?'on':'')+'" title="Сторона '+
       v+'°">'+ar+'</button>';}).join('')+'</div>';
 }
-function routePickEnd(kind,btn){
-  if(!sel)return;const q=routeFreeEnd(sel);
+function routePickEnd(kind,btn,end){
+  if(!sel)return;const q=end||routeFreeEnd(sel);
   if(!q){toast('Этот конец уже занят — выбери следующую деталь цепочки');return;}
   const r=btn&&btn.getBoundingClientRect(),P=routeWorldEnd(sel,q).project(camera),cv=$('#cv');
   const x=r?r.left:(P.x*.5+.5)*(cv.clientWidth||innerWidth);
@@ -5197,7 +5222,7 @@ function routePickEnd(kind,btn){
   rotPick(sel,q.zi,x,y,null,{kind:kind,manual:true});
 }
 function routeSetRoll(deg){
-  if(!sel||!routeTurn90(sel.d)||!sel.link)return;
+  if(!sel||(!routeTurn90(sel.d)&&!routeTee(sel.d))||!sel.link)return;
   posRoll(deg);rotRebuild();routeRebuild();
   toast('Отвод направлен в выбранную сторону · '+deg+'°');
 }
@@ -5214,10 +5239,26 @@ function routeRebuild(){
         :'Сначала посади трубу одним концом на патрубок')+'</div>'+
       '<button data-rb="minus">− '+POS.step+'</button><button data-rb="plus">+ '+POS.step+'</button>';
     if(!q.taken)h+='<button class="pri" data-rb="elbow">↳ Поставить отвод 90°</button>'+
+      '<button class="pri" data-rb="coupling">→ Продолжить прямо через муфту</button>'+
+      '<button data-rb="tee">┬ Сделать ответвление тройником</button>'+
       '<button data-rb="more">＋ Другая деталь…</button>';
     else h+='<button class="pri" data-rb="next">→ К '+esc(q.child.d.name)+'</button>';
+  }else if(routeTee(sel.d)){
+    const legs=routeEnds(sel)||[],host=sel.link&&placed.find(p=>p.uid===sel.link.to),
+      hz=host&&zoneAt(host,sel.link.zi);
+    let axis=null;if(host&&hz&&hz.dir){host.obj.updateMatrixWorld(true);
+      axis=zDir(hz).applyQuaternion(host.obj.quaternion).normalize();}
+    const side=axis&&legs.find(x=>Math.abs(routeWorldDir(sel,x).dot(axis))<.5);
+    h+='</span></div>'+(side?routeRollButtons(sel,side):'')+
+      legs.map((x,i)=>{
+        const straight=axis&&Math.abs(routeWorldDir(sel,x).dot(axis))>.8,
+          label=straight?'Прямой выход':'Боковая ветвь';
+        return x.taken
+          ?'<button class="pri" data-rnext="'+x.zi+'">→ '+label+'</button>'
+          :'<button class="pri" data-rport="'+x.zi+'">＋ '+label+' · труба</button>';}).join('');
   }else{
-    h+='</span></div>'+routeRollButtons(sel,q);
+    h+='</span></div>'+(routeTurn90(sel.d)?routeRollButtons(sel,q):
+      '<div class="rtip">Проходная муфта установлена соосно</div>');
     if(!q.taken)h+='<button class="pri" data-rb="tube">＋ Продолжить трубой</button>'+
       '<button data-rb="more">＋ Другая деталь…</button>';
     else h+='<button class="pri" data-rb="next">→ К '+esc(q.child.d.name)+'</button>';
@@ -5227,10 +5268,16 @@ function routeRebuild(){
     const k=b.dataset.rb;
     if(k==='minus'||k==='plus'){pipeSetSel(pipeLen(sel)+(k==='plus'?1:-1)*POS.step);routeRebuild();}
     else if(k==='elbow')routePickEnd('elbow',b);
+    else if(k==='coupling')routePickEnd('coupling',b);
+    else if(k==='tee')routePickEnd('tee',b);
     else if(k==='tube')routePickEnd('tube',b);
-    else if(k==='more')routePickEnd(null,b);
+    else if(k==='more')routePickEnd('more',b);
     else if(k==='next'&&q.child)select(q.child);
   });
+  bar.querySelectorAll('[data-rport]').forEach(b=>b.onclick=()=>{
+    const x=(routeEnds(sel)||[]).find(q=>q.zi===+b.dataset.rport);if(x)routePickEnd('tube',b,x);});
+  bar.querySelectorAll('[data-rnext]').forEach(b=>b.onclick=()=>{
+    const x=(routeEnds(sel)||[]).find(q=>q.zi===+b.dataset.rnext);if(x&&x.child)select(x.child);});
   bar.querySelectorAll('[data-rroll]').forEach(b=>b.onclick=()=>routeSetRoll(+b.dataset.rroll));
 }
 /* Ручка держится именно на плоскости свободного торца и в каждом кадре едет
@@ -5591,11 +5638,14 @@ function pullThru(zn,c,tc){
    соосных патрубка. Это служебные грани корпуса, а не прямой канал: если
    принять их за переход, труба садится в бок колена вместо его выхода. */
 const TURN_FITTING=/угольник|отвод|колено|водорозетк|двухплоскостн/i;
+/* У тройника тоже находится соосная пара присоединений, но это ответвление,
+   а не переход. Автотрасса не имеет права брать его вместо проходной муфты. */
+const BRANCH_FITTING=/тройник|крестовин|коллектор/i;
 function pullAdapters(c,tc){
   const out=[];
   (DATA||[]).forEach(d=>{
     if(!d.ready||!d.g||d.section!=='pipe'||/труб/i.test(d.name||'')||
-       TURN_FITTING.test(d.name||''))return;
+       TURN_FITTING.test(d.name||'')||BRANCH_FITTING.test(d.name||''))return;
     const zn=pullZn(d);
     if(zn.length<2)return;
     const q=pullThru(zn,c,tc);

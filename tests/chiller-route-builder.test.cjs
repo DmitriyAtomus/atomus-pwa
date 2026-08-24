@@ -26,6 +26,8 @@ function stand() {
   vm.createContext(ctx);
   vm.runInContext(section('function routeTurn90(d){', 'function routeWorldEnd(it,q){'), ctx);
   ctx.routePlain = vm.runInContext('(d)=>routePlainElbow(d)', ctx);
+  ctx.routeCoupling = vm.runInContext('(d)=>routePlainCoupling(d)', ctx);
+  ctx.routeTee = vm.runInContext('(d)=>routeTee(d)', ctx);
   return ctx;
 }
 
@@ -66,6 +68,15 @@ test('для кнопки отвода остаются только повор�
   assert.equal(S.routePlain({ section: 'pipe', name: 'Угольник с переходом на резьбу' }), false);
 });
 
+test('прямое продолжение предлагает проходную муфту, но не тройник и не переход', () => {
+  const S = stand();
+  assert.equal(S.routeCoupling({ section: 'pipe', name: 'Муфта PP-R 40' }), true);
+  assert.equal(S.routeCoupling({ section: 'pipe', name: 'Муфта медная 28' }), true);
+  assert.equal(S.routeCoupling({ section: 'pipe', name: 'Муфта переходная 40 × 32' }), false);
+  assert.equal(S.routeCoupling({ section: 'pipe', name: 'Тройник PP-R 40' }), false);
+  assert.equal(S.routeTee({ section: 'pipe', name: 'Тройник PP-R 40' }), true);
+});
+
 test('ручное растягивание пишет один шаг истории, снимает авто-длину и двигает цепочку', () => {
   const drag = section('(function routeGripBind(){', '/* ═══ автопротяжка трубы');
   assert.match(drag, /setPointerCapture\(e\.pointerId\)/);
@@ -79,8 +90,13 @@ test('конструктор предлагает отвод, четыре ст�
   assert.match(b, /\[0,90,180,270\]/);
   assert.match(page, /face>0\?'⊙':'⊗'/);
   assert.match(b, /data-rb="elbow">↳ Поставить отвод 90°/);
+  assert.match(b, /data-rb="coupling">→ Продолжить прямо через муфту/);
+  assert.match(b, /data-rb="tee">┬ Сделать ответвление тройником/);
   assert.match(b, /data-rb="tube">＋ Продолжить трубой/);
   assert.match(b, /rotPick\(sel,q\.zi,x,y,null,\{kind:kind,manual:true\}\)/);
   assert.match(page, /if\(opt&&opt\.kind==='elbow'\)list=list\.filter\(m=>routePlainElbow\(m\.d\)\)/);
+  assert.match(page, /if\(opt&&opt\.kind==='coupling'\)list=list\.filter\(m=>routePlainCoupling\(m\.d\)\)/);
+  assert.match(page, /if\(opt&&opt\.kind==='tee'\)list=list\.filter\(m=>routeTee\(m\.d\)\)/);
+  assert.match(b, /data-rport="/);
   assert.match(page, /if\(opt&&opt\.kind==='tube'\)list=list\.filter/);
 });
