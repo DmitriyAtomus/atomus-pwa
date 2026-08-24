@@ -776,6 +776,38 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 .flt-res td.i{text-align:right;padding-right:0;color:var(--dim)}
 .flt-res .best td{background:rgba(79,191,139,.09)}
 .flt-note{font-size:11px;color:var(--faint);line-height:1.55;margin-top:9px}
+/* ═══ параметры патрубков и комплект автотрассы ═══ */
+#pas{position:fixed;inset:0;background:rgba(3,8,16,.78);z-index:24;display:none;
+  align-items:center;justify-content:center}
+#pas.on{display:flex}
+.pas-card{width:min(900px,96vw);max-height:90vh;display:flex;flex-direction:column;
+  background:var(--panel);border:1px solid var(--line2);border-radius:13px;overflow:hidden;
+  box-shadow:0 30px 80px rgba(0,0,0,.62)}
+.pas-card .sub{font-size:11px;font-weight:400;color:var(--faint)}
+.pas-body{padding:12px 14px;overflow:auto}
+.pas-lead{padding:9px 11px;margin-bottom:10px;border:1px solid rgba(27,159,216,.24);
+  border-radius:8px;background:rgba(27,159,216,.08);font-size:11.5px;line-height:1.5;color:var(--dim)}
+.pas-row{display:grid;grid-template-columns:minmax(170px,1.5fr) 128px 122px 128px 130px;
+  gap:8px;align-items:end;padding:9px 0;border-bottom:1px solid var(--line)}
+.pas-row .who b{display:block;font-size:12px;color:var(--ink);margin-bottom:3px}
+.pas-row .who small{display:block;color:#e2a49c;font-size:10.5px;line-height:1.35}
+.pas-f label{display:block;margin:0 0 4px;font-size:9px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--faint)}
+.pas-f input,.pas-f select{box-sizing:border-box;width:100%;height:30px;padding:4px 7px;
+  color:var(--ink);background:var(--panel2);border:1px solid var(--line2);border-radius:7px;
+  font:11.5px inherit}
+.pas-f input.bad,.pas-f select.bad{border-color:#d95b4d;background:rgba(217,79,61,.08)}
+.pas-route{display:grid;grid-template-columns:150px minmax(220px,1fr);gap:8px 12px;align-items:center}
+.pas-route label{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+.pas-route select{height:32px;padding:4px 8px;color:var(--ink);background:var(--panel2);
+  border:1px solid var(--line2);border-radius:7px;font:11.5px inherit}
+.pas-bad{margin-top:10px;padding:9px 11px;border-radius:8px;background:rgba(217,79,61,.07);
+  color:var(--dim);font-size:10.5px;line-height:1.5}
+.pas-err{min-height:18px;padding:4px 14px 0;color:#f0a9a0;font-size:11px}
+.pas-act{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--panel2)}
+.pas-act .btn:first-child{flex:1}
+@media(max-width:760px){.pas-row{grid-template-columns:1fr 1fr}.pas-row .who{grid-column:1/-1}
+  .pas-route{grid-template-columns:1fr}.pas-route label{margin-top:5px}}
 /* ═══ бак водяного контура: конструктор (v2.46.014) ═══ */
 #tnk{position:fixed;inset:0;background:linear-gradient(90deg,rgba(3,8,16,.18),rgba(3,8,16,.72));
   z-index:22;display:none;align-items:stretch;justify-content:flex-end}
@@ -1261,6 +1293,14 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
     <div class="frow"><span class="lb">Серия</span><div class="chips" id="fSer"></div></div>
     <div class="flt-res" id="fRes"></div>
   </div>
+</div></div>
+<div id="pas"><div class="pas-card">
+  <div class="pov-h"><span id="pasTitle">Параметры патрубков</span>
+    <span class="sub" id="pasSub"></span><span class="x" id="pasX">✕</span></div>
+  <div class="pas-body" id="pasBody"></div>
+  <div class="pas-err" id="pasErr"></div>
+  <div class="pas-act"><div class="btn pri" id="pasOk">Сохранить и продолжить</div>
+    <div class="btn ghost" id="pasCancel">Отмена</div></div>
 </div></div>
 <div id="tnk"><div class="flt-card tk-card">
   <div class="pov-h"><span id="tkHd">◫ Бак из нержавейки</span>
@@ -1874,6 +1914,8 @@ function bindCtl(cv){
     // v2.45.994: в поле ввода буквы — это текст, а не команды сцены
     const t=e.target&&e.target.tagName;
     if(t==='INPUT'||t==='TEXTAREA'){
+      if(e.key==='Escape'&&e.target.closest&&e.target.closest('#pas')){
+        e.target.blur();pasCancel();return;}
       if(e.key==='Escape'&&e.target.closest&&e.target.closest('#tnk')){
         e.target.blur();tkClose();return;}
       // v2.46.001: Esc из поля координат закрывает панель, а не чат
@@ -1888,6 +1930,7 @@ function bindCtl(cv){
       if(kz||ky){e.preventDefault();(kz&&!e.shiftKey)?undoAct():redoAct();return;}
     }
     if(e.key==='Escape'){
+      if($('#pas').classList.contains('on')){pasCancel();return;}
       if(pullOn()){pullStop();return;}
       if(ctxOn()){ctxClose();return;}
       if($('#tnk').classList.contains('on')){tkClose();return;}
@@ -2288,7 +2331,7 @@ async function addItem(d,at,rot,tilt,roll){
   obj.rotation.set(roll||0,tilt||0,rot||0);
   scene.add(obj);
   const keepUid=at&&Number.isFinite(at.uid)?at.uid:null;
-  const it={uid:keepUid==null?uidSeq++:keepUid,id:d.id,obj,d,pin:false,link:null,off:[],sch:null,fit:null,
+  const it={uid:keepUid==null?uidSeq++:keepUid,id:d.id,obj,d,pin:false,link:null,off:[],sch:null,fit:null,po:null,
     zn:geo.userData.zones||[],zm:!!geo.userData.zoneMats};
   if(keepUid!=null)uidSeq=Math.max(uidSeq,keepUid+1);
   placed.push(it);
@@ -2302,6 +2345,7 @@ async function addItem(d,at,rot,tilt,roll){
     it.link=at.state.link||null;
     it.off=Array.isArray(at.state.off)?at.state.off.slice():[];
     it.fit=at.state.fit||null;                     // v2.46.021: пара авто-длины трубы
+    it.po=at.state.po?JSON.parse(JSON.stringify(at.state.po)):null;
     applyOff(it);pinMark(it);
   }
   select(it);refresh();save();
@@ -3185,7 +3229,7 @@ function ctxItems(it){
   L.push({sep:1},
     {ic:'📌',t:pin?'Открепить':'Закрепить здесь',s:'P',go:togglePin});
   if(it.link&&it.link.mount==='rot'){
-    const hz=(placed.find(p=>p.uid===it.link.to)||{zn:[]}).zn[it.link.zi];
+    const host=placed.find(p=>p.uid===it.link.to),hz=zoneAt(host,it.link.zi);
     const hc=connOf(hz);
     L.push({ic:'⇄',t:'Заменить на патрубке',s:hc?hc.txt:'',go:()=>rotSwapAt(it)},
            {ic:'⤫',t:'Снять с патрубка',s:hc?hc.txt:'',go:()=>rotOff(it)});
@@ -3944,11 +3988,11 @@ function portsRebuild(){
   const list=PORTS===2?placed:(sel?[sel]:[]);
   const keep=(it,z,i)=>it===sel||PORTS===1||(!portDumb(z)&&!portBusy(it,i));
   let zones=0;
-  list.forEach(it=>(it.zn||[]).forEach((z,i)=>{if(keep(it,z,i))zones++;}));
+  list.forEach(it=>(it.zn||[]).forEach((base,i)=>{const z=zoneAt(it,i);if(z&&keep(it,z,i))zones++;}));
   // много деталей — оставляем только газовые линии, иначе сцена в подписях
   const only=(PORTS===2&&zones>60);
   list.forEach(it=>{
-    const zs=it.zn||[];
+    const zs=(it.zn||[]).map((z,i)=>zoneAt(it,i));
     /* v2.46.010: у трубы оба конца названы в базе одинаково («ТРУБА Ø20») —
        вторая такая же подпись ничего не добавляет, только спорит с первой за
        место. У трубы подпись одна, посередине отрезка. */
@@ -4129,6 +4173,33 @@ const CT_COL ={rot:['#C9A227','#e8d49a'],odf:['#5aa5e8','#bcdcf7'],flr:['#8fd3f4
                thr:['#4FBF8B','#bfe8d6'],ppr:['#4FBF8B','#bfe8d6'],flg:['#C9A227','#e8d49a'],
                sae:['#d94f3d','#f0b6ae']};
 const nm1=v=>String(Math.round(v*100)/100).replace('.',',');
+/* Заводская разметка геометрии общая для всех экземпляров. Исправление,
+   которое конструктор вводит в проекте, поэтому храним отдельно на it.po и
+   накладываем только при чтении зоны. Иначе размер, указанный для одного
+   конденсатора, незаметно изменил бы все такие модели в сцене. */
+function zoneAt(it,zi){
+  const z=it&&it.zn&&(it.zn||[])[zi];if(!z)return null;
+  const o=it.po&&it.po[zi];return o?Object.assign({},z,o):z;
+}
+function zoneIssues(z){
+  const q=[];
+  if(!z||!z.p0)q.push('не задана точка патрубка');
+  if(!z||!z.dir)q.push('не задано направление');
+  if(!z||!z.ctype)q.push('не задан тип соединения');
+  if(!z||(!z.conn&&!z.od))q.push('не задан размер');
+  if(!z||!z.sex)q.push('не указана сторона соединения');
+  return q;
+}
+const zoneReady=(it,zi)=>!zoneIssues(zoneAt(it,zi)).length;
+function zoneDirKey(z){
+  if(!z||!z.dir)return '+x';
+  const d=z.dir.map(Number),a=d.map(Math.abs),i=a.indexOf(Math.max.apply(null,a));
+  return (d[i]<0?'-':'+')+'xyz'[i];
+}
+function zoneDir(k){
+  const s=k&&k[0]==='-'?-1:1,a=String(k||'+x').slice(-1);
+  return a==='y'?[0,s,0]:a==='z'?[0,0,s]:[s,0,0];
+}
 /* Присоединение зоны в машиночитаемом виде: тип, размер, наружная/ответная.
    Размер у пайки и отбортовки числом (Ø мм), у резьбы и ротолока строкой. */
 function connOf(z){
@@ -4214,7 +4285,7 @@ function rotSeatLocal(z){
    (pzi), у проектов, сохранённых раньше, — первый ротолок, как и было. */
 function mateZoneOf(v){
   if(!v)return null;
-  if(v.link&&v.link.pzi!=null&&(v.zn||[])[v.link.pzi])return v.zn[v.link.pzi];
+  if(v.link&&v.link.pzi!=null&&(v.zn||[])[v.link.pzi])return zoneAt(v,v.link.pzi);
   return rotZoneOf(v);
 }
 /* дюймы обозначения трубы в миллиметры: 1-1/8" → 28,6 */
@@ -4231,14 +4302,18 @@ function inchMm(t){
 function rotFree(withEmpty){
   const out=[];
   placed.forEach(it=>{
-    (it.zn||[]).forEach((z,i)=>{
+    (it.zn||[]).forEach((base,i)=>{
+      const z=zoneAt(it,i),issues=zoneIssues(z);
       const c=connOf(z);
+      if((!c||!c.sex)&&withEmpty&&z&&z.p0&&!rotTaken(it,i)){
+        out.push({it:it,zi:i,z:z,c:{t:'?',size:'',sex:'',txt:'указать параметры'},
+          n:0,missing:true,issues:issues});return;}
       if(!c||!c.sex||rotTaken(it,i))return;
       /* этим патрубком деталь сама сидит на аппарате — он занят */
       if(it.link&&it.link.mount==='rot'&&it.link.pzi===i)return;
       const n=mates(c).length;
       if(!n&&!withEmpty)return;
-      out.push({it:it,zi:i,z:z,c:c,n:n});
+      out.push({it:it,zi:i,z:z,c:c,n:n,missing:false,issues:issues});
     });
   });
   return out;
@@ -4285,25 +4360,29 @@ function rotRebuild(){
     el.style.setProperty('--cc',zc||col[0]);
     el.style.setProperty('--cc2',zc||col[1]);
     el.innerHTML='<i></i><b></b><span></span>';
-    el.querySelector('i').textContent=pull?(from?'⇄':(f.pullWhy?'×':'→')):(f.n?'+':'·');
+    el.querySelector('i').textContent=f.missing?'?':(pull?(from?'⇄':(f.pullWhy?'×':'→')):(f.n?'+':'·'));
     /* имя патрубка на самой метке: «нагнетание · резьба G1». Без него на
        насосе стояли два одинаковых плюса «резьба G1». */
     el.querySelector('b').textContent=portWord(f.z);
-    el.querySelector('span').textContent=pull?(f.pullWhy?'не соединить':f.c.txt)
-      :(f.n?f.c.txt:f.c.txt+' · нет в базе');
+    el.querySelector('span').textContent=f.missing?'указать параметры':
+      (pull?(f.pullWhy?'не соединить':f.c.txt):(f.n?f.c.txt:f.c.txt+' · нет в базе'));
     el.title=pull?(from?'Отсюда тянем трубу — нажми, чтобы отменить'
                        :(f.pullWhy?('Не соединить: '+f.pullWhy)
                          :('Протянуть трубу сюда · '+f.z.name+' · '+f.c.txt)))
       :(f.z.name+' · '+f.c.txt+(f.n?' — выбрать, что поставить ('+f.n+
         ' в базе)':' — в базе пока нет ответной части'));
     el.onclick=ev=>{ev.stopPropagation();
-      if(pullOn()&&f.pullWhy)toast('Труба не легла: '+f.pullWhy);
+      if(f.missing){portAssist([{it:f.it,zi:f.zi}],()=>{
+        if(pullOn())rotRebuild();else rotPick(f.it,f.zi,ev.clientX,ev.clientY);
+      },pullOn()?'Данные второго патрубка':'Параметры патрубка');}
+      else if(pullOn()&&f.pullWhy)toast('Труба не легла: '+f.pullWhy);
       else if(pullOn())pullPick(f.it,f.zi);
       else rotPick(f.it,f.zi,ev.clientX,ev.clientY);};
     const ln=document.createElement('div');
     ln.className='rotl';ln.style.setProperty('--cc',zc||col[0]);
     box.appendChild(ln);box.appendChild(el);
-    rotBadges.push({el:el,ln:ln,it:f.it,loc:rotSeatLocal(f.z),w:0,h:0});
+    const loc=f.z&&f.z.dir?rotSeatLocal(f.z):new THREE.Vector3().fromArray(f.z.tip||f.z.p0||[0,0,0]);
+    rotBadges.push({el:el,ln:ln,it:f.it,loc:loc,w:0,h:0});
   });
 }
 /* Что написать на метке. Имя патрубка с завода бывает говорящим
@@ -4392,8 +4471,9 @@ function rotToggle(){
    совпало. cur — деталь, которая уже сидит на патрубке: тогда это не
    установка, а замена (v2.45.1005). */
 function rotPick(host,zi,x,y,cur){
-  const z=(host.zn||[])[zi];if(!z)return;
-  const c=connOf(z);if(!c)return;
+  const z=zoneAt(host,zi);if(!z)return;
+  const c=connOf(z);if(!c){portAssist([{it:host,zi:zi}],()=>rotPick(host,zi,x,y,cur),
+    'Параметры патрубка');return;}
   select(cur||host);              // при замене выделенной остаётся сама деталь
   const list=mates(c);
   const box=$('#rpick');
@@ -4470,7 +4550,7 @@ function rotMate(v){
      Поэтому здесь связь не рвём, просто не сажаем. */
   const host=placed.find(p=>p.uid===v.link.to);
   if(!host)return false;
-  const z=(host.zn||[])[v.link.zi],vz=mateZoneOf(v);
+  const z=zoneAt(host,v.link.zi),vz=mateZoneOf(v);
   if(!z||!z.p0||!z.dir||!vz)return false;
   host.obj.updateMatrixWorld(true);
   const A=new THREE.Vector3(z.dir[0],z.dir[1],z.dir[2])
@@ -4971,6 +5051,79 @@ const PULL_LEAD=120;       // место перед П-образным разв
 let PULL=null;             // откуда тянем: {it,zi}
 let PULL_INFO={ok:0,bad:0,why:''};
 const pullOn=()=>!!PULL;
+/* Если заводская модель не дала присоединение, конструктор заполняет его в
+   контексте проекта. Это не prompt(): видно все проблемные трубки сразу,
+   тип/размер/сторону/направление можно проверить до продолжения команды. */
+const PA_TYPES=[['odf','пайка ODF'],['ppr','сварка PP-R'],['flr','отбортовка'],
+  ['thr','трубная резьба'],['rot','ротолок'],['flg','фланец'],['sae','штуцер SAE']];
+const PA_DIR=[['+x','+X · вправо'],['-x','−X · влево'],['+y','+Y · назад'],
+  ['-y','−Y · вперёд'],['+z','+Z · вверх'],['-z','−Z · вниз']];
+let PAS=null;
+function paOpt(list,cur){return list.map(q=>'<option value="'+q[0]+'"'+
+  (q[0]===cur?' selected':'')+'>'+q[1]+'</option>').join('');}
+function paGuessType(z){
+  if(z&&z.ctype)return z.ctype;
+  const s=String((z&&z.name)||'')+' '+String((z&&z.conn)||'');
+  return /PP-?R|полипроп/i.test(s)?'ppr':(/резьб|\bG\d/i.test(s)?'thr':'odf');
+}
+function portAssist(items,next,title){
+  const seen=new Set(),rows=[];
+  (items||[]).forEach(q=>{
+    if(!q||!q.it||q.zi==null)return;
+    const k=q.it.uid+'|'+q.zi;if(seen.has(k))return;seen.add(k);
+    const z=zoneAt(q.it,q.zi);if(!z)return;
+    rows.push({it:q.it,zi:q.zi,z:z,issues:zoneIssues(z)});
+  });
+  if(!rows.length){if(next)next();return false;}
+  PAS={kind:'ports',rows:rows,next:next};
+  $('#pasTitle').textContent=title||'Параметры патрубков';
+  $('#pasSub').textContent=rows.length+' '+(rows.length===1?'патрубок':'патрубка');
+  $('#pasErr').textContent='';$('#pasOk').textContent='Сохранить и продолжить';
+  $('#pasBody').innerHTML='<div class="pas-lead">В модели не хватает данных для точной '+
+    'посадки. Укажите их один раз — параметры сохранятся у этой детали в проекте, '+
+    'а исходная команда продолжится автоматически.</div>'+rows.map((q,i)=>{
+      const z=q.z,conn=z.conn||(+z.od?nm1(+z.od):'');
+      return '<div class="pas-row" data-i="'+i+'"><div class="who"><b>'+
+        esc((z.name||'Патрубок '+(q.zi+1))+' · '+q.it.d.name)+'</b><small>'+
+        esc(q.issues.length?q.issues.join(' · '):'проверьте заводские параметры')+'</small></div>'+
+        '<div class="pas-f"><label>Тип</label><select data-k="ctype">'+
+        paOpt(PA_TYPES,paGuessType(z))+'</select></div>'+
+        '<div class="pas-f"><label>Размер</label><input data-k="conn" value="'+esc(conn)+
+        '" placeholder="25 или G1/2"></div>'+
+        '<div class="pas-f"><label>Сторона</label><select data-k="sex">'+
+        paOpt([['m','наружная часть'],['f','ответная часть']],z.sex||'m')+'</select></div>'+
+        '<div class="pas-f"><label>Направление от детали</label><select data-k="dir">'+
+        paOpt(PA_DIR,zoneDirKey(z))+'</select></div></div>';
+    }).join('');
+  $('#pas').classList.add('on');
+  const first=$('#pasBody').querySelector('input');if(first)setTimeout(()=>first.focus(),0);
+  return true;
+}
+function pasClose(){
+  $('#pas').classList.remove('on');PAS=null;$('#pasErr').textContent='';
+}
+function pasPortsSave(){
+  const changed=[];let bad=null;
+  PAS.rows.forEach((q,i)=>{
+    const row=$('#pasBody').querySelector('[data-i="'+i+'"]'),v={};
+    row.querySelectorAll('[data-k]').forEach(el=>{el.classList.remove('bad');v[el.dataset.k]=el.value.trim();});
+    const conn=v.conn||(+q.z.od?nm1(+q.z.od):'');
+    const o={ctype:v.ctype,conn:conn,sex:v.sex,dir:zoneDir(v.dir)};
+    const z=Object.assign({},q.z,o),c=connOf(z);
+    if(!q.z.p0){bad={el:row.querySelector('[data-k="dir"]'),msg:'У «'+
+      (q.z.name||'патрубка')+'» в модели нет точки выхода. Её нужно исправить в базе 3D.'};}
+    else if(!conn||!c){bad={el:row.querySelector('[data-k="conn"]'),msg:'Укажите размер: '+
+      'например 25 для Ø25 или G1/2 для резьбы.'};}
+    changed.push({q:q,o:o});
+  });
+  if(bad){bad.el.classList.add('bad');bad.el.focus();$('#pasErr').textContent=bad.msg;return;}
+  const next=PAS.next,h=histBegin('уточнение параметров патрубков');
+  try{changed.forEach(x=>{x.q.it.po=Object.assign({},x.q.it.po||{});
+    x.q.it.po[x.q.zi]=Object.assign({},x.q.it.po[x.q.zi]||{},x.o);});}
+  finally{histEnd(h);}
+  pasClose();refresh();save();rotRebuild();
+  if(next)Promise.resolve().then(next).catch(e=>toast('Не получилось продолжить: '+(e.message||e)));
+}
 /* зоны позиции в том же виде, в каком они лягут в сцену: geoOf отбрасывает
    зоны без точки выноски, и номера зон обязаны совпадать с it.zn */
 const pullZn=d=>((((GEOMS||{})[d.g]||{}).zn)||[]).filter(z=>z&&z.tip);
@@ -4979,7 +5132,7 @@ const zDir=z=>new THREE.Vector3(z.dir[0],z.dir[1],z.dir[2]).normalize();
    rotSeatLocal и матрицу детали: у растянутой трубы вылет seat уезжает вместе
    с масштабом, и прибавлять его отдельно от матрицы нельзя. */
 function pullPort(it,zi){
-  const z=(it.zn||[])[zi];
+  const z=zoneAt(it,zi);
   if(!z||!z.p0||!z.dir)return null;
   it.obj.updateMatrixWorld(true);
   return {it:it,zi:zi,z:z,c:connOf(z),
@@ -5059,16 +5212,20 @@ function pullThru(zn,c,tc){
   }
   return null;
 }
-function pullAdapter(c,tc){
-  let best=null;
+function pullAdapters(c,tc){
+  const out=[];
   (DATA||[]).forEach(d=>{
     if(!d.ready||!d.g||d.section!=='pipe'||/труб/i.test(d.name||''))return;
     const zn=pullZn(d);
     if(zn.length<2)return;
     const q=pullThru(zn,c,tc);
-    if(q&&(!best||zn.length<best.n))best={d:d,zi:q.zi,zj:q.zj,n:zn.length};
+    if(q)out.push({d:d,zi:q.zi,zj:q.zj,n:zn.length});
   });
-  return best;
+  return out.sort((a,b)=>a.n-b.n||String(a.d.name).localeCompare(String(b.d.name),'ru'));
+}
+function pullAdapter(c,tc,pref){
+  const all=pullAdapters(c,tc);
+  return pref?(all.find(x=>x.d.id===pref)||null):(all[0]||null);
 }
 /* Отвод размечен щедро: у угольника 90° четыре зоны — два настоящих раструба
    и по «донышку» с обратной стороны каждого. Настоящая пара — та, у которой
@@ -5090,37 +5247,60 @@ function elbowPair(zn){
   }
   return best;
 }
-function pullElbow(tc){
-  let best=null;
+function connWhy(want,got){
+  if(!got)return 'у присоединения не размечены тип и размер';
+  if(want.t!==got.t)return 'другой тип: '+(CT_NAME[got.t]||got.t)+' вместо '+(CT_NAME[want.t]||want.t);
+  if(want.sex&&got.sex&&want.sex===got.sex)return 'одинаковая сторона соединения ('+want.sex+')';
+  const ok=(typeof want.size==='number'&&typeof got.size==='number')
+    ?Math.abs(want.size-got.size)<=.2:want.size===got.size;
+  return ok?'':'другой размер: '+got.txt+' вместо '+want.txt;
+}
+const PULL_EL_CACHE=new Map();
+function pullElbows(tc){
+  const key=tc.t+'|'+tc.size+'|'+tc.sex;
+  if(PULL_EL_CACHE.has(key))return PULL_EL_CACHE.get(key);
+  const good=[],bad=[];
   (DATA||[]).forEach(d=>{
-    if(best||!d.ready||!d.g||d.section!=='pipe')return;
+    if(!d.ready||!d.g||d.section!=='pipe')return;
     if(!/угольник|отвод|колено/i.test(d.name||''))return;
     if(/переход|резьб/i.test(d.name||''))return;      // угольник с переходом — не наш случай
     const zn=pullZn(d),pr=elbowPair(zn);
-    if(!pr)return;
-    if(!connFit(tc,connOf(zn[pr.i]))||!connFit(tc,connOf(zn[pr.j])))return;
-    best={d:d,i:pr.i,j:pr.j,din:pr.din,dout:pr.dout};
+    if(!pr){bad.push({d:d,why:'геометрия не даёт два перпендикулярных выхода 90°'});return;}
+    const a=connOf(zn[pr.i]),b=connOf(zn[pr.j]),wa=connWhy(tc,a),wb=connWhy(tc,b);
+    if(wa||wb){bad.push({d:d,why:wa||wb});return;}
+    good.push({d:d,i:pr.i,j:pr.j,din:pr.din,dout:pr.dout});
   });
-  return best;
+  good.sort((a,b)=>String(a.d.name).localeCompare(String(b.d.name),'ru'));
+  const out={good:good,bad:bad};PULL_EL_CACHE.set(key,out);return out;
+}
+function pullElbow(tc,pref){
+  const all=pullElbows(tc).good;
+  return pref?(all.find(x=>x.d.id===pref)||null):(all[0]||null);
 }
 /* Чем тянем: труба, переходы на концах, отвод в углах. Прямая посадка лучше
    перехода, при равенстве берём диаметр ближе к патрубку. */
-function pullPlan(a,b,corners){
-  const tubes=pullTubes();
+function pullPlan(a,b,corners,pref){
+  pref=pref||{};
+  const tubes=pullTubes().filter(t=>!pref.tube||t.d.id===pref.tube);
   if(!tubes.length)return {err:'в базе нет прямого отрезка трубы'};
   let best=null,why='',whyEl='';
   tubes.forEach(t=>{
     const da=connFit(a.c,t.c),db=connFit(b.c,t.c);
-    const ea=da?null:pullAdapter(a.c,t.c);
-    if(!da&&!ea){why=why||('к патрубку «'+a.z.name+'» ('+a.c.txt+
-      ') в базе нет перехода на '+t.c.txt);return;}
-    const eb=db?null:pullAdapter(b.c,t.c);
-    if(!db&&!eb){why=why||('к патрубку «'+b.z.name+'» ('+b.c.txt+
-      ') в базе нет перехода на '+t.c.txt);return;}
-    const el=corners?pullElbow(t.c):null;
+    const ea=da?null:pullAdapter(a.c,t.c,pref.ea);
+    if(!da&&!ea){const pd=pref.ea&&(DATA||[]).find(d=>d.id===pref.ea);
+      why=why||(pd?('выбранный переход «'+pd.name+'» несовместим с '+a.c.txt+' → '+t.c.txt)
+        :('к патрубку «'+a.z.name+'» ('+a.c.txt+') в базе нет перехода на '+t.c.txt));return;}
+    const eb=db?null:pullAdapter(b.c,t.c,pref.eb);
+    if(!db&&!eb){const pd=pref.eb&&(DATA||[]).find(d=>d.id===pref.eb);
+      why=why||(pd?('выбранный переход «'+pd.name+'» несовместим с '+b.c.txt+' → '+t.c.txt)
+        :('к патрубку «'+b.z.name+'» ('+b.c.txt+') в базе нет перехода на '+t.c.txt));return;}
+    const el=corners?pullElbow(t.c,pref.elbow):null;
     /* по концам труба подошла, а угол собрать нечем — это и есть настоящая
        причина отказа, её и говорим вперёд разговоров про переходы */
-    if(corners&&!el){whyEl=whyEl||('в базе нет отвода 90° под '+t.c.txt);return;}
+    if(corners&&!el){
+      const bad=pref.elbow&&pullElbows(t.c).bad.find(x=>x.d.id===pref.elbow);
+      whyEl=whyEl||(bad?('выбранный отвод «'+bad.d.name+'» не подходит: '+bad.why)
+                         :('в базе нет отвода 90° под '+t.c.txt));return;}
     const cost=(ea?1:0)+(eb?1:0),near=Math.abs(t.od-(+a.z.od||t.od));
     if(!best||cost<best.cost||(cost===best.cost&&near<best.near))
       best={t:t,ea:ea,eb:eb,el:el,cost:cost,near:near};
@@ -5130,7 +5310,7 @@ function pullPlan(a,b,corners){
 /* Одна проверка для подсветки цели и для самой команды. Так метка не обещает
    соединение, которое затем откажется строиться из-за геометрии, отсутствия
    перехода или отвода. */
-function pullCheck(a,b){
+function pullCheck(a,b,pref){
   if(!a||!a.z)return {err:'не найден исходный патрубок'};
   if(!b||!b.z)return {err:'не найден второй патрубок'};
   if(!a.c)return {err:'у патрубка «'+(a.z.name||'исходный')+
@@ -5151,7 +5331,7 @@ function pullCheck(a,b){
     if(Math.abs(d)>0.05)return {err:'угол трассы '+
       Math.round(R2D(Math.acos(d)))+'° — в базе есть только отвод 90°'};
   }
-  const pl=pullPlan(a,b,dirs.length-1);
+  const pl=pullPlan(a,b,dirs.length-1,pref);
   if(pl.err)return {err:pl.err};
   const adapterSpan=e=>{
     if(!e)return 0;
@@ -5225,10 +5405,13 @@ const PIPE_DOWN=new THREE.Vector3(0,0,-1);
 function condDownPorts(it){
   if(!it||roleOf(it.d)!=='cond')return [];
   const out=[];
-  (it.zn||[]).forEach((z,zi)=>{
+  (it.zn||[]).forEach((base,zi)=>{
+    const z=zoneAt(it,zi);
+    if(!z)return;
     /* У конденсатора рабочие трубки размечены как газ/жидкость (dis/suc),
        старые модели давали только тип ODF — их тоже не теряем. */
-    if(z.kind!=='dis'&&z.kind!=='suc'&&z.ctype!=='odf')return;
+    if(z.kind!=='dis'&&z.kind!=='suc'&&z.ctype!=='odf'&&
+       !/вход|выход|газ|жидк|труб|патруб|пайк/i.test(z.name||''))return;
     if(rotTaken(it,zi))return;
     out.push({it:it,zi:zi,z:z,c:connOf(z)});
   });
@@ -5255,11 +5438,14 @@ function madeRemove(made){
     if(k>=0)placed.splice(k,1);
   });
 }
-async function condElbowsDown(it){
+async function condElbowsDown(it,resumed){
   if(!it||roleOf(it.d)!=='cond'){
     toast('Отводы вниз делаются для выбранного конденсатора');return;}
   const ports=condDownPorts(it);
   if(!ports.length){toast('У конденсатора нет свободных трубок для отводов');return;}
+  const missing=ports.filter(f=>!zoneReady(it,f.zi));
+  if(missing.length&&!resumed&&typeof document!=='undefined'){portAssist(missing,()=>condElbowsDown(it,true),
+    'Данные трубок конденсатора');return;}
   const jobs=[],skip=[],bad=[];
   ports.forEach(f=>{
     const q=condDownPlan(it,f.zi);
@@ -5337,9 +5523,50 @@ async function pullLay(made,a,b,pl,pts,dirs){
   pl.total=total;
   return null;
 }
-async function pullRun(a,b){
-  const q=pullCheck(a,b);
+const paPart=x=>esc((x.d.brand?x.d.brand+' ':'')+x.d.name+' · '+x.d.id);
+function paPartOpts(list,cur){return list.map(x=>'<option value="'+esc(x.d.id)+'"'+
+  (x.d.id===cur?' selected':'')+'>'+paPart(x)+'</option>').join('');}
+/* Для PP-R отвод выбирает человек до изменения сцены. Один выбранный артикул
+   ставится во все углы этой трассы; переходы на её концах, если нужны, тоже
+   видны и могут быть заменены на другой совместимый каталожный вариант. */
+function pullRouteAssist(a,b,q){
+  const pl=q.pl,el=pullElbows(pl.t.c),ea=pl.ea?pullAdapters(a.c,pl.t.c):[],
+        eb=pl.eb?pullAdapters(b.c,pl.t.c):[];
+  PAS={kind:'route',a:a,b:b,q:q};
+  $('#pasTitle').textContent='Комплект трассы PP-R';
+  $('#pasSub').textContent=q.rt.kind+' · углов '+(q.dirs.length-1);
+  $('#pasErr').textContent='';$('#pasOk').textContent='Построить трубу с выбранными отводами';
+  let h='<div class="pas-lead">До построения проверьте комплект. Выбранный отвод '+
+    'будет установлен во все '+(q.dirs.length-1)+' угла; труба, отводы и переходы '+
+    'сразу попадут в сцену и BOM.</div><div class="pas-route">'+
+    '<label>Труба</label><select id="pasTube" disabled><option value="'+esc(pl.t.d.id)+'">'+
+    paPart(pl.t)+'</option></select>'+
+    '<label>Отвод 90°</label><select id="pasEl">'+paPartOpts(el.good,pl.el&&pl.el.d.id)+'</select>';
+  if(pl.ea)h+='<label>Переход у начала</label><select id="pasEa">'+
+    paPartOpts(ea,pl.ea.d.id)+'</select>';
+  if(pl.eb)h+='<label>Переход у конца</label><select id="pasEb">'+
+    paPartOpts(eb,pl.eb.d.id)+'</select>';
+  h+='</div>';
+  const bad=el.bad.slice(0,6);
+  if(bad.length)h+='<div class="pas-bad"><b>Почему другие отводы скрыты:</b><br>'+bad.map(x=>
+    esc(x.d.name)+' — '+esc(x.why)).join('<br>')+'</div>';
+  $('#pasBody').innerHTML=h;$('#pas').classList.add('on');
+}
+function pasRouteSave(){
+  const pref={tube:$('#pasTube').value,elbow:$('#pasEl').value,
+    ea:$('#pasEa')&&$('#pasEa').value,eb:$('#pasEb')&&$('#pasEb').value};
+  const q=pullCheck(PAS.a,PAS.b,pref);
+  if(q.err){$('#pasErr').textContent='Трасса не строится: '+q.err;return;}
+  const a=PAS.a,b=PAS.b;pasClose();pullBuild(a,b,q);
+}
+async function pullRun(a,b,pref){
+  const q=pullCheck(a,b,pref);
   if(q.err){toast('Труба не легла: '+q.err);return;}
+  if(!pref&&q.dirs.length>1&&q.pl.t.c.t==='ppr'&&typeof document!=='undefined'){
+    pullRouteAssist(a,b,q);return;}
+  return pullBuild(a,b,q);
+}
+async function pullBuild(a,b,q){
   const rt=q.rt,pts=q.pts,dirs=q.dirs,pl=q.pl;
   const made=[];
   const h=histBegin('протяжку трубы');
@@ -5354,11 +5581,17 @@ async function pullRun(a,b){
     (pl.cost?(' · переходов '+pl.cost):''));
   checkCollisions();showSelZ();refresh();save();rotRebuild();
 }
+function pasCancel(){const route=PAS&&PAS.kind==='route';pasClose();if(route)pullStop();}
+if(typeof document!=='undefined'){
+  $('#pasOk').onclick=()=>{if(!PAS)return;if(PAS.kind==='ports')pasPortsSave();else pasRouteSave();};
+  $('#pasX').onclick=pasCancel;$('#pasCancel').onclick=pasCancel;
+  $('#pas').onclick=e=>{if(e.target.id==='pas')pasCancel();};
+}
 function pullStart(it,zi){
   const p=pullPort(it,zi);
-  if(!p){toast('У этого патрубка база не дала оси — тянуть не от чего');return;}
-  if(!p.c){toast('У патрубка «'+(p.z.name||'')+
-    '» в базе 3D не заданы тип и размер присоединения');return;}
+  if(!zoneReady(it,zi)){portAssist([{it:it,zi:zi}],()=>pullStart(it,zi),
+    'Данные исходного патрубка');return;}
+  if(!p){toast('У этого патрубка база не дала ось — тянуть не от чего');return;}
   PULL={it:it,zi:zi};
   rotPickClose();rotRebuild();
   toast(PULL_INFO.ok
@@ -5378,6 +5611,10 @@ async function pullPick(it,zi){
     toast('Деталь, от которой тянули, ушла со сцены — начни заново');return;}
   if(PULL.it===it&&PULL.zi===zi){pullStop();return;}
   if(PULL.it===it){toast('Второй конец — на другой детали');return;}
+  const need=[];
+  if(!zoneReady(PULL.it,PULL.zi))need.push({it:PULL.it,zi:PULL.zi});
+  if(!zoneReady(it,zi))need.push({it:it,zi:zi});
+  if(need.length){portAssist(need,()=>pullPick(it,zi),'Данные патрубков трассы');return;}
   const a=pullPort(PULL.it,PULL.zi),b=pullPort(it,zi);
   if(!a||!b||!a.c||!b.c){pullStop(true);toast('База не дала оси патрубка');return;}
   await pullRun(a,b);
@@ -5979,6 +6216,7 @@ function projPayload(){
                                              rel:p.link.rel?{p:p.link.rel.p.slice(),
                                                              q:p.link.rel.q.slice()}:undefined}:null,
                                 tk:isTank(p.d)?p.d.tk:undefined,   // бак: размеры и исполнение
+                                po:p.po&&Object.keys(p.po).length?JSON.parse(JSON.stringify(p.po)):undefined,
                                 pl:isPipeSeg(p)?pipeLen(p):undefined,
                                 fit:p.fit?{to:p.fit.to,zi:p.fit.zi}:undefined,
                                 sch:p.sch||undefined,   // v2.46.017: позиция схемы
@@ -6065,6 +6303,7 @@ async function histApply(snapshot){
                       rel:it.link.rel?{p:it.link.rel.p.slice(),q:it.link.rel.q.slice()}:undefined}:null;
       if(it.pl&&isPipeSeg(p))setPipeLen(p,it.pl);      // длина отрезка тоже в снимке
       p.off=Array.isArray(it.off)?it.off.slice():[];
+      p.po=it.po?JSON.parse(JSON.stringify(it.po)):null;
       applyOff(p);pinMark(p);
     }
     schemaData=data.schema||{};
@@ -6109,7 +6348,7 @@ async function loadProjectData(data){
     if(!d)continue;
     // z, наклона и закрепления в старых проектах нет — там деталь просто стоит на полу
     const it=await addItem(d,{x:s.x,y:s.y,z:s.z,
-      state:{pin:s.pin,off:s.off,link:s.link,pl:s.pl,sch:s.sch,fit:s.fit}},s.r,s.t,s.k);
+      state:{pin:s.pin,off:s.off,link:s.link,pl:s.pl,sch:s.sch,fit:s.fit,po:s.po}},s.r,s.t,s.k);
     if(it&&d._user&&s.s){it.obj.scale.setScalar(Math.max(.0001,+s.s));it.obj.updateMatrixWorld(true);}
     if(it&&s.uid)map[s.uid]=it.uid;
   }
