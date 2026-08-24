@@ -1,8 +1,7 @@
 // Подбор фильтра-осушителя внутри проекта (chiller/project.html).
-// Раньше подбор был только в витрине базы: подобрал — запомнил артикул —
-// вернулся в проект — нашёл руками. Теперь он открывается кнопкой в шапке
-// проекта, мощность подставляется с компрессора, который уже стоит в сцене,
-// а выбранная строка сразу добавляет фильтр в компоновку.
+// Подбор фильтра остаётся в каталоге, но не занимает место в верхней панели
+// компоновки. Мощность подставляется с компрессора в сцене, а выбранная строка
+// сразу добавляет фильтр в компоновку.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -47,9 +46,11 @@ const COMP = {                      // компрессор в сцене: с н
   g: 'yh-small-418',
 };
 
-test('кнопка подбора стоит в шапке проекта и открывает окно', () => {
-  assert.match(page, /<button class="back" id="bFlt"/);
-  assert.match(page, /\$\('#bFlt'\)\.onclick=fltOpen;/);
+test('подбор убран из верхней панели, но остался в каталоге', () => {
+  assert.doesNotMatch(page, /id="bFlt"/);
+  assert.doesNotMatch(page, /\$\('#bFlt'\)/, 'код не обращается к удалённой кнопке');
+  assert.match(page, /data-act="flt"/);
+  assert.match(page, /if\(fl\)fl\.onclick=\(\)=>fltOpen\(\);/);
   assert.match(page, /<div id="flt"><div class="flt-card">/);
   // Esc закрывает подбор, а не сбрасывает выделение в сцене
   const keys = section("addEventListener('keydown'", 'function roleOf');

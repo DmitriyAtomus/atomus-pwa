@@ -499,12 +499,18 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
    Кнопки дают только «90°» и «50 мм», а в цехе узел садится на отметку 1250
    и разворачивается на 7°. Панель говорит числами: X/Y — центр детали в плане,
    Z — отметка низа, углы — по трём осям, шаг ± выбирается тут же. */
-#pos{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);z-index:7;display:none;
+#pos{position:absolute;right:12px;bottom:58px;z-index:7;display:none;
   flex-direction:column;gap:5px;background:rgba(8,20,36,.97);border:1px solid var(--line2);
   border-radius:10px;padding:9px;width:322px;max-width:calc(100vw - 16px);
-  box-shadow:0 14px 34px rgba(0,0,0,.5)}
+  overflow-x:hidden;overflow-y:auto;box-shadow:0 14px 34px rgba(0,0,0,.5)}
 #pos.on{display:flex}
 #pos .t{font-size:10.5px;color:var(--faint);padding:0 2px}
+#pos .t.drag{display:flex;align-items:center;min-height:22px;cursor:move;touch-action:none;
+  user-select:none;border-bottom:1px solid transparent}
+#pos .t.drag::before{content:'⋮⋮';margin-right:6px;color:var(--dim);font-size:12px;
+  letter-spacing:-3px;transform:rotate(90deg)}
+#pos .t.drag:hover{color:var(--dim);border-bottom-color:var(--line2)}
+#pos.moving{opacity:.96;box-shadow:0 18px 42px rgba(0,0,0,.62)}
 #pos .t b{color:var(--ice);font-weight:600}
 #pos .t2{margin-top:3px;border-top:1px solid var(--line2);padding-top:7px}
 #pos .rw{display:flex;align-items:center;gap:5px}
@@ -934,8 +940,6 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
     <button class="back" id="bFS" style="margin-left:auto" title="Во весь экран (F11)">⛶ <span id="fsTxt">Во весь экран</span></button>
     <button class="back" id="chatBtn" onclick="toggleChat()" style="display:none;margin-left:8px"
             title="Чат по чиллерам">💬 Чат</button>
-    <button class="back" id="bFlt" style="margin-left:8px"
-          title="Подобрать фильтр-осушитель по мощности и хладагенту">⌗ Подбор</button>
   <button class="back" id="bTank" style="margin-left:8px"
           title="Бак водяного контура: прямоугольный сварной из нержавейки — задать размеры и поставить в компоновку">◫ Бак</button>
   <button class="back" id="bProjects" style="margin-left:8px">⛁ Проекты</button>
@@ -979,7 +983,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <span><i style="background:#6cb4ec"></i>всасывание, выход</span>
         <span><i style="background:#d9b64a"></i>ППК</span>
         <span><i style="background:#6fd3a5"></i>уравнивание</span></div>
-      <div id="hint" class="min"><b>? как управлять</b><div class="hb">ЛКМ по полу — вращение · деталь — тащи мышью<br>корпус сквозной — за панелью берётся деталь; по пустой панели — сам корпус (тащится вторым нажатием)<br>ПКМ по детали — меню · по фону — панорама · колесо — зум<br>PgUp/PgDn — выше/ниже · Del — убрать<br>G — точные координаты и углы (шаг 1 мм / 1°)<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>метка «+» на патрубке — свободное присоединение: жми и выбирай, что поставить<br>оттуда же «⇄ протянуть трубу» — ткни во второй патрубок, трасса ляжет по осям</div></div>
+      <div id="hint" class="min"><b>? как управлять</b><div class="hb">ЛКМ по фону — вращение · деталь — тащи мышью<br>Alt+ЛКМ — вращать поверх детали · Shift+ЛКМ/средняя — панорама<br>два пальца — приближение и панорама · колесо — плавный зум к курсору<br>корпус сквозной — за панелью берётся деталь; по пустой панели — сам корпус (тащится вторым нажатием)<br>ПКМ по детали — меню · по фону — панорама (протяни)<br>PgUp/PgDn — выше/ниже · Del — убрать<br>G — точные координаты и углы (шаг 1 мм / 1°)<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>метка «+» на патрубке — свободное присоединение: жми и выбирай, что поставить<br>оттуда же «⇄ протянуть трубу» — ткни во второй патрубок, трасса ляжет по осям</div></div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="schz"><b data-sz="1" title="Крупнее">+</b><b data-sz="-1" title="Мельче">−</b><b data-sz="0" title="Во всю ширину">↺</b></div>
       <div id="swrap">
@@ -1013,7 +1017,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <div class="o" data-m="off" id="mntOff" style="color:#f0a9a0">✕ Отсоединить</div>
       </div>
       <div id="pos">
-        <div class="t">Точное место · <b id="posNm"></b></div>
+        <div class="t drag" id="posTitle" title="Перетащи окно · двойной клик — вернуть к правому краю">Точное место · <b id="posNm"></b></div>
         <div class="rw"><label>X</label><button data-pn="x" data-k="-1" title="Влево на шаг">−</button>
           <input id="pX" type="number" step="any" inputmode="decimal">
           <button data-pn="x" data-k="1" title="Вправо на шаг">+</button><span class="u">мм · центр</span></div>
@@ -1334,7 +1338,7 @@ const ZONE_SHORT={dis:'нагнетание',suc:'всасывание',ppk:'П�
 const partCol=p=>{const c=p&&p.col?parseInt(String(p.col).replace('#',''),16):NaN;
   return isNaN(c)?C_BODY:c;};
 let renderer,scene,camera,grid,glLost=false;
-let target=new THREE.Vector3(0,0,300),theta=-0.95,phi=1.15,dist=3200,dMin=400,dMax=12000;
+let target=new THREE.Vector3(0,0,300),theta=-0.95,phi=1.15,dist=3200,dMin=120,dMax=12000;
 const placed=[];   // {uid,id,obj,d}
 let sel=null,uidSeq=1;
 
@@ -1539,6 +1543,28 @@ function pan(dx,dy){
   target.addScaledVector(rt,-dx*dist*0.0012).addScaledVector(up,-dy*dist*0.0012);
   panClamp();
 }
+/* Зум держит под курсором ту же точку сцены. Раньше каждый щелчок
+   колеса прыгал на 11% к центру кадра: мелкий штуцер приходилось ловить
+   после каждого приближения. Эта же функция даёт плавный pinch на телефоне. */
+function zoomAt(x,y,factor){
+  if(!isFinite(factor)||factor<=0)return;
+  const old=dist,next=Math.max(dMin,Math.min(dMax,old*factor));
+  if(!isFinite(next)||Math.abs(next-old)<.001)return;
+  const cv=$('#cv'),r=cv.getBoundingClientRect();
+  if(r.width>0&&r.height>0&&isFinite(x)&&isFinite(y)){
+    const nx=((x-r.left)/r.width)*2-1,ny=-((y-r.top)/r.height)*2+1;
+    /* Базис берём из углов, а не из camera.position: между частыми wheel-событиями
+       новый кадр ещё мог не успеть обновить позицию камеры. */
+    const out=new THREE.Vector3(Math.sin(phi)*Math.cos(theta),
+      Math.sin(phi)*Math.sin(theta),Math.cos(phi));
+    const rt=out.clone().cross(camera.up).normalize();
+    const up=new THREE.Vector3().crossVectors(rt,out).normalize();
+    const hh=old*Math.tan(camera.fov*Math.PI/360),hw=hh*r.width/r.height;
+    const anchor=rt.multiplyScalar(nx*hw).add(up.multiplyScalar(ny*hh));
+    target.addScaledVector(anchor,1-next/old);
+  }
+  dist=next;panClamp();
+}
 /* v2.46.032: двумя пальцами панораму на телефоне уводили так далеко, что и машина,
    и сетка оставались за кадром — экран становился ровным фоном. Держим точку
    взгляда возле машины: дальше её габарита плюс запас уехать нельзя. */
@@ -1561,15 +1587,21 @@ function bindCtl(cv){
   const tpMid=()=>{const a=[...tps.values()];
     return {x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2,d:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)};};
   cv.addEventListener('pointerdown',e=>{
+    try{cv.setPointerCapture(e.pointerId);}catch(_){}
     if(e.pointerType==='touch'){
       tps.set(e.pointerId,{x:e.clientX,y:e.clientY});
-      if(tps.size===2){mode=null;dragSnap=null;lpOff();cv.classList.remove('drag');
+      if(tps.size===2){if(mode==='item')pipeAfterDrag();mode=null;dragSnap=null;lpOff();cv.classList.remove('drag');
         pin=tpMid();return;}
       if(tps.size>2)return;
     }
     camTouched=true;
-    cv.setPointerCapture(e.pointerId);last={x:e.clientX,y:e.clientY};
+    last={x:e.clientX,y:e.clientY};
     if(e.button===2){mode='pan';rmb={x:e.clientX,y:e.clientY};return;}
+    /* Средняя кнопка и Shift+ЛКМ панорамируют даже поверх модели;
+       Alt+ЛКМ там же вращает. Обычный ЛКМ на детали остаётся её перетаскиванием. */
+    if(e.button===1||(e.button===0&&e.shiftKey)){e.preventDefault();mode='pan';return;}
+    if(e.button===0&&e.altKey){e.preventDefault();mode='orbit';return;}
+    if(e.button!==0)return;
     const hit=pickItem(e);
     /* с телефона правой кнопки нет — то же меню даёт долгое касание детали.
        Корпус курсор не ловит, но меню по долгому касанию отдаёт */
@@ -1602,7 +1634,7 @@ function bindCtl(cv){
       tps.set(e.pointerId,{x:e.clientX,y:e.clientY});
       if(tps.size>=2&&pin){
         const m=tpMid();
-        if(m.d>4&&pin.d>4)dist=Math.max(dMin,Math.min(dMax,dist*pin.d/m.d));
+        if(m.d>4&&pin.d>4)zoomAt(m.x,m.y,pin.d/m.d);
         pan(m.x-pin.x,m.y-pin.y);pin=m;return;
       }
     }
@@ -1636,7 +1668,11 @@ function bindCtl(cv){
     select(hit);ctxOpen(hit,e.clientX,e.clientY);
   });
   cv.addEventListener('wheel',e=>{e.preventDefault();camTouched=true;
-    dist=Math.max(dMin,Math.min(dMax,dist*(1+Math.sign(e.deltaY)*0.11)));},{passive:false});
+    /* Мышь приходит шагами, тачпад — мелкими delta: экспонента даёт
+       одинаково управляемый зум и не даёт одному событию унести камеру. */
+    const raw=e.deltaMode===1?e.deltaY*16:e.deltaMode===2?e.deltaY*cv.clientHeight:e.deltaY;
+    const dy=Math.max(-240,Math.min(240,raw));
+    zoomAt(e.clientX,e.clientY,Math.exp(dy*.0015));},{passive:false});
   const V={iso:[-0.95,1.15],front:[-1.5708,1.5708],top:[-1.5708,0.05]};
   document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{
     const v=V[b.dataset.v];theta=v[0];phi=v[1];});
@@ -5076,6 +5112,64 @@ function cutPickSel(btn){
   cutPick(sel,Math.max(8,x),y,null);
 }
 
+/* «Точное место» — рабочий инструмент, а не модальное окно: его можно
+   убрать с детали за заголовок. Границы — пересечение сцены и visualViewport:
+   на телефоне панель не уезжает за край и под открытую клавиатуру. */
+const POS_EDGE=6;
+function posViewBounds(){
+  const host=$('#vwrap'),hr=host.getBoundingClientRect();
+  let l=POS_EDGE,t=POS_EDGE,r=hr.width-POS_EDGE,b=hr.height-POS_EDGE;
+  const vv=window.visualViewport;
+  if(vv){
+    const vx=vv.offsetLeft||0,vy=vv.offsetTop||0;
+    l=Math.max(l,vx-hr.left+POS_EDGE);t=Math.max(t,vy-hr.top+POS_EDGE);
+    r=Math.min(r,vx+vv.width-hr.left-POS_EDGE);
+    b=Math.min(b,vy+vv.height-hr.top-POS_EDGE);
+  }
+  if(r<l)r=l;if(b<t)b=t;
+  return {host:host,hr:hr,l:l,t:t,r:r,b:b};
+}
+function posClamp(){
+  const box=$('#pos');if(!box.classList.contains('on'))return;
+  let q=posViewBounds(),br=box.getBoundingClientRect();
+  const aw=Math.max(0,q.r-q.l),ah=Math.max(0,q.b-q.t);
+  if(br.width>aw&&aw>0){box.style.width=aw+'px';br=box.getBoundingClientRect();}
+  box.style.maxHeight=Math.max(96,ah)+'px';
+  const x=Math.max(q.l,Math.min(q.r-br.width,br.left-q.hr.left));
+  const y=Math.max(q.t,Math.min(q.b-br.height,br.top-q.hr.top));
+  box.style.left=x+'px';box.style.top=y+'px';box.style.right='auto';box.style.bottom='auto';
+}
+function posReset(){
+  const box=$('#pos');['left','top','right','bottom','width','max-height'].forEach(k=>box.style.removeProperty(k));
+  requestAnimationFrame(posClamp);
+}
+(function posDragBind(){
+  const box=$('#pos'),hd=$('#posTitle');let drag=null;
+  hd.addEventListener('pointerdown',e=>{
+    if(e.pointerType!=='touch'&&e.button!==0)return;
+    const r=box.getBoundingClientRect(),q=posViewBounds();
+    drag={id:e.pointerId,dx:e.clientX-r.left,dy:e.clientY-r.top,w:r.width,h:r.height};
+    box.style.width=r.width+'px';box.style.left=(r.left-q.hr.left)+'px';box.style.top=(r.top-q.hr.top)+'px';
+    box.style.right='auto';box.style.bottom='auto';box.classList.add('moving');
+    try{hd.setPointerCapture(e.pointerId);}catch(_){}
+    e.preventDefault();
+  });
+  hd.addEventListener('pointermove',e=>{
+    if(!drag||drag.id!==e.pointerId)return;
+    const q=posViewBounds();
+    const x=Math.max(q.l,Math.min(q.r-drag.w,e.clientX-q.hr.left-drag.dx));
+    const y=Math.max(q.t,Math.min(q.b-drag.h,e.clientY-q.hr.top-drag.dy));
+    box.style.left=x+'px';box.style.top=y+'px';
+    e.preventDefault();
+  });
+  const up=e=>{if(!drag||e.pointerId!==drag.id)return;drag=null;box.classList.remove('moving');posClamp();};
+  hd.addEventListener('pointerup',up);hd.addEventListener('pointercancel',up);
+  hd.addEventListener('dblclick',e=>{e.preventDefault();posReset();});
+  addEventListener('resize',posClamp);
+  if(window.visualViewport){window.visualViewport.addEventListener('resize',posClamp);
+    window.visualViewport.addEventListener('scroll',posClamp);}
+})();
+
 /* ═══ v2.46.001: точное позиционирование ═══
    Кнопки ставят деталь «на 90° и на 50 мм», а по месту нужно и 7°, и отметка
    ровно 1250. Панель работает числами: X/Y — центр детали в плане, Z — отметка
@@ -5094,6 +5188,7 @@ const posRotLink=()=>!!(sel&&sel.link&&sel.link.mount==='rot');
 function posShow(){
   if(!sel)return;
   hideMnt();$('#pos').classList.add('on');$('#bPos').classList.add('on');posFill();
+  requestAnimationFrame(posClamp);
 }
 function posHide(){$('#pos').classList.remove('on');$('#bPos').classList.remove('on');}
 function posToggle(){posOn()?posHide():posShow();}
@@ -7026,7 +7121,6 @@ $('#tnk').onclick=e=>{if(e.target.id==='tnk')tkClose();};
   const el=$('#'+id);if(el)el.oninput=tkFields;});
 $('#bTankEd').onclick=()=>sel&&isTank(sel.d)&&tkOpen(sel);
 
-$('#bFlt').onclick=fltOpen;
 $('#fltX').onclick=fltClose;
 $('#flt').onclick=e=>{if(e.target.id==='flt')fltClose();};
 
@@ -7974,7 +8068,6 @@ const MMI=[
   ['⛶','Во весь экран','#bFS'],
   ['⛁','Проекты Атом Чиллер','#bProjects'],
   ['◫','Бак водяного контура','#bTank'],
-  ['⌗','Подбор фильтра-осушителя','#bFlt'],
   ['💬','Чат по чиллерам','#chatBtn'],
   ['⛶','Каталог во весь экран','#nomOpen'],
   ['✦','Расставить по функциям','#bAuto'],
