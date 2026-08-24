@@ -568,6 +568,10 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 .rotb.pfrom{--cc:#4FBF8B;--cc2:#bfe8d6;background:rgba(10,38,28,.94)}
 .rotb.pto{opacity:1;animation:none;border-style:solid}
 .rotb.pto i{background:transparent;color:var(--cc);border:1px solid var(--cc)}
+/* цель видна, но готовая трасса до неё не складывается: по клику остаётся
+   точная причина, а не молчаливый отказ команды */
+.rotb.pno{opacity:.46;animation:none;border-style:dashed;filter:saturate(.45)}
+.rotb.pno i{background:transparent;color:#f0a9a0;border:1px dashed #d96b5f}
 @keyframes rotpulse{0%,100%{box-shadow:0 0 0 4px rgba(255,255,255,.07)}
   50%{box-shadow:0 0 0 9px rgba(255,255,255,.03)}}
 /* выноска метки «+»: метка ушла с патрубка, чтобы не лечь на соседнюю —
@@ -1065,6 +1069,8 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <button id="bLink" title="Поставить на дно или надеть на крышку корпуса">⛓ Соединить с корпусом</button>
         <button id="bRoof" style="display:none"
                 title="Собрать верхний узел: конденсатор — внутрь, под крышку, на четыре уголка М6; вентилятор — в проём крышки на четыре М6">⌂ Верхний узел</button>
+        <button id="bCondDown" style="display:none"
+                title="Поставить на свободные трубки конденсатора отводы 90° и направить выходы вниз">↳ Отводы вниз</button>
         <button id="bTankEd" style="display:none"
                 title="Пересчитать бак: размеры, лист, патрубки">✎ Размеры бака</button>
         <button id="bPos" title="Точные координаты и углы (G)">⌖ Координаты</button>
@@ -2893,6 +2899,9 @@ function ctxItems(it){
   if((roleOf(it.d)==='cond'||roleOf(it.d)==='fan')&&placed.some(p=>roleOf(p.d)==='frame'))
     L.push({ic:'⌂',t:roleOf(it.d)==='cond'?'Под крышку · уголки М6':'В крышу · болты М6',
             s:'штатные отверстия',go:()=>{select(it);roofSel();}});
+  if(roleOf(it.d)==='cond')
+    L.push({ic:'↳',t:'Сделать отводы вниз',s:'со свободных трубок',
+            go:()=>{select(it);condElbowsDown(it);}});
   if(isTank(it.d))L.push({ic:'✎',t:'Размеры бака…',s:Math.round(tkCalc(it.d.tk).Vw)+' л',
     go:()=>{select(it);tkOpen(it);}});
   if(isPipeSeg(it)){
@@ -3042,6 +3051,7 @@ $('#bLink').onclick=()=>{
   $('#mnt').classList.contains('on')?hideMnt():showMnt();};
 $('#bSwap').onclick=()=>{if(sel)rotSwapAt(sel,$('#bSwap'));};
 $('#bRoof').onclick=roofSel;
+$('#bCondDown').onclick=()=>{if(sel)condElbowsDown(sel);};
 $('#mnt').querySelectorAll('.o').forEach(o=>o.onclick=()=>{hideMnt();linkSel(o.dataset.m,o.dataset.f);});
 /* подписи кнопок под выделенную деталь */
 function selBtns(){
@@ -3061,6 +3071,7 @@ function selBtns(){
   const rr=sel?roleOf(sel.d):'';
   const roof=(rr==='cond'||rr==='fan')&&placed.some(p=>roleOf(p.d)==='frame');
   $('#bRoof').style.display=roof?'':'none';
+  $('#bCondDown').style.display=rr==='cond'?'':'none';
   $('#bTankEd').style.display=(sel&&isTank(sel.d))?'':'none';
   if(roof)$('#bRoof').textContent=rr==='cond'?'⌂ Под крышку · уголки М6':'⌂ В крышу · болты М6';
 }
@@ -3926,13 +3937,19 @@ function rotRebuild(){
      выбрать. Выделил насос — видишь все его патрубки и понимаешь, почему на
      одном выбора нет. */
   let list=rotFree(true);
-  /* в протяжке трубы метки нужны все: второй конец трассы почти всегда на
-     другом аппарате, и прятать его патрубки нельзя */
+  /* Обычный режим — только выбранная деталь. Раньше на машине из 18 узлов
+     одновременно вспыхивали два десятка длинных плашек: они перекрывали
+     друг друга, и было непонятно, какой именно патрубок получит деталь.
+     Теперь сначала выбирают аппарат, затем — его хорошо различимый штуцер. */
   if(!pullOn()){
-    list=list.filter(f=>f.n||f.it===sel);
-    /* сцена в метках читается плохо: много аппаратов — оставляем патрубки
-       выделенной детали, остальные вернутся, когда выделишь их */
-    if(list.length>24&&sel&&list.some(f=>f.it===sel))list=list.filter(f=>f.it===sel);
+    list=sel?list.filter(f=>f.it===sel):[];
+  }else{
+    /* При протяжке нужны патрубки других аппаратов, но не вся сцена разом.
+       Показываем источник и только цели, до которых геометрия и каталог
+       действительно позволяют собрать трассу. Если подходящих нет — шесть
+       ближайших серых целей остаются кликабельными и объясняют причину. */
+    const q=pullChoices(list);
+    list=q.list;PULL_INFO=q.info;
   }
   list.forEach(f=>{
     const el=document.createElement('div');
@@ -3940,7 +3957,8 @@ function rotRebuild(){
        приглашает стрелкой. Ответная часть тут ни при чём, поэтому «нет в
        базе» метку не гасит: трубу можно тянуть и в глухой патрубок */
     const pull=pullOn(),from=pull&&PULL.it===f.it&&PULL.zi===f.zi;
-    el.className='rotb'+((f.n||pull)?'':' dry')+(pull?(from?' pfrom':' pto'):'');
+    el.className='rotb'+((f.n||pull)?'':' dry')+
+      (pull?(from?' pfrom':(f.pullWhy?' pno':' pto')):'');
     /* цвет метки — по среде, как у подписи патрубка: нагнетание красное,
        всасывание голубое. По типу присоединения красили раньше, и у насоса
        обе метки выходили одинаково зелёными — какая из них нагнетание,
@@ -3950,18 +3968,20 @@ function rotRebuild(){
     el.style.setProperty('--cc',zc||col[0]);
     el.style.setProperty('--cc2',zc||col[1]);
     el.innerHTML='<i></i><b></b><span></span>';
-    el.querySelector('i').textContent=pull?(from?'⇄':'→'):(f.n?'+':'·');
+    el.querySelector('i').textContent=pull?(from?'⇄':(f.pullWhy?'×':'→')):(f.n?'+':'·');
     /* имя патрубка на самой метке: «нагнетание · резьба G1». Без него на
        насосе стояли два одинаковых плюса «резьба G1». */
     el.querySelector('b').textContent=portWord(f.z);
-    el.querySelector('span').textContent=pull?f.c.txt
+    el.querySelector('span').textContent=pull?(f.pullWhy?'не соединить':f.c.txt)
       :(f.n?f.c.txt:f.c.txt+' · нет в базе');
     el.title=pull?(from?'Отсюда тянем трубу — нажми, чтобы отменить'
-                       :('Протянуть трубу сюда · '+f.z.name+' · '+f.c.txt))
+                       :(f.pullWhy?('Не соединить: '+f.pullWhy)
+                         :('Протянуть трубу сюда · '+f.z.name+' · '+f.c.txt)))
       :(f.z.name+' · '+f.c.txt+(f.n?' — выбрать, что поставить ('+f.n+
         ' в базе)':' — в базе пока нет ответной части'));
     el.onclick=ev=>{ev.stopPropagation();
-      if(pullOn())pullPick(f.it,f.zi);
+      if(pullOn()&&f.pullWhy)toast('Труба не легла: '+f.pullWhy);
+      else if(pullOn())pullPick(f.it,f.zi);
       else rotPick(f.it,f.zi,ev.clientX,ev.clientY);};
     const ln=document.createElement('div');
     ln.className='rotl';ln.style.setProperty('--cc',zc||col[0]);
@@ -4018,7 +4038,10 @@ function rotSync(){
         tagPush(r);ox=c[0];oy=c[1];free=true;break;
       }
     }
-    // свободного места нет — метку всё равно показываем: по ней ставят деталь
+    /* свободного места нет — второстепенную метку гасим. Источник и патрубки
+       выбранной детали оставляем: пользователь уже указал, с чем работает. */
+    if(!free&&b.it!==sel&&!b.el.classList.contains('pfrom')){
+      b.el.style.display='none';b.ln.style.display='none';return;}
     if(!free)tagPush(tagRect(v.x,v.y,b.w,b.h));
     b.el.style.display='flex';
     b.el.style.left=(v.x+ox).toFixed(1)+'px';
@@ -4035,7 +4058,7 @@ function rotSync(){
 }
 function rotBtn(){
   const b=$('#bRl');if(!b)return;
-  const n=ROTS?rotFree().length:0;
+  const n=ROTS?rotFree().filter(f=>sel&&f.it===sel).length:0;
   b.textContent=n?('Присоединения · '+n+' своб.'):'Присоединения';
   b.classList.toggle('on',ROTS);
 }
@@ -4044,7 +4067,8 @@ function rotToggle(){
   if(!ROTS)pullStop(true);          // метки погасли — из протяжки выходим
   try{localStorage.setItem(ROT_KEY,ROTS?'1':'0');}catch(e){}
   rotRebuild();rotPickClose();
-  toast(ROTS?'Свободные патрубки подсвечены — жми «+» и выбирай ответную часть'
+  toast(ROTS?(sel?'Патрубки выбранной детали подсвечены — жми «+»'
+                 :'Выдели деталь — покажу только её свободные патрубки')
             :'Подсветка свободных патрубков выключена');
 }
 /* Что сядет на этот патрубок: в списке только то, у чего присоединение
@@ -4626,7 +4650,9 @@ function pipeSetSel(L){
    метражом, отвод и переход — штуками. */
 const PULL_TOL=6;          // на столько осям позволено разойтись, мм
 const PULL_MIN=25;         // ближе этого патрубки считаем стоящими встык
+const PULL_LEAD=120;       // место перед П-образным разворотом: труба + вылет отвода
 let PULL=null;             // откуда тянем: {it,zi}
+let PULL_INFO={ok:0,bad:0,why:''};
 const pullOn=()=>!!PULL;
 /* зоны позиции в том же виде, в каком они лягут в сцену: geoOf отбрасывает
    зоны без точки выноски, и номера зон обязаны совпадать с it.zn */
@@ -4666,9 +4692,20 @@ function pullRoute(a,b){
     const M=a.p.clone().addScaledVector(A,t/2);
     return {pts:[a.p.clone(),M,M.clone().add(w),b.p.clone()],kind:'Z-образная'};
   }
+  if(dot>0.999){                                      // оси смотрят одинаково
+    const t=v.dot(A),w=v.clone().addScaledVector(A,-t),off=w.length();
+    if(off<PULL_MIN)return {err:'патрубки смотрят в одну сторону и разнесены поперёк всего на '+
+      Math.round(off)+' мм — для двух отводов нет места'};
+    /* П-образная обвязка: оба отвода лежат в одной поперечной плоскости.
+       Плоскость выносим вперёд обоих штуцеров с запасом под отвод и трубу. */
+    const sa=Math.max(PULL_LEAD,t+PULL_LEAD),sb=sa-t;
+    const C=a.p.clone().addScaledVector(A,sa);
+    const D=b.p.clone().addScaledVector(B,sb);
+    return {pts:[a.p.clone(),C,D,b.p.clone()],kind:'П-образная'};
+  }
   const x=axCross(a.p,A,b.p,B);
-  if(!x)return {err:'оси патрубков параллельны и смотрят в одну сторону — '+
-    'по осям трубу не провести'};
+  if(!x)return {err:'оси патрубков параллельны, но направлены не навстречу — '+
+    'нужен другой угол отвода'};
   if(x.gap>PULL_TOL)return {err:'оси не сходятся, расходятся на '+
     Math.round(x.gap)+' мм — подвинь узел'};
   if(x.s<PULL_MIN||x.t<PULL_MIN)return {err:'оси пересекаются позади '+
@@ -4773,6 +4810,70 @@ function pullPlan(a,b,corners){
   });
   return best||{err:whyEl||why||'подходящей трубы в базе нет'};
 }
+/* Одна проверка для подсветки цели и для самой команды. Так метка не обещает
+   соединение, которое затем откажется строиться из-за геометрии, отсутствия
+   перехода или отвода. */
+function pullCheck(a,b){
+  if(!a||!a.z)return {err:'не найден исходный патрубок'};
+  if(!b||!b.z)return {err:'не найден второй патрубок'};
+  if(!a.c)return {err:'у патрубка «'+(a.z.name||'исходный')+
+    '» не задан тип и размер присоединения в базе 3D'};
+  if(!b.c)return {err:'у патрубка «'+(b.z.name||'второй')+
+    '» не задан тип и размер присоединения в базе 3D'};
+  const rt=pullRoute(a,b);
+  if(rt.err)return {err:rt.err};
+  const dirs=[];
+  for(let i=0;i+1<rt.pts.length;i++){
+    const v=rt.pts[i+1].clone().sub(rt.pts[i]);
+    if(v.length()<PULL_MIN)return {err:'участок трассы '+Math.round(v.length())+
+      ' мм — короче минимального отрезка '+PULL_MIN+' мм'};
+    dirs.push(v.normalize());
+  }
+  for(let i=0;i+1<dirs.length;i++){
+    const d=Math.max(-1,Math.min(1,dirs[i].dot(dirs[i+1])));
+    if(Math.abs(d)>0.05)return {err:'угол трассы '+
+      Math.round(R2D(Math.acos(d)))+'° — в базе есть только отвод 90°'};
+  }
+  const pl=pullPlan(a,b,dirs.length-1);
+  if(pl.err)return {err:pl.err};
+  const adapterSpan=e=>{
+    if(!e)return 0;
+    const z=pullZn(e.d),a=z[e.zi],b=z[e.zj];
+    return (a&&b)?rotSeatLocal(a).distanceTo(rotSeatLocal(b)):0;
+  };
+  for(let i=0;i<dirs.length;i++){
+    const raw=rt.pts[i].distanceTo(rt.pts[i+1]);
+    const take=(i&&pl.el?pl.el.dout:0)+(i<dirs.length-1&&pl.el?pl.el.din:0)+
+      (i===0?adapterSpan(pl.ea):0)+(i===dirs.length-1?adapterSpan(pl.eb):0);
+    const left=raw-take;
+    if(left<PIPE_MIN)return {err:'на '+(i+1)+'-й участок после фитингов остаётся '+
+      Math.round(left)+' мм — раздвинь узлы минимум на '+Math.ceil(PIPE_MIN-left)+' мм'};
+  }
+  return {rt:rt,pts:rt.pts,dirs:dirs,pl:pl};
+}
+/* Чистый список целей протяжки. Совместимые показываем все (но не больше 12,
+   чтобы снова не получить стену плашек); когда их нет, оставляем ближайшие
+   неподходящие — по серому «×» можно узнать точную причину. */
+function pullChoices(list){
+  const src=list.find(f=>PULL&&PULL.it===f.it&&PULL.zi===f.zi);
+  const a=PULL&&pullPort(PULL.it,PULL.zi),good=[],bad=[];
+  list.forEach(f=>{
+    delete f.pullWhy;
+    if(f===src)return;
+    if(PULL&&f.it===PULL.it){
+      f.pullWhy='второй конец должен быть на другой детали';
+      bad.push({f:f,d:0});return;
+    }
+    const b=pullPort(f.it,f.zi),q=pullCheck(a,b);
+    const dist=(a&&b)?a.p.distanceTo(b.p):Infinity;
+    if(q.err){f.pullWhy=q.err;bad.push({f:f,d:dist});}
+    else good.push({f:f,d:dist});
+  });
+  good.sort((x,y)=>x.d-y.d);bad.sort((x,y)=>x.d-y.d);
+  const shown=good.length?good.slice(0,12):bad.slice(0,6);
+  return {list:(src?[src]:[]).concat(shown.map(x=>x.f)),
+    info:{ok:good.length,bad:bad.length,why:bad.length?bad[0].f.pullWhy:''}};
+}
 /* Отвод сел на трубу, но вокруг её оси он ещё волен крутиться — доворачиваем
    так, чтобы второй раструб смотрел точно на следующий участок трассы. */
 function pullRoll(el,outIdx,want,axis){
@@ -4798,14 +4899,82 @@ async function pullPut(made,d,hostUid,zi,pzi){
   if(!rotMate(it)){it.link=null;return null;}
   return it;
 }
-/* не сложилось — со сцены уходит всё, что успели поставить */
-function pullBail(made,msg){
+/* ═══ штатные отводы конденсатора вниз ═══
+   На машине трубки воздушного конденсатора не оставляют горизонтально:
+   сразу ставят 90° и выводят обе линии вниз, в объём чиллера. Действие
+   использует каталожный отвод, обычную посадку на патрубок и связь rot —
+   поэтому деталь едет с конденсатором, попадает в BOM и в Ctrl+Z. */
+const PIPE_DOWN=new THREE.Vector3(0,0,-1);
+function condDownPorts(it){
+  if(!it||roleOf(it.d)!=='cond')return [];
+  const out=[];
+  (it.zn||[]).forEach((z,zi)=>{
+    /* У конденсатора рабочие трубки размечены как газ/жидкость (dis/suc),
+       старые модели давали только тип ODF — их тоже не теряем. */
+    if(z.kind!=='dis'&&z.kind!=='suc'&&z.ctype!=='odf')return;
+    if(rotTaken(it,zi))return;
+    out.push({it:it,zi:zi,z:z,c:connOf(z)});
+  });
+  return out;
+}
+function condDownPlan(it,zi){
+  const p=pullPort(it,zi);
+  if(!p)return {err:'у трубки не задана ось в базе 3D'};
+  if(!p.c)return {err:'у трубки «'+(p.z.name||'')+'» не задан размер присоединения'};
+  const down=p.d.dot(PIPE_DOWN);
+  if(down>.995)return {skip:'трубка «'+(p.z.name||'')+'» уже направлена вниз'};
+  if(Math.abs(down)>.08)return {err:'трубка «'+(p.z.name||'')+
+    '» наклонена: одним отводом 90° её точно вниз не направить'};
+  const el=pullElbow(p.c);
+  if(!el)return {err:'в базе нет отвода 90° под '+p.c.txt+
+    ' для трубки «'+(p.z.name||'')+'»'};
+  return {p:p,el:el};
+}
+function madeRemove(made){
   made.forEach(it=>{
     if(it._pinBox){scene.remove(it._pinBox);it._pinBox=null;}
     scene.remove(it.obj);
     const k=placed.indexOf(it);
     if(k>=0)placed.splice(k,1);
   });
+}
+async function condElbowsDown(it){
+  if(!it||roleOf(it.d)!=='cond'){
+    toast('Отводы вниз делаются для выбранного конденсатора');return;}
+  const ports=condDownPorts(it);
+  if(!ports.length){toast('У конденсатора нет свободных трубок для отводов');return;}
+  const jobs=[],skip=[],bad=[];
+  ports.forEach(f=>{
+    const q=condDownPlan(it,f.zi);
+    if(q.err)bad.push(q.err);else if(q.skip)skip.push(q.skip);else jobs.push(q);
+  });
+  /* Не оставляем машину наполовину собранной: сначала проверяем обе линии и
+     только затем меняем сцену. */
+  if(bad.length){toast('Отводы вниз не сделаны: '+bad[0]+
+    (bad.length>1?' · ещё '+(bad.length-1):''));return;}
+  if(!jobs.length){toast(skip.length?skip.join(' · '):'Свободных трубок нет');return;}
+  const made=[],h=histBegin('отводы конденсатора вниз');
+  let err='';
+  try{
+    for(const q of jobs){
+      const el=await pullPut(made,q.el.d,it.uid,q.p.zi,q.el.i);
+      if(!el){err='каталожный отвод не сел на трубку «'+(q.p.z.name||'')+'»';break;}
+      el.link.roll=pullRoll(el,q.el.j,PIPE_DOWN,q.p.d);
+      rotMate(el);
+      const out=zDir(el.zn[q.el.j]).applyQuaternion(el.obj.quaternion).normalize();
+      if(out.dot(PIPE_DOWN)<.995){err='не удалось довернуть отвод «'+
+        (q.p.z.name||'')+'» точно вниз';break;}
+    }
+  }catch(e){err=(e&&e.message)?e.message:String(e);}
+  finally{histEnd(h);}
+  if(err){madeRemove(made);select(it);refresh();save();rotRebuild();
+    toast('Отводы вниз не сделаны: '+err);return;}
+  select(it);checkCollisions();showSelZ();refresh();save();rotRebuild();
+  toast('Отводы конденсатора направлены вниз · '+made.length+' шт · добавлены в BOM');
+}
+/* не сложилось — со сцены уходит всё, что успели поставить */
+function pullBail(made,msg){
+  madeRemove(made);
   select(null);
   toast('Труба не легла: '+msg);
 }
@@ -4852,20 +5021,9 @@ async function pullLay(made,a,b,pl,pts,dirs){
   return null;
 }
 async function pullRun(a,b){
-  const rt=pullRoute(a,b);
-  if(rt.err){toast('Труба не легла: '+rt.err);return;}
-  const pts=rt.pts,dirs=[];
-  for(let i=0;i+1<pts.length;i++)
-    dirs.push(pts[i+1].clone().sub(pts[i]).normalize());
-  /* угол трассы бывает только прямой: отводов под 60° в базе нет */
-  for(let i=0;i+1<dirs.length;i++){
-    const d=Math.max(-1,Math.min(1,dirs[i].dot(dirs[i+1])));
-    if(Math.abs(d)>0.05){
-      toast('Труба не легла: угол трассы '+Math.round(R2D(Math.acos(d)))+
-        '° — отвод в базе только 90°');return;}
-  }
-  const pl=pullPlan(a,b,dirs.length-1);
-  if(pl.err){toast('Труба не легла: '+pl.err);return;}
+  const q=pullCheck(a,b);
+  if(q.err){toast('Труба не легла: '+q.err);return;}
+  const rt=q.rt,pts=q.pts,dirs=q.dirs,pl=q.pl;
   const made=[];
   const h=histBegin('протяжку трубы');
   let err=null;
@@ -4881,10 +5039,16 @@ async function pullRun(a,b){
 }
 function pullStart(it,zi){
   const p=pullPort(it,zi);
-  if(!p||!p.c){toast('У этого патрубка база не дала оси — тянуть не от чего');return;}
+  if(!p){toast('У этого патрубка база не дала оси — тянуть не от чего');return;}
+  if(!p.c){toast('У патрубка «'+(p.z.name||'')+
+    '» в базе 3D не заданы тип и размер присоединения');return;}
   PULL={it:it,zi:zi};
   rotPickClose();rotRebuild();
-  toast('Откуда тянем — задано. Ткни во второй патрубок · Esc — отмена');
+  toast(PULL_INFO.ok
+    ?('Откуда тянем — задано. Подходящих патрубков: '+PULL_INFO.ok+
+      ' · ткни по стрелке · Esc — отмена')
+    :('Готовой трассы пока нет: '+(PULL_INFO.why||'нет второго свободного патрубка')+
+      '. Серый × покажет причину'));
 }
 function pullStop(quiet){
   if(!PULL)return;

@@ -92,5 +92,14 @@ test('подписи держатся за деталями и не наезжа
 test('подписи пересобираются при выборе детали и при изменении сцены', () => {
   assert.match(page, /hideMnt\(\);selBtns\(\);buildParts\(\);portsRebuild\(\)/);
   assert.match(page, /portsPaint\(\);portsRebuild\(\);\s*\/\/ деталь ушла или приехала/);
-  assert.match(page, /portsSync\(\);rotSync\(\);\s*\n?\s*renderer\.render\(scene,camera\)/);
+  assert.match(page, /portsSync\(\);rotSync\(\);[\s\S]{0,80}renderer\.render\(scene,camera\)/);
+});
+
+test('присоединения показываются у выбранной детали, а протяжка фильтрует цели', () => {
+  const src = section('function rotRebuild()', '/* Что написать на метке');
+  assert.match(src, /list=sel\?list\.filter\(f=>f\.it===sel\):\[\]/);
+  assert.match(src, /const q=pullChoices\(list\)/);
+  assert.match(src, /f\.pullWhy\?' pno':' pto'/);
+  assert.match(page, /good\.length\?good\.slice\(0,12\):bad\.slice\(0,6\)/);
+  assert.match(page, /if\(!free&&b\.it!==sel&&!b\.el\.classList\.contains\('pfrom'\)\)/);
 });

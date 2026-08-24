@@ -33,6 +33,16 @@ test('первая строка меню — карточка позиции и�
     .forEach((fn) => assert.ok(menu.includes(fn), 'в меню нет действия ' + fn));
 });
 
+test('у конденсатора есть явное действие «Сделать отводы вниз»', () => {
+  assert.match(page, /id="bCondDown"[^>]*[\s\S]{0,180}Отводы вниз/);
+  const a = page.indexOf('function ctxItems(it)');
+  const b = page.indexOf('function ctxOpen(it,x,y)');
+  const menu = page.slice(a, b);
+  assert.match(menu, /t:'Сделать отводы вниз'/);
+  assert.match(page, /histBegin\('отводы конденсатора вниз'\)/);
+  assert.match(page, /добавлены в BOM/);
+});
+
 test('дублирование вынесено в функцию — её зовут и кнопка, и меню', () => {
   assert.match(page, /async function dupSel\(\)\{if\(!sel\)return;/);
   assert.match(page, /\$\('#bDup'\)\.onclick=dupSel;/);

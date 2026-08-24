@@ -80,6 +80,27 @@ test('оси навстречу, но со сдвигом — Z-образная
   assert.ok(Math.abs(d[1].dot(d[2])) < 1e-6);
 });
 
+test('оси смотрят одинаково — П-образная трасса с двумя отводами', () => {
+  const S = stand();
+  const r = S.pullRoute(port(V(0, 0, 0), V(1, 0, 0)),
+                        port(V(600, 300, 0), V(1, 0, 0)));
+  assert.equal(r.err, undefined);
+  assert.equal(r.kind, 'П-образная');
+  assert.equal(r.pts.length, 4);
+  const d = [];
+  for (let i = 0; i + 1 < r.pts.length; i++)
+    d.push(r.pts[i + 1].clone().sub(r.pts[i]).normalize());
+  assert.deepEqual(d.map(q => [q.x, q.y, q.z].map(Math.round)),
+    [[1, 0, 0], [0, 1, 0], [-1, 0, 0]]);
+});
+
+test('одинаково направленным патрубкам нужно место поперёк под два отвода', () => {
+  const S = stand();
+  const r = S.pullRoute(port(V(0, 0, 0), V(1, 0, 0)),
+                        port(V(600, 10, 0), V(1, 0, 0)));
+  assert.match(r.err, /для двух отводов нет места/);
+});
+
 test('оси разошлись в пространстве — трасса не строится, и сказано на сколько', () => {
   const S = stand();
   const r = S.pullRoute(port(V(0, 0, 0), V(1, 0, 0)), port(V(400, 300, 50), V(0, -1, 0)));
@@ -148,6 +169,14 @@ test('в углу нужен отвод: нет отвода под этот д�
   assert.equal(S.pullPlan({ c, z: { name: 'A' } }, { c, z: { name: 'B' } }, 1).err, undefined);
   assert.match(S2.pullPlan({ c, z: { name: 'A' } }, { c, z: { name: 'B' } }, 1).err,
                /нет отвода 90°/);
+});
+
+test('предварительная проверка объясняет отсутствующую разметку присоединения', () => {
+  const S = stand();
+  const a = port(V(0, 0, 0), V(1, 0, 0), { name: 'ВЫХОД БЕЗ РАЗМЕРА' });
+  const b = port(V(500, 0, 0), V(-1, 0, 0), { name: 'ВХОД' });
+  b.c = S.connOf(zn('VTp.751.0.025')[0]);
+  assert.match(S.pullCheck(a, b).err, /не задан тип и размер присоединения/);
 });
 
 test('доворот отвода: второй раструб встаёт точно на следующий участок трассы', () => {

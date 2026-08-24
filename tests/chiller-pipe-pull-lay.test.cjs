@@ -31,7 +31,7 @@ function stand() {
                section('/* Посадить деталь: её ось ложится', 'function rotOff(it)') +
                section('const PIPE_MIN=20', 'function pullStart(it,zi)') +
                // pipeLen объявлена через const — вытаскиваем её наружу
-               ';this.pipeLen=pipeLen;this.isPipeSeg=isPipeSeg;';
+               ';this.pipeLen=pipeLen;this.isPipeSeg=isPipeSeg;this.zDir=zDir;';
   const ctx = {
     THREE,
     DATA: base.items,
@@ -44,17 +44,19 @@ function stand() {
     $: () => null,
     console,
     R2D: (r) => (r * 180) / Math.PI,
-    roleOf: (d) => (d.section === 'pipe' ? 'pipe' : 'floor'),
+    roleOf: (d) => (d.section === 'pipe' ? 'pipe' : (d.section === 'hx' ? 'cond' : 'floor')),
     select() {},
-    refresh() {},
+    refresh() { ctx.refreshes++; },
     save() {},
     checkCollisions() {},
     showSelZ() {},
-    pushHist() {},
-    histBegin: () => false,
+    pushHist(label) { ctx.histories.push(label); },
+    histBegin(label) { ctx.histories.push(label); return false; },
     histEnd() {},
     rotRebuild() {},
   };
+  ctx.histories = [];
+  ctx.refreshes = 0;
   ctx.toast = (t) => ctx.toasts.push(t);
   ctx.window = ctx;
   let uid = 100;
@@ -157,6 +159,48 @@ test('Z-образная трасса: три отрезка и два отво�
     (t[2].obj.updateMatrixWorld(true), t[2].obj.matrixWorld));
   assert.ok(end.distanceTo(world(S, b, 0)) < 1, 'конец трубы в ' + JSON.stringify(end));
   assert.match(S.toasts.join(' '), /трасса Z-образная · \d+ мм · отводов 2/);
+});
+
+test('П-образная трасса: одинаково направленные патрубки соединяются двумя отводами', async () => {
+  const S = stand();
+  const a = host(S, [0, 0, 0], 0);
+  const b = host(S, [900, 300, 0], 0);
+  await S.pullRun(S.pullPort(a, 0), S.pullPort(b, 0));
+  assert.equal(tubes(S).length, 3, S.toasts.join(' | '));
+  assert.equal(elbows(S).length, 2, S.toasts.join(' | '));
+  const last = tubes(S)[2];
+  const end = S.rotSeatLocal(last.zn[1]).applyMatrix4(
+    (last.obj.updateMatrixWorld(true), last.obj.matrixWorld));
+  assert.ok(end.distanceTo(world(S, b, 0)) < 1, 'конец трубы в ' + JSON.stringify(end));
+  assert.match(S.toasts.join(' '), /трасса П-образная/);
+});
+
+test('кнопка конденсатора ставит каталожный отвод и направляет его вниз', async () => {
+  const S = stand();
+  const c = host(S, [0, 0, 300], 0);
+  c.d = { id: 'COND', name: 'конденсатор', section: 'hx', ready: true };
+  c.zn[0].sex = 'm'; // наружная трубка входит в ответный раструб отвода
+  await S.condElbowsDown(c);
+  const el = elbows(S);
+  assert.equal(el.length, 1, S.toasts.join(' | '));
+  const pr = S.elbowPair(el[0].zn);
+  const out = S.zDir(el[0].zn[pr.j]).applyQuaternion(el[0].obj.quaternion).normalize();
+  assert.ok(out.distanceTo(new THREE.Vector3(0, 0, -1)) < 1e-6,
+    'выход отвода смотрит ' + JSON.stringify(out));
+  assert.ok(el[0].link && el[0].link.to === c.uid && el[0].link.mount === 'rot');
+  assert.match(S.histories.join(' '), /отводы конденсатора вниз/);
+  assert.match(S.toasts.join(' '), /добавлены в BOM/);
+});
+
+test('отводы конденсатора не собираются наполовину без размера присоединения', async () => {
+  const S = stand();
+  const c = host(S, [0, 0, 300], 0);
+  c.d = { id: 'COND', name: 'конденсатор', section: 'hx', ready: true };
+  delete c.zn[0].conn;
+  delete c.zn[0].ctype;
+  await S.condElbowsDown(c);
+  assert.equal(S.placed.length, 1);
+  assert.match(S.toasts.join(' '), /не задан размер присоединения/);
 });
 
 test('оси разошлись — в сцене не остаётся ни трубы, ни фитинга', async () => {
