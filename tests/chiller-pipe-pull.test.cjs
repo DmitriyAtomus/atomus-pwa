@@ -161,6 +161,29 @@ test('на резьбовой патрубок труба идёт через п
   assert.notEqual(pl.ea.d.id, 'VTp.754.0.02004');
 });
 
+test('угловой резьбовой фитинг не принимается за прямой переход трубы', () => {
+  const items = structuredClone(base.items);
+  const geoms = structuredClone(base.geoms);
+  const straight = items.find(d => d.id === 'VTp.708.0.02004');
+  const angle = {
+    ...straight,
+    id: 'VTp.752.0.02004',
+    g: 'ppr-VTp.752.0.02004',
+    name: 'Угольник с переходом на внутреннюю резьбу 20 × 1/2"',
+  };
+  items.push(angle);
+  // Так сейчас ошибочно размечены угловые переходы в базе: два соосных
+  // присоединения вместо реального поворота на 90°. Название обязано не дать
+  // автотрассе посадить трубу на наружную стенку колена.
+  geoms[angle.g] = structuredClone(geoms[straight.g]);
+  const S = stand(items, geoms);
+  const c = { t: 'thr', size: 'G1/2', sex: 'm', txt: 'резьба G1/2' };
+  const tc = { t: 'ppr', size: 20, sex: 'm', txt: 'Ø20 сварка PP-R' };
+  const ids = S.pullAdapters(c, tc).map(x => x.d.id);
+  assert.ok(ids.includes(straight.id), 'прямой переход должен остаться доступен');
+  assert.ok(!ids.includes(angle.id), 'угольник ошибочно попал в прямые переходы');
+});
+
 test('в углу нужен отвод: нет отвода под этот диаметр — трасса не строится', () => {
   const S = stand();
   const c = S.connOf(zn('VTp.751.0.025')[0]);
