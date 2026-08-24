@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.038";
+const APP_VERSION = "v2.46.039";
 const APP_VERSION_DATE = "24.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1261,6 +1261,12 @@ function _restoreLastView() {
     const _s = (window._tvScreen || '').trim();
     selectSection(SECTION_CONFIG[_s] ? _s : 'home');
     return;
+  }
+  // v2.46.039: пришли из среднего клика — повторяем действие исходной вкладки
+  if (window._midAction) {
+    const _act = window._midAction;
+    window._midAction = null;
+    try { _midApplyAction(_act); return; } catch (e) { console.warn('mid-click', e); }
   }
   // Если есть свежий приветственный тост (т.е. только что вошли) — на главную
   if (state._loginWelcome) {
@@ -18218,3 +18224,134 @@ async function mydayEditSeg(sessionId, curMinutes, workId, empId) {
 
 // Класс вешаем сразу: иначе первый кадр чата рисуется без фирменного слоя.
 document.addEventListener('DOMContentLoaded', _devChatSkinApply);
+// ==== v2.46.039: СРЕДНИЙ КЛИК (КОЛЕСО МЫШИ) — ОТКРЫТЬ В НОВОЙ ВКЛАДКЕ ====
+// Кнопки CRM — это <button onclick="...">, а не ссылки, поэтому браузер по
+// колесу мыши ничего не открывал. Делаем сами: запоминаем «что нажали» и
+// открываем новую вкладку, где это действие повторяется.
+// Почему через localStorage, а не через параметр в адресе: в адресе это была бы
+// дыра — чужая ссылка вида ?mid=<код> выполнила бы произвольный код у того, кто
+// её открыл. В localStorage пишет только сам сайт.
+const MID_KEY_PREFIX = 'atomus_mid_';
+const MID_TTL_MS = 120000;
+
+// В новой вкладке повторяем только «открывающие» действия. Средний клик по
+// «Удалить» не должен ничего удалять в фоновой вкладке.
+const MID_SAFE_CALL = /^(open|show|select|view|goto|go|preview|close|hide)/i;
+
+// Код кнопки безопасен, если это только вызовы функций-открывашек:
+// «openContractDetail(12)» — да, «deleteContract(12)» и присваивания — нет.
+function _midCodeSafe(code) {
+  if (!code || code.length > 400) return false;
+  if (/=>|\bnew\b|\bfunction\b|\bawait\b|\beval\b/.test(code)) return false;
+  if (/[^=!<>]=[^=]/.test(code)) return false;   // присваивание
+  const calls = code.match(/[A-Za-z_$][\w$]*\s*\(/g);
+  if (!calls || !calls.length) return false;
+  return calls.every(c => MID_SAFE_CALL.test(c.replace(/\s*\($/, '')));
+}
+
+// Что нажали: свой onclick, таб раздела или пункт бокового меню.
+function _midCodeFromEl(el) {
+  if (!el) return null;
+  const node = el.closest('[onclick],[data-section],[data-nav]');
+  if (!node) return null;
+  if (node.closest('a[href]')) return null;      // ссылку браузер откроет сам
+  const oc = node.getAttribute('onclick');
+  if (oc) return _midCodeSafe(oc) ? oc : '';     // '' = кнопка есть, но не открывающая
+  if (node.dataset.section) return "selectSection('" + node.dataset.section + "')";
+  if (node.dataset.nav) return "selectSidebarItem('" + node.dataset.nav + "')";
+  return null;
+}
+
+// Снимок «где мы находимся»: кнопка внутри карточки договора без этого
+// в новой вкладке откроется в пустоту.
+function _midCtxSnapshot() {
+  const ctx = {};
+  if (state.currentContractId)    ctx.contractId    = state.currentContractId;
+  if (state.currentContractorId)  ctx.contractorId  = state.currentContractorId;
+  if (state.currentTaskId)        ctx.taskId        = state.currentTaskId;
+  if (state.currentOfferId)       ctx.offerId       = state.currentOfferId;
+  if (state.currentEmployeeId)    ctx.employeeId    = state.currentEmployeeId;
+  if (state.currentSaleProductId) ctx.saleProductId = state.currentSaleProductId;
+  if (state.currentSupplyOrderId) ctx.supplyOrderId = state.currentSupplyOrderId;
+  return ctx;
+}
+
+function _midApplyCtx(ctx) {
+  if (!ctx || typeof ctx !== 'object') return;
+  if (ctx.contractId)    state.currentContractId    = ctx.contractId;
+  if (ctx.contractorId)  state.currentContractorId  = ctx.contractorId;
+  if (ctx.taskId)        state.currentTaskId        = ctx.taskId;
+  if (ctx.offerId)       state.currentOfferId       = ctx.offerId;
+  if (ctx.employeeId)    state.currentEmployeeId    = ctx.employeeId;
+  if (ctx.saleProductId) state.currentSaleProductId = ctx.saleProductId;
+  if (ctx.supplyOrderId) state.currentSupplyOrderId = ctx.supplyOrderId;
+}
+
+function _midStash(code) {
+  const key = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  try {
+    // подчищаем протухшие ключи, чтобы не копились
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf(MID_KEY_PREFIX) === 0) {
+        let old = null;
+        try { old = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+        if (!old || Date.now() - (old.ts || 0) > MID_TTL_MS) localStorage.removeItem(k);
+      }
+    }
+    localStorage.setItem(MID_KEY_PREFIX + key, JSON.stringify({
+      code: code,
+      section: state.currentSection || 'home',
+      screen: state.currentScreen || '',
+      ctx: _midCtxSnapshot(),
+      ts: Date.now(),
+    }));
+  } catch (e) { return null; }
+  return key;
+}
+
+// Повтор действия в новой вкладке: сначала раздел и экран, потом сам клик —
+// с паузой, чтобы экран успел отрисоваться и подтянуть данные.
+function _midApplyAction(act) {
+  selectSection(SECTION_CONFIG[act.section] ? act.section : 'home');
+  _midApplyCtx(act.ctx);
+  // раздел берём из state: selectSection мог увести в другой (например
+  // монтажника пускает только в «Монтаж») — экран тогда нужен тамошний
+  const sec = state.currentSection || (SECTION_CONFIG[act.section] ? act.section : 'home');
+  const cfg = SECTION_CONFIG[sec];
+  if (act.screen && cfg && act.screen !== cfg.defaultScreen) {
+    if (document.querySelector('.screen[data-screen="' + act.screen + '"]')) {
+      selectSidebarItem(act.screen);
+    }
+  }
+  setTimeout(function () {
+    try { (new Function(act.code)).call(window); }
+    catch (e) { console.warn('mid-click: не удалось повторить действие', e); }
+  }, 700);
+}
+
+function _midIsTypingTarget(t) {
+  return !!(t && t.closest && t.closest('input,textarea,select,[contenteditable="true"]'));
+}
+
+function _midOnMouseDown(e) {
+  if (e.button !== 1 || _midIsTypingTarget(e.target)) return;
+  if (_midCodeFromEl(e.target) === null) return;
+  e.preventDefault();   // гасим автопрокрутку колесом
+}
+
+function _midOnAuxClick(e) {
+  if (e.button !== 1 || _midIsTypingTarget(e.target)) return;
+  const code = _midCodeFromEl(e.target);
+  if (code === null) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (code === '') { showToast('Эту кнопку в новой вкладке не открыть'); return; }
+  const key = _midStash(code);
+  if (!key) return;
+  window.open(window.location.pathname + '?mid=' + key, '_blank');
+}
+
+document.addEventListener('mousedown', _midOnMouseDown, true);
+document.addEventListener('auxclick', _midOnAuxClick, true);
+// ==== КОНЕЦ: СРЕДНИЙ КЛИК ====
