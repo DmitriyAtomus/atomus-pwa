@@ -886,6 +886,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 body.tk-tank-solo #ports,body.tk-tank-solo #rots{display:none!important}
 .tk-in{width:84px;background:var(--panel2);color:var(--ink);border:1px solid var(--line2);
   border-radius:7px;padding:5px 9px;font:inherit;font-size:12.5px}
+.tk-in.draft{border-color:rgba(201,162,39,.72);color:#e8d49a}
 .tk-x{color:var(--faint);font-size:12px}
 .tk-out{margin-top:12px;border-top:1px solid var(--line);padding-top:11px}
 .tk-sum{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-bottom:9px}
@@ -1382,9 +1383,9 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
       <button id="tkAll">◎ Вся сцена</button>
     </div>
     <div class="frow"><span class="lb">Размеры, мм</span>
-      <input class="tk-in" type="number" id="tkL" step="10" inputmode="decimal"><span class="tk-x">×</span>
-      <input class="tk-in" type="number" id="tkB" step="10" inputmode="decimal"><span class="tk-x">×</span>
-      <input class="tk-in" type="number" id="tkH" step="10" inputmode="decimal">
+      <input class="tk-in" type="number" id="tkL" min="200" step="10" inputmode="decimal"><span class="tk-x">×</span>
+      <input class="tk-in" type="number" id="tkB" min="200" step="10" inputmode="decimal"><span class="tk-x">×</span>
+      <input class="tk-in" type="number" id="tkH" min="200" step="10" inputmode="decimal">
       <span class="fhint">длина × ширина × высота, наружные</span></div>
     <div class="frow"><span class="lb">Лист</span><div class="chips" id="tkS"></div></div>
     <div class="frow"><span class="lb">Марка стали</span><div class="chips" id="tkMark"></div></div>
@@ -1396,7 +1397,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
     <div class="frow"><span class="lb">Изоляция</span><div class="chips" id="tkIns"></div>
       <span class="fhint">+ обшивка нерж 0,5 мм</span></div>
     <div class="frow"><span class="lb">Опоры</span><div class="chips" id="tkLeg"></div>
-      <span id="tkLegR"><input class="tk-in" type="number" id="tkLegH" step="10" inputmode="decimal">
+      <span id="tkLegR"><input class="tk-in" type="number" id="tkLegH" min="0" step="10" inputmode="decimal">
       <span class="fhint">высота опор, мм</span></span></div>
     <div class="frow"><span class="lb">Присоединения</span><div class="chips" id="tkDu"></div>
       <span class="fhint">вход обратки и выход к машине</span></div>
@@ -2850,16 +2851,74 @@ function frameFor(it){
 function seatOf(fr,face,wantHole){
   return face==='cap'?capTop(fr,wantHole):panTop(fr);
 }
-/* ═══ v2.46.010: прибор в лицевой панели ═══
+/* ═══ v2.46.050: прибор в штатном отверстии лицевой панели ═══
    Манометры ВД и НД у нас стоят не на трубе, а в лицевой панели корпуса:
    циферблат наружу, штуцер 1/4" SAE внутрь, к контуру — капилляр от клапана
-   Шрадера, впаянного в нагнетание и всасывание. Врезка держит прибор на
-   плоскости панели и разворачивает его лицом наружу; двигать его вдоль панели
-   и по высоте можно как обычно — прижим по глубине пересчитывается сам.
-   Лицевая панель — сторона минимального Y: там же стоит и щит (SLOT.panel). */
+   Шрадера, впаянного в нагнетание и всасывание. В корпусе 600×900 для них уже
+   вырезаны два отверстия Ø79. Сажаем в их точные центры в СК корпуса, а не в условный
+   ряд по bounding box. Так прибор остаётся в отверстии при перемещении и повороте корпуса. */
+const FACE_HOLES=[
+  {p:[-369.5,293.875,638],d:79},
+  {p:[-369.5,293.875,488],d:79},
+];
+function faceHoleGrid(fr){
+  const g=fr&&fr.obj&&fr.obj.geometry;if(!g)return [];
+  if(!g.boundingBox)g.computeBoundingBox();
+  const s=g.boundingBox.getSize(new THREE.Vector3());
+  /* Координаты относятся только к нашему корпусу 900×606×899. */
+  if(Math.abs(s.x-900)>15||Math.abs(s.y-606)>15||s.z<890||s.z>970)return [];
+  return FACE_HOLES.map((h,i)=>({i,p:h.p.slice(),d:h.d}));
+}
+function faceHolePoint(fr,h){
+  fr.obj.updateMatrixWorld(true);
+  return fr.obj.localToWorld(new THREE.Vector3(h.p[0],h.p[1],h.p[2]));
+}
+function faceHolePick(it,fr,near){
+  let H=faceHoleGrid(fr);if(!H.length)return null;
+  const busy=new Set(placed.filter(p=>p!==it&&p.link&&p.link.to===fr.uid&&
+    p.link.mount==='face'&&Number.isInteger(p.link.hole)).map(p=>p.link.hole));
+  H=H.filter(h=>!busy.has(h.i));if(!H.length)return null;
+  if(near){
+    H.sort((a,b)=>faceHolePoint(fr,a).distanceToSquared(near)-
+                  faceHolePoint(fr,b).distanceToSquared(near));
+  }else{
+    const rank=Math.min(gaugeRank(it.d),H.length-1);
+    H.sort((a,b)=>b.p[2]-a.p[2]);
+    H=H.slice(rank).concat(H.slice(0,rank));
+  }
+  return H[0];
+}
+function faceHolesShow(fr){
+  holesHide();holeMk=new THREE.Group();
+  const fq=fr.obj.getWorldQuaternion(new THREE.Quaternion()),
+        q=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
+  q.premultiply(fq);
+  faceHoleGrid(fr).forEach(h=>{
+    const m=new THREE.Mesh(new THREE.RingGeometry(h.d/2-4,h.d/2+4,36),
+      new THREE.MeshBasicMaterial({color:0xC9A227,transparent:true,opacity:.95,
+        side:THREE.DoubleSide,depthTest:false}));
+    const p=faceHolePoint(fr,h),n=new THREE.Vector3(0,1,0).applyQuaternion(fq);
+    m.position.copy(p).addScaledVector(n,2);m.quaternion.copy(q);m.renderOrder=990;holeMk.add(m);
+  });
+  scene.add(holeMk);holeTmr=setTimeout(holesHide,7000);
+}
 function faceMate(it){
   const fr=placed.find(p=>p.uid===it.link.to);
   if(!fr){it.link=null;return false;}
+  if(Array.isArray(it.link.lp)){
+    const g=it.obj.geometry;if(!g.boundingBox)g.computeBoundingBox();
+    const b=g.boundingBox,anchor=new THREE.Vector3(b.max.x-4,
+      (b.min.y+b.max.y)/2,(b.min.z+b.max.z)/2);
+    const fq=fr.obj.getWorldQuaternion(new THREE.Quaternion()),
+          turn=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2);
+    it.obj.quaternion.copy(fq).multiply(turn);it.obj.position.set(0,0,0);it.obj.updateMatrixWorld(true);
+    anchor.applyMatrix4(it.obj.matrixWorld);
+    const hp=fr.obj.localToWorld(new THREE.Vector3(...it.link.lp));
+    it.obj.position.copy(hp.sub(anchor));it.obj.updateMatrixWorld(true);
+    if(it._pinBox)it._pinBox.update();
+    return true;
+  }
+  /* Старые проекты без номера отверстия остаются на прежней плоскости. */
   const fb=new THREE.Box3().setFromObject(fr.obj);
   it.obj.rotation.set(0,0,-Math.PI/2);        // локальный +X (циферблат) → −Y
   it.obj.updateMatrixWorld(true);
@@ -2877,6 +2936,11 @@ const FACE_LVL=0.72, FACE_EDGE=90, FACE_GAP=40;
 function facePlace(it){
   const fr=frameFor(it);
   if(!fr)return false;                        // корпуса в сцене нет — ставить не во что
+  const hole=isGauge(it.d)?faceHolePick(it,fr):null;
+  if(hole){
+    it.link={to:fr.uid,mount:'face',face:'front',hole:hole.i,lp:hole.p.slice(),d:hole.d};
+    faceMate(it);faceHolesShow(fr);return true;
+  }
   const fb=new THREE.Box3().setFromObject(fr.obj);
   it.link={to:fr.uid,mount:'face',face:'front'};
   if(!faceMate(it))return false;              // разворот лицом наружу и прижим по глубине
@@ -2913,6 +2977,16 @@ function faceSel(){
   if(!sel)return;
   const fr=frameFor(sel);
   if(!fr){toast('В сцене нет корпуса — добавь его из раздела «Корпуса и рамы»');return;}
+  const near=new THREE.Box3().setFromObject(sel.obj).getCenter(new THREE.Vector3()),
+        hole=isGauge(sel.d)?faceHolePick(sel,fr,near):null;
+  if(isGauge(sel.d)&&faceHoleGrid(fr).length){
+    if(!hole){toast('Оба штатных отверстия Ø79 уже заняты');return;}
+    pushHist('врезку манометра в штатное отверстие');
+    sel.link={to:fr.uid,mount:'face',face:'front',hole:hole.i,lp:hole.p.slice(),d:hole.d};
+    faceMate(sel);faceHolesShow(fr);pinMark(sel);selBtns();checkCollisions();showSelZ();refresh();save();
+    toast('Манометр защёлкнут в штатное отверстие Ø'+hole.d+
+      ' · подключение капилляром');return;
+  }
   pushHist('врезку прибора в панель');
   const fb=new THREE.Box3().setFromObject(fr.obj);
   sel.link={to:fr.uid,mount:'face',face:'front'};
@@ -6491,6 +6565,8 @@ function posSpin(ax,deg){
     sel.obj.updateMatrixWorld(true);
   }
   if(sel.link)reseatLink(sel);
+  if(roleOf(sel.d)==='frame')placed.forEach(p=>{
+    if(p.link&&p.link.to===sel.uid&&p.link.mount==='face')faceMate(p);});
   if(sel._pinBox)sel._pinBox.update();
   posDone();
 }
@@ -6583,6 +6659,8 @@ function spinSel(ax){
     sel.obj.updateMatrixWorld(true);
   }
   if(sel.link)reseatLink(sel);
+  if(roleOf(sel.d)==='frame')placed.forEach(p=>{
+    if(p.link&&p.link.to===sel.uid&&p.link.mount==='face')faceMate(p);});
   if(sel._pinBox)sel._pinBox.update();
   checkCollisions();showSelZ();refresh();save();
 }
@@ -6728,7 +6806,10 @@ function projPayload(){
                                              zi:p.link.zi,pzi:p.link.pzi,
                                              roll:p.link.roll,
                                              rel:p.link.rel?{p:p.link.rel.p.slice(),
-                                                             q:p.link.rel.q.slice()}:undefined}:null,
+                                                             q:p.link.rel.q.slice()}:undefined,
+                                             hole:p.link.hole,
+                                             lp:Array.isArray(p.link.lp)?p.link.lp.slice():undefined,
+                                             d:p.link.d}:null,
                                 tk:isTank(p.d)?p.d.tk:undefined,   // бак: размеры и исполнение
                                 po:p.po&&Object.keys(p.po).length?JSON.parse(JSON.stringify(p.po)):undefined,
                                 pl:isPipeSeg(p)?pipeLen(p):undefined,
@@ -6814,12 +6895,15 @@ async function histApply(snapshot){
          отмены цепочка «труба → арматура → труба» садиться перестаёт */
       p.link=it.link?{to:it.link.to,mount:it.link.mount,face:it.link.face||'pan',
                       zi:it.link.zi,pzi:it.link.pzi,roll:it.link.roll,
-                      rel:it.link.rel?{p:it.link.rel.p.slice(),q:it.link.rel.q.slice()}:undefined}:null;
+                      rel:it.link.rel?{p:it.link.rel.p.slice(),q:it.link.rel.q.slice()}:undefined,
+                      hole:it.link.hole,lp:Array.isArray(it.link.lp)?it.link.lp.slice():undefined,
+                      d:it.link.d}:null;
       if(it.pl&&isPipeSeg(p))setPipeLen(p,it.pl);      // длина отрезка тоже в снимке
       p.off=Array.isArray(it.off)?it.off.slice():[];
       p.po=it.po?JSON.parse(JSON.stringify(it.po)):null;
       applyOff(p);pinMark(p);
     }
+    placed.forEach(p=>{if(p.link&&p.link.mount==='face')faceMate(p);});
     schemaData=data.schema||{};
   }finally{_loading=false;}
   if(sel&&!placed.includes(sel))sel=null;
@@ -6869,7 +6953,8 @@ async function loadProjectData(data){
   placed.forEach(p=>{if(p.link&&map[p.link.to])p.link={to:map[p.link.to],mount:p.link.mount,
                                                        face:p.link.face||'pan',zi:p.link.zi,
                                                        pzi:p.link.pzi,roll:p.link.roll,
-                                                       rel:p.link.rel};
+                                                       rel:p.link.rel,hole:p.link.hole,
+                                                       lp:p.link.lp,d:p.link.d};
                      else if(p.link&&!placed.some(x=>x.uid===p.link.to))p.link=null;});
   /* v2.46.021: пара авто-длины тоже ссылается на uid — перевешиваем и её */
   placed.forEach(p=>{
@@ -6877,6 +6962,7 @@ async function loadProjectData(data){
     if(map[p.fit.to])p.fit={to:map[p.fit.to],zi:p.fit.zi};
     else if(!placed.some(x=>x.uid===p.fit.to))p.fit=null;});
   rotReseat();                      // связи починены — вентили садятся на свои штуцеры
+  placed.forEach(p=>{if(p.link&&p.link.mount==='face')faceMate(p);});
   _loading=false;
   histReset();                      // v2.45.996: у каждого проекта своя история
   select(null);refresh();renderSchema();
@@ -8603,6 +8689,7 @@ function tkChips(box,list,key,cb){
     (cb||tkDraw)();});
 }
 function tkDraw(){
+  const editing=arguments[0];
   tkChips('#tkS',TK_S.map(v=>[v,tkG2(v)+' мм']),'s');
   tkChips('#tkMark',TK_MARK,'mark');
   tkChips('#tkLid',TK_LID,'lid');
@@ -8612,8 +8699,13 @@ function tkDraw(){
   tkChips('#tkPart',[[0,'нет'],[1,'есть']],'part');
   tkChips('#tkOver',[[0,'нет'],[1,'есть']],'over');
   tkFixDraw();
-  $('#tkL').value=TKP.L;$('#tkB').value=TKP.B;$('#tkH').value=TKP.H;
-  $('#tkLegH').value=TKP.legH;
+  /* Не переписываем поле, в котором человек сейчас печатает. Раньше первый
+     символ "4" сразу зажимался Math.max до 200, tkDraw возвращал в input
+     старое значение, и набрать 400 было физически невозможно. */
+  if(editing!=='tkL')$('#tkL').value=TKP.L;
+  if(editing!=='tkB')$('#tkB').value=TKP.B;
+  if(editing!=='tkH')$('#tkH').value=TKP.H;
+  if(editing!=='tkLegH')$('#tkLegH').value=TKP.legH;
   $('#tkLegR').style.display=TKP.leg==='none'?'none':'';
   const c=tkCalc(TKP);
   const cut=c.cut.filter(r=>r.n>0);
@@ -8647,11 +8739,19 @@ function tkDraw(){
   tkPreviewUpdate();
 }
 const tkCell=(k,v)=>'<div class="c"><i>'+esc(k)+'</i><b>'+esc(v)+'</b></div>';
-function tkFields(){
-  TKP.L=Math.max(200,tkNum($('#tkL').value,TKP.L));
-  TKP.B=Math.max(200,tkNum($('#tkB').value,TKP.B));
-  TKP.H=Math.max(200,tkNum($('#tkH').value,TKP.H));
-  TKP.legH=Math.max(0,tkNum($('#tkLegH').value,TKP.legH));
+const TK_FIELD={tkL:['L',200],tkB:['B',200],tkH:['H',200],tkLegH:['legH',0]};
+function tkFieldInput(e){
+  const el=e.currentTarget||e.target,[key,min]=TK_FIELD[el.id],v=tkNum(el.value,NaN);
+  /* Пустая строка, "4" и "40" при замене 200 на 400 — нормальные
+     промежуточные состояния. Не зажимаем их и не перестраиваем меш. */
+  if(!isFinite(v)||v<min){el.classList.add('draft');return;}
+  el.classList.remove('draft');TKP[key]=v;
+  tkSmartInvalidate('Размеры изменились — пересчитай варианты.');
+  tkDraw(el.id);
+}
+function tkFieldCommit(e){
+  const el=e.currentTarget||e.target,[key,min]=TK_FIELD[el.id],v=tkNum(el.value,TKP[key]);
+  TKP[key]=Math.max(min,v);el.classList.remove('draft');
   tkSmartInvalidate('Размеры изменились — пересчитай варианты.');
   tkDraw();
 }
@@ -8731,7 +8831,7 @@ $('#tkAll').onclick=()=>tkViewSet('all');
 $('#tkSmartRun').onclick=tkSmartRun;
 $('#tkFixRun').onclick=tkFixDesign;
 ['tkL','tkB','tkH','tkLegH'].forEach(id=>{
-  const el=$('#'+id);if(el)el.oninput=tkFields;});
+  const el=$('#'+id);if(el){el.oninput=tkFieldInput;el.onchange=tkFieldCommit;}});
 $('#bTankEd').onclick=()=>sel&&isTank(sel.d)&&tkOpen(sel);
 
 $('#fltX').onclick=fltClose;

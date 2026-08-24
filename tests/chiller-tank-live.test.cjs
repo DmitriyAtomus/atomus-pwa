@@ -32,6 +32,19 @@ test('конструктор объясняет живой предпросмо�
   assert.match(page, /\$\('#tnk'\)\.classList\.contains\('on'\)\)\{tkClose\(\);return;\}/);
 });
 
+test('размер 200 можно заменить на 400 обычным вводом', () => {
+  const modal = section('<div id="tnk">', '<div id="mdz">');
+  for (const id of ['tkL', 'tkB', 'tkH']) {
+    assert.match(modal, new RegExp(`id="${id}" min="200"`));
+  }
+  const input = section('const TK_FIELD=', 'function tkOpen(it)');
+  assert.match(input, /if\(!isFinite\(v\)\|\|v<min\)\{el\.classList\.add\('draft'\);return;\}/,
+    'промежуточные 4 и 40 не зажимаются обратно до 200');
+  assert.match(input, /tkDraw\(el\.id\)/,
+    'активное поле не переписывается при живом пересчёте');
+  assert.match(page, /el\.oninput=tkFieldInput;el\.onchange=tkFieldCommit/);
+});
+
 test('временный меш не попадает в placed, историю и save', () => {
   const preview = section('function tkPreviewMats(geo)', 'function tkChips(box,list,key,cb)');
   assert.doesNotMatch(preview, /placed\.push/);
