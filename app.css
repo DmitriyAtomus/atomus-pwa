@@ -22716,6 +22716,20 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
     white-space: nowrap;
   }
 
+  /* v2.46.058: выбор изделия, из ведомости которого берём штуки */
+  .pmq-list { display: flex; flex-direction: column; gap: 8px; }
+  .pmq-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    width: 100%; text-align: left; cursor: pointer; font-family: inherit; font-size: 13px;
+    background: white; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+  }
+  .pmq-row:hover { border-color: var(--brand); background: var(--brand-bg); }
+  .pmq-main { min-width: 0; }
+  .pmq-cnt {
+    flex: none; font-size: 11.5px; font-weight: 700; color: var(--brand);
+    background: var(--brand-bg); border-radius: 99px; padding: 3px 9px; white-space: nowrap;
+  }
+
   .pd-materials { display: flex; flex-direction: column; gap: 8px; }
   .pd-mat { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
   .pd-mat-head { font-size: 13px; }

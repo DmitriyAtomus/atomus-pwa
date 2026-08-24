@@ -16828,6 +16828,12 @@ function renderPaintCalcDetail(c) {
         : '') +
       '<button class="btn btn-secondary btn-small" onclick="paintManualOpen(' + c.id + ')">' +
         '<i class="ti ti-plus"></i> Своя деталь</button>' +
+      // v2.46.058: штуки берём из ведомости изделия в «Изготовлении корпусов»
+      (items.length
+        ? '<button class="btn btn-secondary btn-small" title="Взять количество из ведомости изделия" ' +
+          'onclick="openPaintMfgQty(' + c.id + ')">' +
+          '<i class="ti ti-box-multiple"></i> Штуки из изделия</button>'
+        : '') +
       '<button class="btn btn-secondary btn-small ral-head-btn" ' +
         'title="Выбрать цвет: белый, серый, чёрный или код RAL" ' +
         'onclick="openPaintRalPicker(' + c.id + ', null, &quot;' +
@@ -17815,6 +17821,84 @@ async function _paintRenameSave(calcId) {
     state.paintCalcs = null;
     renderPaintCalcDetail(d);
     showToast('Сохранено', 'success');
+  } catch (e) {
+    showToast('Ошибка: ' + String((e && e.message) || e), 'error');
+  }
+}
+
+// ============ v2.46.058: ШТУКИ ИЗ ВЕДОМОСТИ ИЗДЕЛИЯ ============
+// Количество на изделие уже посчитано в «Изготовлении корпусов»: там лежит
+// та же папка с раскроем и разобранная ведомость деталей. Здесь его не
+// набивают заново, а подтягивают — по обозначению детали.
+async function openPaintMfgQty(calcId) {
+  let m = document.getElementById('paint-mfgqty-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'paint-mfgqty-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closePaintMfgQty(); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML = _paintMfgQtyShell('<div class="pd-dim" style="padding:14px 0;">Ищем изделие…</div>');
+  m.classList.add('visible');
+  try {
+    const d = await apiGet('/api/paint-calcs/' + calcId + '/mfg-matches');
+    const list = (d && d.items) || [];
+    const total = (d && d.total) || 0;
+    let body;
+    if (!list.length) {
+      body = '<div class="pd-warn" style="margin:0;"><i class="ti ti-alert-triangle"></i> ' +
+        'В «Изготовлении корпусов» нет изделия с такими обозначениями. ' +
+        'Заведите там изделие с этой папкой раскроя — тогда количество подтянется само.</div>';
+    } else {
+      body = '<div class="pd-dim" style="margin-bottom:8px;">Позиций в расчёте: ' + total +
+        '. Штуки встанут по обозначению детали; свои позиции без обозначения не тронем.</div>' +
+        '<div class="pmq-list">' + list.map(it =>
+          '<button class="pmq-row" onclick="_paintMfgQtyApply(' + calcId + ',' + it.item_id + ')">' +
+            '<span class="pmq-main">' +
+              (it.designation ? '<b>' + escapeHtml(it.designation) + '</b> ' : '') +
+              escapeHtml(it.name || 'Изделие') +
+              (it.section_name ? '<span class="pd-dim"> · ' + escapeHtml(it.section_name) + '</span>' : '') +
+            '</span>' +
+            '<span class="pmq-cnt">совпало ' + it.matched + ' из ' + total + '</span>' +
+          '</button>').join('') + '</div>';
+    }
+    m.innerHTML = _paintMfgQtyShell(body);
+  } catch (e) {
+    m.innerHTML = _paintMfgQtyShell('<div class="pd-warn" style="margin:0;">' +
+      '<i class="ti ti-alert-triangle"></i> Не получилось: ' +
+      escapeHtml(String((e && e.message) || e)) + '</div>');
+  }
+}
+
+function _paintMfgQtyShell(inner) {
+  return '<div class="modal" onclick="event.stopPropagation()" style="max-width:560px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-box-multiple"></i> Штуки из ведомости изделия</h3>' +
+        '<button class="modal-close" onclick="closePaintMfgQty()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-content">' + inner + '</div>' +
+    '</div>';
+}
+
+function closePaintMfgQty() {
+  const m = document.getElementById('paint-mfgqty-modal');
+  if (m) m.classList.remove('visible');
+}
+
+async function _paintMfgQtyApply(calcId, itemId) {
+  try {
+    const r = await apiPost('/api/paint-calcs/' + calcId + '/qty-from-mfg', { item_id: itemId });
+    const d = (r && r.data) || {};
+    if (!r || !r.ok) { showToast(d.message || 'Не получилось подтянуть', 'error'); return; }
+    closePaintMfgQty();
+    if (d.calc) {
+      state.currentPaintCalc = d.calc;
+      renderPaintCalcDetail(d.calc);
+    }
+    showToast(d.applied
+      ? 'Количество подтянуто: позиций ' + d.applied
+      : 'Количество уже совпадало с ведомостью', 'success');
   } catch (e) {
     showToast('Ошибка: ' + String((e && e.message) || e), 'error');
   }
