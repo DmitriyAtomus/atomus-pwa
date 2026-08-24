@@ -1898,6 +1898,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'catalog') loadCatalog();                   // ЭТАП 47 (v2.44.0)
   if (screenName === 'developments') loadDevelopments();         // ЭТАП 48 (v2.44.46)
   if (screenName === 'paint-calc') loadPaintCalcs();              // v2.45.836
+  if (screenName === 'units-journal') loadUnitsJournal();         // v2.46.054
   if (screenName === 'mfg') loadMfg();                            // v2.45.844
   if (screenName === 'inventory') loadInventory();               // ЭТАП 49 (v2.44.56)
   // КП (14Б)
@@ -4736,6 +4737,7 @@ const AUTO_REFRESH_SKIP = [
   'model-form', 'vacation-form', 'new-assembly', 'sales-contractor-form',
   'wh-ship-qr', 'security', 'atom-electrica', 'atom-chiller',
   'defects-detail', 'defects-chats', 'developments', 'inventory', 'paint-calc', 'mfg',
+  'units-journal',   // правка прямо в ячейке — перерисовка стёрла бы недописанное
   'mail-messenger',
 ];
 
