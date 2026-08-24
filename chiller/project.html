@@ -3856,22 +3856,32 @@ function checkHits(){
   const frames=placed.filter(p=>roleOf(p.d)==='frame');
   frames.forEach(f=>f._hit=new Set());
   if(!frames.length)return;
-  const chk=placed.filter(p=>!HIT_SKIP.has(roleOf(p.d)));
+  /* v2.46.050: трубы и фитинги тоже проверяем об панели — правило Дмитрия:
+     всё, что пересеклось, светится. Прошивка глухой панели — нарушение
+     (погашенная панель и посадки не в счёт); текст идёт в pipeBad, а не в
+     «упор в корпус», чтобы кнопка «уберу внутрь» трубы не трогала. */
+  const chk=placed.filter(p=>{const r=roleOf(p.d);return r!=='frame'&&r!=='vibro';});
   if(!chk.length)return;
   frames.forEach(fr=>{
     const boxes=framePartBoxes(fr);if(!boxes)return;
     const PT=fr.obj.geometry.userData.parts;
     const ms=Array.isArray(fr.obj.material)?fr.obj.material:[fr.obj.material];
     chk.forEach(p=>{
+      const isP=roleOf(p.d)==='pipe';
+      if(isP&&p.link&&(p.link.mount==='face'||p.link.to===fr.uid))return; // врезка/посадка
       /* усадка 5 мм — у узла, а деталь корпуса берём как есть: панель
          толщиной 2 мм от такой усадки схлопнулась бы и не ловилась вовсе */
-      const b=new THREE.Box3().setFromObject(p.obj).expandByScalar(-HIT_TOL);
+      const b=new THREE.Box3().setFromObject(p.obj).expandByScalar(-(isP?2:HIT_TOL));
       if(b.isEmpty())return;
       boxes.forEach((fb,i)=>{
         if(ms[i]&&ms[i].visible===false)return;      // погашенную деталь не считаем
         const nm=(PT[i]&&PT[i].name)||'деталь корпуса';
         if(seatPart(p,nm)||!fb.intersectsBox(b))return;
         if(!frameRealHit(p,fr,i,b,fb))return;        // коробки задели, металл — нет
+        if(isP){
+          if(!pipeBad.has(p.uid))pipeBad.set(p.uid,'сквозь · '+nm);
+          return;
+        }
         fr._hit.add(i);hitSet.add(p.uid);
         if(!hitWho.has(p.uid))hitWho.set(p.uid,new Set());
         hitWho.get(p.uid).add(nm);
@@ -4799,17 +4809,36 @@ function pipeAxisCuts(A,B,o){
     if(inMesh(T,pts[i],pts[i+1],pts[i+2]))n++;}
   return n*8>=24;
 }
+/* кратчайшее расстояние между отрезками a1-a2 и b1-b2 (мм) + параметры точек */
+function segSegDist(a1,a2,b1,b2){
+  const d1=a2.clone().sub(a1),d2=b2.clone().sub(b1),r=a1.clone().sub(b1);
+  const A=d1.dot(d1),E=d2.dot(d2),B=d1.dot(d2),C=d1.dot(r),F=d2.dot(r);
+  let s=0,t=0;
+  if(A>1e-8&&E>1e-8){
+    const den=A*E-B*B;
+    s=den>1e-8?Math.min(1,Math.max(0,(B*F-C*E)/den)):0;
+    t=(B*s+F)/E;
+    if(t<0){t=0;s=Math.min(1,Math.max(0,-C/A));}
+    else if(t>1){t=1;s=Math.min(1,Math.max(0,(B-C)/A));}
+  }
+  const p1=a1.clone().addScaledVector(d1,s),p2=b1.clone().addScaledVector(d2,t);
+  return {d:p1.distanceTo(p2),s:s,t:t};
+}
 function checkPipes(){
   pipeBad=new Map();
   const tubes=placed.filter(isPipeSeg);
   if(!tubes.length)return;
   const obst=placed.filter(p=>!isPipeSeg(p)&&!HIT_SKIP.has(roleOf(p.d)));
+  const segs=[];
   tubes.forEach(t=>{
     t.obj.updateMatrixWorld(true);
     const L=pipeLen(t);
     const ax=new THREE.Vector3(1,0,0).applyQuaternion(t.obj.quaternion).normalize();
     const c=new THREE.Box3().setFromObject(t.obj).getCenter(new THREE.Vector3());
     const A=c.clone().addScaledVector(ax,-L/2);
+    const gb=t.obj.geometry.boundingBox;
+    segs.push({t:t,A:A,B:A.clone().addScaledVector(ax,L),L:L,
+               r:((gb.max.y-gb.min.y)/2)*(t.obj.scale.y||1)});
     obst.forEach(o=>{
       if(t.link&&t.link.to===o.uid)return;          // труба сидит на его штуцере
       if(o.link&&o.link.to===t.uid)return;          // это он сидит на трубе
@@ -4817,6 +4846,21 @@ function checkPipes(){
         pipeBad.set(t.uid,'проходит сквозь · '+o.d.name);
     });
   });
+  /* v2.46.050: труба сквозь трубу. Оси двух сегментов сблизились теснее суммы
+     радиусов — это прошивка. Сближение у самых концов обеих — стык (муфта
+     наденется), его отдельно судит «стык без фитинга». */
+  const JOINT_END=45;
+  for(let i=0;i<segs.length;i++)for(let j=i+1;j<segs.length;j++){
+    const a=segs[i],b=segs[j];
+    if(a.t.link&&a.t.link.to===b.t.uid)continue;
+    if(b.t.link&&b.t.link.to===a.t.uid)continue;
+    const q=segSegDist(a.A,a.B,b.A,b.B);
+    if(q.d>=a.r+b.r-MESH_TOL)continue;
+    const endA=Math.min(q.s,1-q.s)*a.L,endB=Math.min(q.t,1-q.t)*b.L;
+    if(endA<JOINT_END&&endB<JOINT_END)continue;
+    if(!pipeBad.has(a.t.uid))pipeBad.set(a.t.uid,'пересекается с трубой · '+b.t.d.name);
+    if(!pipeBad.has(b.t.uid))pipeBad.set(b.t.uid,'пересекается с трубой · '+a.t.d.name);
+  }
   /* стык без фитинга: концы сошлись, а присоединения разные */
   const ends=[];
   placed.forEach(it=>{
@@ -4844,7 +4888,7 @@ function checkCollisions(){
      патрубок. Поэтому трубы перетягиваются здесь, до проверки пересечений:
      иначе красным светилась бы длина, которой уже нет. */
   pipeAutoSync();
-  collSet=new Set();checkOutside();checkHits();checkPipes();
+  collSet=new Set();checkOutside();checkPipes();checkHits();
   pipeBad.forEach((txt,uid)=>collSet.add(uid));      // нарушитель светится красным
   // AABB теперь только грубое сито: коробки задели — спор решает геометрия меша.
   // Усадка коробки убрана, допуск на касание держит разбор по треугольникам

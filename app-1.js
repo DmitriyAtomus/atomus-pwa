@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.039";
+const APP_VERSION = "v2.46.050";
 const APP_VERSION_DATE = "24.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
