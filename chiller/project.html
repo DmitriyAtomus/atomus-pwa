@@ -810,15 +810,46 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
   .pas-route{grid-template-columns:1fr}.pas-route label{margin-top:5px}}
 /* ═══ бак водяного контура: конструктор (v2.46.014) ═══ */
 #tnk{position:fixed;inset:0;background:linear-gradient(90deg,rgba(3,8,16,.18),rgba(3,8,16,.72));
-  z-index:22;display:none;align-items:stretch;justify-content:flex-end}
+  z-index:22;display:none;align-items:stretch;justify-content:flex-end;pointer-events:none}
 #tnk.on{display:flex}
 .tk-card{width:min(760px,56vw);max-height:100vh;border-radius:12px 0 0 12px;
-  box-shadow:-24px 0 60px rgba(0,0,0,.46)}
+  box-shadow:-24px 0 60px rgba(0,0,0,.46);pointer-events:auto}
 .tk-live{display:flex;align-items:center;gap:8px;margin:0 0 11px;padding:8px 10px;
   border:1px solid rgba(79,191,139,.26);border-radius:8px;background:rgba(79,191,139,.08);
   color:var(--dim);font-size:11px;line-height:1.4}
 .tk-live:before{content:'\25CF';color:var(--ok);font-size:10px}
 .tk-live b{color:var(--ok);font-weight:600}
+.tk-view{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 11px}
+.tk-view .lb{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);
+  margin-right:3px}
+.tk-view button,.tk-smart button{border:1px solid var(--line2);border-radius:7px;padding:5px 9px;
+  background:var(--panel2);color:var(--ink);font:inherit;font-size:11px;cursor:pointer}
+.tk-view button:hover,.tk-smart button:hover{border-color:var(--ice2);color:var(--ice)}
+.tk-view button.on{border-color:var(--ice2);color:var(--ice);background:rgba(27,159,216,.13)}
+.tk-smart{margin:12px 0 2px;padding:10px;border:1px solid var(--line2);border-radius:10px;
+  background:rgba(8,24,45,.62)}
+.tk-smart-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tk-smart-h b{font-size:12px;color:#fff}
+.tk-smart-h span{font-size:10.5px;color:var(--faint);line-height:1.35;flex:1 1 250px}
+.tk-smart-h button{color:#bfe8d6;border-color:rgba(79,191,139,.42)}
+.tk-fix{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:9px;padding-top:9px;
+  border-top:1px solid var(--line)}
+.tk-fix .lb{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+.tk-fix .chip{padding:4px 8px}
+.tk-fix button{margin-left:auto;color:#e8d49a;border-color:rgba(201,162,39,.46)}
+.tk-smart-res{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:9px}
+.tk-plan{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);
+  cursor:pointer;min-width:0}
+.tk-plan:hover{border-color:var(--ice2)}
+.tk-plan.on{border-color:var(--ok);box-shadow:inset 0 0 0 1px rgba(79,191,139,.18)}
+.tk-plan.bad{border-color:rgba(217,79,61,.45);cursor:default}
+.tk-plan b{display:block;font-size:11px;color:var(--ice);margin-bottom:4px}
+.tk-plan i{display:block;font-style:normal;font-size:10px;color:var(--dim);line-height:1.4}
+.tk-plan small{display:block;font-size:9.5px;color:var(--faint);line-height:1.35;margin-top:5px}
+.tk-smart-note{grid-column:1/-1;padding:7px 8px;border-radius:7px;font-size:10.5px;
+  color:var(--dim);background:rgba(27,159,216,.07);line-height:1.45}
+.tk-smart-note.warn{color:#f0a9a0;background:rgba(217,79,61,.08)}
+body.tk-tank-solo #ports,body.tk-tank-solo #rots{display:none!important}
 .tk-in{width:84px;background:var(--panel2);color:var(--ink);border:1px solid var(--line2);
   border-radius:7px;padding:5px 9px;font:inherit;font-size:12.5px}
 .tk-x{color:var(--faint);font-size:12px}
@@ -845,7 +876,7 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 .tk-act .btn{flex:1}
 @media(max-width:1100px){.tk-card{width:min(680px,72vw)}}
 @media(max-width:720px){#tnk{background:rgba(3,8,16,.76)}.tk-card{width:100vw;max-height:100vh;
-  border-radius:0}.tk-act{flex-wrap:wrap}.tk-act .btn{flex:1 1 42%}}
+  border-radius:0}.tk-act{flex-wrap:wrap}.tk-act .btn{flex:1 1 42%}.tk-smart-res{grid-template-columns:1fr}}
 @media(max-width:900px){.frow>.lb{min-width:100%;margin-bottom:-2px}}
 /* ═══════════════ ТЕЛЕФОН: одна колонка, шторки, жесты (v2.46.029) ═══════════════
    На узком экране каталог и спецификация уезжают в шторки снизу, сцена занимает
@@ -1307,6 +1338,13 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
     <span class="sub">прямоугольный сварной · размеры свои</span><span class="x" id="tkX">✕</span></div>
   <div class="flt-body">
     <div class="tk-live" id="tkLive"><b>Живой 3D-предпросмотр</b> — временный меш виден в сцене, но пока не входит в проект и BOM.</div>
+    <div class="tk-view">
+      <span class="lb">Вид в сцене</span>
+      <button id="tkFocus" title="Показать бак крупно">◎ Фокус на бак</button>
+      <button id="tkDim">◐ Приглушить остальное</button>
+      <button id="tkSolo">◉ Только бак</button>
+      <button id="tkAll">◎ Вся сцена</button>
+    </div>
     <div class="frow"><span class="lb">Размеры, мм</span>
       <input class="tk-in" type="number" id="tkL" step="10" inputmode="decimal"><span class="tk-x">×</span>
       <input class="tk-in" type="number" id="tkB" step="10" inputmode="decimal"><span class="tk-x">×</span>
@@ -1326,6 +1364,14 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
       <span class="fhint">высота опор, мм</span></span></div>
     <div class="frow"><span class="lb">Присоединения</span><div class="chips" id="tkDu"></div>
       <span class="fhint">вход обратки и выход к машине</span></div>
+    <div class="tk-smart">
+      <div class="tk-smart-h"><b>Клава · инженерная компоновка</b>
+        <span>Локальный расчёт: полость корпуса, коллизии, горелка, радиусы труб, сервис и вес.</span>
+        <button id="tkSmartRun">✦ Рассчитать 3 варианта</button></div>
+      <div class="tk-fix"><span class="lb">Крепление бака</span><div class="chips" id="tkFix"></div>
+        <button id="tkFixRun">⌑ Спроектировать крепления</button></div>
+      <div class="tk-smart-res" id="tkSmartRes"><div class="tk-smart-note">Сначала задай размеры, затем запусти расчёт. Вариант показывается в сцене до подтверждения.</div></div>
+    </div>
     <div class="tk-out" id="tkOut"></div>
   </div>
   <div class="tk-act">
@@ -6149,7 +6195,14 @@ function refresh(){
     const bm=p.link&&BOLT[p.link.mount];
     if(m&&m.hw&&bm)boltBom(p,bm,m.hw).forEach((n,t)=>hw.set(t,(hw.get(t)||0)+n));
     else if(m&&m.hw&&m.n)hw.set(m.hw,(hw.get(m.hw)||0)+m.n);
-    if(m&&m.hw2)hw.set(m.hw2,(hw.get(m.hw2)||0)+m.n2);});
+    if(m&&m.hw2)hw.set(m.hw2,(hw.get(m.hw2)||0)+m.n2);
+    /* Крепление бака в BOM появляется только при жёсткой связи с корпусом
+       и повторной проверке основания. Старый/ручно исправленный JSON не создаст фантомный крепёж. */
+    if(isTank(p.d)&&p.d.tk.fix&&p.d.tk.fix!=='none'&&p.link&&p.link.mount==='tank'){
+      const fr=placed.find(x=>x.uid===p.link.to),ck=fr?tankSupportCheck(p,fr):{ok:false};
+      if(ck.ok){const fx=tkFixData(p.d.tk);hw.set('Крепление бака · '+fx.name,
+        (hw.get('Крепление бака · '+fx.name)||0)+1);}
+    }});
   if(hw.size)$('#spec').innerHTML+=[...hw.entries()].map(([t,n])=>
     `<div class="sr" style="color:var(--dim)"><span class="nm">${esc(t)}</span>`+
     `<span class="n">${n}</span><span class="u">компл</span></div>`).join('');
@@ -7530,6 +7583,7 @@ const TK_MARKN={'304':'AISI 304 (08Х18Н10) — вода, гликоль',
                 '430':'AISI 430 (12Х17) — сухой корпус, не для рассола'};
 const TK_LID=[['none','нет · открытый'],['lift','съёмная'],['weld','сварная с люком']];
 const TK_LEG=[['adj','ножки регулируемые'],['frame','рама 40×40'],['none','без опор']];
+const TK_FIX=[['auto','авто'],['bracket','4 уголка'],['rails','2 опорные рейки']];
 const TK_S=[1.0,1.2,1.5,2.0,3.0];
 const TK_INS=[0,19,25,50];
 const TK_DU=[25,32,40,50];
@@ -7538,10 +7592,11 @@ const TK_PROF=2.5;         // труба профильная 40×40×2 нерж
 const TK_C=4.19, TK_TAU=180, TK_DT=4;   // вода, спиральный компрессор, перепад на баке
 
 const TKD={L:800,B:600,H:700,s:1.5,mark:'304',lid:'none',
-           part:0,ins:0,leg:'adj',legH:120,du:32,over:1,ull:60};
+           part:0,ins:0,leg:'adj',legH:120,du:32,over:1,ull:60,fix:'none'};
 let TKP=Object.assign({},TKD);
 let tkEdit=null;           // uid бака, который правим (иначе — новый)
 let tkPreview=null,tkPreviewOld=null; // временный меш не входит в placed/BOM/save
+let tkFixChoice='auto',tkSmartPlans=[],tkSmartChosen=null;
 
 const tkG=v=>(Math.round(v*10)/10).toString().replace('.',',');
 const tkG2=v=>(Math.round(v*100)/100).toString().replace('.',',');
@@ -7556,8 +7611,19 @@ function tkNorm(P){
     const D=Math.max(200,P.D||600);
     if(P.k==='horz'){P.B=D;P.H=D;}else{P.L=D;P.B=D;}
   }
+  if(!['none','bracket','rails'].includes(P.fix))P.fix='none';
   delete P.k;delete P.D;
   return P;
+}
+
+function tkFixData(P,choice){
+  let k=choice||P.fix||'none';
+  if(k==='auto')k=tkCalc(P).massFull>=400||P.L>=900?'rails':'bracket';
+  if(k==='rails')return {key:k,n:2,bolts:4,thr:'М10',mass:9.2,
+    name:'2 опорные рейки 40×40 и 4 анкера М10'};
+  if(k==='bracket')return {key:k,n:4,bolts:4,thr:'М8',mass:3.4,
+    name:'4 монтажных уголка и 4 болта М8×25'};
+  return {key:'none',n:0,bolts:0,thr:'',mass:0,name:'без крепления к корпусу'};
 }
 
 /* ── раскрой и цифры ─────────────────────────────────────────────────────── */
@@ -7640,6 +7706,8 @@ const TK_PART=[
   {key:'aux' ,des:'—',name:'Слив, перелив, воздушник',col:'#4FBF8B'},
   {key:'ins' ,des:'—',name:'Изоляция и обшивка',col:'#2b3138'},
   {key:'leg' ,des:'—',name:'Опоры',col:'#7d868e'},
+  {key:'fix' ,des:'—',name:'Крепление к основанию',col:'#66717a'},
+  {key:'bolt',des:'—',name:'Болты крепления бака',col:'#23282d'},
 ];
 const TK_MI={};TK_PART.forEach((p,i)=>TK_MI[p.key]=i);
 
@@ -7675,6 +7743,22 @@ function tkBuild(P){
     [[x1,y1],[x2,y1],[x1,y2],[x2,y2]].forEach(([x,y])=>tkTube(acc,B.leg,[x,y,0],[x,y,z0],legW));
     [[y1],[y2]].forEach(([y])=>tkTube(acc,B.leg,[x1,y,z0-25],[x2,y,z0-25],40));
     [[x1],[x2]].forEach(([x])=>tkTube(acc,B.leg,[x,y1,z0-25],[x,y2,z0-25],40));
+  }
+  /* Крепление к дну показываем частью бака: оно попадает в BOM только
+     когда бак реально связан с корпусом и под ним найдено основание. */
+  const fx=tkFixData(P);
+  if(fx.key==='rails'){
+    const yy=Math.max(70,W/2-90),x1=-L/2+45,x2=L/2-45;
+    [-yy,yy].forEach(y=>tkTube(acc,B.fix,[x1,y,20],[x2,y,20],40));
+    [[x1,-yy],[x2,-yy],[x1,yy],[x2,yy]].forEach(([x,y])=>
+      tkAdd(acc,tkCylZ(6,6,28,16),B.bolt,tkMat(x,y,14)));
+  }else if(fx.key==='bracket'){
+    const xx=Math.max(60,L/2-55),yy=Math.max(60,W/2-55);
+    [[-xx,-yy],[xx,-yy],[-xx,yy],[xx,yy]].forEach(([x,y])=>{
+      tkAdd(acc,new THREE.BoxGeometry(86,68,6),B.fix,tkMat(x,y,3));
+      tkAdd(acc,new THREE.BoxGeometry(6,68,64),B.fix,tkMat(x+(x<0?-37:37),y,32));
+      tkAdd(acc,tkCylZ(5,5,24,16),B.bolt,tkMat(x,y,12));
+    });
   }
   /* муфты патрубков — по тем же точкам, что уходят в присоединения */
   tkPorts(P).forEach(pt=>tkMuff(acc,B[pt.kind==='dis'?'dis':pt.kind==='suc'?'suc':'aux'],
@@ -7722,7 +7806,8 @@ function tkName(P){
 function tkId(P){
   return 'TANK-RECT-'+[P.L,P.B,P.H].join('x')+
     '-'+String(P.s).replace('.','')+'-'+P.mark+
-    (P.lid!=='none'?'-L':'')+(P.part?'-P':'')+(P.ins?'-I'+P.ins:'')+'-'+P.du;
+    (P.lid!=='none'?'-L':'')+(P.part?'-P':'')+(P.ins?'-I'+P.ins:'')+'-'+P.du+
+    (P.fix&&P.fix!=='none'?'-F'+P.fix:'');
 }
 function tkZones(P){
   return tkPorts(P).map(pt=>{
@@ -7737,7 +7822,7 @@ function tkZones(P){
 /* карточка позиции: то же, что увидит цех — раскрой построчно */
 function tkModel(P){
   P=tkNorm(P);
-  const c=tkCalc(P), nm=tkName(P);
+  const c=tkCalc(P), nm=tkName(P),fx=tkFixData(P);
   const cut=c.cut.filter(r=>r.n>0);
   const specs=[
     ['Обозначение',tkId(P)],
@@ -7752,6 +7837,7 @@ function tkModel(P){
     ['Теплоизоляция',P.ins?(P.ins+' мм + обшивка нерж 0,5 мм'):'нет'],
     ['Опоры',(TK_LEG.find(l=>l[0]===P.leg)||TK_LEG[0])[1]+
       (P.leg==='none'?'':', высота '+P.legH+' мм')],
+    ['Крепление к корпусу',fx.name],
     ['Присоединения контура','G'+({25:'1',32:'1 1/4',40:'1 1/2',50:'2'}[P.du])+
       ' внутренняя, Ду'+P.du],
     ['Лист на бак',tkG2(c.area)+' м²'+(c.prof?', профиль 40×40×2 — '+tkG(c.prof)+' м':'')],
@@ -7782,6 +7868,226 @@ function tkModel(P){
 /* Предпросмотр — обычный THREE.Mesh, но не элемент placed. Поэтому refresh,
    projPayload, save, history и спецификация его не видят. При редактировании
    исходный бак лишь прячем, а на «Отмена» показываем обратно. */
+/* ── режим просмотра бака в основной 3D-сцене ── */
+let tkViewState=null,tkViewMode='dim',tkViewNeedFocus=false;
+function tkViewCapture(){
+  const objects=[],materials=[],seen=new Set();
+  placed.forEach(p=>{
+    [p.obj,p._pinBox,p._bolts,p._ang,p._pad].forEach(o=>{if(o)objects.push([o,o.visible]);});
+    p.obj.traverse(o=>{
+      const ms=Array.isArray(o.material)?o.material:[o.material];
+      ms.forEach(m=>{if(!m||seen.has(m))return;seen.add(m);
+        materials.push([m,m.transparent,m.opacity,m.depthWrite]);});
+    });
+  });
+  tkViewState={target:target.clone(),dist,theta,phi,camTouched,objects,materials,
+    grid:grid?grid.visible:null,empty:$('#empty').style.display};
+  $('#empty').style.display='none';
+}
+function tkViewRestoreObjects(){
+  if(!tkViewState)return;
+  tkViewState.objects.forEach(x=>{x[0].visible=x[1];});
+  tkViewState.materials.forEach(x=>{x[0].transparent=x[1];x[0].opacity=x[2];
+    x[0].depthWrite=x[3];x[0].needsUpdate=true;});
+  if(grid&&tkViewState.grid!=null)grid.visible=tkViewState.grid;
+  document.body.classList.remove('tk-tank-solo');
+}
+function tkViewButtons(){
+  [['#tkDim','dim'],['#tkSolo','solo'],['#tkAll','all']].forEach(x=>{
+    const b=$(x[0]);if(b)b.classList.toggle('on',tkViewMode===x[1]);});
+}
+function tkViewSet(mode){
+  if(!tkViewState)return;
+  tkViewRestoreObjects();tkViewMode=mode;
+  if(mode==='solo'){
+    placed.forEach(p=>{[p.obj,p._pinBox,p._bolts,p._ang,p._pad].forEach(o=>{if(o)o.visible=false;});});
+    if(grid)grid.visible=false;document.body.classList.add('tk-tank-solo');
+  }else if(mode==='dim'){
+    placed.forEach(p=>p.obj.traverse(o=>{
+      const ms=Array.isArray(o.material)?o.material:[o.material];
+      ms.forEach(m=>{if(!m)return;m.transparent=true;m.opacity=Math.min(m.opacity,.13);
+        m.depthWrite=false;m.needsUpdate=true;});
+    }));
+  }
+  tkPreviewSetOld(false);tkViewButtons();
+}
+function tkFocusPreview(force){
+  if(!tkPreview||(!force&&!tkViewNeedFocus))return;
+  const b=new THREE.Box3().setFromObject(tkPreview.obj),c=b.getCenter(new THREE.Vector3()),
+        s=b.getSize(new THREE.Vector3()),r=Math.max(s.x,s.y,s.z,180)*.5;
+  /* Правая карточка занимает часть экрана: сдвиг цели держит бак в свободной левой части. */
+  const right=new THREE.Vector3(-Math.sin(theta),Math.cos(theta),0);
+  target.copy(c).addScaledVector(right,innerWidth>720?r*.72:0);
+  const vf=camera.fov*Math.PI/360;
+  dist=Math.max(dMin,Math.min(dMax,r/Math.sin(Math.max(.12,vf))*(innerWidth>720?1.22:1.5)));
+  camTouched=true;tkViewNeedFocus=false;
+}
+function tkViewClose(){
+  if(!tkViewState)return;
+  tkViewRestoreObjects();target.copy(tkViewState.target);dist=tkViewState.dist;
+  theta=tkViewState.theta;phi=tkViewState.phi;camTouched=tkViewState.camTouched;
+  $('#empty').style.display=placed.length?'none':(tkViewState.empty||'flex');
+  tkViewState=null;tkViewNeedFocus=false;tkViewMode='dim';
+}
+
+/* «Клава» здесь — локальный повторяемый инженерный алгоритм, а не обещание облачного AI. */
+const TK_SMART_PROFILES=[
+  {key:'compact',name:'Компактно'},
+  {key:'solder',name:'Удобно паять'},
+  {key:'service',name:'Удобно обслуживать'}
+];
+/* Чистая функция: все метрики в мм, меньшая оценка лучше. */
+function tankSmartScore(profile,m){
+  const bad=(m.inside||0)*1000000+(m.collision||0)*500000+(m.support?0:750000),
+        lack=(n,v)=>Math.max(0,n-(v||0));
+  let s=bad;
+  if(profile==='compact')s+=(m.centerDist||0)*1.4+(m.weightMoment||0)*.08+
+    lack(150,m.portClear)*4+lack(180,m.serviceClear)*2+lack(0,m.bendClear)*5;
+  else if(profile==='solder')s+=lack(320,m.portClear)*12+lack(0,m.bendClear)*16+
+    lack(220,m.serviceClear)*3+(m.centerDist||0)*.18+(m.frontBlocked?15000:0);
+  else s+=lack(380,m.serviceClear)*10+lack(250,m.portClear)*4+
+    (m.frontBlocked?28000:0)+(m.centerDist||0)*.25+lack(0,m.bendClear)*6;
+  return Math.round(s*100)/100;
+}
+function tankSmartRank(profile,rows){
+  return rows.map(r=>Object.assign({},r,{score:tankSmartScore(profile,r.metrics)}))
+    .sort((a,b)=>a.score-b.score||String(a.key).localeCompare(String(b.key)));
+}
+function tkBoxGap(a,b){
+  const dx=Math.max(0,a.min.x-b.max.x,b.min.x-a.max.x),
+        dy=Math.max(0,a.min.y-b.max.y,b.min.y-a.max.y),
+        dz=Math.max(0,a.min.z-b.max.z,b.min.z-a.max.z);
+  return Math.hypot(dx,dy,dz);
+}
+function tkPointBoxGap(p,b){
+  const x=Math.max(b.min.x,Math.min(b.max.x,p.x)),y=Math.max(b.min.y,Math.min(b.max.y,p.y)),
+        z=Math.max(b.min.z,Math.min(b.max.z,p.z));
+  return Math.hypot(p.x-x,p.y-y,p.z-z);
+}
+function tkPoseBox(it,rz,x,y,z){
+  const g=it.obj.geometry;if(!g.boundingBox)g.computeBoundingBox();
+  const b=g.boundingBox.clone().applyMatrix4(new THREE.Matrix4().makeRotationZ(rz)),
+        c=b.getCenter(new THREE.Vector3()),p=new THREE.Vector3(x-c.x,y-c.y,z-b.min.z);
+  b.translate(p);return {box:b,p,rz};
+}
+/* Наличие корпуса не равно наличию основания. У штатного корпуса ищем дно, у STEP — реальные опорные поверхности. */
+function tankSupportCheckBox(fr,b){
+  if(!fr)return {ok:false,reason:'нет корпуса'};
+  const z=tankZone(fr),base=floorZ(fr);
+  if(b.min.x<z.min.x-2||b.max.x>z.max.x+2||b.min.y<z.min.y-2||b.max.y>z.max.y+2)
+    return {ok:false,reason:'пятно крепления выходит за дно'};
+  if(Math.abs(b.min.z-base)>24)return {ok:false,reason:'бак не стоит на дне корпуса'};
+  const pan=panTop(fr);
+  if(pan&&pan.part)return {ok:true,reason:'дно '+pan.part.name};
+  if(fr.d&&fr.d._user){
+    const rr=new THREE.Raycaster(),sx=Math.max(15,(b.max.x-b.min.x)*.18),
+      sy=Math.max(15,(b.max.y-b.min.y)*.18),pts=[
+        [b.min.x+sx,b.min.y+sy],[b.max.x-sx,b.min.y+sy],
+        [b.min.x+sx,b.max.y-sy],[b.max.x-sx,b.max.y-sy]];
+    let n=0;
+    pts.forEach(q=>{rr.set(new THREE.Vector3(q[0],q[1],base+120),new THREE.Vector3(0,0,-1));
+      rr.far=180;if(rr.intersectObject(fr.obj,true).some(h=>Math.abs(h.point.z-base)<25))n++;});
+    if(n>=3)return {ok:true,reason:n+' из 4 точек опираются на STEP-корпус'};
+  }
+  return {ok:false,reason:'под точками болтов не найдено дно или рама'};
+}
+function tankSupportCheck(it,fr){return tankSupportCheckBox(fr,new THREE.Box3().setFromObject(it.obj));}
+function tkCandidateMetrics(it,fr,P,pose,obstacles,zone){
+  const b=pose.box,inside=Math.max(0,zone.min.x-b.min.x,b.max.x-zone.max.x,
+    zone.min.y-b.min.y,b.max.y-zone.max.y,zone.min.z-b.min.z,b.max.z-zone.max.z),
+    hits=obstacles.filter(o=>o.b.clone().expandByScalar(-5).intersectsBox(b.clone().expandByScalar(-5))),
+    collision=hits.reduce((n,o)=>{const q=b.clone().intersect(o.b),s=q.getSize(new THREE.Vector3());
+      return n+Math.max(1,Math.min(s.x,s.y,s.z));},0),
+    serviceClear=Math.min(b.min.x-zone.min.x,zone.max.x-b.max.x,b.min.y-zone.min.y,
+      zone.max.y-b.max.y,...obstacles.map(o=>tkBoxGap(b,o.b))),
+    zrot=new THREE.Matrix4().makeRotationZ(pose.rz),ports=tkPorts(P).map(pt=>
+      V3(pt.p).applyMatrix4(zrot).add(pose.p)),
+    portClear=Math.min(...ports.map(p=>Math.min(p.x-zone.min.x,zone.max.x-p.x,
+      p.y-zone.min.y,zone.max.y-p.y,...obstacles.map(o=>tkPointBoxGap(p,o.b))))),
+    bendClear=portClear-Math.max(90,P.du*3),c=zone.getCenter(new THREE.Vector3()),
+    bc=b.getCenter(new THREE.Vector3()),centerDist=Math.hypot(bc.x-c.x,bc.y-c.y),
+    frontBlocked=obstacles.some(o=>o.b.max.y<=b.min.y&&o.b.min.y>=zone.min.y&&
+      o.b.max.x>b.min.x-80&&o.b.min.x<b.max.x+80),support=tankSupportCheckBox(fr,b).ok,
+    weightMoment=tkCalc(P).massFull*centerDist/1000;
+  return {inside,collision,serviceClear,portClear,bendClear,centerDist,
+    frontBlocked,support,weightMoment};
+}
+function tankSmartScenePlans(it,fr,P){
+  if(!it||!fr)return {plans:[],why:'Для расчёта нужен корпус в сцене.'};
+  const zone=tankZone(fr),fz=floorZ(fr),obstacles=placed.filter(p=>p!==tkPreviewOld&&
+    roleOf(p.d)!=='frame'&&roleOf(p.d)!=='pipe'&&roleOf(p.d)!=='vibro')
+    .map(p=>({p,b:new THREE.Box3().setFromObject(p.obj)})),rows=[];
+  [0,Math.PI/2].forEach((rz,ri)=>{
+    const q=tkPoseBox(it,rz,0,0,fz),sz=q.box.getSize(new THREE.Vector3());
+    if(sz.x>zone.max.x-zone.min.x+1||sz.y>zone.max.y-zone.min.y+1||
+       sz.z>zone.max.z-fz+1)return;
+    const xs=[zone.min.x+sz.x/2,(zone.min.x+zone.max.x)/2,zone.max.x-sz.x/2],
+          ys=[zone.min.y+sz.y/2,(zone.min.y+zone.max.y)/2,zone.max.y-sz.y/2];
+    xs.forEach((x,xi)=>ys.forEach((y,yi)=>{
+      const pose=tkPoseBox(it,rz,snap(x),snap(y),fz),key=ri+'-'+xi+'-'+yi;
+      rows.push({key,pose,metrics:tkCandidateMetrics(it,fr,P,pose,obstacles,zone)});
+    }));
+  });
+  if(!rows.length)return {plans:[],why:'Бак больше свободной полости корпуса.'};
+  const used=new Set(),plans=TK_SMART_PROFILES.map(pr=>{
+    const rank=tankSmartRank(pr.key,rows);let p=rank.find(x=>!used.has(x.key))||rank[0];
+    used.add(p.key);return Object.assign(p,{profile:pr.key,name:pr.name});
+  });
+  return {plans};
+}
+
+function tkSmartText(p){
+  const m=p.metrics,a=[];
+  if(m.collision>0)a.push('есть пересечение');
+  if(!m.support)a.push('нет основания');
+  if(m.portClear<220)a.push('тесно у патрубков');
+  if(m.bendClear<0)a.push('мало места для радиуса трубы');
+  if(m.serviceClear<250)a.push('сервисный зазор мал');
+  if(m.frontBlocked)a.push('вынос к панели перекрыт');
+  return a.length?a.join('; '):'свободно, основание и доступы проверены';
+}
+function tkSmartRender(note){
+  const el=$('#tkSmartRes');if(!el)return;
+  if(!tkSmartPlans.length){el.innerHTML='<div class="tk-smart-note'+(note?' warn':'')+'">'+
+    esc(note||'Задай размеры и запусти расчёт трёх вариантов.')+'</div>';return;}
+  el.innerHTML=tkSmartPlans.map((p,i)=>{
+    const m=p.metrics,bad=m.inside>0||m.collision>0||!m.support;
+    return '<div class="tk-plan'+(bad?' bad':'')+(tkSmartChosen===p?' on':'')+'" data-i="'+i+'">'+
+      '<b>'+esc(p.name)+'</b><i>горелка '+Math.round(m.portClear)+' мм · сервис '+
+      Math.round(m.serviceClear)+' мм</i><small>'+esc(tkSmartText(p))+'</small></div>';}).join('')+
+    '<div class="tk-smart-note">Клава не гадает: оценка повторяема для одинаковой сцены. '+
+    'Красный вариант можно осмотреть, но нельзя применить.</div>';
+  el.querySelectorAll('.tk-plan:not(.bad)').forEach(e=>e.onclick=()=>tkSmartApply(+e.dataset.i));
+}
+function tkSmartInvalidate(note){tkSmartPlans=[];tkSmartChosen=null;tkSmartRender(note);}
+function tkSmartRun(){
+  const fr=placed.find(p=>roleOf(p.d)==='frame'),r=tankSmartScenePlans(tkPreview,fr,TKP);
+  tkSmartPlans=r.plans||[];tkSmartChosen=null;tkSmartRender(r.why);
+  if(tkSmartPlans.length)toast('Клава рассчитала 3 инженерных варианта');
+  else toast(r.why||'Нет допустимых вариантов');
+}
+function tkSmartApply(i){
+  const p=tkSmartPlans[i];if(!p||!tkPreview)return;
+  const m=p.metrics;if(m.inside>0||m.collision>0||!m.support){toast('Этот вариант нельзя применить: '+tkSmartText(p));return;}
+  tkPreview.obj.rotation.set(0,0,p.pose.rz);tkPreview.obj.position.copy(p.pose.p);
+  tkPreview.obj.updateMatrixWorld(true);tkSmartChosen=p;tkSmartRender();tkFocusPreview(true);
+  toast('В сцене — вариант «'+p.name+'». Проверь и примени');
+}
+function tkFixDraw(){
+  const el=$('#tkFix');if(!el)return;
+  el.innerHTML=TK_FIX.map(x=>'<div class="chip'+(tkFixChoice===x[0]?' on':'')+'" data-v="'+x[0]+'">'+x[1]+'</div>').join('');
+  el.querySelectorAll('.chip').forEach(e=>e.onclick=()=>{tkFixChoice=e.dataset.v;tkFixDraw();});
+}
+function tkFixDesign(){
+  const fr=placed.find(p=>roleOf(p.d)==='frame');
+  if(!tkPreview||!fr){tkSmartRender('Крепёж не создан: в сцене нет корпуса.');return;}
+  const ck=tankSupportCheck(tkPreview,fr);
+  if(!ck.ok){tkSmartRender('Крепёж не создан: '+ck.reason+'. Сначала выбери вариант расстановки.');
+    toast('Без основания крепёж не создаём');return;}
+  const fx=tkFixData(TKP,tkFixChoice);TKP.fix=fx.key;tkDraw();
+  toast('Крепление спроектировано: '+fx.name+' · основание: '+ck.reason);
+}
+
 function tkPreviewMats(geo){
   const mk=c=>new THREE.MeshStandardMaterial({color:c,metalness:.5,roughness:.48,
     flatShading:true,transparent:true,opacity:.88});
@@ -7822,6 +8128,7 @@ function tkPreviewUpdate(){
     }else placeAt(it,target.x,target.y,site().min.z,0,0);
   }
   obj.updateMatrixWorld(true);scene.add(obj);tkPreview=it;
+  if(typeof tkFocusPreview==='function')tkFocusPreview(false);
 }
 
 function tkChips(box,list,key,cb){
@@ -7831,6 +8138,7 @@ function tkChips(box,list,key,cb){
     esc(nm)+'</div>').join('');
   el.querySelectorAll('.chip').forEach(e=>e.onclick=()=>{
     const v=e.dataset.v;TKP[key]=(/^-?\d+(\.\d+)?$/.test(v)?parseFloat(v):v);
+    tkSmartInvalidate('Параметры бака изменились — пересчитай варианты.');
     (cb||tkDraw)();});
 }
 function tkDraw(){
@@ -7842,6 +8150,7 @@ function tkDraw(){
   tkChips('#tkDu',TK_DU.map(v=>[v,'Ду'+v]),'du');
   tkChips('#tkPart',[[0,'нет'],[1,'есть']],'part');
   tkChips('#tkOver',[[0,'нет'],[1,'есть']],'over');
+  tkFixDraw();
   $('#tkL').value=TKP.L;$('#tkB').value=TKP.B;$('#tkH').value=TKP.H;
   $('#tkLegH').value=TKP.legH;
   $('#tkLegR').style.display=TKP.leg==='none'?'none':'';
@@ -7882,22 +8191,26 @@ function tkFields(){
   TKP.B=Math.max(200,tkNum($('#tkB').value,TKP.B));
   TKP.H=Math.max(200,tkNum($('#tkH').value,TKP.H));
   TKP.legH=Math.max(0,tkNum($('#tkLegH').value,TKP.legH));
+  tkSmartInvalidate('Размеры изменились — пересчитай варианты.');
   tkDraw();
 }
 function tkOpen(it){
-  tkPreviewClear(true);tkPreviewOld=null;
+  tkPreviewClear(false);tkViewClose();tkPreviewOld=null;
+  tkViewCapture();tkViewNeedFocus=true;tkViewMode='dim';tkSmartPlans=[];tkSmartChosen=null;
   tkEdit=null;
-  if(it&&isTank(it.d)){tkEdit=it.uid;tkPreviewOld=it;TKP=tkNorm(it.d.tk);}
+  if(it&&isTank(it.d)){tkEdit=it.uid;tkPreviewOld=it;TKP=tkNorm(it.d.tk);
+    tkFixChoice=TKP.fix&&TKP.fix!=='none'?TKP.fix:'auto';}
+  else{TKP=tkNorm(TKP);tkFixChoice='auto';}
   $('#tnk').classList.add('on');
   $('#tkHd').textContent=tkEdit?'◫ Размеры бака':'◫ Бак из нержавейки';
-  tkDraw();
+  tkSmartRender();tkDraw();tkViewSet('dim');
 }
 function tkClose(){
-  tkPreviewClear(true);tkPreviewOld=null;
+  tkPreviewClear(true);tkViewClose();tkPreviewOld=null;
   $('#tnk').classList.remove('on');tkEdit=null;
 }
 function tkFinish(){
-  tkPreviewOld=null;tkPreview=null;
+  tkViewClose();tkPreviewOld=null;tkPreview=null;
   $('#tnk').classList.remove('on');tkEdit=null;
 }
 /* поставить в сцену или переделать тот, что уже стоит: место, поворот,
@@ -7905,12 +8218,19 @@ function tkFinish(){
 async function tkPut(){
   const d=tkModel(TKP);
   const pp=tkPreview&&tkPreview.obj.position.clone(),pq=tkPreview&&tkPreview.obj.rotation.clone();
-  const oldPreview=tkPreviewOld;
+  const oldPreview=tkPreviewOld,fr=placed.find(p=>roleOf(p.d)==='frame'),
+        wantsLink=!!tkSmartChosen||(TKP.fix&&TKP.fix!=='none');
+  if(TKP.fix&&TKP.fix!=='none'){
+    const ck=tankSupportCheck(tkPreview,fr);
+    if(!ck.ok){toast('Бак не добавлен: крепёжу нет основания — '+ck.reason);return;}
+  }
   tkPreviewClear(false);
+  let made=null;
   if(tkEdit){
     const old=placed.find(p=>p.uid===tkEdit)||oldPreview;
-    if(!old){tkPreviewOld=null;tkEdit=null;return tkPut();}
-    const pos=old.obj.position.clone(),rot=old.obj.rotation.clone();
+    if(!old){tkPreviewOld=null;tkEdit=null;toast('Исходный бак не найден — закрой и открой конструктор заново');return;}
+    const pos=tkSmartChosen&&pp?pp:old.obj.position.clone(),
+          rot=tkSmartChosen&&pq?pq:old.obj.rotation.clone();
     const st={pin:old.pin,off:old.off,link:old.link,fit:old.fit,sch:old.sch};
     const idx=placed.indexOf(old);
     const h=histBegin('размеры бака');
@@ -7918,7 +8238,7 @@ async function tkPut(){
       scene.remove(old.obj);if(old._pinBox)scene.remove(old._pinBox);boltClear(old);
       if(idx>=0)placed.splice(idx,1);
       const it=await addItem(d,{uid:tkEdit,x:pos.x,y:pos.y,z:pos.z,state:st},rot.z,rot.y,rot.x);
-      if(it)it.uid=tkEdit;
+      if(it){it.uid=tkEdit;made=it;}
       else{
         if(idx>=0)placed.splice(idx,0,old);scene.add(old.obj);tkPreviewOld=old;tkPreviewSetOld(true);
         toast('Бак не пересчитался — исходная модель оставлена');return;
@@ -7926,18 +8246,29 @@ async function tkPut(){
     }finally{histEnd(h);}
     toast('Бак пересчитан: '+tkName(TKP));
   }else{
-    await addItem(d,pp?{x:pp.x,y:pp.y,z:pp.z}:undefined,
+    made=await addItem(d,pp?{x:pp.x,y:pp.y,z:pp.z}:undefined,
       pq?pq.z:undefined,pq?pq.y:undefined,pq?pq.x:undefined);
     toast('Бак в сцене: '+tkName(TKP)+', '+tkG(tkCalc(TKP).mass)+' кг');
+  }
+  /* Вариант Клавы или спроектированный крепёж делают бак дочерним к корпусу.
+     Относительную матрицу пересчитываем и после переноса уже закреплённого бака. */
+  if(made&&fr&&(wantsLink||(made.link&&made.link.mount==='tank'))){
+    made.link={to:fr.uid,mount:'tank',face:'pan'};made.link.rel=tankRelOf(made,fr);
   }
   tkFinish();refresh();save();
 }
 $('#bTank').onclick=()=>tkOpen(sel&&isTank(sel.d)?sel:null);
 $('#tkX').onclick=tkClose;
 $('#tkAddB').onclick=tkPut;
-$('#tkReset').onclick=()=>{TKP=Object.assign({},TKD);tkDraw();};
+$('#tkReset').onclick=()=>{TKP=Object.assign({},TKD);tkFixChoice='auto';tkSmartInvalidate();tkDraw();};
 $('#tkCancelB').onclick=tkClose;
 $('#tnk').onclick=e=>{if(e.target.id==='tnk')tkClose();};
+$('#tkFocus').onclick=()=>tkFocusPreview(true);
+$('#tkDim').onclick=()=>tkViewSet('dim');
+$('#tkSolo').onclick=()=>tkViewSet('solo');
+$('#tkAll').onclick=()=>tkViewSet('all');
+$('#tkSmartRun').onclick=tkSmartRun;
+$('#tkFixRun').onclick=tkFixDesign;
 ['tkL','tkB','tkH','tkLegH'].forEach(id=>{
   const el=$('#'+id);if(el)el.oninput=tkFields;});
 $('#bTankEd').onclick=()=>sel&&isTank(sel.d)&&tkOpen(sel);
