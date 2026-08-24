@@ -20978,3 +20978,877 @@ function ujCardLog(d) {
              escapeHtml(l.author || '—') + '</td><td>' + what + '</td></tr>';
     }).join('') + '</tbody></table>';
 }
+
+// ==================================================================
+// ПОКРАСОЧНЫЕ РАБОТЫ (Производство → Покрасочные работы), v2.46.056
+// ------------------------------------------------------------------
+// Три вкладки: детали из УПД по ЭДО → расчётные файлы покраски → журнал.
+// Расчётный файл — это тот же документ, что и в «Расчёте окраски»
+// (paint_calcs с номером АГ.РД-XXX/ГГ), поэтому деталь из УПД и деталь,
+// посчитанная по DXF раскроя, лежат в одной ведомости.
+//
+// Ловушки, о которые тут уже спотыкались:
+//  * отметки деталей живут в PW_STATE.sel и переживают перерисовку — иначе
+//    правка площади в одной строке сбрасывала бы весь отбор;
+//  * раскрытые карточки УПД помним отдельно (PW_STATE.open): список
+//    перерисовывается после каждой правки ячейки;
+//  * экран внесён в AUTO_REFRESH_SKIP — автообновление стёрло бы
+//    недописанное примечание.
+// ==================================================================
+
+const PW_STATE = {
+  tab: 'upd',
+  catalogs: null,
+  canManage: false,
+  upd: [], files: [], kpi: null, journal: [],
+  open: {},                 // id УПД → раскрыт ли
+  sel: new Set(),           // id отмеченных деталей
+  filters: { supplier: '', from: '', to: '', status: '', q: '' },
+  jfilters: { status: '', ral: '', q: '' },
+  card: null,               // открытый расчётный файл
+};
+
+const PW_PART_CHIP = {
+  ready: 'ok', rework: 'warn', in_file: 'gray',
+  in_paint: 'info', painted: 'ok', accepted: 'ok',
+};
+const PW_FILE_CHIP = { draft: 'gray', sent: 'info', painted: 'ok', accepted: 'ok' };
+const PW_DOC_CHIP = {
+  new: 'warn', rework: 'warn', in_file: 'gray',
+  in_paint: 'info', painted: 'ok', accepted: 'ok', empty: 'gray',
+};
+
+function pwAttr(s) {
+  return escapeHtml(s === null || s === undefined ? '' : String(s)).replace(/"/g, '&quot;');
+}
+
+// «18.48» → «18,48», пусто → «—». В цехе запятая, не точка.
+function pwNum(v, dash) {
+  if (v === null || v === undefined || v === '') return dash === false ? '' : '—';
+  const n = Number(v);
+  if (!isFinite(n)) return dash === false ? '' : '—';
+  return String(Math.round(n * 1000) / 1000).replace('.', ',');
+}
+
+function pwDate(iso) {
+  const s = (iso || '').trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? (m[3] + '.' + m[2] + '.' + m[1]) : s;
+}
+
+function pwChip(kind, label) {
+  return '<span class="pw-chip is-' + (kind || 'gray') + '">' + escapeHtml(label || '') + '</span>';
+}
+
+// Свой fetch: общие apiPatch/apiPost бросают исключение на любой не-200, а тут
+// нужен текст отказа («деталь требует доработки», 409 по переданному файлу).
+async function pwFetch(method, path, body) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const opts = { method: method, headers: { 'Authorization': 'Bearer ' + token } };
+  if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const r = await fetch(API_BASE + path, opts);
+  if (r.status === 401) { logout(); throw new Error('Сессия истекла'); }
+  return { ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) };
+}
+
+function pwFail(res, fallback) {
+  showToast((res.data && res.data.message) || fallback || 'Не получилось', 'error');
+}
+
+// ---------------- загрузка
+
+async function loadPaintWorks() {
+  const box = document.getElementById('paint-works-content');
+  if (!box) return;
+  if (!PW_STATE.catalogs) box.innerHTML = '<div class="loading-block">Загружаем раздел…</div>';
+  try {
+    if (!PW_STATE.catalogs) {
+      PW_STATE.catalogs = (await apiGet('/api/paint-works/catalogs')) || {};
+      PW_STATE.canManage = !!PW_STATE.catalogs.can_manage;
+    }
+    if (PW_STATE.tab === 'upd') await pwLoadUpd();
+    else if (PW_STATE.tab === 'files') await pwLoadFiles();
+    else await pwLoadJournal();
+    renderPaintWorks();
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block">Раздел не загрузился. Обновите страницу.</div>';
+  }
+}
+
+function pwQs(obj) {
+  const parts = [];
+  Object.keys(obj).forEach(k => { if (obj[k]) parts.push(k + '=' + encodeURIComponent(obj[k])); });
+  return parts.length ? '?' + parts.join('&') : '';
+}
+
+async function pwLoadUpd() {
+  const d = await apiGet('/api/paint-works/upd' + pwQs(PW_STATE.filters));
+  PW_STATE.upd = d.items || [];
+  PW_STATE.canManage = !!d.can_manage;
+  // Первое открытие — разворачиваем самый свежий документ.
+  if (!Object.keys(PW_STATE.open).length && PW_STATE.upd.length) {
+    PW_STATE.open[PW_STATE.upd[0].id] = true;
+  }
+  const alive = new Set();
+  PW_STATE.upd.forEach(u => (u.parts || []).forEach(p => alive.add(p.id)));
+  Array.from(PW_STATE.sel).forEach(id => { if (!alive.has(id)) PW_STATE.sel.delete(id); });
+}
+
+async function pwLoadFiles() {
+  const d = await apiGet('/api/paint-works/files');
+  PW_STATE.files = d.rows || [];
+  PW_STATE.kpi = d.kpi || null;
+  PW_STATE.canManage = !!d.can_manage;
+}
+
+async function pwLoadJournal() {
+  const d = await apiGet('/api/paint-works/journal' + pwQs(PW_STATE.jfilters));
+  PW_STATE.journal = d.rows || [];
+}
+
+function pwSetTab(tab) {
+  PW_STATE.tab = tab;
+  loadPaintWorks();
+}
+
+// ---------------- общий каркас
+
+function renderPaintWorks() {
+  const box = document.getElementById('paint-works-content');
+  if (!box) return;
+  const tabs = [
+    ['upd', 'Поступления по ЭДО (УПД)'],
+    ['files', 'Расчётные файлы покраски'],
+    ['journal', 'Журнал покраски'],
+  ];
+  let html = '<div class="pw-tabs">' + tabs.map(t =>
+    '<button class="pw-tab' + (PW_STATE.tab === t[0] ? ' is-act' : '') + '" ' +
+    'onclick="pwSetTab(\'' + t[0] + '\')">' + escapeHtml(t[1]) + '</button>').join('') + '</div>';
+
+  if (!PW_STATE.canManage) {
+    html += '<div class="pw-ro"><i class="ti ti-lock"></i> Режим просмотра: отбор деталей и ' +
+            'расчётные файлы ведут мастер, инженер и директор.</div>';
+  }
+
+  if (PW_STATE.tab === 'upd') html += pwRenderUpd();
+  else if (PW_STATE.tab === 'files') html += pwRenderFiles();
+  else html += pwRenderJournal();
+
+  box.innerHTML = html;
+}
+
+// ---------------- вкладка 1: поступления по ЭДО
+
+function pwRenderUpd() {
+  const cat = PW_STATE.catalogs || {};
+  const f = PW_STATE.filters;
+  const supplierOpts = ['<option value="">Все поставщики</option>'].concat(
+    (cat.suppliers || []).map(s =>
+      '<option value="' + pwAttr(s) + '"' + (f.supplier === s ? ' selected' : '') + '>' +
+      escapeHtml(s) + '</option>')).join('');
+  const statusOpts = ['<option value="">Все детали</option>'].concat(
+    (cat.part_statuses || []).map(s =>
+      '<option value="' + pwAttr(s.key) + '"' + (f.status === s.key ? ' selected' : '') + '>' +
+      escapeHtml(s.label) + '</option>')).join('');
+
+  let html = '<div class="pw-filters">' +
+    '<div class="pw-f"><span class="pw-lbl">Поставщик</span>' +
+      '<select onchange="pwFilter(\'supplier\', this.value)">' + supplierOpts + '</select></div>' +
+    '<div class="pw-f"><span class="pw-lbl">Поступление с</span>' +
+      '<input type="date" value="' + pwAttr(f.from) + '" onchange="pwFilter(\'from\', this.value)"></div>' +
+    '<div class="pw-f"><span class="pw-lbl">по</span>' +
+      '<input type="date" value="' + pwAttr(f.to) + '" onchange="pwFilter(\'to\', this.value)"></div>' +
+    '<div class="pw-f"><span class="pw-lbl">Статус деталей</span>' +
+      '<select onchange="pwFilter(\'status\', this.value)">' + statusOpts + '</select></div>' +
+    '<div class="pw-f"><span class="pw-lbl">Поиск по детали</span>' +
+      '<input type="text" value="' + pwAttr(f.q) + '" placeholder="наименование или артикул" ' +
+      'onchange="pwFilter(\'q\', this.value)"></div>' +
+    '</div>';
+
+  if (!PW_STATE.upd.length) {
+    return html + '<div class="empty-block">УПД по ЭДО не найдены. ' +
+           'Документы попадают сюда из раздела «Снабжение → Приёмка УПД».</div>';
+  }
+
+  PW_STATE.upd.forEach(u => {
+    const open = !!PW_STATE.open[u.id];
+    const title = 'УПД ' + (u.number || 'б/н') + ' · ' + (u.seller_name || 'поставщик не указан');
+    html += '<div class="pw-doc' + (open ? ' is-open' : '') + '">' +
+      '<div class="pw-dochead" onclick="pwToggleDoc(' + u.id + ')">' +
+        '<b>' + escapeHtml(title) + '</b>' +
+        '<span class="pw-docmeta">от ' + escapeHtml(u.doc_date || pwDate(u.received_at)) +
+          ' · позиций: ' + u.parts_total +
+          (u.intake_done ? ' · оприходован' : '') +
+          (u.area_total ? ' · ' + pwNum(u.area_total) + ' м²' : '') + '</span>' +
+        pwChip(PW_DOC_CHIP[u.status] || 'gray', u.status_label) +
+        '<span class="pw-chev"><i class="ti ti-chevron-' + (open ? 'up' : 'down') + '"></i></span>' +
+      '</div>';
+    if (open) html += pwDocTable(u);
+    html += '</div>';
+  });
+
+  const n = PW_STATE.sel.size;
+  if (PW_STATE.canManage) {
+    html += '<div class="pw-actbar">' +
+      '<span class="pw-count">Отмечено деталей: <b>' + n + '</b></span>' +
+      '<button class="btn btn-primary" ' + (n ? '' : 'disabled ') +
+        'onclick="pwMakeFile()"><i class="ti ti-file-plus"></i> Сформировать расчётный файл</button>' +
+      '<button class="btn" ' + (n ? '' : 'disabled ') + 'onclick="pwMarkRework()">' +
+        '<i class="ti ti-tool"></i> Отметить «требует доработки»</button>' +
+      '<button class="btn" ' + (n ? '' : 'disabled ') + 'onclick="pwAddToFilePick()">' +
+        '<i class="ti ti-file-plus"></i> Добавить в существующий файл</button>' +
+      (n ? '<button class="btn pw-link" onclick="pwClearSel()">снять отметки</button>' : '') +
+      '</div>';
+  }
+  return html;
+}
+
+function pwDocTable(u) {
+  const parts = u.parts || [];
+  if (!parts.length) {
+    return '<div class="pw-docbody"><div class="pw-empty-line">' +
+           'В этом документе нет позиций под выбранный фильтр.</div></div>';
+  }
+  const editable = PW_STATE.canManage;
+  const allOn = parts.every(p => PW_STATE.sel.has(p.id) || p.status !== 'ready' && p.status !== 'rework');
+  let html = '<div class="pw-docbody"><div class="pw-tblwrap"><table class="pw-table"><thead><tr>' +
+    (editable ? '<th class="pw-chk"><input type="checkbox"' + (allOn ? ' checked' : '') +
+      ' onclick="pwToggleAll(' + u.id + ', this.checked)"></th>' : '') +
+    '<th>Наименование детали</th><th>Артикул</th><th>Кол-во</th>' +
+    '<th>Площадь на деталь, м²</th><th>Итого, м²</th><th>Цвет RAL</th><th>Тип покрытия</th>' +
+    '<th>Готовность к покраске</th><th class="pw-note-col">Примечание / доработка</th>' +
+    '</tr></thead><tbody>';
+
+  parts.forEach(p => {
+    const free = (p.status === 'ready' || p.status === 'rework');
+    const sel = PW_STATE.sel.has(p.id);
+    html += '<tr' + (sel ? ' class="is-sel"' : '') + '>';
+    if (editable) {
+      html += '<td class="pw-chk">' + (free
+        ? '<input type="checkbox"' + (sel ? ' checked' : '') +
+          ' onchange="pwToggleRow(' + p.id + ', this.checked)">'
+        : '<i class="ti ti-lock pw-lock" title="Деталь уже в расчётном файле"></i>') + '</td>';
+    }
+    html += '<td class="pw-name">' + escapeHtml(p.name || '—') + '</td>' +
+      '<td>' + (editable && free
+        ? pwInput(p.id, 'sku', p.sku, 'артикул', 'pw-w-sku')
+        : escapeHtml(p.sku || '—')) + '</td>' +
+      '<td class="pw-qty">' + pwNum(p.qty) + ' ' + escapeHtml(p.unit || 'шт') + '</td>' +
+      '<td>' + (editable && free
+        ? pwInput(p.id, 'area_m2', pwNum(p.area_m2, false), '0,00', 'pw-w-num')
+        : pwNum(p.area_m2)) + '</td>' +
+      '<td class="pw-total">' + pwNum(p.total_m2) + '</td>' +
+      '<td>' + (editable && free ? pwRalSelect(p.id, p.ral) : pwRalLabel(p.ral)) + '</td>' +
+      '<td>' + (editable && free ? pwCoatingSelect(p.id, p.coating)
+                                 : escapeHtml(p.coating || '—')) + '</td>' +
+      '<td>' + pwChip(PW_PART_CHIP[p.status] || 'gray', p.status_label) +
+        (p.calc_number ? '<div class="pw-sub">' + escapeHtml(p.calc_number) + '</div>' : '') +
+        '</td>' +
+      '<td class="pw-note-col">' + (editable && free
+        ? pwInput(p.id, 'note', p.note, 'что доработать', 'pw-w-note')
+        : escapeHtml(p.note || '—')) + '</td></tr>';
+  });
+  return html + '</tbody></table></div></div>';
+}
+
+function pwInput(partId, field, value, placeholder, cls) {
+  return '<input class="pw-in ' + (cls || '') + '" type="text" value="' + pwAttr(value) + '" ' +
+         'placeholder="' + pwAttr(placeholder || '') + '" ' +
+         'onchange="pwPartSave(' + partId + ', \'' + field + '\', this.value)">';
+}
+
+function pwRalOptions(current) {
+  const cur = (current || '').trim();
+  let html = '<option value="">—</option>';
+  let seen = false;
+  RAL_CATALOG.forEach(r => {
+    const on = r.c === cur;
+    if (on) seen = true;
+    html += '<option value="' + pwAttr(r.c) + '"' + (on ? ' selected' : '') + '>' +
+            escapeHtml(_ralLabel(r.c)) + '</option>';
+  });
+  if (cur && !seen) {
+    html += '<option value="' + pwAttr(cur) + '" selected>' + escapeHtml(cur) + '</option>';
+  }
+  return html;
+}
+
+function pwRalSelect(partId, current) {
+  return '<select class="pw-in pw-w-ral" onchange="pwPartSave(' + partId + ', \'ral\', this.value)">' +
+         pwRalOptions(current) + '</select>';
+}
+
+function pwRalLabel(code) {
+  const c = (code || '').trim();
+  if (!c) return '—';
+  const hex = _ralHex(c);
+  return (hex ? '<i class="pw-ral-dot" style="background:' + hex + '"></i>' : '') +
+         escapeHtml(c);
+}
+
+function pwCoatingOptions(current) {
+  const cat = PW_STATE.catalogs || {};
+  const cur = (current || '').trim();
+  const list = (cat.coatings || []).slice();
+  if (cur && list.indexOf(cur) < 0) list.push(cur);
+  return '<option value="">—</option>' + list.map(c =>
+    '<option value="' + pwAttr(c) + '"' + (c === cur ? ' selected' : '') + '>' +
+    escapeHtml(c) + '</option>').join('');
+}
+
+function pwCoatingSelect(partId, current) {
+  return '<select class="pw-in pw-w-coat" onchange="pwPartSave(' + partId +
+         ', \'coating\', this.value)">' + pwCoatingOptions(current) + '</select>';
+}
+
+// ---------------- действия вкладки 1
+
+function pwFilter(key, value) {
+  PW_STATE.filters[key] = value;
+  loadPaintWorks();
+}
+
+function pwToggleDoc(id) {
+  PW_STATE.open[id] = !PW_STATE.open[id];
+  renderPaintWorks();
+}
+
+function pwToggleRow(partId, on) {
+  if (on) PW_STATE.sel.add(partId); else PW_STATE.sel.delete(partId);
+  renderPaintWorks();
+}
+
+function pwToggleAll(updId, on) {
+  const u = PW_STATE.upd.find(x => x.id === updId);
+  if (!u) return;
+  (u.parts || []).forEach(p => {
+    if (p.status !== 'ready' && p.status !== 'rework') return;
+    if (on) PW_STATE.sel.add(p.id); else PW_STATE.sel.delete(p.id);
+  });
+  renderPaintWorks();
+}
+
+function pwClearSel() {
+  PW_STATE.sel.clear();
+  renderPaintWorks();
+}
+
+async function pwPartSave(partId, field, value) {
+  const body = {};
+  body[field] = value;
+  const res = await pwFetch('PATCH', '/api/paint-works/parts/' + partId, body);
+  if (!res.ok) { pwFail(res, 'Не сохранилось'); loadPaintWorks(); return; }
+  // Точечно обновляем строку — перерисовка всей вкладки схлопнула бы карточки.
+  PW_STATE.upd.forEach(u => (u.parts || []).forEach((p, i) => {
+    if (p.id === partId) u.parts[i] = Object.assign({}, p, res.data);
+  }));
+  renderPaintWorks();
+}
+
+async function pwMarkRework() {
+  const ids = Array.from(PW_STATE.sel);
+  if (!ids.length) return;
+  const note = prompt('Что нужно доработать? (сверление отверстий, сварочные работы…)', '');
+  if (note === null) return;
+  const res = await pwFetch('POST', '/api/paint-works/parts/bulk',
+                            { part_ids: ids, action: 'rework', note: note });
+  if (!res.ok) { pwFail(res, 'Не отметилось'); return; }
+  showToast('Отмечено деталей: ' + res.data.updated +
+            (res.data.blocked ? ', уже в работе: ' + res.data.blocked : ''), 'success');
+  PW_STATE.sel.clear();
+  loadPaintWorks();
+}
+
+async function pwMakeFile() {
+  const ids = Array.from(PW_STATE.sel);
+  if (!ids.length) return;
+  const res = await pwFetch('POST', '/api/paint-works/files', { part_ids: ids });
+  if (!res.ok) { pwFail(res, 'Файл не создался'); return; }
+  const skipped = (res.data.skipped || []).length;
+  showToast('Файл создан, деталей: ' + res.data.added +
+            (skipped ? ', не попало: ' + skipped : ''), 'success');
+  PW_STATE.sel.clear();
+  await pwLoadUpd();
+  renderPaintWorks();
+  pwOpenFileCard(res.data.file);
+}
+
+async function pwAddToFilePick() {
+  const ids = Array.from(PW_STATE.sel);
+  if (!ids.length) return;
+  await pwLoadFiles();
+  const drafts = PW_STATE.files.filter(f => f.work_status === 'draft');
+  if (!drafts.length) {
+    showToast('Черновиков файлов нет — сформируйте новый', 'info');
+    return;
+  }
+  const m = document.createElement('div');
+  m.className = 'modal-overlay visible';
+  m.innerHTML = '<div class="modal pw-modal-sm"><div class="modal-header">' +
+    '<h3>В какой файл добавить?</h3>' +
+    '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">' +
+    '<i class="ti ti-x"></i></button></div><div class="modal-body"><div class="pw-pick">' +
+    drafts.map(f => '<button class="pw-pick-row" onclick="pwAddToFile(' + f.id + ', this)">' +
+      '<b>' + escapeHtml(f.doc_number || f.title) + '</b>' +
+      '<span>' + escapeHtml(f.title) + ' · позиций: ' + f.items_count +
+      ' · ' + pwNum(f.total_m2) + ' м²</span></button>').join('') +
+    '</div></div></div>';
+  document.body.appendChild(m);
+}
+
+async function pwAddToFile(fileId, btn) {
+  const ids = Array.from(PW_STATE.sel);
+  const res = await pwFetch('POST', '/api/paint-works/files/' + fileId + '/parts',
+                            { part_ids: ids });
+  if (btn) { const o = btn.closest('.modal-overlay'); if (o) o.remove(); }
+  if (!res.ok) { pwFail(res, 'Не добавилось'); return; }
+  const skipped = (res.data.skipped || []).length;
+  showToast('Добавлено деталей: ' + res.data.added +
+            (skipped ? ', не попало: ' + skipped : ''), 'success');
+  PW_STATE.sel.clear();
+  await pwLoadUpd();
+  renderPaintWorks();
+}
+
+// ---------------- вкладка 2: расчётные файлы
+
+function pwRenderFiles() {
+  const k = PW_STATE.kpi || {};
+  let html = '<div class="pw-kpi">' +
+    '<div><b>' + (k.drafts || 0) + '</b><span>черновиков файлов</span></div>' +
+    '<div><b>' + (k.sent || 0) + '</b><span>переданы подрядчику</span></div>' +
+    '<div><b>' + (k.rework_parts || 0) + '</b><span>деталей ждут доработки</span></div>' +
+    '<div><b>' + pwNum(k.m2_in_work) + '</b><span>м² в работе</span></div>' +
+    '</div>';
+
+  if (PW_STATE.canManage) {
+    html += '<div class="pw-toolbar">' +
+      '<button class="btn" onclick="pwContractors()">' +
+      '<i class="ti ti-users"></i> Подрядчики и участки</button></div>';
+  }
+
+  if (!PW_STATE.files.length) {
+    return html + '<div class="empty-block">Расчётных файлов пока нет. ' +
+           'Отметьте детали на вкладке «Поступления по ЭДО» и нажмите ' +
+           '«Сформировать расчётный файл».</div>';
+  }
+
+  html += '<div class="pw-tblwrap"><table class="pw-table"><thead><tr>' +
+    '<th>Файл покраски</th><th>Источник (УПД)</th><th>Позиций</th><th>Площадь, м²</th>' +
+    '<th>Цвета</th><th>Подрядчик</th><th>Статус</th><th></th></tr></thead><tbody>';
+  PW_STATE.files.forEach(f => {
+    html += '<tr><td class="pw-name">' + escapeHtml(f.doc_number || '—') +
+      '<div class="pw-sub">' + escapeHtml(f.title || '') + '</div></td>' +
+      '<td>' + (f.sources && f.sources.length
+        ? escapeHtml(f.sources.join(', ')) : '<span class="pw-sub">вручную</span>') + '</td>' +
+      '<td>' + f.items_count + '</td>' +
+      '<td class="pw-total">' + pwNum(f.total_m2) + '</td>' +
+      '<td>' + (f.colors && f.colors.length
+        ? f.colors.map(c => pwRalLabel(c)).join(' ') : '—') + '</td>' +
+      '<td>' + escapeHtml(f.contractor_name || 'не выбран') +
+        (f.transfer_date ? '<div class="pw-sub">передан ' + pwDate(f.transfer_date) + '</div>' : '') +
+        '</td>' +
+      '<td>' + pwChip(PW_FILE_CHIP[f.work_status] || 'gray', f.status_label) + '</td>' +
+      '<td><button class="btn btn-sm" onclick="pwOpenFile(' + f.id + ')">Открыть</button></td>' +
+      '</tr>';
+  });
+  return html + '</tbody></table></div>';
+}
+
+// ---------------- карточка расчётного файла
+
+async function pwOpenFile(id) {
+  const res = await pwFetch('GET', '/api/paint-works/files/' + id);
+  if (!res.ok) { pwFail(res, 'Файл не открылся'); return; }
+  pwOpenFileCard(res.data);
+}
+
+function pwOpenFileCard(card) {
+  PW_STATE.card = card;
+  let m = document.getElementById('pw-file-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'pw-file-modal';
+    m.className = 'modal-overlay';
+    document.body.appendChild(m);
+  }
+  m.classList.add('visible');
+  pwRenderFileCard();
+}
+
+function pwCloseFile() {
+  const m = document.getElementById('pw-file-modal');
+  if (m) m.classList.remove('visible');
+  PW_STATE.card = null;
+  loadPaintWorks();
+}
+
+function pwRenderFileCard() {
+  const m = document.getElementById('pw-file-modal');
+  const c = PW_STATE.card;
+  if (!m || !c) return;
+  const cat = PW_STATE.catalogs || {};
+  const editable = c.editable && PW_STATE.canManage;
+  const contractorOpts = ['<option value="">не выбран</option>'].concat(
+    (cat.contractors || []).map(k =>
+      '<option value="' + k.id + '"' + (Number(c.contractor_id) === k.id ? ' selected' : '') + '>' +
+      escapeHtml(k.name) + '</option>')).join('');
+
+  let items = '';
+  (c.items || []).forEach(it => {
+    items += '<tr><td class="pw-name">' + escapeHtml(it.name || '—') + '</td>' +
+      '<td>' + escapeHtml(it.designation || '—') + '</td>' +
+      '<td>' + (editable
+        ? '<input class="pw-in pw-w-num" type="number" min="1" value="' + (it.qty || 1) +
+          '" onchange="pwItemSave(' + it.id + ', \'qty\', this.value)">'
+        : (it.qty || 1)) + '</td>' +
+      '<td>' + (editable
+        ? '<input class="pw-in pw-w-num" type="text" value="' +
+          pwAttr(pwNum(it.paint_per_part_m2, false)) +
+          '" onchange="pwItemSave(' + it.id + ', \'area_m2\', this.value)">'
+        : pwNum(it.paint_per_part_m2)) + '</td>' +
+      '<td class="pw-total">' + pwNum(it.paint_total_m2) + '</td>' +
+      '<td>' + (editable
+        ? '<select class="pw-in pw-w-ral" onchange="pwItemSave(' + it.id + ', \'ral\', this.value)">' +
+          pwRalOptions(it.ral) + '</select>'
+        : pwRalLabel(it.ral)) + '</td>' +
+      '<td>' + (editable
+        ? '<select class="pw-in pw-w-coat" onchange="pwItemSave(' + it.id +
+          ', \'coating\', this.value)">' + pwCoatingOptions(it.coating) + '</select>'
+        : escapeHtml(it.coating || '—')) + '</td>' +
+      '<td class="pw-sub">' + escapeHtml(it.source_label || '') + '</td>' +
+      '<td>' + (editable
+        ? '<button class="btn btn-sm pw-link" onclick="pwItemRemove(' + it.id + ')">Убрать</button>'
+        : '') + '</td></tr>';
+  });
+  if (!items) {
+    items = '<tr><td colspan="9" class="pw-empty-line">В файле пока нет деталей.</td></tr>';
+  }
+
+  let actions = '';
+  if (PW_STATE.canManage) {
+    if (c.work_status === 'draft') {
+      actions += '<button class="btn btn-primary" onclick="pwFileStatus(\'sent\')">' +
+        '<i class="ti ti-truck-delivery"></i> Передать подрядчику</button>' +
+        '<button class="btn pw-link" onclick="pwFileDelete()">Удалить черновик</button>';
+    } else if (c.work_status === 'sent') {
+      actions += '<button class="btn btn-primary" onclick="pwFileStatus(\'painted\')">' +
+        '<i class="ti ti-check"></i> Покрашено</button>';
+    } else if (c.work_status === 'painted') {
+      actions += '<button class="btn btn-primary" onclick="pwFileStatus(\'accepted\')">' +
+        '<i class="ti ti-package-import"></i> Принято на склад</button>';
+    }
+  }
+
+  m.innerHTML = '<div class="modal pw-modal"><div class="modal-header">' +
+    '<h3>Расчётный файл покрасочных работ</h3>' +
+    pwChip(PW_FILE_CHIP[c.work_status] || 'gray', c.status_label) +
+    '<button class="modal-close" onclick="pwCloseFile()"><i class="ti ti-x"></i></button>' +
+    '</div><div class="modal-body">' +
+
+    '<div class="pw-card-head">' +
+      '<div class="pw-doc-no">' + escapeHtml(c.doc_number || '') + '</div>' +
+      '<input class="pw-in pw-title" type="text" value="' + pwAttr(c.title || '') + '" ' +
+        (PW_STATE.canManage ? '' : 'disabled ') +
+        'onchange="pwFileField(\'title\', this.value)">' +
+    '</div>' +
+
+    '<div class="pw-grid3">' +
+      '<div class="pw-f"><span class="pw-lbl">Подрядчик / участок</span>' +
+        '<select ' + (PW_STATE.canManage ? '' : 'disabled ') +
+        'onchange="pwFileField(\'contractor_id\', this.value)">' + contractorOpts + '</select></div>' +
+      '<div class="pw-f"><span class="pw-lbl">Дата передачи</span>' +
+        '<input type="date" value="' + pwAttr(c.transfer_date || '') + '" ' +
+        (PW_STATE.canManage ? '' : 'disabled ') +
+        'onchange="pwFileField(\'transfer_date\', this.value)"></div>' +
+      '<div class="pw-f"><span class="pw-lbl">Плановый возврат</span>' +
+        '<input type="date" value="' + pwAttr(c.plan_return_date || '') + '" ' +
+        (PW_STATE.canManage ? '' : 'disabled ') +
+        'onchange="pwFileField(\'plan_return_date\', this.value)"></div>' +
+    '</div>' +
+
+    '<div class="pw-tblwrap"><table class="pw-table"><thead><tr>' +
+      '<th>Деталь</th><th>Артикул</th><th>Кол-во</th><th>Площадь на деталь, м²</th>' +
+      '<th>Итого, м²</th><th>Цвет RAL</th><th>Тип покрытия</th><th>Источник</th><th></th>' +
+      '</tr></thead><tbody>' + items + '</tbody></table></div>' +
+
+    '<div class="pw-sumline">Итого по файлу: <b>' + pwNum(c.total_m2) + ' м²</b>' +
+      (c.return_date ? ' · возврат ' + pwDate(c.return_date) : '') + '</div>' +
+
+    (editable ? pwAddRowBlock() : '') +
+
+    '<div class="pw-card-actions">' + actions +
+      '<button class="btn" onclick="pwExportFile()"><i class="ti ti-file-spreadsheet"></i> ' +
+      'Выгрузить в Excel</button>' +
+      '<button class="btn pw-link" onclick="pwCloseFile()">Закрыть</button>' +
+    '</div>' +
+
+    '</div></div>';
+}
+
+function pwAddRowBlock() {
+  return '<div class="pw-addrow">' +
+    '<div class="pw-sub">Дополнить файл деталью не из этого УПД — со склада или руками</div>' +
+    '<div class="pw-grid4">' +
+      '<div class="pw-f"><span class="pw-lbl">Деталь</span>' +
+        '<input type="text" id="pw-add-name" placeholder="наименование" autocomplete="off" ' +
+        'oninput="pwStockSearch(this.value)"><div id="pw-add-hits" class="pw-hits"></div></div>' +
+      '<div class="pw-f"><span class="pw-lbl">Артикул</span>' +
+        '<input type="text" id="pw-add-sku" placeholder="—"></div>' +
+      '<div class="pw-f"><span class="pw-lbl">Кол-во</span>' +
+        '<input type="number" id="pw-add-qty" value="1" min="1"></div>' +
+      '<div class="pw-f"><span class="pw-lbl">Площадь на деталь, м²</span>' +
+        '<input type="text" id="pw-add-area" placeholder="0,00"></div>' +
+      '<div class="pw-f"><span class="pw-lbl">Цвет RAL</span>' +
+        '<select id="pw-add-ral">' + pwRalOptions('') + '</select></div>' +
+      '<div class="pw-f"><span class="pw-lbl">Тип покрытия</span>' +
+        '<select id="pw-add-coating">' + pwCoatingOptions('') + '</select></div>' +
+    '</div>' +
+    '<button class="btn" onclick="pwAddItem()"><i class="ti ti-plus"></i> Добавить строку</button>' +
+    '</div>';
+}
+
+let _pwStockTimer = null;
+function pwStockSearch(q) {
+  clearTimeout(_pwStockTimer);
+  const box = document.getElementById('pw-add-hits');
+  if (!box) return;
+  if ((q || '').trim().length < 2) { box.innerHTML = ''; return; }
+  _pwStockTimer = setTimeout(async () => {
+    try {
+      const d = await apiGet('/api/paint-works/stock-search?q=' + encodeURIComponent(q.trim()));
+      const items = d.items || [];
+      box.innerHTML = items.length ? items.map(i =>
+        '<button class="pw-hit" onclick="pwPickStock(' + i.id + ', \'' +
+        pwAttr(i.name).replace(/'/g, "\\'") + '\', \'' +
+        pwAttr(i.sku || '').replace(/'/g, "\\'") + '\')">' +
+        escapeHtml(i.name) + (i.sku ? ' · ' + escapeHtml(i.sku) : '') +
+        '<span class="pw-sub"> остаток ' + pwNum(i.qty_on_stock) + '</span></button>').join('')
+        : '<div class="pw-sub pw-hit-empty">На складе не нашлось — можно добавить строку руками</div>';
+    } catch (e) { box.innerHTML = ''; }
+  }, 250);
+}
+
+function pwPickStock(id, name, sku) {
+  const n = document.getElementById('pw-add-name');
+  const s = document.getElementById('pw-add-sku');
+  if (n) n.value = name;
+  if (s) s.value = sku;
+  const box = document.getElementById('pw-add-hits');
+  if (box) box.innerHTML = '';
+}
+
+function pwVal(id) {
+  const el = document.getElementById(id);
+  return el ? (el.value || '').trim() : '';
+}
+
+async function pwAddItem() {
+  const c = PW_STATE.card;
+  if (!c) return;
+  const name = pwVal('pw-add-name');
+  if (!name) { showToast('Укажите наименование детали', 'error'); return; }
+  const res = await pwFetch('POST', '/api/paint-works/files/' + c.id + '/items', {
+    name: name, sku: pwVal('pw-add-sku'), qty: pwVal('pw-add-qty') || 1,
+    area_m2: pwVal('pw-add-area'), ral: pwVal('pw-add-ral'), coating: pwVal('pw-add-coating'),
+  });
+  if (!res.ok) { pwFail(res, 'Строка не добавилась'); return; }
+  PW_STATE.card = res.data;
+  pwRenderFileCard();
+}
+
+async function pwItemSave(itemId, field, value) {
+  const c = PW_STATE.card;
+  if (!c) return;
+  const body = {};
+  body[field] = value;
+  const res = await pwFetch('PATCH', '/api/paint-works/files/' + c.id + '/items/' + itemId, body);
+  if (!res.ok) { pwFail(res, 'Не сохранилось'); return; }
+  PW_STATE.card = res.data;
+  pwRenderFileCard();
+}
+
+async function pwItemRemove(itemId) {
+  const c = PW_STATE.card;
+  if (!c) return;
+  const res = await pwFetch('DELETE', '/api/paint-works/files/' + c.id + '/items/' + itemId);
+  if (!res.ok) { pwFail(res, 'Не убралось'); return; }
+  PW_STATE.card = res.data;
+  pwRenderFileCard();
+  showToast('Деталь вернулась в список УПД', 'info');
+}
+
+async function pwFileField(field, value) {
+  const c = PW_STATE.card;
+  if (!c) return;
+  const body = {};
+  body[field] = value;
+  const res = await pwFetch('PATCH', '/api/paint-works/files/' + c.id, body);
+  if (!res.ok) { pwFail(res, 'Не сохранилось'); return; }
+  PW_STATE.card = res.data;
+  pwRenderFileCard();
+}
+
+async function pwFileStatus(status) {
+  const c = PW_STATE.card;
+  if (!c) return;
+  const asks = {
+    sent: 'Передать файл подрядчику? Детали получат статус «в покраске», состав закроется.',
+    painted: 'Отметить, что детали покрашены?',
+    accepted: 'Принять покрашенные детали на склад?',
+  };
+  if (asks[status] && !confirm(asks[status])) return;
+  const res = await pwFetch('POST', '/api/paint-works/files/' + c.id + '/status',
+                            { status: status });
+  if (!res.ok) { pwFail(res, 'Статус не поменялся'); return; }
+  PW_STATE.card = res.data;
+  pwRenderFileCard();
+  showToast('Статус: ' + res.data.status_label, 'success');
+}
+
+async function pwFileDelete() {
+  const c = PW_STATE.card;
+  if (!c) return;
+  if (!confirm('Удалить черновик? Детали вернутся в список УПД.')) return;
+  const res = await pwFetch('DELETE', '/api/paint-works/files/' + c.id);
+  if (!res.ok) { pwFail(res, 'Не удалилось'); return; }
+  pwCloseFile();
+  showToast('Черновик удалён', 'success');
+}
+
+async function pwExportFile() {
+  const c = PW_STATE.card;
+  if (!c) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/paint-works/files/' + c.id + '/export.xlsx',
+                          { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { showToast('Не удалось выгрузить', 'error'); return; }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filenameFromCD(r.headers.get('Content-Disposition'), 'pokraska.xlsx');
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// ---------------- справочник подрядчиков
+
+function pwContractors() {
+  const cat = PW_STATE.catalogs || {};
+  const rows = (cat.contractors || []).map(k =>
+    '<div class="pw-contr-row"><div><b>' + escapeHtml(k.name) + '</b>' +
+    '<div class="pw-sub">' + escapeHtml(k.kind === 'site' ? 'Свой участок' : 'Подрядчик') +
+    (k.contact ? ' · ' + escapeHtml(k.contact) : '') + '</div></div>' +
+    '<button class="btn btn-sm pw-link" onclick="pwContractorDelete(' + k.id + ', this)">' +
+    'Убрать</button></div>').join('') ||
+    '<div class="pw-empty-line">Справочник пуст.</div>';
+
+  const m = document.createElement('div');
+  m.className = 'modal-overlay visible';
+  m.id = 'pw-contr-modal';
+  m.innerHTML = '<div class="modal pw-modal-sm"><div class="modal-header">' +
+    '<h3>Подрядчики и покрасочные участки</h3>' +
+    '<button class="modal-close" onclick="pwContractorsClose()"><i class="ti ti-x"></i></button>' +
+    '</div><div class="modal-body">' +
+    '<div id="pw-contr-list">' + rows + '</div>' +
+    '<div class="pw-grid3" style="margin-top:12px">' +
+      '<div class="pw-f"><span class="pw-lbl">Название</span>' +
+        '<input type="text" id="pw-contr-name" placeholder="Покрасочный участок №1"></div>' +
+      '<div class="pw-f"><span class="pw-lbl">Кто это</span>' +
+        '<select id="pw-contr-kind"><option value="contractor">Подрядчик</option>' +
+        '<option value="site">Свой участок</option></select></div>' +
+      '<div class="pw-f"><span class="pw-lbl">Контакт</span>' +
+        '<input type="text" id="pw-contr-contact" placeholder="телефон, ФИО"></div>' +
+    '</div>' +
+    '<button class="btn btn-primary" onclick="pwContractorAdd()">' +
+    '<i class="ti ti-plus"></i> Добавить</button>' +
+    '</div></div>';
+  document.body.appendChild(m);
+}
+
+function pwContractorsClose() {
+  const m = document.getElementById('pw-contr-modal');
+  if (m) m.remove();
+}
+
+async function pwContractorAdd() {
+  const name = pwVal('pw-contr-name');
+  if (!name) { showToast('Введите название', 'error'); return; }
+  const res = await pwFetch('POST', '/api/paint-works/contractors', {
+    name: name, kind: pwVal('pw-contr-kind'), contact: pwVal('pw-contr-contact'),
+  });
+  if (!res.ok) { pwFail(res, 'Не добавилось'); return; }
+  PW_STATE.catalogs = null;
+  pwContractorsClose();
+  await loadPaintWorks();
+  pwContractors();
+}
+
+async function pwContractorDelete(id, btn) {
+  const res = await pwFetch('DELETE', '/api/paint-works/contractors/' + id);
+  if (!res.ok) { pwFail(res, 'Не убралось'); return; }
+  PW_STATE.catalogs = null;
+  pwContractorsClose();
+  await loadPaintWorks();
+  pwContractors();
+}
+
+// ---------------- вкладка 3: журнал покраски
+
+function pwRenderJournal() {
+  const cat = PW_STATE.catalogs || {};
+  const f = PW_STATE.jfilters;
+  const statusOpts = ['<option value="">Все статусы</option>'].concat(
+    (cat.part_statuses || []).map(s =>
+      '<option value="' + pwAttr(s.key) + '"' + (f.status === s.key ? ' selected' : '') + '>' +
+      escapeHtml(s.label) + '</option>')).join('');
+  const ralOpts = ['<option value="">Все цвета</option>'].concat(
+    (cat.rals || []).map(r =>
+      '<option value="' + pwAttr(r) + '"' + (f.ral === r ? ' selected' : '') + '>' +
+      escapeHtml(_ralLabel(r)) + '</option>')).join('');
+
+  let html = '<div class="pw-filters">' +
+    '<div class="pw-f"><span class="pw-lbl">Статус детали</span>' +
+      '<select onchange="pwJFilter(\'status\', this.value)">' + statusOpts + '</select></div>' +
+    '<div class="pw-f"><span class="pw-lbl">Цвет RAL</span>' +
+      '<select onchange="pwJFilter(\'ral\', this.value)">' + ralOpts + '</select></div>' +
+    '<div class="pw-f"><span class="pw-lbl">Поиск по детали</span>' +
+      '<input type="text" value="' + pwAttr(f.q) + '" placeholder="наименование или артикул" ' +
+      'onchange="pwJFilter(\'q\', this.value)"></div>' +
+    '</div>';
+
+  if (!PW_STATE.journal.length) {
+    return html + '<div class="empty-block">По этому фильтру деталей нет.</div>';
+  }
+
+  html += '<div class="pw-tblwrap"><table class="pw-table"><thead><tr>' +
+    '<th>Деталь</th><th>Артикул</th><th>Кол-во</th><th>Площадь, м²</th><th>Цвет</th>' +
+    '<th>Файл покраски</th><th>Доработка</th><th>Статус</th><th>Дата возврата</th>' +
+    '</tr></thead><tbody>';
+  PW_STATE.journal.forEach(r => {
+    html += '<tr><td class="pw-name">' + escapeHtml(r.name || '—') +
+      (r.source === 'manual' ? '<div class="pw-sub">добавлена вручную</div>' : '') + '</td>' +
+      '<td>' + escapeHtml(r.sku || '—') + '</td>' +
+      '<td>' + pwNum(r.qty) + ' ' + escapeHtml(r.unit || 'шт') + '</td>' +
+      '<td class="pw-total">' + pwNum(r.total_m2) + '</td>' +
+      '<td>' + pwRalLabel(r.ral) + '</td>' +
+      '<td>' + (r.calc_id
+        ? '<button class="btn btn-sm pw-link" onclick="pwOpenFile(' + r.calc_id + ')">' +
+          escapeHtml(r.calc_label || 'файл') + '</button>' : '—') + '</td>' +
+      '<td>' + escapeHtml(r.note || '—') + '</td>' +
+      '<td>' + pwChip(PW_PART_CHIP[r.status] || 'gray', r.status_label) + '</td>' +
+      '<td>' + (r.returned_at ? pwDate(r.returned_at) : '—') + '</td></tr>';
+  });
+  return html + '</tbody></table></div>';
+}
+
+function pwJFilter(key, value) {
+  PW_STATE.jfilters[key] = value;
+  loadPaintWorks();
+}

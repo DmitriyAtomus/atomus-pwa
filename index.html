@@ -346,6 +346,9 @@
         <button class="nav-item" data-nav="paint-calc" onclick="selectSidebarItem('paint-calc')">
           <i class="ti ti-spray"></i><span>Расчёт окраски</span>
         </button>
+        <button class="nav-item" data-nav="paint-works" onclick="selectSidebarItem('paint-works')">
+          <i class="ti ti-brush"></i><span>Покрасочные работы</span>
+        </button>
         <button class="nav-item" data-nav="schemas-3d" onclick="selectSidebarItem('schemas-3d')">
           <i class="ti ti-3d-cube-sphere"></i><span>3D-схемы</span>
         </button>
@@ -1342,6 +1345,27 @@
         </div>
         <div class="content-inner">
           <div id="paint-calc-content"><div class="loading-block">Загружаем расчёты…</div></div>
+        </div>
+      </div>
+
+      <!-- ============ ПОКРАСОЧНЫЕ РАБОТЫ (v2.46.056) ============ -->
+      <div class="screen" data-screen="paint-works" data-section="production">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
+          <h2>Покрасочные работы</h2>
+          <button class="icon-btn" onclick="loadPaintWorks()"><i class="ti ti-refresh"></i></button>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>Покрасочные работы</h1>
+            <div class="page-subtitle">Детали из УПД по ЭДО → расчётный файл покраски → журнал</div>
+          </div>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="loadPaintWorks()" title="Обновить"><i class="ti ti-refresh"></i></button>
+          </div>
+        </div>
+        <div class="content-inner">
+          <div id="paint-works-content"><div class="loading-block">Загружаем раздел…</div></div>
         </div>
       </div>
 

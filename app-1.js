@@ -1899,6 +1899,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'developments') loadDevelopments();         // ЭТАП 48 (v2.44.46)
   if (screenName === 'paint-calc') loadPaintCalcs();              // v2.45.836
   if (screenName === 'units-journal') loadUnitsJournal();         // v2.46.054
+  if (screenName === 'paint-works') loadPaintWorks();              // v2.46.056
   if (screenName === 'mfg') loadMfg();                            // v2.45.844
   if (screenName === 'inventory') loadInventory();               // ЭТАП 49 (v2.44.56)
   // КП (14Б)
@@ -4738,6 +4739,7 @@ const AUTO_REFRESH_SKIP = [
   'wh-ship-qr', 'security', 'atom-electrica', 'atom-chiller',
   'defects-detail', 'defects-chats', 'developments', 'inventory', 'paint-calc', 'mfg',
   'units-journal',   // правка прямо в ячейке — перерисовка стёрла бы недописанное
+  'paint-works',     // отбор деталей и примечания — перерисовка сбросила бы отметки
   'mail-messenger',
 ];
 
