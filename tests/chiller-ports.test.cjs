@@ -33,9 +33,11 @@ test('меш покупной позиции сохраняет группы с�
 });
 
 test('цвета сред те же, что в базе 3D, и деталь получает пять материалов', () => {
+  assert.match(page, /const C_BODY=0x8d959d,C_COPPER=0xb87333/);
   assert.match(page, /const C_DIS=0xd94f3d,C_SUC=0x3d8fd9,C_PPK=0xC9A227,C_EQ=0x4FBF8B/);
   assert.match(page, /const ZONE_COL=\[C_BODY,C_DIS,C_SUC,C_PPK,C_EQ\]/);
-  assert.match(page, /geo\.userData\.zoneMats\?ZONE_COL\.map\(c=>mk\(c,true\)\):mk\(C_BODY\)/);
+  assert.match(page, /const modelCol=d=>d&&d\.sub==='copper'\?C_COPPER:C_BODY/);
+  assert.match(page, /ZONE_COL\.map\(\(c,i\)=>mk\(i&&PORTS\?c:base,true\)\)/);
   // патрубок остаётся сталью по блеску, а не выглядит крашеным
   assert.match(page, /const mk=\(c,steel\)=>new THREE\.MeshStandardMaterial/);
 });
@@ -67,7 +69,7 @@ test('режим подписей: по умолчанию у выделенно
   assert.match(page, /\$\('#bPorts'\)\.onclick=portsToggle/);
   assert.match(page, /id="bPorts"/);
   // выключили подписи — гаснет и краска патрубков
-  assert.match(page, /m\.color\.setHex\(PORTS\?ZONE_COL\[i\]:C_BODY\)/);
+  assert.match(page, /m\.color\.setHex\(PORTS\?ZONE_COL\[i\]:modelCol\(p\.d\)\)/);
 });
 
 test('подписи держатся за деталями и не наезжают друг на друга', () => {

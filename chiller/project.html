@@ -1346,7 +1346,7 @@ async function geoOf(d){
 }
 
 /* ═══ сцена: z вверх, как в базе ═══ */
-const C_BODY=0x8d959d;
+const C_BODY=0x8d959d,C_COPPER=0xb87333;
 /* цвета патрубков — те же, что в базе 3D: нагнетание красное, всасывание
    голубое, порт предохранительного клапана золотой, уравнивание зелёное */
 const C_DIS=0xd94f3d,C_SUC=0x3d8fd9,C_PPK=0xC9A227,C_EQ=0x4FBF8B;
@@ -1356,6 +1356,10 @@ const ZONE_SHORT={dis:'нагнетание',suc:'всасывание',ppk:'П�
 /* цвет детали из пакета: '#1A1D21' у крашеных, иначе исходная сталь */
 const partCol=p=>{const c=p&&p.col?parseInt(String(p.col).replace('#',''),16):NaN;
   return isNaN(c)?C_BODY:c;};
+/* Параметрическая медная номенклатура приезжает отдельным подразделом.
+   Её тело должно оставаться медным, когда подсветка патрубков выключена;
+   иначе труба выглядела как серая сталь и в сцене её не отличить. */
+const modelCol=d=>d&&d.sub==='copper'?C_COPPER:C_BODY;
 let renderer,scene,camera,grid,glLost=false;
 let target=new THREE.Vector3(0,0,300),theta=-0.95,phi=1.15,dist=3200,dMin=120,dMax=12000;
 const placed=[];   // {uid,id,obj,d}
@@ -2114,8 +2118,11 @@ async function addItem(d,at,rot,tilt,roll){
   const PT=geo.userData.parts;
   /* v2.45.999: у позиции с размеченными патрубками материалов пять — корпус
      и четыре среды; гасить их нельзя, поэтому список деталей узла не трогаем */
+  const base=modelCol(d);
   const mat=PT?PT.map(x=>mk(x.col))
-             :(geo.userData.zoneMats?ZONE_COL.map(c=>mk(c,true)):mk(C_BODY));
+             :(geo.userData.zoneMats
+               ?ZONE_COL.map((c,i)=>mk(i&&PORTS?c:base,true))
+               :mk(base,base===C_BODY||base===C_COPPER));
   pushHist('добавление детали');           // v2.45.996: шаг истории — до появления детали
   const obj=new THREE.Mesh(geo,mat);
   const bb=geo.boundingBox;
@@ -3897,7 +3904,7 @@ function portsPaint(){
   placed.forEach(p=>{
     if(!p.zm||!Array.isArray(p.obj.material))return;
     p.obj.material.forEach((m,i)=>{
-      if(i>0)m.color.setHex(PORTS?ZONE_COL[i]:C_BODY);});
+      if(i>0)m.color.setHex(PORTS?ZONE_COL[i]:modelCol(p.d));});
   });
 }
 function portsOn(){portsPaint();placed.forEach(applyTint);portsRebuild();}
