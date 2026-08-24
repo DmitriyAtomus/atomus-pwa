@@ -5166,6 +5166,11 @@ function routeWorldEnd(it,q){it.obj.updateMatrixWorld(true);
   return rotSeatLocal(q.z).applyMatrix4(it.obj.matrixWorld);}
 function routeWorldDir(it,q){return zDir(q.z).applyQuaternion(it.obj.quaternion).normalize();}
 function routeArrow(P,D){
+  /* Два положения могут смотреть почти точно в камеру и от неё: на экране их
+     проекция схлопывается в одну стрелку. Показываем их отдельными символами,
+     чтобы четыре стороны отвода всегда были различимы. */
+  const face=D.dot(camera.position.clone().sub(P).normalize());
+  if(Math.abs(face)>.62)return face>0?'⊙':'⊗';       // к себе / от себя
   const a=P.clone().project(camera),b=P.clone().addScaledVector(D,120).project(camera);
   const dx=b.x-a.x,dy=b.y-a.y;
   return Math.abs(dx)>Math.abs(dy)?(dx>0?'→':'←'):(dy>0?'↑':'↓');

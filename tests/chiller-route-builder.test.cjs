@@ -77,6 +77,7 @@ test('ручное растягивание пишет один шаг исто�
 test('конструктор предлагает отвод, четыре стороны и продолжение трубой', () => {
   const b = section('function routeRollButtons(it,q){', '(function routeGripBind(){');
   assert.match(b, /\[0,90,180,270\]/);
+  assert.match(page, /face>0\?'⊙':'⊗'/);
   assert.match(b, /data-rb="elbow">↳ Поставить отвод 90°/);
   assert.match(b, /data-rb="tube">＋ Продолжить трубой/);
   assert.match(b, /rotPick\(sel,q\.zi,x,y,null,\{kind:kind,manual:true\}\)/);
