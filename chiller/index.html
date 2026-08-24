@@ -586,7 +586,7 @@ function drawCards(){
       <span class="badge ${d.ready?'b-ok':'b-q'}">${d.ready?'STEP · LOD '+d.lod:'в очереди'}</span>
       <div class="ph">${d.ready
         ? (GEOMS[d.g]&&GEOMS[d.g].user
-            ? `<div class="none" style="color:#8FD3F4"><i>⬢</i>свой корпус<br>STEP</div>`
+            ? `<img loading="lazy" data-uth="${d._uid}">`
             : `<img loading="lazy" data-th="${GEOMS[d.g].f}">`)
         : `<div class="none"><i>◻</i>модель<br>не выпущена</div>`}</div>
       <div class="body">
@@ -624,6 +624,7 @@ async function fillThumb(img){
   delete img.dataset.busy;
 }
 function fillVisible(){
+  fillUserThumbs();
   const H = window.innerHeight + 600;
   const list = document.querySelectorAll('#grid img[data-th]');
   let started = 0;
@@ -1138,7 +1139,8 @@ function userItem(m){
       ['Треугольников',String(m.triangle_count||0)],['Единицы STEP',m.source_unit||'не определены']],
     geom:{bolt:[0,0],bolt_plane:'none',rows:[['Роль в компоновке','корпус'],['Координаты','нормализованы в мм']],
       ports:[],pcol:[],conn:'',lod:'Пользовательская модель: геометрия из загруженного STEP, патрубки не размечены.'},
-    _ustep:m.step_url,_ufile:m.original_filename||'model.step',_uid:m.id};
+    _ustep:m.step_url,_ufile:m.original_filename||'model.step',_uid:m.id,
+    _uthumb:m.thumb_url||''};
 }
 async function mergeUserModels(){
   if(!API)return 0;
@@ -1152,6 +1154,73 @@ async function mergeUserModels(){
     });
     return n;
   }catch(e){return 0;}
+}
+/* превью своей модели: серверу рисовать нечем — рендерим тут из меша,
+   отправляем webp, дальше все видят лёгкую картинку как у заводских */
+const UTH=new Map();
+function userGeo(MS){
+  const p16=new Uint16Array(b64(MS.pos).buffer);
+  const ib=b64(MS.idx).buffer,i16=MS.i32?new Uint32Array(ib):new Uint16Array(ib);
+  const pos=new Float32Array(p16.length);
+  for(let i=0;i<p16.length;i+=3){
+    pos[i]=MS.lo[0]+p16[i]*MS.scale[0];
+    pos[i+1]=MS.lo[1]+p16[i+1]*MS.scale[1];
+    pos[i+2]=MS.lo[2]+p16[i+2]*MS.scale[2];}
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setIndex(new THREE.BufferAttribute(i16,1));
+  geo.computeVertexNormals();geo.computeBoundingBox();
+  return geo;
+}
+async function userThumbMake(d){
+  const G=GEOMS[d.g];
+  const MS=await meshOf(G);
+  const geo=userGeo(MS);
+  const cnv=document.createElement('canvas');
+  const ren=new THREE.WebGLRenderer({canvas:cnv,antialias:true,preserveDrawingBuffer:true});
+  ren.setSize(320,240);ren.outputEncoding=THREE.sRGBEncoding;
+  const sc=new THREE.Scene();sc.background=new THREE.Color(0x0D1B30);
+  sc.add(new THREE.HemisphereLight(0xdcecff,0x162238,.8));
+  const dl=new THREE.DirectionalLight(0xffffff,.85);dl.position.set(1,-2,3);sc.add(dl);
+  const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial(
+    {color:0x9aa8b4,metalness:.5,roughness:.5,flatShading:true}));
+  sc.add(mesh);
+  const cam=new THREE.PerspectiveCamera(32,320/240,1,100000);cam.up.set(0,0,1);
+  const bb=geo.boundingBox,c=new THREE.Vector3(),s=new THREE.Vector3();
+  bb.getCenter(c);bb.getSize(s);
+  const R=Math.max(s.x,s.y,s.z)*2.05;
+  cam.position.set(c.x+R*.72,c.y-R*.72,c.z+R*.5);cam.lookAt(c);
+  ren.render(sc,cam);
+  const blob=await new Promise(res=>cnv.toBlob(res,'image/webp',.82));
+  geo.dispose();ren.dispose();
+  if(blob&&d._uid){
+    try{await fetch(U.index().replace('/index','/user-models/'+d._uid+'/thumb'),
+      {method:'POST',headers:AUTH,body:blob});}catch(e){}
+  }
+  return blob?URL.createObjectURL(blob):null;
+}
+let _uthBusy=false;
+async function fillUserThumbs(){
+  if(_uthBusy)return;_uthBusy=true;
+  try{
+    for(const img of document.querySelectorAll('img[data-uth]')){
+      if(img.src)continue;
+      const mid=img.dataset.uth,d=DATA.find(x=>x.id==='user:'+mid);
+      if(!d)continue;
+      if(UTH.has(mid)){img.src=UTH.get(mid);continue;}
+      let u=null;
+      if(d._uthumb){
+        try{
+          const r=await fetch(d._uthumb,{cache:'default',headers:AUTH});
+          if(r.ok)u=URL.createObjectURL(await r.blob());
+        }catch(e){}
+      }
+      if(!u){
+        try{u=await userThumbMake(d);}catch(e){}
+      }
+      if(u){UTH.set(mid,u);img.src=u;}
+    }
+  }finally{_uthBusy=false;}
 }
 async function userOrient(mid,rot){
   const d=DATA.find(x=>x.id==='user:'+mid);
@@ -1169,7 +1238,11 @@ async function userOrient(mid,rot){
     const dims=sz.length===3?sz.map(v=>Math.round(+v||0)).join(' × ')+' мм':'габарит из STEP';
     d.tags=[dims,'STEP → мм'];
     d.specs=d.specs.map(s=>s[0]==='Габарит'?['Габарит',dims]:s);
+    d._uthumb=m.thumb_url||d._uthumb;
     openDet(d.id);          // карточка перерисуется уже повернутым мешем
+    UTH.delete(mid);
+    try{const u=await userThumbMake(d);if(u)UTH.set(mid,u);
+      document.querySelectorAll('img[data-uth="'+mid+'"]').forEach(im=>im.src=u);}catch(e){}
   }catch(err){alert('Поворот не применился: '+(err.message||err));}
 }
 $('#upBtn').onclick=()=>$('#upFile').click();

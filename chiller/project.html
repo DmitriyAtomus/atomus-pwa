@@ -1530,7 +1530,8 @@ const USER_PREFIX='user:';
 function userModelData(m){
   const id=USER_PREFIX+m.id,g=USER_PREFIX+m.id,sz=(m.bbox&&m.bbox.size)||[];
   const dims=sz.length===3?sz.map(v=>Math.round(+v||0)).join(' × ')+' мм':'габарит из STEP';
-  GEOMS[g]={f:m.id,url:m.mesh_url,user:true,bb:m.bbox||{},step:m.step_url};
+  GEOMS[g]={f:m.id,url:m.mesh_url,user:true,bb:m.bbox||{},step:m.step_url,
+    thumb:m.thumb_url||''};
   return {id:id,g:g,ready:true,name:m.name||'Корпус из STEP',brand:'Мои корпуса',
     kind:'Загруженный STEP · корпус',section:'frames',sub:'user',tags:[dims,'STEP → мм'],
     specs:[['Исходный файл',m.original_filename||'model.step'],['Габарит',dims],
@@ -9089,7 +9090,11 @@ async function fillThumbsIn(sel){
     if(img.src||img.dataset.busy)continue;
     if(THUMBS.has(f)){img.src=THUMBS.get(f);continue;}
     img.dataset.busy='1';
-    try{const r=await fetch(U.thumb(f),{cache:'default',headers:AUTH});
+    /* v2.46.056: превью своей модели живёт на /user-models/{id}/thumb —
+       витрина рендерит и сохраняет его при загрузке корпуса */
+    const G=Object.values(GEOMS).find(g=>g&&g.user&&g.f===f);
+    const url=(G&&G.thumb)?G.thumb:U.thumb(f);
+    try{const r=await fetch(url,{cache:'default',headers:AUTH});
       if(r.ok){const u=URL.createObjectURL(await r.blob());THUMBS.set(f,u);img.src=u;}}catch(e){}
     delete img.dataset.busy;
   }
