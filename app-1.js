@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.036";
+const APP_VERSION = "v2.46.037";
 const APP_VERSION_DATE = "24.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2597,10 +2597,21 @@ function _devChatRender(msg) {
 // ТЗ, которое сотрудник собрал с Клавой в разделе «Идеи». Приезжает в ленту
 // автором `idea` и БЕЗ статуса: очередь агента берёт только сообщения автора
 // `user` со статусом `new`, поэтому само по себе оно ничего не запускает.
-// «Внедрить» ставит задачу, «Не сейчас» пишет автору причину.
+// «Внедрить» ставит задачу, «На доработку» возвращает ТЗ в исходный чат,
+// «Не сейчас» пишет автору причину.
 function _devChatIdeaCard(msg) {
   const idea = msg.meta && msg.meta.idea;
   if (!idea || !idea.id) return null;
+  const decisions = {
+    taken: ['ti-rocket', 'Внедряем — задача в очереди'],
+    revision: ['ti-edit', 'Возвращено на доработку'],
+    declined: ['ti-clock-pause', 'Отложено'],
+  };
+  const decision = decisions[msg.status] || null;
+  const textButton = idea.card
+    ? '<button type="button" class="txt" onclick="ideaSpecTextToggle(this)">' +
+      '<i class="ti ti-file-text"></i>ТЗ текстом</button>'
+    : '';
   const box = document.createElement('div');
   box.className = 'dchat-idea';
   box.setAttribute('data-idea-card', idea.id);
@@ -2609,12 +2620,16 @@ function _devChatIdeaCard(msg) {
       escapeHtml(idea.author || 'сотрудник') + ' предлагает</div>' +
     ideaSpecCardHtml(idea.card) +
     '<div class="di-act">' +
-      '<button type="button" class="ok" onclick="ideaImplement(' + Number(idea.id) + ')">' +
+      (decision
+        ? '<span class="di-decision"><i class="ti ' + decision[0] + '"></i>' +
+          decision[1] + '</span>'
+        : '<button type="button" class="ok" onclick="ideaImplement(' + Number(idea.id) + ')">' +
         '<i class="ti ti-rocket"></i>Внедрить</button>' +
+      '<button type="button" onclick="ideaRevision(' + Number(idea.id) + ')">' +
+        '<i class="ti ti-edit"></i>На доработку</button>' +
       '<button type="button" onclick="ideaDecline(' + Number(idea.id) + ')">' +
-        '<i class="ti ti-clock-pause"></i>Не сейчас</button>' +
-      (idea.card ? '<button type="button" class="txt" onclick="ideaSpecTextToggle(this)">' +
-        '<i class="ti ti-file-text"></i>ТЗ текстом</button>' : '') +
+        '<i class="ti ti-clock-pause"></i>Не сейчас</button>') +
+      textButton +
     '</div>';
   return box;
 }

@@ -48,6 +48,7 @@ test('ТЗ собирается и уходит директору двумя р
   // решение директора — отдельные кнопки, они есть только у него
   assert.match(acts, /state\._ideas\.isDir/);
   assert.match(acts, /ideaImplement\(/);
+  assert.match(acts, /ideaRevision\(/);
   assert.match(acts, /ideaDecline\(/);
 });
 
@@ -56,7 +57,10 @@ test('карточка ТЗ в ленте разработки: решение �
                           app1.indexOf('// Итог работы Клавы'));
   assert.match(card, /msg\.meta && msg\.meta\.idea/);
   assert.match(card, /ideaImplement\(' \+ Number\(idea\.id\)/);
+  assert.match(card, /ideaRevision\(' \+ Number\(idea\.id\)/);
   assert.match(card, /ideaDecline\(' \+ Number\(idea\.id\)/);
+  assert.match(card, /decisions\[msg\.status\]/);
+  assert.match(card, /Возвращено на доработку/);
   // карточка подключена к рендеру ленты
   assert.match(app1, /const idea = _devChatIdeaCard\(msg\);/);
   assert.match(css, /\.dchat-idea/);
@@ -68,6 +72,15 @@ test('внедрение спрашивает правку и зовёт бэк�
   assert.match(fn, /prompt\(/);                       // директор может дописать правку
   assert.match(fn, /'\/implement'/);
   assert.doesNotMatch(fn, /dev-chat\/send/);          // очередь агента дёргает только сервер
+});
+
+test('доработка требует комментарий и возвращает ТЗ в тот же чат', () => {
+  const fn = app4.slice(app4.indexOf('async function ideaRevision'),
+                        app4.indexOf('async function ideaDecline'));
+  assert.match(fn, /prompt\(/);
+  assert.match(fn, /'\/revision'/);
+  assert.match(fn, /ideasOpen\(id\)/);
+  assert.doesNotMatch(fn, /dev-chat\/send/);
 });
 
 test('карточка «Идеи и доработки» в Помощи ведёт в раздел', () => {
@@ -87,7 +100,7 @@ test('IDEA_STATUS покрывает все статусы бэкенда', () =
   vm.createContext(ctx);
   vm.runInContext(src + '\n;globalThis.out = IDEA_STATUS;', ctx);
   assert.deepEqual(Object.keys(ctx.out).sort(),
-    ['declined', 'done', 'open', 'ready', 'sent', 'taken']);
+    ['declined', 'done', 'open', 'ready', 'revision', 'sent', 'taken']);
 });
 
 // v2.46.024: скриншоты и файлы в чате идей

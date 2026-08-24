@@ -24777,6 +24777,7 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
 .ich-chip { flex: none; font-size: 10.5px; font-weight: 700; border-radius: 7px; padding: 1px 6px;
   background: #EEF2F7; color: var(--text-mid); white-space: nowrap; }
 .ich-chip.is-ready { background: #FEF3C7; color: #92400E; }
+.ich-chip.is-revision { background: #FFEDD5; color: #9A3412; }
 .ich-chip.is-sent { background: #DBEAFE; color: #1E40AF; }
 .ich-chip.is-taken { background: #DCFCE7; color: #166534; }
 .ich-chip.is-declined { background: #F1F5F9; color: #64748B; }
@@ -24849,6 +24850,9 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
 .dchat-idea .di-act button:hover { filter: brightness(.97); }
 .dchat-idea .di-act button { min-width: 104px; }   /* три кнопки в узкой ленте: лишняя переносится, а не сплющивается в буквы */
 .dchat-idea .di-act button.txt { flex: 0 0 auto; }
+.dchat-idea .di-decision { flex: 1 1 100%; display: inline-flex; align-items: center;
+  gap: 6px; padding: 8px 10px; border-radius: 10px; font-size: 12.5px; font-weight: 700;
+  color: var(--text-mid); background: #EEF2F8; }
 
 /* ---- ТЗ по полкам: шапка «стоит ли» и свёрнутые полки ----
    Текст ТЗ в сообщении тот же самый, поэтому по умолчанию он спрятан —
