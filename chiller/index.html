@@ -389,6 +389,9 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
             title="Чат по чиллерам">💬 <span id="chatTxt">Чат</span></button>
     <!-- v2.46.051: кнопка «Подбор» из витрины убрана — подбор фильтра живёт
          в конструкторе (Проект), где фильтр и ставят; pickOpen() остаётся. -->
+    <button id="upBtn" class="fsbtn"
+            title="Загрузить STEP-модель корпуса — она появится в разделе «Корпуса и рамы» и в конструкторе">⇧ <span>Корпус</span></button>
+    <input type="file" id="upFile" accept=".step,.stp" style="display:none">
     <a class="fsbtn" href="project.html" style="text-decoration:none"
        title="Прототип конструктора: собери машину из моделей базы">⚙ <span>Проект</span></a>
     <button id="fsBtn" class="fsbtn" onclick="toggleFS()"
@@ -582,7 +585,9 @@ function drawCards(){
     <div class="card" data-id="${d.id}">
       <span class="badge ${d.ready?'b-ok':'b-q'}">${d.ready?'STEP · LOD '+d.lod:'в очереди'}</span>
       <div class="ph">${d.ready
-        ? `<img loading="lazy" data-th="${GEOMS[d.g].f}">`
+        ? (GEOMS[d.g]&&GEOMS[d.g].user
+            ? `<div class="none" style="color:#8FD3F4"><i>⬢</i>свой корпус<br>STEP</div>`
+            : `<img loading="lazy" data-th="${GEOMS[d.g].f}">`)
         : `<div class="none"><i>◻</i>модель<br>не выпущена</div>`}</div>
       <div class="body">
         <div class="brand">${d.brand}</div>
@@ -1109,14 +1114,73 @@ async function boot(){
   const ix = await r.json();
   DATA = ix.items; GEOMS = ix.geoms; SECTIONS = ix.sections; VERSION = ix.built;
   VER = (ix.version || ix.built || '').replace(/[^0-9a-zA-Z]/g,'');
+  const nUser = await mergeUserModels();
   draw();
   const c=document.querySelector('.hcount');
-  if(c) c.innerHTML = '<b>'+ix.count.ready+'</b> моделей выпущено<br>'+
-                      ix.count.items+' позиций в базе<br>'+
+  if(c) c.innerHTML = '<b>'+(ix.count.ready+nUser)+'</b> моделей выпущено<br>'+
+                      (ix.count.items+nUser)+' позиций в базе<br>'+
                       '<span style="font-size:10px;opacity:.6">база от '+ix.built+'</span>';
   chatArm();     /* чат по чиллерам — если он этому пользователю доступен */
 }
 boot();
+
+/* ═══ v2.46.052: загруженные корпуса (STEP из CRM) — в витрине ═══
+   Хранятся отдельно от пакета базы (/api/3d/user-models); подмешиваем их
+   в раздел «Корпуса и рамы» той же формой, что делает конструктор. */
+function userItem(m){
+  const id='user:'+m.id, g=id, sz=(m.bbox&&m.bbox.size)||[];
+  const dims=sz.length===3?sz.map(v=>Math.round(+v||0)).join(' × ')+' мм':'габарит из STEP';
+  GEOMS[g]={f:m.id,url:m.mesh_url,user:true};
+  return {id:id,g:g,ready:true,lod:'350 · свой',name:m.name||'Корпус из STEP',
+    brand:'Мои корпуса',kind:'Загруженный STEP · корпус',section:'frames',sub:'user',
+    tags:[dims,'STEP → мм'],
+    specs:[['Исходный файл',m.original_filename||'model.step'],['Габарит',dims],
+      ['Треугольников',String(m.triangle_count||0)],['Единицы STEP',m.source_unit||'не определены']],
+    geom:{bolt:[0,0],bolt_plane:'none',rows:[['Роль в компоновке','корпус'],['Координаты','нормализованы в мм']],
+      ports:[],pcol:[],conn:'',lod:'Пользовательская модель: геометрия из загруженного STEP, патрубки не размечены.'},
+    _ustep:m.step_url,_ufile:m.original_filename||'model.step'};
+}
+async function mergeUserModels(){
+  if(!API)return 0;
+  try{
+    const r=await fetch(U.index().replace('/index','/user-models'),{cache:'no-store',headers:AUTH});
+    if(!r.ok)return 0;
+    const x=await r.json();let n=0;
+    (x.items||[]).slice().reverse().forEach(m=>{
+      const id='user:'+m.id;
+      if(!DATA.some(d=>d.id===id)){DATA.unshift(userItem(m));n++;}
+    });
+    return n;
+  }catch(e){return 0;}
+}
+$('#upBtn').onclick=()=>$('#upFile').click();
+$('#upFile').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value='';
+  if(!f)return;
+  if(!/\.(step|stp)$/i.test(f.name||'')){alert('Нужен файл .step или .stp');return;}
+  const btn=$('#upBtn'),old=btn.innerHTML;
+  btn.innerHTML='⏳ <span>Конвертирую…</span>';btn.disabled=true;
+  try{
+    const fd=new FormData();
+    fd.append('file',f,f.name);
+    fd.append('name',(f.name||'Корпус').replace(/\.(step|stp)$/i,''));
+    const r=await fetch(U.index().replace('/index','/user-models'),
+      {method:'POST',headers:AUTH,body:fd});
+    const x=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(x.message||x.error||('HTTP '+r.status));
+    const m=x.model||x;
+    if(m&&m.id&&!DATA.some(d=>d.id==='user:'+m.id))DATA.unshift(userItem(m));
+    const hc=document.querySelector('.hcount');
+    if(hc)hc.innerHTML='<b>'+DATA.filter(d=>d.ready).length+'</b> моделей выпущено<br>'+
+      DATA.length+' позиций в базе';
+    draw();
+    alert('Корпус «'+((m&&m.name)||f.name)+'» загружен — он в разделе «Корпуса и рамы» и уже доступен в конструкторе.');
+  }catch(err){
+    alert('Не загрузилось: '+(err.message||err));
+  }finally{
+    btn.innerHTML=old;btn.disabled=false;
+  }
+});
 
 /* ===================== 3D ===================== */
 let renderer, scene, camera, mesh, wire, boxH, mats, bolt, labels=[], cur=null;
@@ -1162,7 +1226,7 @@ async function gunzip(s){
 }
 async function meshOf(G){
   if(!G._mesh){
-    const r = await fetch(U.mesh(G.f), {cache:'default', headers:AUTH});
+    const r = await fetch(G.url || U.mesh(G.f), {cache:'default', headers:AUTH});
     if(!r.ok) throw new Error('меш не отдался: '+r.status);
     let buf = await r.arrayBuffer();
     /* Локально файл лежит .json.gz и распаковывать надо самим; из CRM тот же
@@ -1571,6 +1635,13 @@ function side(d){
 async function dlStep(d){
   // файлы лежат рядом: наш STEP в pack/step, файл завода — по прямой ссылке
   const a=document.createElement('a');
+  if(d._ustep){
+    const r=await fetch(d._ustep,{headers:AUTH});
+    if(!r.ok){ alert('Файл не отдался: '+r.status); return; }
+    a.href=URL.createObjectURL(await r.blob());
+    a.download=(d._ufile||'model.step');
+    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),8000); return;
+  }
   if(d.dl){ a.href=d.dl; a.target='_blank'; a.rel='noopener'; }
   else if(d.f){
     if(API){ // под авторизацией: тянем сами и отдаём файлом
