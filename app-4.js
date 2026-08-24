@@ -16805,6 +16805,7 @@ function renderPaintCalcDetail(c) {
   const t = c.totals || {};
   const sel = _paintSelMap(c);
   const view = _paintView();
+  const sets = _paintSets(c);
 
   let h = '<div class="paint-detail">';
 
@@ -16871,7 +16872,23 @@ function renderPaintCalcDetail(c) {
         '<div class="pd-total-label">ПЛОЩАДЬ ОКРАСКИ ВСЕГО</div>' +
         '<div class="pd-total-value">' + Number(c.total_paint_m2 || 0).toFixed(2) + ' м²</div>' +
       '</div>' +
+      // v2.46.057: комплекты. Штуки на плитке — на ОДИН комплект, а заказ
+      // приходит на партию изделий: тут одно число вместо правки всех плиток.
       '<div class="pd-total-side">' +
+        '<div class="pd-sets">' +
+          '<span class="pd-sets-lbl">Комплектов:</span>' +
+          '<span class="pd-sets-box">' +
+            '<button class="s" onclick="paintSetsStep(' + c.id + ',-1)" title="Меньше">−</button>' +
+            '<input class="v" id="pd-sets-input" type="number" min="1" step="1" inputmode="numeric" ' +
+              'value="' + sets + '" oninput="paintSetsTyped(' + c.id + ',this.value)" ' +
+              'onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}" ' +
+              'onblur="paintSetsFlush(' + c.id + ')">' +
+            '<button class="s" onclick="paintSetsStep(' + c.id + ',1)" title="Больше">+</button>' +
+          '</span>' +
+          '<span class="pd-dim">' + (sets > 1
+            ? 'штуки на плитках — на 1 комплект, итоги и ведомость — на ' + sets
+            : 'сколько изделий красим; штуки на плитках — на 1 комплект') + '</span>' +
+        '</div>' +
         '<div><b>Порошок:</b> ' + (powder.min_kg || 0) + '…' + (powder.max_kg || 0) + ' кг ' +
           '<span class="pd-dim">при слое 60…80 мкм</span></div>' +
         (t.ral_list && t.ral_list.length
@@ -16931,7 +16948,7 @@ function renderPaintCalcDetail(c) {
 
   // позиции: таблица или плитки
   if (items.length && view === 'tiles') {
-    h += '<div class="pdx-grid">' + items.map(it => _paintTileHtml(it, !!sel[it.id])).join('') + '</div>';
+    h += '<div class="pdx-grid">' + items.map(it => _paintTileHtml(it, !!sel[it.id], sets)).join('') + '</div>';
   } else if (items.length) {
     h += '<div class="pd-table-wrap"><table class="pd-table">' +
       '<thead><tr>' +
@@ -16951,7 +16968,9 @@ function renderPaintCalcDetail(c) {
           (it.holes_count ? '<small> · вырезов ' + it.holes_count + '</small>' : '') +
           (_paintStatusChip(it) ? '<div style="margin-top:2px;">' + _paintStatusChip(it) + '</div>' : '') + '</td>' +
         '<td><input type="number" min="1" class="pd-qty" value="' + (it.qty || 1) + '" ' +
-          'onchange="savePaintItem(' + it.calc_id + ',' + it.id + ',{qty:this.value})"></td>' +
+          'onchange="savePaintItem(' + it.calc_id + ',' + it.id + ',{qty:this.value})">' +
+          (sets > 1 ? '<span class="pdx-sets" title="на ' + sets + ' компл.">= ' +
+            ((it.qty || 1) * sets) + ' шт</span>' : '') + '</td>' +
         '<td>' + (it.thickness_mm ? it.thickness_mm + ' мм' : '<span class="pd-dim">?</span>') + '</td>' +
         '<td class="pd-mat-cell"><button class="pd-mat-btn" onclick="openPaintMaterialPicker(' +
           it.calc_id + ',' + it.id + ',&quot;' + escapeHtml(it.material || '') + '&quot;)">' +
@@ -16982,7 +17001,9 @@ function renderPaintCalcDetail(c) {
     h += '<div class="pd-note">Площадь окраски = 2 × площадь развёртки + периметр реза × толщина. ' +
       'Контроль: расчётная масса против массы в основной надписи, допуск 1 %.<br>' +
       'Количество штук ставится прямо на плитке кнопками <b>−</b> / <b>+</b> ' +
-      '(или числом в поле), в таблице — в колонке «Кол-во». Площадь и порошок пересчитываются сразу.</div>';
+      '(или числом в поле), в таблице — в колонке «Кол-во»: это штуки <b>на один комплект</b>. ' +
+      'Сколько комплектов красим — поле <b>«Комплектов»</b> в итогах сверху; ' +
+      'итоги, ведомость и порошок пересчитываются сразу.</div>';
   }
 
   // липкая панель партии
@@ -17010,7 +17031,8 @@ function renderPaintCalcDetail(c) {
   box.innerHTML = h;
 }
 
-function _paintTileHtml(it, isSel) {
+function _paintTileHtml(it, isSel, sets) {
+  sets = Math.max(parseInt(sets, 10) || 1, 1);
   const svg = it.svg ||
     '<svg viewBox="0 0 170 110" xmlns="http://www.w3.org/2000/svg">' +
     '<rect x="30" y="20" width="110" height="70" rx="8" fill="none" stroke="#D8B4FE" ' +
@@ -17042,7 +17064,9 @@ function _paintTileHtml(it, isSel) {
     '</span>' +
     '<div class="pdx-info">' +
       '<div class="d">' + escapeHtml(it.designation || '—') + '</div>' +
-      '<div class="n">' + escapeHtml(it.name || '—') + _paintManualTag(it) + '</div>' +
+      '<div class="n">' + escapeHtml(it.name || '—') + _paintManualTag(it) +
+        (sets > 1 ? '<span class="pdx-sets">×' + sets + ' компл. = ' +
+          ((it.qty || 1) * sets) + ' шт</span>' : '') + '</div>' +
       '<div class="m"><b>' + Number(it.paint_total_m2 || 0).toFixed(2) + ' м²</b>' +
         (it.thickness_mm ? ' · ' + it.thickness_mm + ' мм' : '') +
         ' · ' + escapeHtml(String(matShort).slice(0, 14)) +
@@ -17107,6 +17131,64 @@ function paintQtyFlush(calcId, itemId) {
   const qty = parseInt(inp.value, 10);
   if (!qty || qty < 1) { inp.value = _paintQtyCurrent(itemId); return; }
   _paintQtySave(calcId, itemId, qty);
+}
+
+// ============ v2.46.057: СКОЛЬКО КОМПЛЕКТОВ КРАСИМ ============
+// Штуки в позиции — на один комплект (как в ведомости деталей к изделию).
+// Партия задаётся одним числом на расчёте: заказ на 5 блоков — поставил 5,
+// и площадь, порошок и ведомость пересчитались на всю партию.
+let _paintSetsTimer = null;
+
+function _paintSets(c) {
+  return Math.max(parseInt((c || {}).sets_qty, 10) || 1, 1);
+}
+function _paintSetsInput() {
+  return document.getElementById('pd-sets-input');
+}
+async function _paintSetsSave(calcId, sets) {
+  clearTimeout(_paintSetsTimer);
+  _paintSetsTimer = null;
+  if (sets === _paintSets(state.currentPaintCalc)) return;
+  const wasFocused = document.activeElement === _paintSetsInput();
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ sets_qty: sets }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(d.message || 'Не сохранилось', 'error'); return; }
+    state.currentPaintCalc = d;
+    renderPaintCalcDetail(d);
+    if (wasFocused) {
+      const el = _paintSetsInput();
+      if (el) { el.focus(); el.select(); }
+    }
+  } catch (e) {
+    showToast('Ошибка: ' + String((e && e.message) || e), 'error');
+  }
+}
+function paintSetsStep(calcId, delta) {
+  const inp = _paintSetsInput();
+  if (!inp) return;
+  const next = Math.max(1, (parseInt(inp.value, 10) || _paintSets(state.currentPaintCalc)) + delta);
+  inp.value = next;
+  clearTimeout(_paintSetsTimer);
+  _paintSetsTimer = setTimeout(() => _paintSetsSave(calcId, next), 700);
+}
+function paintSetsTyped(calcId, value) {
+  const sets = parseInt(value, 10);
+  clearTimeout(_paintSetsTimer);
+  if (!sets || sets < 1) return;
+  _paintSetsTimer = setTimeout(() => _paintSetsSave(calcId, sets), 900);
+}
+function paintSetsFlush(calcId) {
+  const inp = _paintSetsInput();
+  if (!inp) return;
+  const sets = parseInt(inp.value, 10);
+  if (!sets || sets < 1) { inp.value = _paintSets(state.currentPaintCalc); return; }
+  _paintSetsSave(calcId, sets);
 }
 
 // v2.45.880: открыть исходный чертёж детали — тот PDF, который загружали.
