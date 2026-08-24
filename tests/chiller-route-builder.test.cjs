@@ -74,7 +74,8 @@ test('прямое продолжение предлагает проходну�
   assert.equal(S.routeCoupling({ section: 'pipe', name: 'Муфта медная 28' }), true);
   assert.equal(S.routeCoupling({ section: 'pipe', name: 'Муфта переходная 40 × 32' }), false);
   assert.equal(S.routeCoupling({ section: 'pipe', name: 'Тройник PP-R 40' }), false);
-  assert.equal(S.routeTee({ section: 'pipe', name: 'Тройник PP-R 40' }), true);
+  assert.equal(S.routeTee({ section: 'pipe', name: 'Тройник 40' }), true);
+  assert.equal(S.routeTee({ section: 'pipe', name: 'Тройник переходной 40 × 32 × 40' }), false);
 });
 
 test('ручное растягивание пишет один шаг истории, снимает авто-длину и двигает цепочку', () => {

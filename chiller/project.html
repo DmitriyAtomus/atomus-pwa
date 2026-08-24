@@ -4561,7 +4561,7 @@ function rotPick(host,zi,x,y,cur,opt){
   if(opt&&opt.kind==='elbow')list=list.filter(m=>routePlainElbow(m.d));
   if(opt&&opt.kind==='coupling')list=list.filter(m=>routePlainCoupling(m.d));
   if(opt&&opt.kind==='tee')list=list.filter(m=>routeTee(m.d));
-  if(opt&&opt.kind==='more')list=list.filter(m=>!routeTee(m.d));
+  if(opt&&opt.kind==='more')list=list.filter(m=>!routeBranch(m.d));
   if(opt&&opt.kind==='tube')list=list.filter(m=>m.d.section==='pipe'&&/труб/i.test(m.d.name||''));
   const box=$('#rpick');
   box.innerHTML='<div class="hd"><b></b><span></span></div>'+
@@ -5137,7 +5137,7 @@ function pipeSetSel(L){
   if(was)toast('Длина задана вручную — авто-длина по патрубкам снята');
 }
 
-/* ═══ v2.46.048: ручной конструктор медной и PP-R трассы ═══
+/* ═══ v2.46.049: ручной конструктор медной и PP-R трассы ═══
    Выделенная труба получает круглую ручку на дальнем торце: тащишь вдоль оси
    — меняется настоящая длина отрезка, всё посаженное на конце едет следом.
    Там же лежит следующий шаг сборки: совместимый отвод 90°, четыре стороны
@@ -5157,7 +5157,10 @@ const routePlainElbow=d=>routeTurn90(d)&&!/переход|резьб/i.test((d&&
    они не должны подменять обычную муфту одним случайным кликом. */
 const routePlainCoupling=d=>!!(d&&d.section==='pipe'&&/муфт|соединител/i.test(d.name||'')&&
   !/переход|редукц|резьб|американ|разъ[её]м/i.test(d.name||''));
-const routeTee=d=>!!(d&&d.section==='pipe'&&/тройник/i.test(d.name||''));
+/* Быстрая кнопка ветвления берёт только равнопроходный тройник. Переходные и
+   резьбовые тройники выбираются осознанно через каталог присоединений. */
+const routeTee=d=>!!(d&&d.section==='pipe'&&/^тройник\s+[0-9]+(?:[.,][0-9]+)?\s*$/i.test(d.name||''));
+const routeBranch=d=>!!(d&&d.section==='pipe'&&/тройник|крестовин|коллектор/i.test(d.name||''));
 const routeChildAt=(it,zi)=>placed.find(p=>p.link&&p.link.mount==='rot'&&
   p.link.to===it.uid&&p.link.zi===zi)||null;
 /* Рабочий выход детали. У трубы это торец напротив посадочного; у отвода —
@@ -5366,6 +5369,33 @@ const PPR_TURN_PORTS={
   'VTp.752.0.04006':{x:-36.5,z:50.5},
   'VTp.753.0.04006':{x:-36.5,z:50.5}
 };
+/* У стандартных PP-R муфт в части индекса есть точный STEP и габарит, но нет
+   zn вообще; у равнопроходных тройников иногда размечен только сквозной ход.
+   Восстанавливаем однозначные осевые раструбы из заводской ориентации модели:
+   муфта вдоль X, тройник вдоль X с ветвью +Z. Без этого каталог показывает
+   деталь, но присоединить её к трубе невозможно. */
+function fixPprRoutePorts(){
+  const port=(size,od,dir,seat)=>({kind:'suc',name:'ПОД СВАРКУ Ø'+nm1(size),od:od,
+    p0:[0,0,0],dir:dir,tip:dir.map(v=>v*(seat+11)),ctype:'ppr',sex:'f',
+    conn:'Ø'+nm1(size)+' сварка PP-R',seat:seat});
+  (DATA||[]).forEach(d=>{
+    if(!d||d.section!=='pipe'||d.sub!=='ppr'||!d.g)return;
+    const g=GEOMS&&GEOMS[d.g],bb=g&&g.bb,lo=bb&&bb.lo,hi=bb&&bb.hi;
+    if(!g||!lo||!hi)return;
+    let m=String(d.name||'').match(/^Муфта\s+([0-9]+(?:[.,][0-9]+)?)\s*$/i);
+    if(m){
+      const size=+m[1].replace(',','.'),od=2*Math.max(Math.abs(+lo[1]),Math.abs(+hi[1]));
+      g.zn=[port(size,od,[1,0,0],+hi[0]),port(size,od,[-1,0,0],Math.abs(+lo[0]))];
+      return;
+    }
+    m=String(d.name||'').match(/^Тройник\s+([0-9]+(?:[.,][0-9]+)?)\s*$/i);
+    if(m){
+      const size=+m[1].replace(',','.'),od=2*Math.max(Math.abs(+lo[1]),Math.abs(+hi[1]));
+      g.zn=[port(size,od,[1,0,0],+hi[0]),port(size,od,[-1,0,0],Math.abs(+lo[0])),
+        port(size,od,[0,0,1],+hi[2])];
+    }
+  });
+}
 function fixPprTurnPorts(){
   (DATA||[]).forEach(d=>{
     const f=PPR_TURN_PORTS[d.id],g=f&&GEOMS&&GEOMS[d.g],zs=g&&g.zn;
@@ -9547,7 +9577,7 @@ function chGrow(el){
     $('#cat').innerHTML='<div style="padding:14px 6px;font-size:12px;color:var(--bad)">База не отдалась ('+e.message+').<br>Открой прототип из CRM (Производство → Атом Чиллер), чтобы был токен.</div>';
     return;
   }
-  DATA=ix.items;GEOMS=ix.geoms;SECTIONS=ix.sections;secNames();fixPprTurnPorts();
+  DATA=ix.items;GEOMS=ix.geoms;SECTIONS=ix.sections;secNames();fixPprRoutePorts();fixPprTurnPorts();
   VER=(ix.version||ix.built||'').replace(/[^0-9a-zA-Z]/g,'');
   await loadUserModels();
   drawCat();   /* чипы разделов, подразделов и брендов рисует сам каталог */

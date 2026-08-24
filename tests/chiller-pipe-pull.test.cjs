@@ -304,6 +304,25 @@ test('у резьбового угольника Ø40 PP-R зона перено
   assert.equal(z.conn, 'Ø40 сварка PP-R');
 });
 
+test('у PP-R муфты восстанавливаются два раструба, у тройника — боковая ветвь', () => {
+  const items = [
+    { id: 'VTp.703.0.040', g: 'coupling', ready: true, section: 'pipe', sub: 'ppr', name: 'Муфта 40' },
+    { id: 'VTp.731.0.040', g: 'tee', ready: true, section: 'pipe', sub: 'ppr', name: 'Тройник 40' },
+  ];
+  const geoms = {
+    coupling: { bb: { lo: [-23, -27.5, -27.5], hi: [23.5, 27.5, 27.5] }, zn: null },
+    tee: { bb: { lo: [-44.5, -27.5, -27.5], hi: [45, 27.5, 44.5] }, zn: [] },
+  };
+  const S = stand(items, geoms);
+  S.fixPprRoutePorts();
+  assert.equal(geoms.coupling.zn.length, 2);
+  assert.equal(geoms.coupling.zn.map(z => Array.from(z.dir).join(',')).join('|'), '1,0,0|-1,0,0');
+  assert.equal(geoms.coupling.zn.every(z => z.sex === 'f' && z.conn === 'Ø40 сварка PP-R'), true);
+  assert.equal(geoms.tee.zn.length, 3);
+  assert.deepEqual(Array.from(geoms.tee.zn[2].dir), [0, 0, 1]);
+  assert.equal(geoms.tee.zn[2].seat, 44.5);
+});
+
 test('в углу нужен отвод: нет отвода под этот диаметр — трасса не строится', () => {
   const S = stand();
   const c = S.connOf(zn('VTp.751.0.025')[0]);
