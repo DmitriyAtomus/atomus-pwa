@@ -334,6 +334,9 @@
         <button class="nav-item" data-nav="summary" onclick="selectSidebarItem('summary')">
           <i class="ti ti-chart-bar"></i><span>Сводки</span>
         </button>
+        <button class="nav-item" data-nav="units-journal" onclick="selectSidebarItem('units-journal')">
+          <i class="ti ti-snowflake"></i><span>Журнал агрегатов</span>
+        </button>
         <button class="nav-item" data-nav="developments" onclick="selectSidebarItem('developments')">
           <i class="ti ti-bulb"></i><span>Разработка оборудования</span>
         </button>
@@ -1339,6 +1342,30 @@
         </div>
         <div class="content-inner">
           <div id="paint-calc-content"><div class="loading-block">Загружаем расчёты…</div></div>
+        </div>
+      </div>
+
+      <!-- ============ ЖУРНАЛ АГРЕГАТОВ (v2.46.054) ============ -->
+      <div class="screen" data-screen="units-journal" data-section="production">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
+          <h2>Журнал агрегатов</h2>
+          <button class="icon-btn" onclick="loadUnitsJournal()"><i class="ti ti-refresh"></i></button>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>Журнал регистрации холодильных агрегатов</h1>
+            <div class="page-subtitle">Серийные номера, протоколы запуска и пусконаладки — вместо файла Excel</div>
+          </div>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="loadUnitsJournal()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <button class="icon-btn" onclick="ujImportPick()" title="Перенести записи из Excel"><i class="ti ti-file-import"></i></button>
+            <button class="btn btn-secondary" onclick="ujExport()"><i class="ti ti-file-spreadsheet"></i> <span>Выгрузить в Excel</span></button>
+            <button class="btn btn-primary" onclick="ujAddUnit()"><i class="ti ti-plus"></i> <span>Агрегат</span></button>
+          </div>
+        </div>
+        <div class="content-inner">
+          <div id="units-journal-content"><div class="loading-block">Загружаем журнал…</div></div>
         </div>
       </div>
 
@@ -3352,6 +3379,19 @@
     </div>
     <div class="modal-body" id="model-modal-body">
       <div class="loading-block">Загружаем модели…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ КАРТОЧКА АГРЕГАТА (журнал агрегатов, v2.46.054) ============ -->
+<div class="modal-overlay" id="unit-card-modal" onclick="if(event.target===this) closeUnitCard()">
+  <div class="modal ujr-modal">
+    <div class="modal-header">
+      <h3 id="unit-card-title">Карточка агрегата</h3>
+      <button class="icon-btn" onclick="closeUnitCard()" aria-label="Закрыть"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body" id="unit-card-body">
+      <div class="loading-block">Загружаем карточку…</div>
     </div>
   </div>
 </div>

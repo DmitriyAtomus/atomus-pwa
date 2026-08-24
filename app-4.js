@@ -20339,3 +20339,642 @@ async function toggleTvScreenCast() {
     setTimeout(refreshTvScreenCastState, 800);
   }
 }
+
+// ==================================================================
+// ЖУРНАЛ АГРЕГАТОВ (Производство → Журнал агрегатов), v2.46.054
+// ------------------------------------------------------------------
+// Замена Excel-журнала регистрации холодильных агрегатов: плоская таблица в
+// 25 колонок из образца, правка прямо в ячейке, карточка агрегата с
+// пусконаладками и комплектующими из оплаченных счетов.
+//
+// Ловушки, о которые тут уже спотыкались:
+//  * клик по строке НЕ открывает карточку — иначе не отредактируешь ячейку.
+//    Карточка открывается по «№ п/п» (и по любому месту строки в режиме
+//    просмотра, когда правка всё равно закрыта);
+//  * ячейка сохраняется на blur, поэтому перерисовывать таблицу во время
+//    правки нельзя — экран внесён в AUTO_REFRESH_SKIP.
+// ==================================================================
+
+const UJ_STATE = {
+  rows: [], columns: [], protocol: null, canManage: false,
+  catalogs: null, filters: { q: '', customer: '', direction_id: '', year: '', tested: '' },
+  card: null, cardTab: 'passport',
+};
+
+// Только руками — сервер их не считает и не подставляет.
+const UJ_MANUAL_ONLY = { power: 1, note: 1 };
+
+function ujAttr(s) {
+  return escapeHtml(s === null || s === undefined ? '' : String(s)).replace(/"/g, '&quot;');
+}
+
+function ujDate(iso) {
+  const s = (iso || '').trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? (m[3] + '.' + m[2] + '.' + m[1]) : s;
+}
+
+// Свои PATCH/DELETE: общие apiPatch/apiDelete бросают исключение на любой не-200,
+// а журналу нужен именно код 409 — «серийный номер уже занят, подтвердить?».
+async function ujFetch(method, path, body) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const opts = { method: method, headers: { 'Authorization': 'Bearer ' + token } };
+  if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const r = await fetch(API_BASE + path, opts);
+  if (r.status === 401) { logout(); throw new Error('Сессия истекла'); }
+  return { ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) };
+}
+function ujPatch(path, body) { return ujFetch('PATCH', path, body || {}); }
+function ujDelete(path) { return ujFetch('DELETE', path); }
+
+async function loadUnitsJournal() {
+  const box = document.getElementById('units-journal-content');
+  if (!box) return;
+  box.innerHTML = '<div class="loading-block">Загружаем журнал…</div>';
+  try {
+    if (!UJ_STATE.catalogs) {
+      UJ_STATE.catalogs = (await apiGet('/api/units/catalogs')) || {};
+    }
+    const f = UJ_STATE.filters;
+    const qs = [];
+    Object.keys(f).forEach(k => { if (f[k]) qs.push(k + '=' + encodeURIComponent(f[k])); });
+    const d = await apiGet('/api/units' + (qs.length ? '?' + qs.join('&') : ''));
+    UJ_STATE.rows = d.rows || [];
+    UJ_STATE.columns = d.columns || [];
+    UJ_STATE.protocol = d.protocol || null;
+    UJ_STATE.canManage = !!d.can_manage;
+    renderUnitsJournal();
+  } catch (e) {
+    box.innerHTML = '<div class="empty-block">Журнал не загрузился. Обновите страницу.</div>';
+  }
+}
+
+function renderUnitsJournal() {
+  const box = document.getElementById('units-journal-content');
+  if (!box) return;
+  const cat = UJ_STATE.catalogs || {};
+  const f = UJ_STATE.filters;
+  const opt = (list, val) => (list || []).map(x => {
+    const v = (typeof x === 'object') ? String(x.id) : String(x);
+    const t = (typeof x === 'object') ? (x.name || x.id) : x;
+    return '<option value="' + ujAttr(v) + '"' + (String(val) === v ? ' selected' : '') + '>' +
+           escapeHtml(t) + '</option>';
+  }).join('');
+
+  let html = '<div class="ujr-filters" id="uj-filters">' +
+    '<div class="ujr-f"><span class="ujr-lbl">Поиск по серийному / наименованию</span>' +
+      '<input type="text" id="uj-q" value="' + ujAttr(f.q) + '" placeholder="например, 000-224" ' +
+      'oninput="ujFilter(\'q\', this.value)"></div>' +
+    '<button class="ujr-more-btn" onclick="ujToggleFilters()">Ещё фильтры</button>' +
+    '<div class="ujr-f is-extra"><span class="ujr-lbl">Заказчик</span>' +
+      '<select onchange="ujFilter(\'customer\', this.value)"><option value="">Все</option>' +
+      opt(cat.customers, f.customer) + '</select></div>' +
+    '<div class="ujr-f is-extra"><span class="ujr-lbl">Направление деятельности</span>' +
+      '<select onchange="ujFilter(\'direction_id\', this.value)"><option value="">Все</option>' +
+      opt(cat.directions, f.direction_id) + '</select></div>' +
+    '<div class="ujr-f is-extra"><span class="ujr-lbl">Год выпуска</span>' +
+      '<select onchange="ujFilter(\'year\', this.value)"><option value="">Все</option>' +
+      opt(cat.years, f.year) + '</select></div>' +
+    '<div class="ujr-f is-extra"><span class="ujr-lbl">Испытание</span>' +
+      '<select onchange="ujFilter(\'tested\', this.value)"><option value="">Все</option>' +
+      '<option value="yes"' + (f.tested === 'yes' ? ' selected' : '') + '>Проведено</option>' +
+      '<option value="no"' + (f.tested === 'no' ? ' selected' : '') + '>Не проведено</option>' +
+      '</select></div>' +
+    '</div>';
+
+  if (!UJ_STATE.canManage) {
+    html += '<div class="ujr-ro"><i class="ti ti-lock"></i> Режим просмотра: ячейки заблокированы. ' +
+            'Доступны фильтры, карточка агрегата и выгрузка.</div>';
+  }
+
+  const cols = UJ_STATE.columns;
+  const p = UJ_STATE.protocol || {};
+  const iFrom = cols.findIndex(c => c.key === p.from);
+  const iTo = cols.findIndex(c => c.key === p.to);
+
+  // Первая строка шапки — объединённый «Протокол запуска» над своим блоком.
+  let head1 = '<tr class="ujr-group"><th class="ujr-no"></th>';
+  cols.forEach((c, i) => {
+    if (iFrom >= 0 && i === iFrom) {
+      head1 += '<th class="ujr-proto" colspan="' + (iTo - iFrom + 1) + '">' +
+               escapeHtml(p.label || 'Протокол запуска') + '</th>';
+    } else if (iFrom >= 0 && i > iFrom && i <= iTo) {
+      /* поглощено colspan */
+    } else {
+      head1 += '<th></th>';
+    }
+  });
+  head1 += '</tr>';
+
+  const head2 = '<tr><th class="ujr-no">№ п/п</th>' +
+    cols.map(c => '<th>' + escapeHtml(c.label) + '</th>').join('') + '</tr>';
+
+  let body = '';
+  if (!UJ_STATE.rows.length) {
+    body = '<tr><td class="ujr-empty" colspan="' + (cols.length + 1) + '">' +
+           'Журнал пуст. Нажмите «+ Агрегат» или перенесите записи из Excel.</td></tr>';
+  }
+  UJ_STATE.rows.forEach(r => {
+    const warnBy = {};
+    (r.warnings || []).forEach(w => {
+      warnBy[w.field] = (warnBy[w.field] ? warnBy[w.field] + '; ' : '') + w.text;
+    });
+    const rowCls = (r.warnings || []).length ? ' class="has-warn"' : '';
+    body += '<tr data-unit="' + r.id + '"' + rowCls +
+            (UJ_STATE.canManage ? '' : ' onclick="openUnitCard(' + r.id + ')"') + '>';
+    body += '<td class="ujr-no" onclick="openUnitCard(' + r.id + ')" ' +
+            'title="Открыть карточку агрегата">' + r.no + '</td>';
+    cols.forEach(c => {
+      const key = c.key;
+      let val = (r[key] === null || r[key] === undefined) ? '' : String(r[key]);
+      let cls = 'ujr-cell';
+      let title = warnBy[key] || '';
+      if (key === 'made_date' || key === 'test_date') val = ujDate(val);
+      if (key === 'current') {
+        if (!Number(r.current_manual) && r.current_auto) cls += ' is-auto';
+        if (r.current_parts) title = (title ? title + ' · ' : '') + r.current_parts;
+      }
+      if (warnBy[key]) cls += ' is-warn';
+      if (UJ_MANUAL_ONLY[key]) cls += ' is-manual';
+      // Содержимое живёт во вложенном div: длинное примечание иначе растягивает
+      // строку на пол-экрана, а обрезать высоту у самой ячейки таблицы нельзя.
+      const editable = UJ_STATE.canManage ? ' contenteditable="true"' : '';
+      body += '<td class="' + cls + '"' + (title ? ' title="' + ujAttr(title) + '"' : '') + '>' +
+              '<div class="ujr-in" data-unit="' + r.id + '" data-field="' + ujAttr(key) + '"' +
+              editable + ' onblur="ujCellBlur(this)" onkeydown="ujCellKey(event, this)">' +
+              escapeHtml(val) + '</div></td>';
+    });
+    body += '</tr>';
+  });
+
+  html += '<div class="ujr-legend">' +
+    '<span><i class="ujr-dot is-auto"></i>считается автоматически (Ток, А)</span>' +
+    '<span><i class="ujr-dot is-warn"></i>спорное значение — наведите на ячейку</span>' +
+    '<span><i class="ujr-dot is-manual"></i>только ручной ввод</span>' +
+    '<span>клик по «№ п/п» — карточка агрегата</span>' +
+    '</div>';
+
+  html += '<div class="ujr-wrap"><table class="ujr-table"><thead>' + head1 + head2 +
+          '</thead><tbody>' + body + '</tbody></table></div>';
+  html += '<div class="ujr-count">Записей: ' + UJ_STATE.rows.length + '</div>';
+  box.innerHTML = html;
+}
+
+function ujToggleFilters() {
+  const box = document.getElementById('uj-filters');
+  if (box) box.classList.toggle('is-open');
+}
+
+let _ujFilterTimer = null;
+function ujFilter(key, value) {
+  UJ_STATE.filters[key] = value;
+  clearTimeout(_ujFilterTimer);
+  _ujFilterTimer = setTimeout(loadUnitsJournal, key === 'q' ? 350 : 0);
+}
+
+function ujCellKey(e, el) {
+  if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+  if (e.key === 'Escape') {
+    const row = UJ_STATE.rows.find(r => String(r.id) === el.dataset.unit);
+    if (row) el.textContent = row[el.dataset.field] || '';
+    el.blur();
+  }
+}
+
+async function ujCellBlur(el) {
+  const id = el.dataset.unit, field = el.dataset.field;
+  const row = UJ_STATE.rows.find(r => String(r.id) === id);
+  if (!row) return;
+  let was = (row[field] === null || row[field] === undefined) ? '' : String(row[field]);
+  if (field === 'made_date' || field === 'test_date') was = ujDate(was);
+  const now = (el.textContent || '').trim();
+  if (now === was.trim()) return;
+  await ujSaveField(id, field, now, el);
+}
+
+async function ujSaveField(id, field, value, el, force) {
+  const body = {}; body[field] = value;
+  if (force) body.force = true;
+  const res = await ujPatch('/api/units/' + id, body);
+  if (res.status === 409 && res.data && res.data.error === 'duplicate_serial') {
+    if (confirm(res.data.message + '. Всё равно сохранить?')) {
+      return ujSaveField(id, field, value, el, true);
+    }
+    if (el) {
+      const row = UJ_STATE.rows.find(r => String(r.id) === String(id));
+      el.textContent = row ? (row[field] || '') : '';
+    }
+    return;
+  }
+  if (!res.ok) {
+    showToast((res.data && res.data.message) || 'Не сохранилось', 'error');
+    return;
+  }
+  const unit = res.data && res.data.unit;
+  if (unit) {
+    const i = UJ_STATE.rows.findIndex(r => String(r.id) === String(id));
+    if (i >= 0) UJ_STATE.rows[i] = unit;
+    // Ток и предупреждения пересчитались на сервере. Перерисовываем только
+    // когда курсор уже ушёл из таблицы — иначе прервём правку соседней ячейки.
+    if (!document.querySelector('.ujr-in:focus')) renderUnitsJournal();
+  }
+  showToast('Сохранено', 'success');
+}
+
+async function ujAddUnit() {
+  let res = await apiPost('/api/units', {});
+  if (res.status === 409 && res.data) {
+    if (!confirm(res.data.message + '. Завести ещё одну запись с этим номером?')) return;
+    res = await apiPost('/api/units', { force: true });
+  }
+  if (!res.ok) {
+    showToast((res.data && res.data.message) || 'Не получилось', 'error');
+    return;
+  }
+  UJ_STATE.catalogs = null;
+  await loadUnitsJournal();
+  const unit = res.data && res.data.unit;
+  showToast(unit ? ('Агрегат ' + unit.serial + ' заведён') : 'Агрегат заведён', 'success');
+  if (unit) openUnitCard(unit.id);
+}
+
+async function ujExport() {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/units/export',
+                          { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { showToast('Не удалось выгрузить', 'error'); return; }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filenameFromCD(r.headers.get('Content-Disposition'), 'zhurnal-agregatov.xlsx');
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    showToast('Журнал выгружен', 'success');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+function ujImportPick() {
+  let inp = document.getElementById('uj-import-file');
+  if (!inp) {
+    inp = document.createElement('input');
+    inp.type = 'file';
+    inp.id = 'uj-import-file';
+    inp.accept = '.xlsx';
+    inp.style.display = 'none';
+    inp.onchange = () => { if (inp.files && inp.files[0]) ujImport(inp.files[0]); inp.value = ''; };
+    document.body.appendChild(inp);
+  }
+  inp.click();
+}
+
+async function ujImport(file) {
+  if (!confirm('Перенести записи из «' + file.name + '» в журнал?\n' +
+               'Строки с уже заведёнными серийными номерами пропустятся, ' +
+               'ошибки в данных не правятся.')) return;
+  showToast('Переносим журнал…', 'info');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/units/import', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(d.message || 'Не перенеслось', 'error'); return; }
+    UJ_STATE.catalogs = null;
+    await loadUnitsJournal();
+    showToast('Перенесено: ' + d.added + ', пропущено: ' + d.skipped, 'success');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+}
+
+// ---------------- карточка агрегата
+
+async function openUnitCard(id) {
+  const m = document.getElementById('unit-card-modal');
+  if (!m) return;
+  m.classList.add('visible');
+  const body = document.getElementById('unit-card-body');
+  body.innerHTML = '<div class="loading-block">Загружаем карточку…</div>';
+  try {
+    UJ_STATE.card = await apiGet('/api/units/' + id);
+    renderUnitCard();
+  } catch (e) {
+    body.innerHTML = '<div class="empty-block">Карточка не загрузилась.</div>';
+  }
+}
+
+function closeUnitCard() {
+  const m = document.getElementById('unit-card-modal');
+  if (m) m.classList.remove('visible');
+  UJ_STATE.card = null;
+}
+
+function ujCardTab(tab) { UJ_STATE.cardTab = tab; renderUnitCard(); }
+
+function renderUnitCard() {
+  const d = UJ_STATE.card;
+  if (!d) return;
+  const u = d.unit || {};
+  const can = !!d.can_manage;
+  const title = document.getElementById('unit-card-title');
+  if (title) title.textContent = (u.serial || 'Без номера') + (u.name ? ' · ' + u.name : '');
+
+  const tabs = [['passport', 'Паспорт'], ['parts', 'Комплектующие'],
+                ['comm', 'Пусконаладки'], ['log', 'История']];
+  let html = '<div class="ujr-tabs">' + tabs.map(t =>
+    '<button class="ujr-tab' + (UJ_STATE.cardTab === t[0] ? ' is-on' : '') +
+    '" onclick="ujCardTab(\'' + t[0] + '\')">' + t[1] + '</button>').join('') + '</div>';
+
+  if (UJ_STATE.cardTab === 'passport') html += ujCardPassport(u, d, can);
+  if (UJ_STATE.cardTab === 'parts') html += ujCardParts(d, can);
+  if (UJ_STATE.cardTab === 'comm') html += ujCardComm(d, can);
+  if (UJ_STATE.cardTab === 'log') html += ujCardLog(d);
+
+  document.getElementById('unit-card-body').innerHTML = html;
+}
+
+function ujField(label, key, value, can, hint) {
+  return '<label class="ujr-fld"><span>' + escapeHtml(label) + '</span>' +
+    '<input type="text" value="' + ujAttr(value || '') + '"' + (can ? '' : ' disabled') +
+    ' onchange="ujCardSave(\'' + key + '\', this.value)">' +
+    (hint ? '<em>' + escapeHtml(hint) + '</em>' : '') + '</label>';
+}
+
+function ujSelect(label, key, value, list, can) {
+  const opts = ['<option value="">— не выбрано —</option>'].concat(
+    (list || []).map(x => '<option value="' + ujAttr(x.id) + '"' +
+      (String(value || '') === String(x.id) ? ' selected' : '') + '>' +
+      escapeHtml(x.label) + '</option>'));
+  return '<label class="ujr-fld"><span>' + escapeHtml(label) + '</span>' +
+    '<select' + (can ? '' : ' disabled') + ' onchange="ujCardSave(\'' + key + '\', this.value)">' +
+    opts.join('') + '</select></label>';
+}
+
+function ujCardPassport(u, d, can) {
+  const cat = UJ_STATE.catalogs || {};
+  const contracts = (cat.contracts || []).map(c => ({
+    id: c.id,
+    label: '№' + (c.number || c.id) + (c.contractor_name ? ' · ' + c.contractor_name : ''),
+  }));
+  const works = (cat.works || []).map(w => ({
+    id: w.id, label: '#' + w.id + ' ' + (w.label || w.model_name || 'работа'),
+  }));
+  const dirs = (cat.directions || []).map(x => ({ id: x.id, label: x.name }));
+
+  let html = '<div class="ujr-grid">';
+  html += ujField('Серийный номер', 'serial', u.serial, can, 'присвоен автоматически');
+  html += ujField('Чиллер наименование', 'name', u.name, can);
+  html += ujField('Холодопроизводительность, кВт', 'capacity', u.capacity, can);
+  html += ujField('Заказчик', 'customer', u.customer, can);
+  html += ujField('Номер договора', 'contract_no', u.contract_no, can);
+  html += ujSelect('Договор (объект) в CRM', 'contract_id', u.contract_id, contracts, can);
+  html += ujField('Объект (если договора нет)', 'object_name', u.object_name, can);
+  html += ujSelect('Направление деятельности', 'direction_id', u.direction_id, dirs, can);
+  html += ujSelect('Задание, под которое закуп', 'work_id', u.work_id, works, can);
+  html += ujField('Потребляемая мощность, кВт', 'power', u.power, can, 'только вручную');
+  html += ujField('Ток, А', 'current', u.current, can,
+                  u.current_parts ? ('авто: ' + u.current_parts)
+                                  : 'авто: компрессор + вентилятор + насос');
+  html += ujField('ф/В/Гц', 'net', u.net, can);
+  html += ujField('Фреон', 'freon', u.freon, can);
+  html += ujField('Количество хладагента, кг', 'freon_kg', u.freon_kg, can);
+  html += ujField('Дата выпуска', 'made_date', ujDate(u.made_date), can, 'дд.мм.гггг');
+  html += '</div>';
+
+  html += '<div class="ujr-sub">Примечание (одной свободной строкой, только вручную)</div>' +
+    '<textarea class="ujr-note"' + (can ? '' : ' disabled') +
+    ' onchange="ujCardSave(\'note\', this.value)">' + escapeHtml(u.note || '') + '</textarea>';
+
+  if (d.contract) {
+    html += '<div class="ujr-hint">Договор №' + escapeHtml(d.contract.number || '') +
+      (d.contract.contractor_name ? ' · ' + escapeHtml(d.contract.contractor_name) : '') +
+      (d.contract.delivery_address ? ' · ' + escapeHtml(d.contract.delivery_address) : '') +
+      '</div>';
+  }
+  if ((u.warnings || []).length) {
+    html += '<div class="ujr-warnbox"><b>Программа предупреждает (данные не менялись):</b><ul>' +
+      u.warnings.map(w => '<li>' + escapeHtml(w.text) + '</li>').join('') + '</ul></div>';
+  }
+  if (can) {
+    html += '<div class="ujr-actions"><button class="btn btn-secondary" onclick="ujDeleteUnit()">' +
+            'Удалить из журнала</button></div>';
+  }
+  return html;
+}
+
+async function ujCardSave(field, value) {
+  const d = UJ_STATE.card;
+  if (!d || !d.unit) return;
+  const body = {}; body[field] = value;
+  let res = await ujPatch('/api/units/' + d.unit.id, body);
+  if (res.status === 409 && res.data && res.data.error === 'duplicate_serial') {
+    if (!confirm(res.data.message + '. Всё равно сохранить?')) { renderUnitCard(); return; }
+    body.force = true;
+    res = await ujPatch('/api/units/' + d.unit.id, body);
+  }
+  if (!res.ok) { showToast((res.data && res.data.message) || 'Не сохранилось', 'error'); return; }
+  if (res.data && res.data.unit) UJ_STATE.card.unit = res.data.unit;
+  showToast('Сохранено', 'success');
+  // Смена договора или задания меняет список материалов из счетов — карточку
+  // перезагружаем целиком.
+  if (field === 'contract_id' || field === 'work_id') openUnitCard(d.unit.id);
+  else renderUnitCard();
+  loadUnitsJournal();
+}
+
+async function ujDeleteUnit() {
+  const d = UJ_STATE.card;
+  if (!d || !d.unit) return;
+  if (!confirm('Убрать агрегат ' + (d.unit.serial || '') + ' из журнала?')) return;
+  const res = await ujDelete('/api/units/' + d.unit.id);
+  if (!res.ok) { showToast('Не удалось', 'error'); return; }
+  closeUnitCard();
+  loadUnitsJournal();
+  showToast('Убрано из журнала', 'success');
+}
+
+// ---------------- вкладка «Комплектующие»
+
+function ujCardParts(d, can) {
+  const slots = (UJ_STATE.catalogs || {}).slots || [];
+  const slotName = k => (slots.find(s => s.key === k) || {}).label || k;
+  let html = '<div class="ujr-sub">В агрегате</div>';
+  if (!(d.parts || []).length) {
+    html += '<div class="ujr-empty-line">Пока ничего не отмечено.</div>';
+  } else {
+    html += '<table class="ujr-sm"><thead><tr><th>Куда</th><th>Позиция</th><th>Кол-во</th>' +
+            '<th>Из счёта</th>' + (can ? '<th></th>' : '') + '</tr></thead><tbody>' +
+      d.parts.map(p => '<tr><td>' + escapeHtml(slotName(p.slot)) + '</td><td>' +
+        escapeHtml(p.name) + '</td><td>' +
+        escapeHtml(((p.qty || '') + ' ' + (p.unit_name || '')).trim()) + '</td><td>' +
+        escapeHtml(p.source_label || (p.source_kind === 'manual' ? 'вручную' : '')) + '</td>' +
+        (can ? '<td><button class="ujr-x" onclick="ujDeletePart(' + p.id + ')" ' +
+               'title="Убрать">×</button></td>' : '') + '</tr>').join('') +
+      '</tbody></table>';
+  }
+
+  html += '<div class="ujr-sub">Из оплаченных счетов по этому объекту и заданию</div>';
+  const cands = d.candidates || [];
+  if (!cands.length) {
+    html += '<div class="ujr-empty-line">Ничего не нашлось. Проверьте, что в «Паспорте» выбран ' +
+            'договор (объект) или задание и что счета по нему оплачены.</div>';
+  } else {
+    html += '<table class="ujr-sm"><thead><tr><th>Позиция</th><th>Кол-во</th><th>Из счёта</th>' +
+            '<th>Куда в агрегате</th>' + (can ? '<th></th>' : '') + '</tr></thead><tbody>';
+    cands.forEach((c, i) => {
+      const taken = (d.parts || []).some(p => p.name === c.name);
+      html += '<tr' + (taken ? ' class="is-taken"' : '') + '><td>' + escapeHtml(c.name) + '</td>' +
+        '<td>' + escapeHtml(((c.qty || '') + ' ' + (c.unit_name || '')).trim()) + '</td>' +
+        '<td>' + escapeHtml(c.source_label + (c.supplier ? ' · ' + c.supplier : '')) + '</td>' +
+        '<td><select id="uj-slot-' + i + '"' + (can ? '' : ' disabled') + '>' +
+        slots.map(s => '<option value="' + ujAttr(s.key) + '"' +
+          (s.key === c.slot_guess ? ' selected' : '') + '>' + escapeHtml(s.label) +
+          '</option>').join('') + '</select></td>' +
+        (can ? '<td><button class="btn btn-secondary btn-sm" onclick="ujAddPart(' + i + ')">' +
+               (taken ? 'Ещё раз' : 'В агрегат') + '</button></td>' : '') + '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '<div class="ujr-hint">Отмеченные позиции попадают в колонки журнала: «Компрессор», ' +
+          '«ТО», «ТЗ на ТО/Поверхность ТО», «Конденсатор», «Насос».</div>';
+  return html;
+}
+
+async function ujAddPart(idx) {
+  const d = UJ_STATE.card;
+  const c = (d.candidates || [])[idx];
+  if (!c) return;
+  const sel = document.getElementById('uj-slot-' + idx);
+  const res = await apiPost('/api/units/' + d.unit.id + '/parts', {
+    slot: sel ? sel.value : c.slot_guess, name: c.name, qty: c.qty,
+    unit_name: c.unit_name, source_kind: 'supply_order', source_id: c.order_id,
+    source_label: c.source_label,
+  });
+  if (!res.ok) { showToast('Не добавилось', 'error'); return; }
+  UJ_STATE.card.parts = (res.data && res.data.parts) || [];
+  renderUnitCard();
+  loadUnitsJournal();
+  showToast('Добавлено в агрегат', 'success');
+}
+
+async function ujDeletePart(id) {
+  const d = UJ_STATE.card;
+  const res = await ujDelete('/api/units/parts/' + id);
+  if (!res.ok) { showToast('Не удалось', 'error'); return; }
+  openUnitCard(d.unit.id);
+  loadUnitsJournal();
+}
+
+// ---------------- вкладка «Пусконаладки»
+
+const UJ_COMM_FIELDS = [
+  ['test_date', 'Дата испытания'], ['i_compressor', 'Ток компрессора, А'],
+  ['i_fan', 'Ток вентилятора, А'], ['i_pump', 'Ток насоса, А'],
+  ['hp', 'Верхнее давление (HP)'], ['lp', 'Нижнее давление (LP)'],
+  ['tn', 'Тн'], ['tk', 'Тк'], ['delta', 'Дельта'], ['cool_time', 'Время охлаждения, мин'],
+];
+const UJ_ALARM_FIELDS = [
+  ['alarm_kind', 'Вид аварии'], ['i_max', 'Макс. ток, А'],
+  ['t_after_cond', 'Макс. Т после конденсатора'], ['hp_alarm', 'HP при аварии'],
+];
+
+function ujCardComm(d, can) {
+  const kinds = (UJ_STATE.catalogs || {}).comm_kinds || [];
+  let html = '<div class="ujr-hint">Пусконаладок может быть несколько: первый запуск, проверка ' +
+             'токов, отработка аварийных ситуаций. Все поля необязательные — что замерили, ' +
+             'то и записали. Первичная пусконаладка попадает в строку журнала.</div>';
+  (d.commissionings || []).forEach((c, i) => {
+    html += '<div class="ujr-pn"><div class="ujr-pn-head"><b>Запуск №' + (i + 1) + '</b>' +
+      '<select' + (can ? '' : ' disabled') +
+      ' onchange="ujCommSave(' + c.id + ', \'kind\', this.value)">' +
+      kinds.map(k => '<option value="' + ujAttr(k.key) + '"' +
+        (c.kind === k.key ? ' selected' : '') + '>' + escapeHtml(k.label) + '</option>').join('') +
+      '</select>' +
+      (c.kind === 'alarm' ? '<span class="ujr-tag is-alarm">авария</span>' :
+        (c.kind === 'primary' ? '<span class="ujr-tag">в строку журнала</span>' : '')) +
+      (can ? '<button class="ujr-x" onclick="ujCommDelete(' + c.id + ')" ' +
+             'title="Удалить">×</button>' : '') + '</div>';
+    html += '<div class="ujr-grid">';
+    UJ_COMM_FIELDS.concat(c.kind === 'alarm' ? UJ_ALARM_FIELDS : []).forEach(f => {
+      const v = f[0] === 'test_date' ? ujDate(c[f[0]]) : c[f[0]];
+      html += '<label class="ujr-fld"><span>' + escapeHtml(f[1]) + '</span>' +
+        '<input type="text" value="' + ujAttr(v || '') + '"' + (can ? '' : ' disabled') +
+        ' onchange="ujCommSave(' + c.id + ', \'' + f[0] + '\', this.value)"></label>';
+    });
+    html += '<label class="ujr-fld"><span>Кто проводил</span><input type="text" value="' +
+      ujAttr(c.performer || '') + '"' + (can ? '' : ' disabled') +
+      ' onchange="ujCommSave(' + c.id + ', \'performer\', this.value)"></label>';
+    html += '</div>';
+    html += '<div class="ujr-sub-sm">Примечание</div><textarea class="ujr-note"' +
+      (can ? '' : ' disabled') + ' onchange="ujCommSave(' + c.id + ', \'note\', this.value)">' +
+      escapeHtml(c.note || '') + '</textarea>';
+    html += '</div>';
+  });
+  if (!(d.commissionings || []).length) {
+    html += '<div class="ujr-empty-line">Пусконаладок пока нет.</div>';
+  }
+  if (can) {
+    html += '<div class="ujr-actions">' +
+      '<button class="btn btn-primary" onclick="ujCommAdd(\'primary\')">' +
+      '+ Добавить пусконаладку</button>' +
+      '<button class="btn btn-secondary" onclick="ujCommAdd(\'alarm\')">' +
+      'Аварийная ситуация</button></div>';
+  }
+  return html;
+}
+
+async function ujCommAdd(kind) {
+  const d = UJ_STATE.card;
+  const res = await apiPost('/api/units/' + d.unit.id + '/commissionings', { kind: kind });
+  if (!res.ok) { showToast('Не добавилось', 'error'); return; }
+  openUnitCard(d.unit.id);
+  loadUnitsJournal();
+}
+
+async function ujCommSave(id, field, value) {
+  const body = {}; body[field] = value;
+  const res = await ujPatch('/api/units/commissionings/' + id, body);
+  if (!res.ok) { showToast('Не сохранилось', 'error'); return; }
+  const d = UJ_STATE.card;
+  const i = (d.commissionings || []).findIndex(c => c.id === id);
+  if (i >= 0 && res.data && res.data.commissioning) d.commissionings[i] = res.data.commissioning;
+  if (field === 'kind') renderUnitCard();
+  showToast('Сохранено', 'success');
+  loadUnitsJournal();
+}
+
+async function ujCommDelete(id) {
+  if (!confirm('Удалить эту пусконаладку?')) return;
+  const res = await ujDelete('/api/units/commissionings/' + id);
+  if (!res.ok) { showToast('Не удалось', 'error'); return; }
+  openUnitCard(UJ_STATE.card.unit.id);
+  loadUnitsJournal();
+}
+
+// ---------------- вкладка «История»
+
+const UJ_ACTIONS = {
+  create: 'завёл запись', edit: 'поправил', delete: 'убрал из журнала',
+  commissioning: 'пусконаладка', part: 'комплектующие',
+};
+
+function ujCardLog(d) {
+  if (!(d.log || []).length) return '<div class="ujr-empty-line">Правок пока не было.</div>';
+  const colName = k => (UJ_STATE.columns.find(c => c.key === k) || {}).label || k;
+  return '<table class="ujr-sm"><thead><tr><th>Когда</th><th>Кто</th><th>Что изменил</th></tr>' +
+    '</thead><tbody>' + d.log.map(l => {
+      let what = escapeHtml(UJ_ACTIONS[l.action] || l.action);
+      if (l.field) what += ' · ' + escapeHtml(colName(l.field));
+      if (l.old_value || l.new_value) {
+        what += ': ' + (l.old_value ? escapeHtml(l.old_value) : '—') + ' → ' +
+                (l.new_value ? escapeHtml(l.new_value) : '—');
+      }
+      return '<tr><td>' + escapeHtml((l.ts || '').replace('T', ' ').slice(0, 16)) + '</td><td>' +
+             escapeHtml(l.author || '—') + '</td><td>' + what + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
