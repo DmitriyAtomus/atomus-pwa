@@ -777,10 +777,16 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 .flt-res .best td{background:rgba(79,191,139,.09)}
 .flt-note{font-size:11px;color:var(--faint);line-height:1.55;margin-top:9px}
 /* ═══ бак водяного контура: конструктор (v2.46.014) ═══ */
-#tnk{position:fixed;inset:0;background:rgba(3,8,16,.78);z-index:22;display:none;
-  align-items:center;justify-content:center}
+#tnk{position:fixed;inset:0;background:linear-gradient(90deg,rgba(3,8,16,.18),rgba(3,8,16,.72));
+  z-index:22;display:none;align-items:stretch;justify-content:flex-end}
 #tnk.on{display:flex}
-.tk-card{width:min(880px,96vw)}
+.tk-card{width:min(760px,56vw);max-height:100vh;border-radius:12px 0 0 12px;
+  box-shadow:-24px 0 60px rgba(0,0,0,.46)}
+.tk-live{display:flex;align-items:center;gap:8px;margin:0 0 11px;padding:8px 10px;
+  border:1px solid rgba(79,191,139,.26);border-radius:8px;background:rgba(79,191,139,.08);
+  color:var(--dim);font-size:11px;line-height:1.4}
+.tk-live:before{content:'\25CF';color:var(--ok);font-size:10px}
+.tk-live b{color:var(--ok);font-weight:600}
 .tk-in{width:84px;background:var(--panel2);color:var(--ink);border:1px solid var(--line2);
   border-radius:7px;padding:5px 9px;font:inherit;font-size:12.5px}
 .tk-x{color:var(--faint);font-size:12px}
@@ -805,6 +811,9 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 .tk-act{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line);
   background:var(--panel2)}
 .tk-act .btn{flex:1}
+@media(max-width:1100px){.tk-card{width:min(680px,72vw)}}
+@media(max-width:720px){#tnk{background:rgba(3,8,16,.76)}.tk-card{width:100vw;max-height:100vh;
+  border-radius:0}.tk-act{flex-wrap:wrap}.tk-act .btn{flex:1 1 42%}}
 @media(max-width:900px){.frow>.lb{min-width:100%;margin-bottom:-2px}}
 /* ═══════════════ ТЕЛЕФОН: одна колонка, шторки, жесты (v2.46.029) ═══════════════
    На узком экране каталог и спецификация уезжают в шторки снизу, сцена занимает
@@ -1073,6 +1082,8 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
                 title="Поставить на свободные трубки конденсатора отводы 90° и направить выходы вниз">↳ Отводы вниз</button>
         <button id="bTankEd" style="display:none"
                 title="Пересчитать бак: размеры, лист, патрубки">✎ Размеры бака</button>
+        <button id="bTankLink" style="display:none"
+                title="Поставить бак в свободное место внутри корпуса и жёстко связать с чиллером">⛓ Закрепить бак внутри</button>
         <button id="bPos" title="Точные координаты и углы (G)">⌖ Координаты</button>
         <button id="bSwap" style="display:none" title="Поставить на этот патрубок другую деталь">⇄ Заменить</button>
         <button id="bRot" title="Повернуть вокруг вертикали (R)">⟳ 90°</button>
@@ -1217,6 +1228,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
   <div class="pov-h"><span id="tkHd">◫ Бак из нержавейки</span>
     <span class="sub">прямоугольный сварной · размеры свои</span><span class="x" id="tkX">✕</span></div>
   <div class="flt-body">
+    <div class="tk-live" id="tkLive"><b>Живой 3D-предпросмотр</b> — временный меш виден в сцене, но пока не входит в проект и BOM.</div>
     <div class="frow"><span class="lb">Размеры, мм</span>
       <input class="tk-in" type="number" id="tkL" step="10" inputmode="decimal"><span class="tk-x">×</span>
       <input class="tk-in" type="number" id="tkB" step="10" inputmode="decimal"><span class="tk-x">×</span>
@@ -1239,8 +1251,9 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
     <div class="tk-out" id="tkOut"></div>
   </div>
   <div class="tk-act">
-    <div class="btn pri" id="tkAddB">Поставить в сцену</div>
-    <div class="btn ghost" id="tkReset">Сбросить</div>
+    <div class="btn pri" id="tkAddB">Добавить бак в проект</div>
+    <div class="btn ghost" id="tkReset">Сбросить размеры</div>
+    <div class="btn ghost" id="tkCancelB">Отмена</div>
   </div>
 </div></div>
 <div id="mdz"><div class="mdz-card">
@@ -1628,6 +1641,8 @@ function bindCtl(cv){
       // деталь сидит на патрубке: тащить её отдельно от аппарата незачем
       if(hit.link&&hit.link.mount==='rot'){mode='orbit';
         toast('Деталь на патрубке — сними её, чтобы двигать отдельно');return;}
+      if(hit.link&&hit.link.mount==='tank'){mode='orbit';
+        toast('Бак закреплён на чиллере — сначала открепи его');return;}
       mode='item';cv.classList.add('drag');
       const fp=planePoint(e,hit.obj.position.z);
       dragOff=fp?{x:hit.obj.position.x-fp.x,y:hit.obj.position.y-fp.y}:{x:0,y:0};
@@ -1699,6 +1714,8 @@ function bindCtl(cv){
     // v2.45.994: в поле ввода буквы — это текст, а не команды сцены
     const t=e.target&&e.target.tagName;
     if(t==='INPUT'||t==='TEXTAREA'){
+      if(e.key==='Escape'&&e.target.closest&&e.target.closest('#tnk')){
+        e.target.blur();tkClose();return;}
       // v2.46.001: Esc из поля координат закрывает панель, а не чат
       if(e.key==='Escape'&&e.target.closest&&e.target.closest('#pos')){
         e.target.blur();posHide();return;}
@@ -1713,6 +1730,7 @@ function bindCtl(cv){
     if(e.key==='Escape'){
       if(pullOn()){pullStop();return;}
       if(ctxOn()){ctxClose();return;}
+      if($('#tnk').classList.contains('on')){tkClose();return;}
       if($('#mdz').classList.contains('on')){closeDesc();return;}
       if($('#asg').classList.contains('on')){$('#asg').classList.remove('on');return;}
       if($('#flt').classList.contains('on')){fltClose();return;}
@@ -2104,8 +2122,10 @@ async function addItem(d,at,rot,tilt,roll){
   obj.position.z=-bb.min.z;                      // низ детали — на пол
   obj.rotation.set(roll||0,tilt||0,rot||0);
   scene.add(obj);
-  const it={uid:uidSeq++,id:d.id,obj,d,pin:false,link:null,off:[],sch:null,fit:null,
+  const keepUid=at&&Number.isFinite(at.uid)?at.uid:null;
+  const it={uid:keepUid==null?uidSeq++:keepUid,id:d.id,obj,d,pin:false,link:null,off:[],sch:null,fit:null,
     zn:geo.userData.zones||[],zm:!!geo.userData.zoneMats};
+  if(keepUid!=null)uidSeq=Math.max(uidSeq,keepUid+1);
   placed.push(it);
   if(at){obj.position.x=at.x;obj.position.y=at.y;
     if(typeof at.z==='number')obj.position.z=at.z;}  // из проекта — как сохранили
@@ -2170,6 +2190,10 @@ function togglePin(){
 
 /* Крепление к корпусу: чем узел держится за дно. */
 const MOUNT={
+  /* Бак не просто «стоит на дне»: после команды закрепления его место
+     хранится в системе координат корпуса. Так бак едет и поворачивается вместе
+     с чиллером, а в BOM не появляется выдуманный крепёж. */
+  tank:  {t:'бак внутри корпуса',hw:null,n:0},
   /* v2.46.010: прибор не стоит на дне, а врезается в лицевую панель —
      манометры ВД и НД видно снаружи, к контуру они идут капилляром */
   face:  {t:'врезка в лицевую панель', hw:null, n:0},
@@ -2613,6 +2637,7 @@ function reseatLink(it){
   if(it.link.mount==='face'){faceMate(it);return;}
   const fr=placed.find(x=>x.uid===it.link.to);
   if(!fr){it.link=null;return;}
+  if(it.link.mount==='tank'){tankReseat(it,fr);return;}
   const st=seatOf(fr,it.link.face),b=new THREE.Box3().setFromObject(it.obj);
   /* вентилятор сидит в проёме крышки: держим начало его СК на листе,
      а не низ габарита — иначе он выпрыгивает наверх при каждой перекладке */
@@ -2683,6 +2708,94 @@ function linkSel(mount,face){
   if(face==='cap')toast((st.part?'Надето на крышку '+st.part.des:'Поставлено на верх корпуса')
     +(st.hole?' по проёму Ø'+Math.round((st.hole.w+st.hole.d)/2)+' мм,':',')+z);
   else toast((st.part?'Поставлено на дно '+st.part.des+',':'Поставлено на низ корпуса,')+z);
+}
+/* Жёсткая связь бака с чиллером. Обычная link-связь уже двигает
+   дочернюю деталь в moveItem. Для бака дополнительно храним полный
+   относительный transform: он не отстанет после поворота или авторасстановки
+   корпуса. */
+function tankRelOf(it,fr){
+  fr.obj.updateMatrixWorld(true);it.obj.updateMatrixWorld(true);
+  const wp=it.obj.getWorldPosition(new THREE.Vector3());
+  const lp=fr.obj.worldToLocal(wp.clone());
+  const fq=fr.obj.getWorldQuaternion(new THREE.Quaternion()).invert();
+  const iq=it.obj.getWorldQuaternion(new THREE.Quaternion());
+  const q=fq.multiply(iq);
+  return {p:[lp.x,lp.y,lp.z],q:[q.x,q.y,q.z,q.w]};
+}
+function tankReseat(it,fr){
+  if(!it.link||it.link.mount!=='tank')return false;
+  if(!it.link.rel)it.link.rel=tankRelOf(it,fr);
+  const r=it.link.rel,p=r.p||[0,0,0],q=r.q||[0,0,0,1];
+  fr.obj.updateMatrixWorld(true);
+  const w=fr.obj.localToWorld(new THREE.Vector3(p[0],p[1],p[2]));
+  const fq=fr.obj.getWorldQuaternion(new THREE.Quaternion());
+  const wq=fq.multiply(new THREE.Quaternion(q[0],q[1],q[2],q[3]));
+  it.obj.position.copy(w);it.obj.quaternion.copy(wq);it.obj.updateMatrixWorld(true);
+  if(it._pinBox)it._pinBox.update();
+  return true;
+}
+function tankZone(fr){
+  const s=new THREE.Box3().setFromObject(fr.obj),top=capTop(fr).z;
+  return new THREE.Box3(new THREE.Vector3(s.min.x+WALL,s.min.y+WALL,s.min.z),
+                        new THREE.Vector3(s.max.x-WALL,s.max.y-WALL,top));
+}
+/* Ищем ближайшее свободное место в полости. Сначала — текущий разворот,
+   затем 90°: длинный бак часто входит в корпус только поперёк. Пробы
+   временные: история, BOM и save их не видят. */
+function tankInsidePlan(it,fr){
+  const op=it.obj.position.clone(),or=it.obj.rotation.clone(),zone=tankZone(fr),fz=floorZ(fr);
+  const zc=new THREE.Vector3();zone.getCenter(zc);
+  const rz0=Math.round(or.z/(Math.PI/2))*(Math.PI/2),rots=[rz0,rz0+Math.PI/2];
+  let found=null;
+  for(const rz of rots){
+    it.obj.rotation.set(0,0,rz);it.obj.position.set(0,0,0);it.obj.updateMatrixWorld(true);
+    const b0=new THREE.Box3().setFromObject(it.obj),sz=b0.getSize(new THREE.Vector3());
+    if(sz.x>zone.max.x-zone.min.x+1||sz.y>zone.max.y-zone.min.y+1||
+       sz.z>zone.max.z-fz+1)continue;
+    const cand=[];
+    for(let x=zone.min.x+sz.x/2;x<=zone.max.x-sz.x/2+1;x+=40)
+      for(let y=zone.min.y+sz.y/2;y<=zone.max.y-sz.y/2+1;y+=40)
+        cand.push([x,y,(x-zc.x)*(x-zc.x)+(y-zc.y)*(y-zc.y)]);
+    cand.push([zc.x,zc.y,-1]);cand.sort((a,b)=>a[2]-b[2]);
+    for(const c of cand){
+      const b=placeAt(it,c[0],c[1],fz,rz,0);
+      if(b.min.x<zone.min.x-1||b.max.x>zone.max.x+1||
+         b.min.y<zone.min.y-1||b.max.y>zone.max.y+1||b.max.z>zone.max.z+1)continue;
+      if(boxFree(b,it)&&frameFree(b,it)){
+        found={p:it.obj.position.clone(),r:it.obj.rotation.clone()};break;
+      }
+    }
+    if(found)break;
+  }
+  it.obj.position.copy(op);it.obj.rotation.copy(or);it.obj.updateMatrixWorld(true);
+  return found;
+}
+function tankLinkSel(){
+  if(!sel||!isTank(sel.d))return;
+  if(sel.link&&sel.link.mount==='tank'){
+    pushHist('открепление бака от чиллера');
+    sel.link=null;selBtns();refresh();save();
+    toast('Бак откреплён от чиллера — теперь его можно двигать отдельно');return;
+  }
+  const fr=frameFor(sel);
+  if(!fr){toast('В сцене нет корпуса — сначала добавь чиллер');return;}
+  const plan=tankInsidePlan(sel,fr);
+  if(!plan){
+    const tb=new THREE.Box3().setFromObject(sel.obj).getSize(new THREE.Vector3());
+    const z=tankZone(fr),zs=z.getSize(new THREE.Vector3());
+    toast('Бак '+Math.round(tb.x)+'×'+Math.round(tb.y)+'×'+Math.round(tb.z)+
+      ' мм не входит в свободную полость '+Math.round(zs.x)+'×'+Math.round(zs.y)+'×'+
+      Math.round(z.max.z-floorZ(fr))+' мм — уменьши бак или освободи место');return;
+  }
+  pushHist('закрепление бака внутри чиллера');
+  const p0=sel.obj.position.clone();
+  sel.obj.rotation.copy(plan.r);sel.obj.updateMatrixWorld(true);
+  moveItem(sel,plan.p.x-p0.x,plan.p.y-p0.y,plan.p.z-p0.z);
+  sel.link={to:fr.uid,mount:'tank',face:'pan'};
+  sel.link.rel=tankRelOf(sel,fr);
+  selBtns();checkCollisions();showSelZ();refresh();save();
+  toast('Бак поставлен в свободное место внутри и закреплён на чиллере — '+
+    'при перемещении корпуса он поедет вместе с ним');
 }
 /* ═══ v2.46.010: болты крепления видно в сцене ═══
    Выбор «болты М8 · 4 шт» менял только спецификацию: в сцене узел просто
@@ -2902,8 +3015,14 @@ function ctxItems(it){
   if(roleOf(it.d)==='cond')
     L.push({ic:'↳',t:'Сделать отводы вниз',s:'со свободных трубок',
             go:()=>{select(it);condElbowsDown(it);}});
-  if(isTank(it.d))L.push({ic:'✎',t:'Размеры бака…',s:Math.round(tkCalc(it.d.tk).Vw)+' л',
-    go:()=>{select(it);tkOpen(it);}});
+  if(isTank(it.d)){
+    L.push({ic:'✎',t:'Размеры бака…',s:Math.round(tkCalc(it.d.tk).Vw)+' л',
+      go:()=>{select(it);tkOpen(it);}});
+    L.push({ic:'⛓',t:it.link&&it.link.mount==='tank'
+      ?'Открепить бак от чиллера':'Закрепить бак внутри чиллера',
+      s:it.link&&it.link.mount==='tank'?'связь с корпусом':'автопоиск места',
+      go:()=>{select(it);tankLinkSel();}});
+  }
   if(isPipeSeg(it)){
     const pt=ctxPt?ctxPt.clone():null,cx=ctxXY.x,cy=ctxXY.y;
     L.push({ic:'⇹',t:'Длина отрезка…',
@@ -3045,6 +3164,7 @@ $('#bParts').onclick=()=>{
   if(on)buildParts();
 };
 $('#bPin').onclick=togglePin;
+$('#bTankLink').onclick=tankLinkSel;
 $('#bLink').onclick=()=>{
   // деталь на патрубке эта кнопка снимает, а не сажает на корпус
   if(sel&&sel.link&&sel.link.mount==='rot'){rotOff(sel);return;}
@@ -3073,6 +3193,10 @@ function selBtns(){
   $('#bRoof').style.display=roof?'':'none';
   $('#bCondDown').style.display=rr==='cond'?'':'none';
   $('#bTankEd').style.display=(sel&&isTank(sel.d))?'':'none';
+  const tank=!!(sel&&isTank(sel.d)),tankLinked=tank&&sel.link&&sel.link.mount==='tank';
+  $('#bTankLink').style.display=tank?'':'none';
+  $('#bTankLink').textContent=tankLinked?'⛓ Открепить бак':'⛓ Закрепить бак внутри';
+  $('#bTankLink').classList.toggle('on',!!tankLinked);
   if(roof)$('#bRoof').textContent=rr==='cond'?'⌂ Под крышку · уголки М6':'⌂ В крышу · болты М6';
 }
 function select(it){
@@ -3100,6 +3224,8 @@ function lift(dz){
   if(!sel)return;
   if(sel.link&&sel.link.mount==='rot'){
     toast('Деталь сидит на патрубке — сними её, чтобы двигать');return;}
+  if(sel.link&&sel.link.mount==='tank'){
+    toast('Бак закреплён на чиллере — сначала открепи его');return;}
   pushHist(dz>0?'подъём детали':'опускание детали');
   moveItem(sel,0,0,Math.round(dz));
   checkCollisions();showSelZ();refresh();save();
@@ -3108,6 +3234,8 @@ function toFloor(){
   if(!sel)return;
   if(sel.link&&sel.link.mount==='rot'){
     toast('Деталь сидит на патрубке — сними её, чтобы двигать');return;}
+  if(sel.link&&sel.link.mount==='tank'){
+    toast('Бак закреплён на чиллере — сначала открепи его');return;}
   pushHist('посадку на пол');
   const b=new THREE.Box3().setFromObject(sel.obj);
   const fz=INSIDE.has(roleOf(sel.d))?floorZ():site().min.z;
@@ -3150,12 +3278,14 @@ function checkOutside(){
   if(!placed.some(p=>roleOf(p.d)==='frame'))return;
   const z=siteIn();
   placed.forEach(p=>{
-    if(!INSIDE.has(roleOf(p.d)))return;
+    const rt=roleOf(p.d),anchoredTank=rt==='tank'&&p.link&&p.link.mount==='tank';
+    if(!INSIDE.has(rt)&&!anchoredTank)return;
     // v2.46.011: врезанный прибор и должен торчать наружу — это не «вне корпуса»
     if(p.link&&p.link.mount==='face')return;
     const b=new THREE.Box3().setFromObject(p.obj);
-    if(b.min.x<z.min.x-6||b.max.x>z.max.x+6||
-       b.min.y<z.min.y-6||b.max.y>z.max.y+6||b.max.z>z.max.z+6)outSet.add(p.uid);
+    const fr=anchoredTank?placed.find(x=>x.uid===p.link.to):null,iz=fr?tankZone(fr):z;
+    if(b.min.x<iz.min.x-6||b.max.x>iz.max.x+6||
+       b.min.y<iz.min.y-6||b.max.y>iz.max.y+6||b.max.z>iz.max.z+6)outSet.add(p.uid);
   });
 }
 /* ═══ пересечения по реальной геометрии меша ═══
@@ -5402,6 +5532,8 @@ function posDone(){checkCollisions();showSelZ();refresh();save();posFill();}
 function posMove(ax,val){
   if(!sel||!isFinite(val))return;
   if(posRotLink()){toast('Деталь сидит на патрубке — сними её, чтобы двигать');posFill();return;}
+  if(sel.link&&sel.link.mount==='tank'){
+    toast('Бак закреплён на чиллере — сначала открепи его');posFill();return;}
   const b=posBox(),c=new THREE.Vector3();b.getCenter(c);
   const d=posN(val-(ax==='z'?b.min.z:c[ax]));
   if(!d){posFill();return;}
@@ -5415,6 +5547,8 @@ function posMove(ax,val){
 function posSpin(ax,deg){
   if(!sel||!isFinite(deg))return;
   if(posRotLink()){if(ax==='z')posRoll(deg);else posFill();return;}
+  if(sel.link&&sel.link.mount==='tank'){
+    toast('Бак закреплён на чиллере — сначала открепи его');posFill();return;}
   const want=D2R(posN(deg));
   if(Math.abs(want-sel.obj.rotation[ax])<1e-6){posFill();return;}
   pushHist('поворот детали');
@@ -5506,6 +5640,9 @@ function spinSel(ax){
     toast('Деталь повёрнута на патрубке на 90°');
     return;
   }
+  if(sel.link&&sel.link.mount==='tank'){
+    toast('Бак закреплён на чиллере — сначала открепи его');return;
+  }
   pushHist('поворот детали');
   const r=sel.obj.rotation,z0=new THREE.Box3().setFromObject(sel.obj).min.z;
   r[ax]=(Math.round(r[ax]/(Math.PI/2))+1)%4*(Math.PI/2);
@@ -5552,6 +5689,7 @@ $('#bBom').onclick=()=>toast('Следующий шаг: спецификаци�
 /* ═══ спецификация + габарит ═══ */
 function refresh(){
   schSceneMarks();                  // v2.46.021: метки «стоит в машине» на листе Г3
+  placed.forEach(p=>{if(p.link&&p.link.mount==='tank')reseatLink(p);}); // бак — жёстко с корпусом
   rotReseat();                      // вентили держатся за свои штуцеры
   placed.forEach(p=>{if(p.link&&p.link.mount==='face')faceMate(p);});   // приборы — панели
   const by=new Map();
@@ -5640,7 +5778,9 @@ function projPayload(){
                                 link:p.link?{to:p.link.to,mount:p.link.mount,
                                              face:p.link.face||'pan',
                                              zi:p.link.zi,pzi:p.link.pzi,
-                                             roll:p.link.roll}:null,
+                                             roll:p.link.roll,
+                                             rel:p.link.rel?{p:p.link.rel.p.slice(),
+                                                             q:p.link.rel.q.slice()}:undefined}:null,
                                 tk:isTank(p.d)?p.d.tk:undefined,   // бак: размеры и исполнение
                                 pl:isPipeSeg(p)?pipeLen(p):undefined,
                                 fit:p.fit?{to:p.fit.to,zi:p.fit.zi}:undefined,
@@ -5723,7 +5863,8 @@ async function histApply(snapshot){
       /* v2.46.023: pzi — номер патрубка, которым деталь сидит; без него после
          отмены цепочка «труба → арматура → труба» садиться перестаёт */
       p.link=it.link?{to:it.link.to,mount:it.link.mount,face:it.link.face||'pan',
-                      zi:it.link.zi,pzi:it.link.pzi,roll:it.link.roll}:null;
+                      zi:it.link.zi,pzi:it.link.pzi,roll:it.link.roll,
+                      rel:it.link.rel?{p:it.link.rel.p.slice(),q:it.link.rel.q.slice()}:undefined}:null;
       if(it.pl&&isPipeSeg(p))setPipeLen(p,it.pl);      // длина отрезка тоже в снимке
       p.off=Array.isArray(it.off)?it.off.slice():[];
       applyOff(p);pinMark(p);
@@ -5775,7 +5916,8 @@ async function loadProjectData(data){
   }
   placed.forEach(p=>{if(p.link&&map[p.link.to])p.link={to:map[p.link.to],mount:p.link.mount,
                                                        face:p.link.face||'pan',zi:p.link.zi,
-                                                       pzi:p.link.pzi,roll:p.link.roll};
+                                                       pzi:p.link.pzi,roll:p.link.roll,
+                                                       rel:p.link.rel};
                      else if(p.link&&!placed.some(x=>x.uid===p.link.to))p.link=null;});
   /* v2.46.021: пара авто-длины тоже ссылается на uid — перевешиваем и её */
   placed.forEach(p=>{
@@ -6951,6 +7093,7 @@ const TKD={L:800,B:600,H:700,s:1.5,mark:'304',lid:'none',
            part:0,ins:0,leg:'adj',legH:120,du:32,over:1,ull:60};
 let TKP=Object.assign({},TKD);
 let tkEdit=null;           // uid бака, который правим (иначе — новый)
+let tkPreview=null,tkPreviewOld=null; // временный меш не входит в placed/BOM/save
 
 const tkG=v=>(Math.round(v*10)/10).toString().replace('.',',');
 const tkG2=v=>(Math.round(v*100)/100).toString().replace('.',',');
@@ -7188,6 +7331,51 @@ function tkModel(P){
 }
 
 /* ── панель конструктора ────────────────────────────────────────────────── */
+/* Предпросмотр — обычный THREE.Mesh, но не элемент placed. Поэтому refresh,
+   projPayload, save, history и спецификация его не видят. При редактировании
+   исходный бак лишь прячем, а на «Отмена» показываем обратно. */
+function tkPreviewMats(geo){
+  const mk=c=>new THREE.MeshStandardMaterial({color:c,metalness:.5,roughness:.48,
+    flatShading:true,transparent:true,opacity:.88});
+  const pt=geo.userData.parts;
+  return pt?pt.map(x=>mk(x.col)):mk(C_BODY);
+}
+function tkPreviewSetOld(on){
+  const it=tkPreviewOld;if(!it)return;
+  [it.obj,it._pinBox,it._bolts,it._ang,it._pad].forEach(o=>{if(o)o.visible=!!on;});
+}
+function tkPreviewClear(restore){
+  if(tkPreview){
+    scene.remove(tkPreview.obj);
+    tkPreview.obj.geometry.dispose();
+    const ms=Array.isArray(tkPreview.obj.material)?tkPreview.obj.material:[tkPreview.obj.material];
+    ms.forEach(m=>m&&m.dispose());
+    tkPreview=null;
+  }
+  if(restore)tkPreviewSetOld(true);
+}
+function tkPreviewUpdate(){
+  if(!$('#tnk').classList.contains('on'))return;
+  const keep=tkPreview?{p:tkPreview.obj.position.clone(),q:tkPreview.obj.quaternion.clone()}:null;
+  tkPreviewClear(false);
+  const d=tkModel(TKP),geo=tkBuild(d.tk);geo.userData.zones=d._zn;
+  const obj=new THREE.Mesh(geo,tkPreviewMats(geo));obj.userData.tkPreview=true;
+  const it={uid:0,id:d.id,d,obj,pin:false,link:null,off:[],zn:d._zn,zm:false,preview:true};
+  if(tkPreviewOld){
+    obj.position.copy(tkPreviewOld.obj.position);obj.quaternion.copy(tkPreviewOld.obj.quaternion);
+    tkPreviewSetOld(false);
+  }else if(keep){obj.position.copy(keep.p);obj.quaternion.copy(keep.q);}
+  else{
+    const fr=placed.find(p=>roleOf(p.d)==='frame');
+    if(fr){
+      const s=new THREE.Box3().setFromObject(fr.obj),b=new THREE.Box3().setFromObject(obj);
+      const sz=b.getSize(new THREE.Vector3()),c=s.getCenter(new THREE.Vector3());
+      placeAt(it,s.min.x-sz.x/2-100,c.y,s.min.z,0,0);
+    }else placeAt(it,target.x,target.y,site().min.z,0,0);
+  }
+  obj.updateMatrixWorld(true);scene.add(obj);tkPreview=it;
+}
+
 function tkChips(box,list,key,cb){
   const el=$(box);if(!el)return;
   el.innerHTML=list.map(([v,nm])=>
@@ -7235,7 +7423,10 @@ function tkDraw(){
     '<div class="tk-note">Буфер считаем по V = Q·τ/(c·ρ·ΔT): вода 4,19 кДж/(кг·К), '+
     'пауза между пусками 180 с (спираль), перепад на баке 4 К. Раскрой — заготовки '+
     'без припусков на гибку и сварку.</div>';
-  $('#tkAddB').textContent=tkEdit?'Применить размеры':'Поставить в сцену';
+  $('#tkAddB').textContent=tkEdit?'Применить к баку':'Добавить бак в проект';
+  $('#tkLive').innerHTML='<b>Живой 3D-предпросмотр</b> — '+
+    (tkEdit?'исходный бак не изменится до кнопки «Применить».':'этот меш пока не входит в BOM и не сохраняется.');
+  tkPreviewUpdate();
 }
 const tkCell=(k,v)=>'<div class="c"><i>'+esc(k)+'</i><b>'+esc(v)+'</b></div>';
 function tkFields(){
@@ -7246,40 +7437,58 @@ function tkFields(){
   tkDraw();
 }
 function tkOpen(it){
+  tkPreviewClear(true);tkPreviewOld=null;
   tkEdit=null;
-  if(it&&isTank(it.d)){tkEdit=it.uid;TKP=tkNorm(it.d.tk);}
+  if(it&&isTank(it.d)){tkEdit=it.uid;tkPreviewOld=it;TKP=tkNorm(it.d.tk);}
   $('#tnk').classList.add('on');
   $('#tkHd').textContent=tkEdit?'◫ Размеры бака':'◫ Бак из нержавейки';
   tkDraw();
 }
-function tkClose(){$('#tnk').classList.remove('on');tkEdit=null;}
+function tkClose(){
+  tkPreviewClear(true);tkPreviewOld=null;
+  $('#tnk').classList.remove('on');tkEdit=null;
+}
+function tkFinish(){
+  tkPreviewOld=null;tkPreview=null;
+  $('#tnk').classList.remove('on');tkEdit=null;
+}
 /* поставить в сцену или переделать тот, что уже стоит: место, поворот,
    закрепление и связи у бака остаются свои — меняется только геометрия */
 async function tkPut(){
   const d=tkModel(TKP);
+  const pp=tkPreview&&tkPreview.obj.position.clone(),pq=tkPreview&&tkPreview.obj.rotation.clone();
+  const oldPreview=tkPreviewOld;
+  tkPreviewClear(false);
   if(tkEdit){
-    const old=placed.find(p=>p.uid===tkEdit);
-    if(!old){tkEdit=null;return tkPut();}
+    const old=placed.find(p=>p.uid===tkEdit)||oldPreview;
+    if(!old){tkPreviewOld=null;tkEdit=null;return tkPut();}
     const pos=old.obj.position.clone(),rot=old.obj.rotation.clone();
-    const st={pin:old.pin,off:old.off,link:old.link};
+    const st={pin:old.pin,off:old.off,link:old.link,fit:old.fit,sch:old.sch};
+    const idx=placed.indexOf(old);
     const h=histBegin('размеры бака');
     try{
-      scene.remove(old.obj);boltClear(old);placed.splice(placed.indexOf(old),1);
-      const it=await addItem(d,{x:pos.x,y:pos.y,z:pos.z,state:st},rot.z,rot.y,rot.x);
-      if(it){placed.forEach(p=>{if(p.link&&p.link.to===tkEdit&&p!==it)p.link.to=it.uid;});
-             it.uid=tkEdit;}
+      scene.remove(old.obj);if(old._pinBox)scene.remove(old._pinBox);boltClear(old);
+      if(idx>=0)placed.splice(idx,1);
+      const it=await addItem(d,{uid:tkEdit,x:pos.x,y:pos.y,z:pos.z,state:st},rot.z,rot.y,rot.x);
+      if(it)it.uid=tkEdit;
+      else{
+        if(idx>=0)placed.splice(idx,0,old);scene.add(old.obj);tkPreviewOld=old;tkPreviewSetOld(true);
+        toast('Бак не пересчитался — исходная модель оставлена');return;
+      }
     }finally{histEnd(h);}
     toast('Бак пересчитан: '+tkName(TKP));
   }else{
-    await addItem(d);
+    await addItem(d,pp?{x:pp.x,y:pp.y,z:pp.z}:undefined,
+      pq?pq.z:undefined,pq?pq.y:undefined,pq?pq.x:undefined);
     toast('Бак в сцене: '+tkName(TKP)+', '+tkG(tkCalc(TKP).mass)+' кг');
   }
-  tkClose();refresh();save();
+  tkFinish();refresh();save();
 }
 $('#bTank').onclick=()=>tkOpen(sel&&isTank(sel.d)?sel:null);
 $('#tkX').onclick=tkClose;
 $('#tkAddB').onclick=tkPut;
 $('#tkReset').onclick=()=>{TKP=Object.assign({},TKD);tkDraw();};
+$('#tkCancelB').onclick=tkClose;
 $('#tnk').onclick=e=>{if(e.target.id==='tnk')tkClose();};
 ['tkL','tkB','tkH','tkLegH'].forEach(id=>{
   const el=$('#'+id);if(el)el.oninput=tkFields;});
