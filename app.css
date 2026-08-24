@@ -24813,6 +24813,9 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
   letter-spacing: .02em; text-transform: uppercase; color: #4338CA; margin-bottom: 7px; }
 .ich-spec-body { font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
 .ich-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 2px 0; }
+.ich-manage { margin-left: auto; display: inline-flex; flex-wrap: wrap; gap: 8px; }
+.ich-manage .btn.danger { color: var(--danger, #B5260C); border-color: #F3C5BC; }
+.ich-manage .btn.danger:hover { background: #FEF2F2; }
 .ich-note { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-light); }
 .ich-composer { display: flex; align-items: flex-end; gap: 8px; margin-top: 8px;
   border: 1px solid var(--border-strong, #DDE5F0); border-radius: 14px; padding: 6px 6px 6px 12px; }
