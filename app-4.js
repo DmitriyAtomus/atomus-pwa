@@ -1799,8 +1799,9 @@ function _ideasRenderLock(st) {
     '<div class="ich-lock">' +
       '<div class="ich-lock-ico"><i class="ti ti-lock"></i></div>' +
       '<h3>Чат идей — под паролем</h3>' +
-      '<p>Здесь можно рассказать Клаве, что улучшить в программе: она уточнит детали, ' +
-        'оформит ТЗ и передаст директору. Пароль выдаёт директор.</p>' +
+      '<p>Здесь Клава вместе с сотрудниками улучшает программы: разбирается в проблеме, ' +
+        'читает файлы и текущую логику, проектирует решение, оформляет ТЗ и передаёт ' +
+        'директору. Пароль выдаёт директор.</p>' +
       (st.has_password
         ? '<div class="ich-lock-form">' +
             '<input type="password" id="idea-pass" class="form-input" placeholder="Пароль" ' +
@@ -1856,7 +1857,8 @@ function _ideasRenderShell() {
             'oninput="ideasGrow(this)" onkeydown="ideasKey(event)" onpaste="ideasPaste(event)"></textarea>' +
           '<button class="ich-send" onclick="ideaSend()" title="Отправить (Enter)"><i class="ti ti-arrow-up"></i></button>' +
         '</div>' +
-        '<div class="ich-hint">Порядок: обсудили → «Показать макет» → поправили словами → ' +
+        '<div class="ich-hint">Клава ведёт задачу от проблемы до проверяемого решения: ' +
+          'обсудили → «Показать макет» → поправили словами → ' +
           '«Согласовать макет» → «Сформировать ТЗ». Скриншот можно вставить из буфера (Ctrl+V) — ' +
           'или просто перетащить файл в окно чата — Клава его увидит. ' +
           'Код она не правит, договоры и суммы не показывает. ' +
@@ -1921,9 +1923,9 @@ function ideasNew() {
     '<div class="ich-hello">' +
       '<div class="ich-ava"><i class="ti ti-sparkles"></i></div>' +
       '<div><b>Привет' + (state._ideas.name ? ', ' + escapeHtml(state._ideas.name) : '') + '!</b><br>' +
-      'Я Клава. Расскажите, что в программе мешает или чего не хватает. Я уточню детали, ' +
-      'нарисую макет будущего экрана — посмотрите, поправим, — и уже по нему соберём ' +
-      'ТЗ для директора.</div>' +
+      'Я Клава — помощник по улучшению программ. Расскажите, что мешает в работе, ' +
+      'или приложите экран, Excel, PDF. Я проверю, как всё устроено сейчас, разберу ' +
+      'данные, предложу решение, покажу точный макет и соберу ТЗ для директора.</div>' +
     '</div>';
   if (acts) acts.innerHTML = '';
   document.querySelectorAll('.ich-item.active').forEach(function (el) { el.classList.remove('active'); });
@@ -2336,7 +2338,9 @@ async function ideaSend() {
     return { name: f.name, content_type: f.type,
              url: (f.type || '').indexOf('image/') === 0 ? URL.createObjectURL(f) : '' };
   }), true);
-  const ph = _ideaAddMsg('assistant', 'думаю…');
+  const ph = _ideaAddMsg('assistant', picked.length
+    ? 'Изучаю сообщение и вложения…'
+    : 'Разбираюсь в задаче…');
   try {
     let d;
     const isNew = !state._ideas.current;
@@ -2375,9 +2379,12 @@ async function ideasMockup() {
   if (!id) { showToast('Сначала опишите идею', 'error'); return; }
   const th = state._ideas.thread || {};
   const again = (th.mockup_status || 'none') !== 'none';
-  const ph = _ideaAddMsg('assistant', again ? 'Перерисовываю макет…' : 'Рисую макет…');
+  const ph = _ideaAddMsg('assistant', again
+    ? 'Перерисовываю экран и проверяю данные файлов…'
+    : 'Проектирую экран и проверяю данные файлов…');
   const acts = document.getElementById('ideas-actions');
-  if (acts) acts.innerHTML = '<span class="ich-note"><i class="ti ti-loader"></i> Клава рисует макет…</span>';
+  if (acts) acts.innerHTML = '<span class="ich-note"><i class="ti ti-loader"></i> ' +
+    'Клава проектирует экран и проверяет вложения…</span>';
   const r = await apiPost('/api/ideas/' + id + '/mockup', {});
   const d = (r && r.data) || {};
   if (!r.ok || !d.ok) {
