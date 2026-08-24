@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.037";
+const APP_VERSION = "v2.46.038";
 const APP_VERSION_DATE = "24.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2606,6 +2606,7 @@ function _devChatIdeaCard(msg) {
     taken: ['ti-rocket', 'Внедряем — задача в очереди'],
     revision: ['ti-edit', 'Возвращено на доработку'],
     declined: ['ti-clock-pause', 'Отложено'],
+    deleted: ['ti-trash', 'Идея удалена'],
   };
   const decision = decisions[msg.status] || null;
   const textButton = idea.card

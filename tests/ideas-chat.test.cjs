@@ -61,6 +61,7 @@ test('карточка ТЗ в ленте разработки: решение �
   assert.match(card, /ideaDecline\(' \+ Number\(idea\.id\)/);
   assert.match(card, /decisions\[msg\.status\]/);
   assert.match(card, /Возвращено на доработку/);
+  assert.match(card, /Идея удалена/);
   // карточка подключена к рендеру ленты
   assert.match(app1, /const idea = _devChatIdeaCard\(msg\);/);
   assert.match(css, /\.dchat-idea/);
@@ -81,6 +82,26 @@ test('доработка требует комментарий и возвращ
   assert.match(fn, /'\/revision'/);
   assert.match(fn, /ideasOpen\(id\)/);
   assert.doesNotMatch(fn, /dev-chat\/send/);
+});
+
+test('директор может переименовать и удалить идею с подтверждением', () => {
+  const acts = app4.slice(app4.indexOf('function _ideasRenderActions'),
+                          app4.indexOf('function _ideaFormat'));
+  assert.match(acts, /state\._ideas\.isDir/);
+  assert.match(acts, /ideaRename\(/);
+  assert.match(acts, /ideaDelete\(/);
+
+  const rename = app4.slice(app4.indexOf('async function ideaRename'),
+                            app4.indexOf('async function ideaDelete'));
+  assert.match(rename, /apiPatch\('\/api\/ideas\/' \+ id/);
+  assert.match(rename, /ideasLoadListSilent\(\)/);
+
+  const remove = app4.slice(app4.indexOf('async function ideaDelete'),
+                            app4.indexOf('// ============ Пароль'));
+  assert.match(remove, /confirm\(/);
+  assert.match(remove, /Отменить это нельзя/);
+  assert.match(remove, /apiDelete\('\/api\/ideas\/' \+ id/);
+  assert.match(remove, /state\._ideas\.current = null/);
 });
 
 test('карточка «Идеи и доработки» в Помощи ведёт в раздел', () => {

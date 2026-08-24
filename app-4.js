@@ -2037,6 +2037,13 @@ function _ideasRenderActions(th) {
   if (status === 'declined') h += '<span class="ich-note"><i class="ti ti-clock-pause"></i> Отложено' +
     (th.note ? ': ' + escapeHtml(th.note) : '') + '</span>';
   if (status === 'done') h += '<span class="ich-note"><i class="ti ti-check"></i> Сделано</span>';
+  if (state._ideas.isDir && th.id) {
+    h += '<span class="ich-manage">' +
+      '<button class="btn btn-secondary btn-small" onclick="ideaRename(' + th.id + ')">' +
+      '<i class="ti ti-pencil"></i> Переименовать</button>' +
+      '<button class="btn btn-secondary btn-small danger" onclick="ideaDelete(' + th.id + ')">' +
+      '<i class="ti ti-trash"></i> Удалить</button></span>';
+  }
   acts.innerHTML = h;
 }
 
@@ -2475,6 +2482,42 @@ async function ideaDecline(id) {
   if (state._ideas && state._ideas.current === id) ideasOpen(id);
   const card = document.querySelector('[data-idea-card="' + id + '"]');
   if (card) card.innerHTML = '<span class="ich-note"><i class="ti ti-clock-pause"></i> Отложено</span>';
+}
+
+async function ideaRename(id) {
+  const th = (state._ideas && state._ideas.thread) || {};
+  const current = th.id === id ? (th.title || '') : '';
+  const value = prompt('Новое название идеи:', current);
+  if (value === null) return;
+  const title = value.trim();
+  if (!title) { showToast('Название не может быть пустым', 'error'); return; }
+  try {
+    const d = await apiPatch('/api/ideas/' + id, { title: title });
+    if (state._ideas.thread && state._ideas.thread.id === id) {
+      state._ideas.thread.title = d.title || title;
+    }
+    await ideasLoadListSilent();
+    showToast('Идея переименована', 'success');
+  } catch (e) {
+    showToast(e.message || 'Не получилось переименовать', 'error');
+  }
+}
+
+async function ideaDelete(id) {
+  const th = (state._ideas && state._ideas.thread) || {};
+  const title = th.id === id ? (th.title || 'Идея') : 'Идея';
+  if (!confirm('Удалить идею «' + title + '»?\n\n' +
+      'Исчезнут вся переписка, ТЗ, макеты и вложения. Отменить это нельзя.')) return;
+  try {
+    await apiDelete('/api/ideas/' + id);
+    state._ideas.current = null;
+    state._ideas.thread = null;
+    state._ideas.files = [];
+    await ideasLoadList();
+    showToast('Идея удалена', 'success');
+  } catch (e) {
+    showToast(e.message || 'Не получилось удалить', 'error');
+  }
 }
 
 // ============ Пароль и доступ (директор) ============
