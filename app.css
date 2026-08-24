@@ -25046,3 +25046,166 @@ body.dchat-ag .dcl-item.is-on {
 
 /* Полноэкранный режим — тот же лист, а не голый белый фон. */
 body.dchat-ag.dchat-fullscreen [data-screen="devchat"] { background: var(--bg); }
+
+
+/* ============ ЖУРНАЛ АГРЕГАТОВ (Производство → Журнал агрегатов), v2.46.054 ============ */
+/* Плоская таблица образца в 25 колонок: на телефоне листается вбок, шапка липкая,
+   первая колонка («№ п/п») примерзает слева — иначе на 25 колонках теряешь строку. */
+
+.ujr-filters {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px; margin-bottom: 12px;
+}
+.ujr-f { flex: 1 1 180px; min-width: 150px; }
+.ujr-lbl { display: block; font-size: 12px; color: var(--text-light); margin-bottom: 4px; }
+.ujr-f input, .ujr-f select {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong);
+  border-radius: 8px; background: var(--surface); color: var(--text-dark); outline: none;
+}
+.ujr-f input:focus, .ujr-f select:focus { border-color: var(--brand); }
+
+.ujr-ro {
+  background: var(--warning-bg); border: 1px solid var(--warning);
+  color: var(--warning); border-radius: 10px; padding: 9px 12px;
+  font-size: 13px; margin-bottom: 12px;
+}
+
+.ujr-legend {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+  color: var(--text-light); font-size: 12px; margin-bottom: 8px;
+}
+.ujr-dot {
+  display: inline-block; width: 11px; height: 11px; border-radius: 3px;
+  margin-right: 5px; vertical-align: middle; border: 1px solid var(--border-strong);
+}
+.ujr-dot.is-auto { background: var(--brand-bg); border-color: var(--brand-light); }
+.ujr-dot.is-warn { background: var(--warning-bg); border-color: var(--warning); }
+.ujr-dot.is-manual { background: var(--bg); }
+
+.ujr-wrap {
+  overflow: auto; max-height: 72vh; background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.ujr-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12.5px; }
+.ujr-table th, .ujr-table td {
+  border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  padding: 5px 7px; text-align: left; vertical-align: top;
+  background: var(--surface); min-width: 112px; line-height: 1.35;
+}
+.ujr-table thead th {
+  position: sticky; top: 26px; z-index: 3;
+  background: var(--bg); color: var(--text-mid); font-weight: 600; font-size: 11.5px;
+}
+.ujr-table thead tr.ujr-group th { top: 0; z-index: 4; height: 26px; padding: 3px 7px; }
+.ujr-table thead tr.ujr-group th.ujr-proto {
+  background: var(--brand-bg); color: var(--brand); text-align: center; font-weight: 700;
+}
+.ujr-table th.ujr-no, .ujr-table td.ujr-no {
+  position: sticky; left: 0; z-index: 2;
+  width: 46px; min-width: 46px; text-align: center;
+  background: var(--bg); color: var(--text-light); cursor: pointer;
+}
+.ujr-table thead th.ujr-no { z-index: 5; }
+.ujr-table td.ujr-no:hover { background: var(--brand-bg); color: var(--brand); }
+.ujr-table tbody tr:hover td { background: var(--brand-bg); }
+.ujr-table tbody tr:hover td.ujr-no { background: var(--brand-bg-strong); }
+.ujr-table td.ujr-cell { max-width: 260px; padding: 0; }
+/* Длинное примечание не должно растягивать строку: показываем три строки,
+   при правке ячейка разворачивается целиком. */
+.ujr-in {
+  padding: 5px 7px; outline: none; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+}
+.ujr-in[contenteditable="true"]:focus {
+  -webkit-line-clamp: unset; display: block; overflow: visible;
+  background: var(--surface); box-shadow: inset 0 0 0 2px var(--brand); border-radius: 2px;
+}
+.ujr-cell.is-auto { background: var(--brand-bg); }
+.ujr-cell.is-warn { background: var(--warning-bg); }
+.ujr-cell.is-manual { background: var(--bg); }
+.ujr-empty { text-align: center; color: var(--text-light); padding: 22px !important; }
+.ujr-count { color: var(--text-light); font-size: 12px; margin-top: 8px; }
+
+/* ---- карточка агрегата ---- */
+.modal.ujr-modal { max-width: 1040px !important; }
+.ujr-tabs {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  border-bottom: 1px solid var(--border); padding: 0 16px; margin-bottom: 14px;
+}
+.ujr-tab {
+  padding: 9px 13px; border: none; background: none; cursor: pointer;
+  color: var(--text-light); font-size: 14px; border-radius: 8px 8px 0 0;
+}
+.ujr-tab.is-on { color: var(--brand); background: var(--brand-bg); font-weight: 600; }
+/* Отступы держит сам контейнер: таблицы внутри — width:100%, и на детских
+   margin'ах они вылезали за скруглённый край модалки. */
+#unit-card-body { padding: 0 16px 16px; max-height: 76vh; overflow-y: auto; }
+.ujr-tabs { margin: 0 -16px 14px; }
+
+.ujr-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px;
+}
+.ujr-fld { display: block; }
+.ujr-fld > span { display: block; font-size: 12px; color: var(--text-light); margin-bottom: 3px; }
+.ujr-fld input, .ujr-fld select, .ujr-note {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong);
+  border-radius: 8px; background: var(--surface); color: var(--text-dark); outline: none;
+}
+.ujr-fld input:focus, .ujr-fld select:focus, .ujr-note:focus { border-color: var(--brand); }
+.ujr-fld input:disabled, .ujr-fld select:disabled, .ujr-note:disabled {
+  background: var(--bg); color: var(--text-mid);
+}
+.ujr-fld em { display: block; font-style: normal; font-size: 11px; color: var(--text-faint); margin-top: 3px; }
+.ujr-note { min-height: 66px; resize: vertical; line-height: 1.4; }
+.ujr-sub { font-weight: 600; font-size: 13px; margin: 16px 0 6px; }
+.ujr-sub-sm { font-size: 12px; color: var(--text-light); margin: 8px 0 3px; }
+.ujr-hint { color: var(--text-light); font-size: 12.5px; margin-top: 8px; line-height: 1.45; }
+.ujr-empty-line { color: var(--text-light); font-size: 13px; padding: 8px 0; }
+.ujr-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+.ujr-sm { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 6px; }
+.ujr-sm th, .ujr-sm td {
+  border: 1px solid var(--border); padding: 7px 9px; text-align: left; vertical-align: top;
+}
+.ujr-sm th { background: var(--bg); font-size: 12px; color: var(--text-mid); font-weight: 600; }
+.ujr-sm tr.is-taken td { color: var(--text-light); background: var(--bg); }
+.ujr-x {
+  border: none; background: var(--bg); border-radius: 6px; width: 26px; height: 26px;
+  cursor: pointer; color: var(--text-light); font-size: 15px; line-height: 1;
+}
+.ujr-x:hover { background: var(--danger-bg); color: var(--danger); }
+
+.ujr-pn { border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+.ujr-pn-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.ujr-pn-head select {
+  padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--surface); color: var(--text-dark);
+}
+.ujr-tag {
+  background: var(--brand-bg); color: var(--brand); border-radius: 999px;
+  padding: 2px 9px; font-size: 11.5px;
+}
+.ujr-tag.is-alarm { background: var(--danger-bg); color: var(--danger); }
+.ujr-warnbox {
+  background: var(--warning-bg); border: 1px solid var(--warning); color: var(--warning);
+  border-radius: 10px; padding: 10px 12px; font-size: 12.5px; margin-top: 12px; line-height: 1.5;
+}
+.ujr-warnbox ul { margin: 6px 0 0 18px; }
+
+.ujr-more-btn {
+  display: none; border: 1px solid var(--border-strong); background: var(--surface);
+  color: var(--text-mid); border-radius: 8px; padding: 8px 12px; cursor: pointer;
+  font: inherit; align-self: flex-end;
+}
+@media (max-width: 700px) {
+  /* На телефоне четыре выпадашки занимали экран целиком до таблицы. */
+  .ujr-more-btn { display: block; }
+  .ujr-filters .ujr-f.is-extra { display: none; }
+  .ujr-filters.is-open .ujr-f.is-extra { display: block; }
+  .ujr-wrap { max-height: 64vh; }
+  .ujr-table th, .ujr-table td { min-width: 104px; font-size: 12px; }
+  #unit-card-body { padding: 0 10px 12px; }
+  .ujr-tabs { padding: 0 10px; margin: 0 -10px 12px; }
+}
