@@ -27,6 +27,8 @@ function section(from, to) {
 /* присоединения (connOf/connFit/rotSeatLocal) + сама протяжка, без DOM */
 function stand(items, geoms) {
   const code = section('const CT_NAME=', 'function rotClear()') +
+               section('function meshTris(p){', '/* ═══ v2.45.1011: упор') +
+               section('const PIPE_RAY_MAX=', 'function checkPipes(){') +
                section('const PULL_TOL=', 'async function pullPut(');
   const ctx = {
     THREE,
@@ -35,6 +37,9 @@ function stand(items, geoms) {
     placed: [],
     localStorage: { getItem: () => null, setItem: () => {} },
     $: () => null,
+    roleOf: d => d.section === 'frames' ? 'frame' :
+      (d.section === 'compressors' ? 'comp' : (d.section === 'pipe' ? 'pipe' : 'floor')),
+    HIT_SKIP: new Set(['frame', 'vibro', 'pipe']),
   };
   ctx.window = ctx;
   vm.createContext(ctx);
@@ -47,6 +52,12 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const port = (p, d, z) => ({ p, d: d.clone().normalize(), z: z || { name: 'ВЫХОД' },
                              c: null, it: null, zi: 0 });
 const zn = (id) => base.geoms[base.items.find(d => d.id === id).g].zn;
+function boxObstacle(name, center, size) {
+  const obj = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z),
+                             new THREE.MeshBasicMaterial());
+  obj.position.copy(center);obj.updateMatrixWorld(true);
+  return { uid: 'obstacle-' + name, d: { name, section: 'compressors' }, obj, zn: [] };
+}
 
 test('оси смотрят друг в друга — трасса прямая, из одного отрезка', () => {
   const S = stand();
@@ -159,6 +170,33 @@ test('на резьбовой патрубок труба идёт через п
   // водорозетка тоже «резьба + раструб», но раструб у неё смещён с оси
   assert.equal(pl.ea.d.id, 'VTp.708.0.02004');
   assert.notEqual(pl.ea.d.id, 'VTp.754.0.02004');
+});
+
+test('П-образная трасса переносит поперечную трубу за компрессор до построения', () => {
+  const S = stand();
+  const a = port(V(0, 0, 0), V(1, 0, 0));
+  const b = port(V(600, 300, 0), V(1, 0, 0));
+  // Базовая поперечина лежит в плоскости X=720 и режет тело компрессора.
+  S.placed.push(boxObstacle('YH69T1-100', V(720, 150, 0), V(120, 120, 120)));
+  const baseRoute = S.pullRoute(a, b);
+  assert.equal(Math.round(baseRoute.pts[1].x), 720);
+  assert.equal(S.pullRouteHit(a, b, baseRoute.pts).d.name, 'YH69T1-100');
+
+  const route = S.pullRouteClear(a, b, baseRoute);
+  assert.equal(route.err, undefined);
+  assert.equal(route.kind, 'П-образная');
+  assert.equal(route.detour, 80);                    // X=760 ещё внутри, X=800 уже свободен
+  assert.equal(Math.round(route.pts[1].x), 800);
+  assert.equal(S.pullRouteHit(a, b, route.pts), null);
+});
+
+test('прямая трасса сквозь аппарат не создаётся и называет помеху', () => {
+  const S = stand();
+  const a = port(V(0, 0, 0), V(1, 0, 0));
+  const b = port(V(500, 0, 0), V(-1, 0, 0));
+  S.placed.push(boxObstacle('компрессор', V(250, 0, 0), V(100, 100, 100)));
+  const route = S.pullRouteClear(a, b, S.pullRoute(a, b));
+  assert.match(route.err, /прямая проходит сквозь «компрессор»/);
 });
 
 test('угловой резьбовой фитинг не принимается за прямой переход трубы', () => {

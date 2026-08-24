@@ -4718,12 +4718,34 @@ $('#bRl').onclick=rotToggle;
    с ней не сходится (медь к полипропилену) — так не паяют, нужен переход. */
 let pipeBad=new Map();
 const PIPE_RAY_MAX=20000;                          // треугольников в аппарате
+/* Одна и та же проверка оси нужна в двух местах: готовой трубе — для красной
+   диагностики, будущей трассе — чтобы не создавать заведомый проход сквозь
+   аппарат. A/B здесь именно ось отрезка, поэтому наклон и поворот не дают
+   огромную ложную AABB, как у целого меша трубы. */
+function pipeAxisCuts(A,B,o){
+  const v=B.clone().sub(A),L=v.length();if(L<24)return false;
+  const ax=v.multiplyScalar(1/L),P=new THREE.Vector3();
+  const b=new THREE.Box3().setFromObject(o.obj).expandByScalar(-6);
+  if(b.isEmpty())return false;
+  let pts=null;
+  for(let d=6;d<L;d+=8){
+    P.copy(A).addScaledVector(ax,d);
+    if(b.containsPoint(P))(pts||(pts=[])).push(P.x,P.y,P.z);
+  }
+  if(!pts)return false;
+  /* Коробка только отсеивает далёкое. У ресивера между лапами и внутри
+     кронштейнов пусто — там маршрут не должен считаться пересечением. */
+  const T0=meshTris(o),T=(T0&&T0.n<=PIPE_RAY_MAX)?T0:null;
+  let n=pts.length/3;
+  if(T){n=0;for(let i=0;i<pts.length;i+=3)
+    if(inMesh(T,pts[i],pts[i+1],pts[i+2]))n++;}
+  return n*8>=24;
+}
 function checkPipes(){
   pipeBad=new Map();
   const tubes=placed.filter(isPipeSeg);
   if(!tubes.length)return;
   const obst=placed.filter(p=>!isPipeSeg(p)&&!HIT_SKIP.has(roleOf(p.d)));
-  const P=new THREE.Vector3();
   tubes.forEach(t=>{
     t.obj.updateMatrixWorld(true);
     const L=pipeLen(t);
@@ -4733,22 +4755,8 @@ function checkPipes(){
     obst.forEach(o=>{
       if(t.link&&t.link.to===o.uid)return;          // труба сидит на его штуцере
       if(o.link&&o.link.to===t.uid)return;          // это он сидит на трубе
-      const b=new THREE.Box3().setFromObject(o.obj).expandByScalar(-6);
-      if(b.isEmpty())return;
-      let pts=null;
-      for(let d=6;d<L;d+=8){
-        P.copy(A).addScaledVector(ax,d);
-        if(b.containsPoint(P))(pts||(pts=[])).push(P.x,P.y,P.z);
-      }
-      if(!pts)return;
-      /* коробка сказала «внутри» — дальше спрашиваем металл: труба, идущая
-         мимо аппарата в вырезе его габарита, сквозь него не проходит.
-         Меш побольше лучом не щупаем: на каждый сдвиг мыши это дорого */
-      const T0=meshTris(o),T=(T0&&T0.n<=PIPE_RAY_MAX)?T0:null;
-      let n=pts.length/3;
-      if(T){n=0;for(let i=0;i<pts.length;i+=3)
-        if(inMesh(T,pts[i],pts[i+1],pts[i+2]))n++;}
-      if(n*8>=24)pipeBad.set(t.uid,'проходит сквозь · '+o.d.name);
+      if(pipeAxisCuts(A,A.clone().addScaledVector(ax,L),o))
+        pipeBad.set(t.uid,'проходит сквозь · '+o.d.name);
     });
   });
   /* стык без фитинга: концы сошлись, а присоединения разные */
@@ -5094,6 +5102,8 @@ function pipeSetSel(L){
 const PULL_TOL=6;          // на столько осям позволено разойтись, мм
 const PULL_MIN=25;         // ближе этого патрубки считаем стоящими встык
 const PULL_LEAD=120;       // место перед П-образным разворотом: труба + вылет отвода
+const PULL_DETOUR_STEP=40; // шаг поиска следующей свободной поперечной плоскости
+const PULL_DETOUR_MAX=1200;// дальше трассу не раздуваем — просим переставить узел
 /* В заводском STEP резьбовых угольников Ø40 вертикальная ось раструба дальше
    25 мм от начала координат. Сканер базы её пропустил и вместо неё записал
    служебную цилиндрическую грань в -X — труба садилась в наружную стенку
@@ -5248,6 +5258,57 @@ function pullRoute(a,b){
     'патрубка — трубе некуда идти'};
   return {pts:[a.p.clone(),x.at,b.p.clone()],kind:'Г-образная'};
 }
+/* Аппараты проверяем до добавления труб и отводов. Для П-образной трассы есть
+   одна честная степень свободы: поперечную перемычку можно отнести дальше по
+   направлению обоих штуцеров, сохранив два угла 90°. Перебираем такие плоскости
+   до первой свободной; если оба конца внутри корпуса, наружу за панель не
+   уходим. У прямой, Г- и Z-трассы без дополнительных отводов обхода нет —
+   лучше отказ с названием помехи, чем красная труба сквозь компрессор. */
+function pullRouteHit(a,b,pts){
+  if(typeof placed==='undefined'||!placed||!placed.length)return null;
+  const skip=new Set();if(a.it)skip.add(a.it.uid);if(b.it)skip.add(b.it.uid);
+  const obst=placed.filter(p=>!skip.has(p.uid)&&!HIT_SKIP.has(roleOf(p.d)));
+  for(let i=0;i+1<pts.length;i++)for(let j=0;j<obst.length;j++)
+    if(pipeAxisCuts(pts[i],pts[i+1],obst[j]))return obst[j];
+  return null;
+}
+function pullRouteInside(a,b,pts){
+  if(typeof placed==='undefined'||!placed||
+     !placed.some(p=>roleOf(p.d)==='frame'))return true;
+  const outer=site();
+  /* Наружные патрубки и обвязку бака не загоняем обратно в корпус. */
+  if(!outer.containsPoint(a.p)||!outer.containsPoint(b.p))return true;
+  const inner=siteIn().clone().expandByScalar(-8);
+  if(inner.isEmpty())return true;
+  for(let i=1;i+1<pts.length;i++)if(!inner.containsPoint(pts[i]))return false;
+  return true;
+}
+function pullRouteClear(a,b,rt){
+  const first=pullRouteHit(a,b,rt.pts),inside=pullRouteInside(a,b,rt.pts);
+  if(!first&&inside)return rt;
+  if(rt.kind==='П-образная'){
+    const A=a.d.clone().normalize(),B=b.d.clone().normalize();
+    const t=b.p.clone().sub(a.p).dot(A);
+    const base=Math.max(PULL_LEAD,t+PULL_LEAD);
+    let last=first;
+    for(let add=PULL_DETOUR_STEP;add<=PULL_DETOUR_MAX;add+=PULL_DETOUR_STEP){
+      const sa=base+add,sb=sa-t;
+      const C=a.p.clone().addScaledVector(A,sa);
+      const D=b.p.clone().addScaledVector(B,sb);
+      const q={pts:[a.p.clone(),C,D,b.p.clone()],kind:rt.kind,detour:add};
+      if(!pullRouteInside(a,b,q.pts))break;
+      const hit=pullRouteHit(a,b,q.pts);if(hit){last=hit;continue;}
+      return q;
+    }
+    const who=last||first;
+    return {err:'свободной П-образной трассы внутри корпуса нет'+
+      (who?(' — мешает «'+who.d.name+'»'):' — поперечная труба выходит за корпус')+
+      '; переставь узел или выбери другой патрубок'};
+  }
+  const who=first&&first.d&&first.d.name;
+  return {err:'трасса '+rt.kind+' проходит сквозь '+(who?('«'+who+'»'):'оборудование')+
+    ' — переставь узел или добавь обход'};
+}
 /* Прямой отрезок трубы в базе: две зоны вдоль своей оси X. */
 function pullTubes(){
   const out=[],ax=z=>Math.abs((z.dir&&z.dir[0])||0)>.9;
@@ -5388,7 +5449,9 @@ function pullCheck(a,b,pref){
     '» не задан тип и размер присоединения в базе 3D'};
   if(!b.c)return {err:'у патрубка «'+(b.z.name||'второй')+
     '» не задан тип и размер присоединения в базе 3D'};
-  const rt=pullRoute(a,b);
+  let rt=pullRoute(a,b);
+  if(rt.err)return {err:rt.err};
+  rt=pullRouteClear(a,b,rt);
   if(rt.err)return {err:rt.err};
   const dirs=[];
   for(let i=0;i+1<rt.pts.length;i++){
@@ -5648,6 +5711,7 @@ async function pullBuild(a,b,q){
   PULL=null;
   if(err)pullBail(made,err);
   else toast('Труба '+pl.t.c.txt+' · трасса '+rt.kind+' · '+pl.total+' мм'+
+    (rt.detour?(' · обход оборудования +'+rt.detour+' мм'):'')+
     (dirs.length>1?(' · отводов '+(dirs.length-1)):'')+
     (pl.cost?(' · переходов '+pl.cost):''));
   checkCollisions();showSelZ();refresh();save();rotRebuild();
