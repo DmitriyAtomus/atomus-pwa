@@ -1756,6 +1756,7 @@ const IDEA_STATUS = {
   open:     { label: 'черновик',   cls: 'is-open' },
   ready:    { label: 'ТЗ готово',  cls: 'is-ready' },
   sent:     { label: 'у директора', cls: 'is-sent' },
+  revision: { label: 'доработать', cls: 'is-revision' },
   taken:    { label: 'в работе',   cls: 'is-taken' },
   declined: { label: 'отложено',   cls: 'is-declined' },
   done:     { label: 'сделано',    cls: 'is-done' },
@@ -1984,8 +1985,13 @@ function _ideasRenderActions(th) {
   if (!acts) return;
   const status = th.status || 'open';
   const mockup = th.mockup_status || 'none';
+  const editable = status === 'open' || status === 'ready' || status === 'revision';
   let h = '';
-  if (status === 'open' || status === 'ready') {
+  if (status === 'revision') {
+    h += '<span class="ich-note"><i class="ti ti-edit"></i> На доработке' +
+         (th.note ? ': ' + escapeHtml(th.note) : '') + '</span>';
+  }
+  if (editable) {
     // Пока макет не согласован, главная кнопка — про макет: ТЗ пишется уже по
     // картинке, на которую человек посмотрел и сказал «да».
     if (mockup !== 'approved') {
@@ -2003,13 +2009,13 @@ function _ideasRenderActions(th) {
            '<i class="ti ti-refresh"></i> Переделать макет</button>';
     }
   }
-  if ((status === 'open' || status === 'ready') && mockup === 'approved') {
+  if (editable && mockup === 'approved') {
     h += '<button class="btn btn-primary btn-small" onclick="ideaCompile()">' +
          '<i class="ti ti-file-check"></i> ' + (th.spec_text ? 'Пересобрать ТЗ' : 'Сформировать ТЗ') + '</button>';
   }
   // Аварийный выход для идей без экрана («присылать уведомление», «звук в цеху»):
   // держать человека на макете там не за что.
-  if ((status === 'open' || status === 'ready') && mockup !== 'approved') {
+  if (editable && mockup !== 'approved') {
     h += '<button class="ich-skip" onclick="ideaCompile(true)">Идея без экрана — собрать ТЗ без макета</button>';
   }
   if (th.spec_text && (status === 'open' || status === 'ready')) {
@@ -2021,6 +2027,8 @@ function _ideasRenderActions(th) {
     if (state._ideas.isDir) {
       h += '<button class="btn btn-primary btn-small" onclick="ideaImplement(' + th.id + ')">' +
            '<i class="ti ti-rocket"></i> Внедрить</button>' +
+           '<button class="btn btn-secondary btn-small" onclick="ideaRevision(' + th.id + ')">' +
+           '<i class="ti ti-edit"></i> На доработку</button>' +
            '<button class="btn btn-secondary btn-small" onclick="ideaDecline(' + th.id + ')">' +
            '<i class="ti ti-clock-pause"></i> Не сейчас</button>';
     }
@@ -2428,7 +2436,7 @@ async function ideaSubmit() {
 }
 
 // ============ Решение директора ============
-// Эти две функции зовёт и раздел «Идеи», и карточка ТЗ в ленте разработки.
+// Эти функции зовёт и раздел «Идеи», и карточка ТЗ в ленте разработки.
 
 async function ideaImplement(id, comment) {
   const note = comment !== undefined ? comment
@@ -2441,6 +2449,20 @@ async function ideaImplement(id, comment) {
   if (state._ideas && state._ideas.current === id) ideasOpen(id);
   const card = document.querySelector('[data-idea-card="' + id + '"]');
   if (card) card.innerHTML = '<span class="ich-note"><i class="ti ti-rocket"></i> Внедряем — задача в очереди</span>';
+}
+
+async function ideaRevision(id) {
+  const note = prompt('Что именно доработать? Автор увидит этот комментарий.', '');
+  if (note === null) return;
+  if (!note.trim()) { showToast('Напишите, что нужно доработать', 'error'); return; }
+  const r = await apiPost('/api/ideas/' + id + '/revision', { note: note.trim() });
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не получилось', 'error'); return; }
+  showToast('ТЗ вернули на доработку', 'success');
+  if (state._ideas && state._ideas.current === id) ideasOpen(id);
+  const card = document.querySelector('[data-idea-card="' + id + '"]');
+  if (card) card.innerHTML = '<span class="ich-note"><i class="ti ti-edit"></i> На доработке: ' +
+    escapeHtml(note.trim()) + '</span>';
 }
 
 async function ideaDecline(id) {
