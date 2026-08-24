@@ -1051,15 +1051,15 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
       </div>
       <div id="mnt">
         <div class="t">Внутрь, на дно корпуса:</div>
-        <div class="o" data-m="bolt8" data-f="pan">Болты М8 <small>· 4 шт, на дно корпуса</small></div>
-        <div class="o" data-m="bolt10" data-f="pan">Болты М10 <small>· 4 шт, на дно корпуса</small></div>
+        <div class="o" data-m="bolt8" data-f="pan">Болты М8 <small>· по штатным отверстиям, на дно</small></div>
+        <div class="o" data-m="bolt10" data-f="pan">Болты М10 <small>· по штатным отверстиям, на дно</small></div>
         <div class="o" data-m="weld" data-f="pan">Сварка <small>· приварить к дну</small></div>
         <div class="o" data-m="free" data-f="pan">Просто поставить <small>· без крепежа</small></div>
         <div class="t t2">Сверху, на крышку:</div>
-        <div class="o" data-m="bolt8" data-f="cap">Болты М8 <small>· 4 шт, к крышке</small></div>
-        <div class="o" data-m="bolt10" data-f="cap">Болты М10 <small>· 4 шт, к крышке</small></div>
+        <div class="o" data-m="bolt8" data-f="cap">Болты М8 <small>· по штатным отверстиям, к крышке</small></div>
+        <div class="o" data-m="bolt10" data-f="cap">Болты М10 <small>· по штатным отверстиям, к крышке</small></div>
         <div class="o" data-m="ang6" data-f="cap">Уголки М6 <small>· 4 шт, конденсатор под крышку</small></div>
-        <div class="o" data-m="bolt6" data-f="cap">Болты М6 <small>· 4 шт, вентилятор в крышку</small></div>
+        <div class="o" data-m="bolt6" data-f="cap">Болты М6 <small>· по штатным отверстиям, вентилятор в крышку</small></div>
         <div class="o" data-m="weld" data-f="cap">Сварка <small>· приварить к крышке</small></div>
         <div class="o" data-m="free" data-f="cap">Просто надеть <small>· по проёму, без крепежа</small></div>
         <div class="t t2" id="mntFaceT" style="display:none">В лицевую панель:</div>
@@ -2364,6 +2364,13 @@ const MOUNT={
   face:  {t:'врезка в лицевую панель', hw:null, n:0},
   bolt8: {t:'болты М8',  hw:'Болт М8×25 с гайкой и шайбой',  n:4},
   bolt10:{t:'болты М10', hw:'Болт М10×30 с гайкой и шайбой', n:4},
+  /* Автовыбор по thr монтажного отверстия. В меню эти размеры отдельно не
+     нужны, но связь, BOM и undo должны хранить именно фактический крепёж. */
+  bolt4: {t:'болты М4',  hw:'Болт М4×16 с гайкой и шайбами', n:0},
+  bolt5: {t:'болты М5',  hw:'Болт М5×20 с гайкой и шайбами', n:0},
+  bolt12:{t:'болты М12', hw:'Болт М12×35 с гайкой и шайбами',n:0},
+  bolt16:{t:'болты М16', hw:'Болт М16×45 с гайкой и шайбами',n:0},
+  bolt20:{t:'болты М20', hw:'Болт М20×55 с гайкой и шайбами',n:0},
   /* v2.45.1027: верхний узел. Конденсатор в наших чиллерах цепляется к крышке
      не напрямую, а через гнутые уголки — по два болта М6 на уголок (один в
      крышку, второй в раму аппарата). Вентилятор садится в крышку сам.
@@ -2848,25 +2855,26 @@ function linkSel(mount,face){
                 Math.max(st.box.min.y+sz.y/2+M,st.box.max.y-sz.y/2-M));
   }
   moveItem(sel,snap(cx-c.x),snap(cy-c.y),Math.round(st.z-b.min.z));
+  mount=boltMountOf(sel,mount);
   sel.link={to:fr.uid,mount:mount,face:face};
   /* закрепление отдельной кнопкой: посаженную деталь можно ещё подвинуть по
      площадке, а поедет она вместе с корпусом в любом случае */
   pinMark(sel);selBtns();checkCollisions();showSelZ();refresh();save();
   const m=MOUNT[mount]||MOUNT.free;
-  /* v2.46.021 (#894): о креплении говорим честно. Есть разметка отверстий —
-     пишем, сколько их и какой болт туда идёт; разметки нет и лапы нет —
-     предупреждаем, что болтить не во что: такой аппарат держит хомут. */
+  /* О креплении говорим честно. Координаты отверстий обязательны: старое
+     «пятно лап» задаёт лишь межосевые размеры, но не положение лапы в СК
+     модели, поэтому по нему нельзя ставить крепёж. */
   const bm=BOLT[mount];
   let note='';
   if(bm){
     const H=holesOf(sel),num=v=>String(v).replace('.',',');
     if(H.length){
-      const tight=H.filter(h=>h.d&&h.d<bm.d+0.2);
-      note=' · '+H.length+' × '+bm.t+' в штатные отверстия Ø'+num(H[0].d)+
-        (tight.length?', но болт '+bm.t+' в Ø'+num(tight[0].d)+' не проходит':'');
-    }else if(!boltPad(sel)){
-      note=' · монтажных отверстий у позиции нет: крепится хомутом или '+
-        'кронштейном, болты не показаны';
+      const actual=[...new Set(H.map(h=>boltForHole(h,bm)).filter(Boolean).map(b=>b.t))];
+      note=' · '+H.length+' отв. Ø'+num(H[0].d)+' · штатный крепёж '+
+        (actual.length?actual.join('/'):'не определён — нужна проверка разметки');
+    }else{
+      note=' · ⚠ нет разметки монтажных отверстий: крепёж не добавлен в 3D и BOM; '+
+        'нужна разметка модели';
     }
   }
   const z=' отм. '+Math.round(st.z)+' мм · '+m.t+note;
@@ -2962,33 +2970,30 @@ function tankLinkSel(){
   toast('Бак поставлен в свободное место внутри и закреплён на чиллере — '+
     'при перемещении корпуса он поедет вместе с ним');
 }
-/* ═══ v2.46.010: болты крепления видно в сцене ═══
-   Выбор «болты М8 · 4 шт» менял только спецификацию: в сцене узел просто
+/* ═══ болты крепления видно в сцене ═══
+   Выбор болтов раньше менял только спецификацию: в сцене узел просто
    стоял на дне, и проверить, попадают ли болты в лапы и не лезут ли они в
    балку, было нельзя. Теперь крепёж рисуется: головка с шайбой над лапой,
-   стержень уходит сквозь дно. Пятно берём из базы (geom.bolt — шаг
-   отверстий), а если завод его не дал — по габариту с отступом от края.
+   стержень уходит сквозь дно. Координаты берём только из разметки базы.
    Болты живут отдельным объектом сцены, а не в детали: иначе они попали бы
    в её габарит, и «упор в корпус» считался бы по ним. */
-const BOLT={bolt8: {d:8, hd:13,hh:5.5,wd:17,ln:25,t:'М8'},
-            bolt10:{d:10,hd:17,hh:6.5,wd:21,ln:30,t:'М10'},
+const BOLT={bolt8: {d:8, hd:13,hh:5.5,wd:17,ln:25,t:'М8', hw:'Болт М8×25 с гайкой и шайбами'},
+            bolt10:{d:10,hd:17,hh:6.5,wd:21,ln:30,t:'М10',hw:'Болт М10×30 с гайкой и шайбами'},
             /* v2.46.021 (#894): М6 — это вентилятор в крышку. Раньше его в
                справочнике не было и крепёж не рисовался вовсе; теперь у
                панели вентилятора размечены четыре отверстия, и болт есть
                куда посадить */
-            bolt6: {d:6, hd:10,hh:4,  wd:12,ln:20,t:'М6'}};
+            bolt6: {d:6, hd:10,hh:4,  wd:12,ln:20,t:'М6', hw:'Болт М6×20 с гайкой и шайбами'},
+            /* Остальные размеры не показываем отдельными кнопками: штатный thr
+               отверстия выбирает их автоматически. */
+            bolt4: {d:4, hd:7, hh:2.8,wd:9, ln:16,t:'М4', hw:'Болт М4×16 с гайкой и шайбами'},
+            bolt5: {d:5, hd:8, hh:3.5,wd:10,ln:20,t:'М5', hw:'Болт М5×20 с гайкой и шайбами'},
+            bolt12:{d:12,hd:19,hh:7.5,wd:24,ln:35,t:'М12',hw:'Болт М12×35 с гайкой и шайбами'},
+            bolt16:{d:16,hd:24,hh:10, wd:30,ln:45,t:'М16',hw:'Болт М16×45 с гайкой и шайбами'},
+            bolt20:{d:20,hd:30,hh:12.5,wd:37,ln:55,t:'М20',hw:'Болт М20×55 с гайкой и шайбами'}};
+const BOLT_THR=Object.fromEntries(Object.values(BOLT).map(b=>[b.t,b]));
 const boltMat=new THREE.MeshStandardMaterial({color:0x3a4046,metalness:.85,roughness:.3,
   flatShading:true});
-const _blRay=new THREE.Raycaster();
-/* Верх лапы в точке болта: пускаем луч сверху вниз по самой детали. Без этого
-   головка тонула в лапе (у компрессора она 10 мм) и крепежа было не видно —
-   а смысл правки как раз в том, чтобы видеть, куда сядут болты. */
-function boltTop(it,x,y,z0){
-  _blRay.set(new THREE.Vector3(x,y,z0+400),new THREE.Vector3(0,0,-1));
-  _blRay.far=420;
-  const h=_blRay.intersectObject(it.obj,false);
-  return h.length?Math.max(z0,h[0].point.z):z0+8;
-}
 /* ═══ v2.46.021 (#894): болт садится в настоящее отверстие ═══
    Раньше крепёж рисовался по углам габаритной коробки: пятна в базе не было
    почти ни у кого, и болты торчали мимо лап, сквозь дно и всегда по четыре.
@@ -2997,24 +3002,55 @@ function boltTop(it,x,y,z0){
    их: болтов столько, сколько отверстий, стоят они в СК модели, поэтому
    поворот и крен узла им не мешают. Разметки нет — болты не рисуем вовсе
    и говорим об этом вслух: у такой позиции штатное крепление другое. */
-const holesOf=it=>(!it||!it.d?[]:((GEOMS[it.d.g]||{}).mh)||[]);
+const holesOf=it=>{
+  const H=(!it||!it.d?[]:((GEOMS[it.d.g]||{}).mh)||[]);
+  /* Неполная запись тоже не является координатной разметкой. Не подменяем её
+     четырьмя углами габарита: крепёж должен попасть в реальную лапу. */
+  return Array.isArray(H)?H.filter(h=>h&&Array.isArray(h.p)&&h.p.length===3&&
+    Array.isArray(h.dir)&&h.dir.length===3&&+h.d>0&&+h.t>=0):[];
+};
 function boltPad(it){
-  const g=(it.d&&it.d.geom)||{},b=g.bolt;
-  if(b&&b[0]>0&&b[1]>0)return [b[0],b[1]];
-  /* база прямо говорит: болтовой лапы у изделия нет (арматура на трубе,
-     ресивер в хомуте) — тогда и пятна не выдумываем */
-  if(g.bolt_plane==='none')return null;
-  const bb=new THREE.Box3().setFromObject(it.obj),sz=new THREE.Vector3();bb.getSize(sz);
-  /* пятна в базе нет — ставим по углам опорной плиты, 30 мм от края */
-  return [Math.max(40,sz.x-60),Math.max(40,sz.y-60)];
+  /* Оставлено как совместимый предикат для старых вызовов. Ни bbox, ни
+     geom.bolt не задают центры отверстий и локальное смещение лапы. */
+  return null;
 }
-/* сколько болтов идёт на узел: по разметке отверстий, иначе штатные 4.
-   Ни отверстий, ни лапы — крепёж не считаем: ведомость не должна обещать
-   болты там, где их некуда вкрутить (ресивер держит хомут) */
+function boltForHole(h,m){
+  const t=String((h&&h.thr)||'').trim().toUpperCase().replace(/^M/,'М');
+  if(t)return BOLT_THR[t]||null;
+  /* Для старой, но координатно полной записи без thr допустим только реально
+     проходящий выбранный болт. */
+  return m&&(+h.d>=m.d+0.2)?m:null;
+}
+function boltMountOf(it,mount){
+  const req=BOLT[mount],H=req?holesOf(it):[];
+  if(!H.length)return mount;
+  const specs=[...new Set(H.map(h=>boltForHole(h,req)).filter(Boolean))];
+  if(specs.length!==1)return mount;
+  const e=Object.entries(BOLT).find(([,b])=>b===specs[0]);
+  return e?e[0]:mount;
+}
+function boltIssue(it,m){
+  if(!m)return '';
+  const H=holesOf(it);
+  if(!H.length)return 'Нет разметки монтажных отверстий — крепёж не показан и не попал в BOM; '+
+    'нужна разметка 3D-модели.';
+  const bad=H.find(h=>!boltForHole(h,m));
+  return bad?('Для отверстия Ø'+String(bad.d).replace('.',',')+
+    ' не определён штатный крепёж '+(bad.thr||'')+' — нужна проверка разметки.') : '';
+}
+/* Ведомость получает ровно столько комплектов, сколько размечено отверстий.
+   Без mh количество всегда ноль — даже если в старом каталоге есть пятно лап. */
 function boltCount(it,m){
   const H=holesOf(it);
-  if(H.length)return H.length;
-  return boltPad(it)?(m?m.n:0):0;
+  return H.filter(h=>boltForHole(h,m)).length;
+}
+function boltBom(it,m,fallback){
+  const out=new Map();
+  holesOf(it).forEach(h=>{
+    const b=boltForHole(h,m);if(!b)return;
+    const hw=b.hw||fallback;if(hw)out.set(hw,(out.get(hw)||0)+1);
+  });
+  return out;
 }
 /* Крепёж по разметке базы: на каждое отверстие стержень, шайба, головка и
    гайка. Всё строится в системе координат модели, а группа повторяет матрицу
@@ -3024,12 +3060,16 @@ function boltHoles(it,m,H){
   const grp=new THREE.Group();grp.userData.mh=1;
   const q=new THREE.Quaternion(),p=new THREE.Vector3(),d=new THREE.Vector3();
   H.forEach(h=>{
+    const bm=boltForHole(h,m);if(!bm)return;
     d.set.apply(d,(h.dir&&h.dir.length===3)?h.dir:[0,0,1]);
     if(!d.lengthSq())d.set(0,0,1);
     d.normalize();
     p.set.apply(p,(h.p&&h.p.length===3)?h.p:[0,0,0]);
     q.setFromUnitVectors(_bZ,d);
-    const t=Math.max(h.t||0,2);              // толщина лапы: на ней лежит головка
+    const t=Math.max(+h.t||0,2);             // толщина лапы: на ней лежит головка
+    /* p — плоскость прилегания лапы. Основание корпуса лежит сразу за ней.
+       Нижняя шайба и гайка прижаты к листу, а не висят на конце nominal ln. */
+    const supportT=3,upperWasher=1.8,lowerWasher=1.8;
     const put=(r,len,off)=>{
       const g=new THREE.CylinderGeometry(r,r,len,12);
       g.rotateX(Math.PI/2);g.translate(0,0,len/2);
@@ -3038,10 +3078,13 @@ function boltHoles(it,m,H){
       o.position.copy(p).addScaledVector(d,off);
       grp.add(o);
     };
-    put(m.d/2,t+m.ln+4,-m.ln);               // стержень сквозь лапу и опору
-    put(m.wd/2,1.8,t);                       // шайба
-    put(m.hd/2,m.hh,t+1.8);                  // головка под ключ
-    put(m.hd/2,m.hh,-m.ln);                  // гайка с той стороны опоры
+    const nut0=-supportT-lowerWasher-bm.hh;
+    const tip=Math.min(nut0-2,t+upperWasher-bm.ln);
+    put(bm.d/2,t+upperWasher+2-tip,tip);        // стержень через лапу и основание
+    put(bm.wd/2,upperWasher,t);                // верхняя шайба на лапе
+    put(bm.hd/2,bm.hh,t+upperWasher);          // головка под ключ
+    put(bm.wd/2,lowerWasher,-supportT-lowerWasher); // нижняя шайба у основания
+    put(bm.hd/2,bm.hh,nut0);                   // гайка сразу под основанием
   });
   grp.renderOrder=1;grp.matrixAutoUpdate=false;
   scene.add(grp);it._bolts=grp;boltSync(it);
@@ -3085,41 +3128,15 @@ function boltMark(it){
   if(it.link&&it.link.mount==='ang6'&&angMark(it))return;
   const m=it.link&&it.link.mount&&BOLT[it.link.mount];
   const H=m?holesOf(it):[];
-  const pad=m&&!H.length?boltPad(it):null;
   /* крепёж не пересобираем на каждый чих: тот же болт на том же пятне —
      просто двигаем группу за деталью */
-  const key=!m?'':(it.link.mount+'|'+(H.length?'mh'+H.length:(pad?pad.join('x'):'no')));
+  const hk=H.map(h=>[h.p.join(','),h.dir.join(','),h.d,h.t,h.thr||''].join('/')).join(';');
+  const key=!m?'':(it.link.mount+'|'+(H.length?'mh:'+hk:'no-mh'));
   if(it._boltKey===key){if(it._bolts)boltSync(it);return;}
   it._boltKey=key;
   boltClear(it);
   if(!m)return;
-  if(H.length){boltHoles(it,m,H);return;}
-  if(!pad)return;                 // отверстий нет и лапы нет — болтов не рисуем
-  const [px,py]=pad;
-  /* группа стоит в точке посадки, болты внутри неё — в локальных координатах
-     пятна; тогда сдвиг узла это сдвиг одной группы, а не пересборка геометрии */
-  const grp=new THREE.Group();
-  const cyl=(r,h,z)=>{
-    const g=new THREE.CylinderGeometry(r,r,h,12);
-    g.rotateX(Math.PI/2);g.translate(0,0,z+h/2);
-    return g;
-  };
-  const bb0=new THREE.Box3().setFromObject(it.obj);
-  const c0=bb0.getCenter(new THREE.Vector3());
-  [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([sx,sy])=>{
-    const lx=sx*px/2,ly=sy*py/2;
-    // высота лапы в этой точке: головка ложится на неё, а не внутрь металла
-    const lap=Math.min(60,boltTop(it,c0.x+lx,c0.y+ly,bb0.min.z)-bb0.min.z);
-    [cyl(m.d/2,lap+m.ln+4,-m.ln),                  // стержень сквозь лапу и дно
-     cyl(m.wd/2,1.8,lap),                          // шайба на лапе
-     cyl(m.hd/2,m.hh,lap+1.8),                     // головка под ключ
-     cyl(m.hd/2,m.hh,-m.ln)].forEach(g=>{          // гайка снизу
-      const o=new THREE.Mesh(g,boltMat);
-      o.position.set(lx,ly,0);grp.add(o);
-    });
-  });
-  grp.renderOrder=1;
-  scene.add(grp);it._bolts=grp;boltSync(it);
+  if(H.length)boltHoles(it,m,H);
 }
 /* болты держатся за деталь: подвинул или повернул узел — крепёж поехал с ним */
 function boltSync(it){
@@ -3345,11 +3362,14 @@ function selBtns(){
   $('#bPin').classList.toggle('on',pin);
   const rl=!!(sel&&sel.link&&sel.link.mount==='rot');
   const lk=(sel&&sel.link&&!rl)?MOUNT[sel.link.mount]:null;
+  const bm=sel&&sel.link&&BOLT[sel.link.mount],bi=bm?boltIssue(sel,bm):'';
   $('#bLink').textContent=rl?'⤫ Снять с патрубка'
+    :bi?'⚠ Нужна разметка крепежа'
     :lk?('⛓ '+(sel.link.face==='cap'?'на крышке':'на дне')+' · '+lk.t)
        :'⛓ Соединить с корпусом';
   $('#bLink').classList.toggle('on',rl||!!lk);
   $('#bLink').title=rl?'Деталь сидит на патрубке аппарата — снять'
+                     :bi?('⚠ '+bi)
                      :'Поставить на дно или надеть на крышку корпуса';
   $('#bSwap').style.display=rl?'':'none';   // v2.45.1005: поставил не тот — поменяй
   /* v2.45.1027: верхний узел — своя кнопка, у остальных ролей её нет */
@@ -3381,8 +3401,10 @@ function showSelZ(){
   if(!sel){$('#selZ').textContent='';return;}
   const b=new THREE.Box3().setFromObject(sel.obj);
   /* v2.45.1011: раз деталь горит красным — рядом сказано, во что она упёрлась */
+  const bm=sel.link&&BOLT[sel.link.mount],bi=bm?boltIssue(sel,bm):'';
   $('#selZ').textContent=(ROLE_NAME[roleOf(sel.d)]||'')+' · отм. '+Math.round(b.min.z)+' мм'+
-    (hitSet.has(sel.uid)?(' · упор в '+hitNames(sel.uid)):'');
+    (hitSet.has(sel.uid)?(' · упор в '+hitNames(sel.uid)):'')+
+    (bi?' · ⚠ нужна разметка монтажных отверстий':'');
   posFill();                        // v2.46.001: в панели координат те же числа
 }
 function lift(dz){
@@ -4538,14 +4560,14 @@ async function rotSwap(v,d,pzi){
     it.link={to:host.uid,mount:'rot',face:'port',zi:zi,roll:roll,
              pzi:(pzi==null?null:pzi)};
     if(!rotMate(it)){                      // не села — откатываем к прежней
-      scene.remove(it.obj);placed.splice(placed.indexOf(it),1);
+      scene.remove(it.obj);boltClear(it);placed.splice(placed.indexOf(it),1);
       select(v);
       toast('Деталь не села на патрубок — оставил прежнюю');
       return;
     }
     if(v._pinBox){scene.remove(v._pinBox);v._pinBox=null;}
     placed.forEach(p=>{if(p.link&&p.link.to===v.uid)p.link=null;});
-    scene.remove(v.obj);placed.splice(placed.indexOf(v),1);
+    scene.remove(v.obj);boltClear(v);placed.splice(placed.indexOf(v),1);
     select(it);
     toast('На патрубке «'+(z?z.name:'')+'» '+host.d.name+': '+old.name+' → '+d.name);
   }finally{histEnd(h);}
@@ -5228,7 +5250,7 @@ function condDownPlan(it,zi){
 function madeRemove(made){
   made.forEach(it=>{
     if(it._pinBox){scene.remove(it._pinBox);it._pinBox=null;}
-    scene.remove(it.obj);
+    scene.remove(it.obj);boltClear(it);
     const k=placed.indexOf(it);
     if(k>=0)placed.splice(k,1);
   });
@@ -5848,7 +5870,7 @@ $('#bDup').onclick=dupSel;
 $('#bClear').onclick=()=>{if(!placed.length)return;
   if(!confirm('Убрать все детали со сцены?'))return;
   pushHist('очистку сцены');
-  placed.forEach(p=>{scene.remove(p.obj);if(p._pinBox)scene.remove(p._pinBox);});
+  placed.forEach(p=>{scene.remove(p.obj);if(p._pinBox)scene.remove(p._pinBox);boltClear(p);});
   placed.length=0;select(null);refresh();save();};
 $('#bBom').onclick=()=>toast('Следующий шаг: спецификация → BOM модели ЧИЛ и чертёж сборки');
 
@@ -5881,18 +5903,26 @@ function refresh(){
     ?((theirs.length?head('В КОМПЛЕКТЕ ЧИЛЛЕРА'):'')+ours.map(srow).join('')+
       (theirs.length?head('ВНЕ КОМПЛЕКТА · ЗАКАЗЧИК И МОНТАЖ')+theirs.map(srow).join(''):''))
     :'<div style="padding:14px 12px;font-size:12px;color:var(--faint)">Пока пусто — добавь детали из базы слева.</div>';
-  // v2.45.994: крепёж посадки на корпус — отдельными строками, по 4 болта на узел
+  // v2.45.994: крепёж посадки на корпус — отдельными строками
   const hw=new Map();
   placed.forEach(p=>{
     const m=p.link?MOUNT[p.link.mount]:null;
-    /* v2.46.021 (#894): болтов столько, сколько монтажных отверстий у позиции,
-       а не всегда четыре: у насоса своя плита, у фланца рамы вентилятора шесть */
-    const nb=m&&m.hw?(BOLT[p.link.mount]?boltCount(p,m):m.n):0;
-    if(nb)hw.set(m.hw,(hw.get(m.hw)||0)+nb);
+    /* Для координатно размеченных отверстий размер берём из их штатного thr:
+       насос с М6 не превращается в М8 только потому, что нажали общую кнопку. */
+    const bm=p.link&&BOLT[p.link.mount];
+    if(m&&m.hw&&bm)boltBom(p,bm,m.hw).forEach((n,t)=>hw.set(t,(hw.get(t)||0)+n));
+    else if(m&&m.hw&&m.n)hw.set(m.hw,(hw.get(m.hw)||0)+m.n);
     if(m&&m.hw2)hw.set(m.hw2,(hw.get(m.hw2)||0)+m.n2);});
   if(hw.size)$('#spec').innerHTML+=[...hw.entries()].map(([t,n])=>
     `<div class="sr" style="color:var(--dim)"><span class="nm">${esc(t)}</span>`+
     `<span class="n">${n}</span><span class="u">компл</span></div>`).join('');
+  /* Неразмеченный насос не получает выдуманные четыре болта, но проблема не
+     исчезает молча: предупреждение остаётся в составе проекта до разметки mh. */
+  const mw=placed.filter(p=>p.link&&BOLT[p.link.mount]&&boltIssue(p,BOLT[p.link.mount]));
+  if(mw.length)$('#spec').innerHTML+=mw.map(p=>
+    `<div class="sr" style="color:var(--warn)" title="${esc(boltIssue(p,BOLT[p.link.mount]))}">`+
+    `<span class="nm">⚠ ${esc(p.d.name)} · нужна разметка отверстий</span>`+
+    `<span class="n">0</span><span class="u">креп.</span></div>`).join('');
   $('#spec').querySelectorAll('.sr[data-id]').forEach(row=>row.onclick=()=>{
     const it=placed.find(p=>p.id===row.dataset.id&&p!==sel)||placed.find(p=>p.id===row.dataset.id);
     if(it)select(it);});
@@ -6005,7 +6035,7 @@ async function histApply(snapshot){
     placed.slice().forEach(p=>{
       if(keep.has(p.uid))return;
       if(p._pinBox){scene.remove(p._pinBox);p._pinBox=null;}
-      scene.remove(p.obj);placed.splice(placed.indexOf(p),1);
+      scene.remove(p.obj);boltClear(p);placed.splice(placed.indexOf(p),1);
       if(sel===p)sel=null;
     });
     for(const it of items){
