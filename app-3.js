@@ -12957,13 +12957,26 @@ function openContractFromSupply(contractId) {
 
 // ========== ЗАКАЗЫ (список) ==========
 
-// v2.45.x: поиск по заказам (сервер: поставщик/ИНН/№/номенклатура/примечание).
+// v2.45.x: поиск по заказам (сервер: поставщик/ИНН/№/номенклатура/примечание,
+// с v2.46.040 — и по назначению счёта, тегу «за что платили»).
 // При непустом запросе ищем по ВСЕМ статусам, чтобы находило везде.
 let _supOrdSearchTimer = null;
 function onSupplyOrdSearch(val) {
   state.supplyOrdSearch = (val || '').trim();
   if (_supOrdSearchTimer) clearTimeout(_supOrdSearchTimer);
   _supOrdSearchTimer = setTimeout(() => { loadSupplyOrders(); }, 300);
+}
+
+// v2.46.040: клик по жёлтому тегу назначения в списке — показать все заказы
+// с такой же пометкой («Воздуховоды», «Вентиляция в Смоленск»), без набора руками.
+function searchSupplyOrdersByPurpose(tag) {
+  tag = (tag || '').trim();
+  if (!tag) return;
+  const inp = document.getElementById('sup-ord-search');
+  if (inp) inp.value = tag;
+  if (_supOrdSearchTimer) clearTimeout(_supOrdSearchTimer);
+  state.supplyOrdSearch = tag;
+  loadSupplyOrders();
 }
 
 // Фильтр по одному дню. Какая дата (оплаты/поставки/создания) — зависит от вкладки.
@@ -13317,7 +13330,8 @@ function renderSupplyOrders() {
           // v2.45.665: внешний статус поставки (Всеинструменты) — «что идёт»
           (o.ext_status ? '<span class="sup-status-pill" style="background:#E7EEFB;color:#3257B0;font-weight:600;"><i class="ti ti-truck-delivery"></i> ' + escapeHtml(o.ext_status) + '</span>' : '') +
           // v2.45.773: назначение счёта («Реклама», «Инструмент»…) — видно из списка
-          (o.purpose ? '<span class="sup-status-pill" style="background:#FEF3C7;color:#92400E;font-weight:700;" title="Назначение счёта"><i class="ti ti-tag"></i> ' + escapeHtml(o.purpose) + '</span>' : '') +
+          (o.purpose ? '<span class="sup-status-pill sup-ord-tag" data-purpose="' + escapeHtml(o.purpose).replace(/"/g, '&quot;') + '" title="Назначение счёта — нажми, чтобы найти все заказы с этой пометкой"' +
+              ' onclick="event.stopPropagation();searchSupplyOrdersByPurpose(this.dataset.purpose)"><i class="ti ti-tag"></i> ' + escapeHtml(o.purpose) + '</span>' : '') +
           // v2.45.699: кто оформил — тихо, в конце строки
           (o.created_by_name
             ? '<span class="sup-ord-who" title="Кто оформил заказ"><span class="sup-ord-who-ava">' +
@@ -18411,6 +18425,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.46.040',
+    date: '24.08.2026',
+    title: 'Поиск заказов — по тегу «за что платили»',
+    features: [
+      'В «На оплату → Заказы поставщикам» поиск теперь смотрит и на <b>назначение счёта</b> — жёлтый тег на карточке. Набрал «воздуховоды» — вышли все заказы с такой пометкой, в любом статусе',
+      'Ищет и по тегу, поставленному на самом входящем счёте в «Почте» — даже если на заказ он не успел переехать',
+      'По тегу можно просто <b>кликнуть</b> прямо в списке — CRM сама подставит его в поиск и покажет все заказы с этой пометкой',
+    ],
+  },
   {
     version: 'v2.46.033',
     date: '22.08.2026',
