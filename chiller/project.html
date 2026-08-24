@@ -940,6 +940,40 @@ body.mob .ncard .ph2{height:78px}
 /* окна-карточки: до самых краёв, чтобы влезал текст */
 body.mob .flt-card,body.mob .tk-card,body.mob .mdz-card,body.mob .pov-card,
 body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none;max-height:88vh}
+
+/* Пользовательский корпус STEP: явная кнопка, drop-зона и проверка перед
+   установкой. Конвертация идёт на сервере, поэтому закрытие страницы не
+   оставляет в каталоге полумодель. */
+#stepDrop{position:absolute;inset:10px;z-index:38;display:none;align-items:center;justify-content:center;
+  border:2px dashed #4FBBEC;border-radius:14px;background:rgba(4,18,34,.88);pointer-events:none}
+#stepDrop.on{display:flex}
+#stepDrop .in{text-align:center;color:#DCECF8;font-size:14px;line-height:1.6}
+#stepDrop b{display:block;color:#8FD3F4;font-size:20px;margin-bottom:4px}
+#stepDrop small{display:block;color:var(--dim);font-size:11px}
+#um{position:fixed;inset:0;z-index:58;display:none;align-items:center;justify-content:center;
+  background:rgba(3,8,16,.82);backdrop-filter:blur(4px)}
+#um.on{display:flex}
+.um-card{width:min(680px,95vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;
+  border:1px solid var(--line2);border-radius:14px;background:var(--panel);box-shadow:0 24px 70px rgba(0,0,0,.65)}
+.um-body{display:grid;grid-template-columns:minmax(280px,1.2fr) minmax(230px,.8fr);gap:12px;padding:12px;overflow:auto}
+#umCv{width:100%;height:310px;display:block;border:1px solid var(--line);border-radius:10px;background:#061020}
+.um-fields{display:flex;flex-direction:column;gap:10px}
+.um-state{font-size:12px;line-height:1.5;color:var(--dim);padding:9px 10px;border-radius:8px;background:var(--panel2)}
+.um-state.busy{color:var(--warn)}.um-state.bad{color:#f0a9a0}.um-state.ok{color:#bfe8d6}
+.um-name{font-size:14px;color:#fff;font-weight:600;word-break:break-word}
+.um-meta{font:11px/1.55 var(--mono);color:var(--faint)}
+.um-field label{display:block;font-size:10.5px;color:var(--faint);margin-bottom:4px}
+.um-field select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line2);
+  background:var(--panel2);color:var(--ink);font:inherit;font-size:12px}
+.um-note{font-size:10.5px;line-height:1.45;color:var(--faint)}
+.um-act{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line)}
+.um-act .btn{flex:1}.um-act .btn.off{opacity:.4;pointer-events:none}
+.ci .uph{width:40px;height:40px;display:flex;align-items:center;justify-content:center;flex:none;
+  border-radius:7px;background:rgba(27,159,216,.11);border:1px solid rgba(27,159,216,.35);
+  color:#8FD3F4;font:700 9px var(--mono)}
+.ncard .uph{height:110px;display:flex;align-items:center;justify-content:center;background:#0D1B30;
+  color:#8FD3F4;font:700 16px var(--mono)}
+@media(max-width:620px){.um-body{grid-template-columns:1fr}#umCv{height:220px}}
 </style></head><body>
 <div id="app">
   <header>
@@ -955,6 +989,8 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
             title="Чат по чиллерам">💬 Чат</button>
   <button class="back" id="bTank" style="margin-left:8px"
           title="Бак водяного контура: прямоугольный сварной из нержавейки — задать размеры и поставить в компоновку">◫ Бак</button>
+  <button class="back" id="bStep" style="margin-left:8px"
+          title="Загрузить свой корпус из STEP/STP">⇧ STEP-корпус</button>
   <button class="back" id="bProjects" style="margin-left:8px">⛁ Проекты</button>
     <a class="back" href="index.html" style="margin-left:8px">← База 3D</a>
   </header>
@@ -975,6 +1011,8 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
 
     <div id="vwrap">
       <canvas id="cv"></canvas>
+      <div id="stepDrop"><div class="in"><b>Отпусти STEP/STP здесь</b>
+        Корпус будет безопасно обработан на сервере<small>до 80 МБ · исходный файл сохранится в CRM</small></div></div>
       <div class="vbar">
         <div class="vb" data-v="iso">Изометрия</div><div class="vb" data-v="front">Спереди</div>
         <div class="vb" data-v="top">Сверху</div>
@@ -1256,6 +1294,24 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
     <div class="btn ghost" id="tkCancelB">Отмена</div>
   </div>
 </div></div>
+<input type="file" id="stepFile" accept=".step,.stp,application/step,model/step" style="display:none">
+<div id="um"><div class="um-card">
+  <div class="pov-h">⇧ Свой корпус из STEP <span class="x" id="umX">✕</span></div>
+  <div class="um-body">
+    <canvas id="umCv"></canvas>
+    <div class="um-fields">
+      <div class="um-name" id="umName">Корпус</div>
+      <div class="um-state" id="umState">Подготовка…</div>
+      <div class="um-meta" id="umMeta"></div>
+      <div class="um-field"><label>Вертикальная ось исходной модели</label>
+        <select id="umUp"><option value="z">Z вверх (обычно STEP)</option><option value="y">Y вверх</option><option value="x">X вверх</option></select></div>
+      <div class="um-field"><label>Масштаб в сцене</label>
+        <select id="umScale"><option value="1">Авто · STEP приведён к мм</option><option value="10">Коррекция ×10 (если исходник в см)</option><option value="25.4">Коррекция ×25,4 (дюймы)</option><option value="1000">Коррекция ×1000 (метры)</option><option value="0.1">Коррекция ×0,1</option></select></div>
+      <div class="um-note">Проверь габарит и ориентацию. После установки модель получает роль «корпус»: от неё считаются полость, уровни и автоматическая расстановка.</div>
+    </div>
+  </div>
+  <div class="um-act"><div class="btn pri off" id="umAdd">Поставить корпус в сцену</div><div class="btn ghost" id="umCancel">Закрыть</div></div>
+</div></div>
 <div id="mdz"><div class="mdz-card">
   <div class="pov-h" id="mdzT">Описание позиции <span class="x" id="mdzX">✕</span></div>
   <div class="mdz-body" id="mdzB"></div>
@@ -1273,7 +1329,8 @@ let VER='';
 const vq=u=>VER?(u+(u.indexOf('?')<0?'?':'&')+'v='+VER):u;
 const U={index:()=>API?API+'/index':BASE+'index.json',
   mesh:f=>vq(API?API+'/mesh/'+encodeURIComponent(f):BASE+'mesh/'+f+'.json.gz'),
-  thumb:f=>vq(API?API+'/thumb/'+encodeURIComponent(f):BASE+'thumb/'+f+'.webp')};
+  thumb:f=>vq(API?API+'/thumb/'+encodeURIComponent(f):BASE+'thumb/'+f+'.webp'),
+  users:()=>API?API+'/user-models':null};
 const $=s=>document.querySelector(s);
 let DATA=[],GEOMS={},SECTIONS=[];
 
@@ -1284,7 +1341,7 @@ function b64(s){const b=atob(s),a=new Uint8Array(b.length);
   for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;}
 async function meshOf(G){
   if(!G._mesh){
-    const r=await fetch(U.mesh(G.f),{cache:'default',headers:AUTH});
+    const r=await fetch(G.url||U.mesh(G.f),{cache:'default',headers:AUTH});
     if(!r.ok)throw new Error('меш не отдался: '+r.status);
     let buf=await r.arrayBuffer();
     const b=new Uint8Array(buf);
@@ -1344,6 +1401,105 @@ async function geoOf(d){
   geo.userData.zones=((IZ&&IZ.length?IZ:MS.zones)||[]).filter(z=>z&&z.tip);
   GEO_CACHE.set(key,geo);return geo;
 }
+
+/* ═══ свой STEP-корпус: загрузка → серверный OpenCascade → проверка → сцена ═══ */
+const USER_PREFIX='user:';
+function userModelData(m){
+  const id=USER_PREFIX+m.id,g=USER_PREFIX+m.id,sz=(m.bbox&&m.bbox.size)||[];
+  const dims=sz.length===3?sz.map(v=>Math.round(+v||0)).join(' × ')+' мм':'габарит из STEP';
+  GEOMS[g]={f:m.id,url:m.mesh_url,user:true,bb:m.bbox||{},step:m.step_url};
+  return {id:id,g:g,ready:true,name:m.name||'Корпус из STEP',brand:'Мои корпуса',
+    kind:'Загруженный STEP · корпус',section:'frames',sub:'user',tags:[dims,'STEP → мм'],
+    specs:[['Исходный файл',m.original_filename||'model.step'],['Габарит',dims],
+      ['Треугольников',String(m.triangle_count||0)],['Единицы STEP',m.source_unit||'не определены']],
+    geom:{rows:[['Роль в компоновке','корпус'],['Координаты','нормализованы в мм']],lod:'Пользовательская модель; геометрия из загруженного STEP.'},
+    _user:m};
+}
+function registerUserModel(m){
+  const id=USER_PREFIX+m.id,old=DATA.find(d=>d.id===id);
+  if(old)return old;
+  const d=userModelData(m);DATA.unshift(d);HAY.delete(d.id);return d;
+}
+async function loadUserModels(){
+  if(!API)return [];
+  try{
+    const r=await fetch(U.users(),{cache:'no-store',headers:AUTH});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const x=await r.json(),out=[];(x.items||[]).slice().reverse().forEach(m=>out.push(registerUserModel(m)));
+    return out;
+  }catch(e){console.warn('Пользовательские STEP не загрузились',e);return [];}
+}
+
+const UM={seq:0,d:null,ren:null,sc:null,cam:null,obj:null,raf:0,theta:-.75,phi:1.0,dist:1000,drag:null};
+const umScale=()=>Math.max(.0001,+($('#umScale').value||1));
+function umAngles(){const up=$('#umUp').value;
+  return up==='y'?{x:Math.PI/2,y:0}:up==='x'?{x:0,y:-Math.PI/2}:{x:0,y:0};}
+function umClose(){UM.seq++;$('#um').classList.remove('on');
+  if(UM.raf)cancelAnimationFrame(UM.raf);UM.raf=0;
+  if(UM.ren){try{UM.ren.dispose();}catch(e){}UM.ren=null;}UM.sc=UM.cam=UM.obj=null;}
+function umFit(){if(!UM.obj||!UM.cam)return;
+  UM.obj.scale.setScalar(umScale());const a=umAngles();UM.obj.rotation.set(a.x,a.y,0);UM.obj.updateMatrixWorld(true);
+  const b=new THREE.Box3().setFromObject(UM.obj),c=new THREE.Vector3(),s=new THREE.Vector3();b.getCenter(c);b.getSize(s);
+  UM.obj.userData.center=c;UM.dist=Math.max(20,s.length()*1.35);
+  $('#umMeta').textContent='Габарит в сцене: '+[s.x,s.y,s.z].map(v=>Math.round(v)).join(' × ')+' мм';}
+function umFrame(){if(!$('#um').classList.contains('on')||!UM.ren||!UM.obj)return;
+  const cv=$('#umCv'),w=Math.max(2,cv.clientWidth),h=Math.max(2,cv.clientHeight);
+  if(cv.width!==Math.round(w*devicePixelRatio)||cv.height!==Math.round(h*devicePixelRatio)){
+    UM.ren.setPixelRatio(Math.min(devicePixelRatio,2));UM.ren.setSize(w,h,false);UM.cam.aspect=w/h;UM.cam.updateProjectionMatrix();}
+  const c=UM.obj.userData.center||new THREE.Vector3(),sp=Math.sin(UM.phi),cp=Math.cos(UM.phi);
+  UM.cam.position.set(c.x+UM.dist*sp*Math.cos(UM.theta),c.y+UM.dist*sp*Math.sin(UM.theta),c.z+UM.dist*cp);
+  UM.cam.lookAt(c);UM.ren.render(UM.sc,UM.cam);UM.raf=requestAnimationFrame(umFrame);}
+async function umPreview(d){
+  let geo;try{geo=await geoOf(d);}catch(e){$('#umState').className='um-state bad';$('#umState').textContent=e.message;return;}
+  const cv=$('#umCv');UM.ren=new THREE.WebGLRenderer({canvas:cv,antialias:true});UM.ren.outputEncoding=THREE.sRGBEncoding;
+  UM.sc=new THREE.Scene();UM.sc.background=new THREE.Color(0x061020);
+  UM.cam=new THREE.PerspectiveCamera(36,1,1,100000);UM.cam.up.set(0,0,1);
+  UM.sc.add(new THREE.HemisphereLight(0xdcecff,0x162238,.75));
+  const dl=new THREE.DirectionalLight(0xffffff,.9);dl.position.set(1,-2,3);UM.sc.add(dl);
+  UM.obj=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0x9aa3ab,metalness:.55,roughness:.48,flatShading:true}));
+  UM.sc.add(UM.obj);umFit();$('#umState').className='um-state ok';$('#umState').textContent='Готово. Проверь ориентацию и габарит.';
+  $('#umAdd').classList.remove('off');umFrame();}
+function stepFileOk(f){return !!f&&/\.(step|stp)$/i.test(f.name||'');}
+async function uploadUserStep(file){
+  if(!API){toast('Загрузка STEP доступна только из CRM');return;}
+  if(!stepFileOk(file)){toast('Нужен файл .STEP или .STP');return;}
+  if(file.size>80*1024*1024){toast('STEP больше 80 МБ — упрости сборку или выгрузи оболочку');return;}
+  const seq=++UM.seq;UM.d=null;$('#um').classList.add('on');$('#umName').textContent=file.name;
+  $('#umState').className='um-state busy';$('#umState').textContent='Загружаю и конвертирую на сервере… Большая сборка может занять до 3 минут.';
+  $('#umMeta').textContent=(file.size/1048576).toFixed(1)+' МБ';$('#umAdd').classList.add('off');
+  try{
+    const fd=new FormData();fd.append('file',file,file.name);
+    const r=await fetch(U.users(),{method:'POST',headers:AUTH,body:fd});
+    let m={};try{m=await r.json();}catch(e){}
+    if(!r.ok)throw new Error(m.message||('HTTP '+r.status));
+    const d=registerUserModel(m);HAY.clear();secNames();drawCat();
+    if(seq!==UM.seq){toast('STEP обработан и сохранён в «Моих корпусах»');return;}
+    UM.d=d;$('#umName').textContent=m.name||file.name;
+    const unit={mm:'мм',cm:'см',m:'м',inch:'дюймы',unknown:'не определены'}[m.source_unit]||m.source_unit;
+    $('#umMeta').textContent='Исходные единицы: '+unit+' · OpenCascade привёл модель к мм';
+    await umPreview(d);
+  }catch(e){if(seq!==UM.seq)return;$('#umState').className='um-state bad';
+    $('#umState').textContent='Не получилось: '+(e.message||e);}
+}
+$('#bStep').onclick=()=>$('#stepFile').click();
+$('#stepFile').onchange=e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(f)uploadUserStep(f);};
+$('#umX').onclick=$('#umCancel').onclick=umClose;
+$('#um').onclick=e=>{if(e.target.id==='um')umClose();};
+$('#umUp').onchange=$('#umScale').onchange=()=>{if(UM.obj)umFit();};
+$('#umAdd').onclick=async()=>{if(!UM.d||$('#umAdd').classList.contains('off'))return;
+  const d=UM.d,a=umAngles(),sc=umScale();umClose();
+  const it=await addItem(d,{scale:sc},0,a.y,a.x);if(it)toast('Свой корпус поставлен в сцену и сохранён в проекте');};
+(function stepDropBind(){const box=$('#vwrap'),ov=$('#stepDrop');let n=0;
+  const has=e=>Array.from((e.dataTransfer&&e.dataTransfer.items)||[]).some(x=>x.kind==='file');
+  box.addEventListener('dragenter',e=>{if(!has(e))return;e.preventDefault();n++;ov.classList.add('on');});
+  box.addEventListener('dragover',e=>{if(has(e)){e.preventDefault();e.dataTransfer.dropEffect='copy';}});
+  box.addEventListener('dragleave',()=>{n=Math.max(0,n-1);if(!n)ov.classList.remove('on');});
+  box.addEventListener('drop',e=>{n=0;ov.classList.remove('on');const fs=e.dataTransfer&&e.dataTransfer.files;
+    if(!fs||!fs.length)return;e.preventDefault();const f=Array.from(fs).find(stepFileOk);if(f)uploadUserStep(f);else toast('Перетащи файл .STEP или .STP');});
+  const previewCanvas=$('#umCv');previewCanvas.addEventListener('pointerdown',e=>{UM.drag={x:e.clientX,y:e.clientY};try{previewCanvas.setPointerCapture(e.pointerId);}catch(_){}});
+  previewCanvas.addEventListener('pointermove',e=>{if(!UM.drag)return;UM.theta-=(e.clientX-UM.drag.x)*.008;UM.phi=Math.max(.08,Math.min(Math.PI-.08,UM.phi+(e.clientY-UM.drag.y)*.008));UM.drag={x:e.clientX,y:e.clientY};});
+  const up=()=>{UM.drag=null;};previewCanvas.addEventListener('pointerup',up);previewCanvas.addEventListener('pointercancel',up);
+  previewCanvas.addEventListener('wheel',e=>{e.preventDefault();UM.dist=Math.max(10,UM.dist*(1+Math.sign(e.deltaY)*.1));},{passive:false});})();
 
 /* ═══ сцена: z вверх, как в базе ═══ */
 const C_BODY=0x8d959d,C_COPPER=0xb87333;
@@ -1935,7 +2091,8 @@ function frameFree(box,it){
 const GAP=70;
 function autoPlace(it){
   const role=roleOf(it.d);
-  if(role==='frame'){placeAt(it,0,0,0,0,0);return;}   // корпус — в центр сцены, он и есть площадка
+  if(role==='frame'){const keep=!!it.d._user;placeAt(it,0,0,0,
+    keep?it.obj.rotation.z:0,keep?it.obj.rotation.y:0);return;} // у своего STEP сохраняем выбранную ориентацию
   // v2.46.011: манометр не ищет место на ярусе — он сам встаёт в лицевую панель
   if(isGauge(it.d)&&facePlace(it))return;
   const s=site(),sl=SLOT[role]||SLOT.floor;
@@ -2125,8 +2282,9 @@ async function addItem(d,at,rot,tilt,roll){
                :mk(base,base===C_BODY||base===C_COPPER));
   pushHist('добавление детали');           // v2.45.996: шаг истории — до появления детали
   const obj=new THREE.Mesh(geo,mat);
+  obj.scale.setScalar(Math.max(.0001,+((at&&at.scale)||1)));
   const bb=geo.boundingBox;
-  obj.position.z=-bb.min.z;                      // низ детали — на пол
+  obj.position.z=-bb.min.z*obj.scale.z;          // низ детали — на пол
   obj.rotation.set(roll||0,tilt||0,rot||0);
   scene.add(obj);
   const keepUid=at&&Number.isFinite(at.uid)?at.uid:null;
@@ -2134,7 +2292,7 @@ async function addItem(d,at,rot,tilt,roll){
     zn:geo.userData.zones||[],zm:!!geo.userData.zoneMats};
   if(keepUid!=null)uidSeq=Math.max(uidSeq,keepUid+1);
   placed.push(it);
-  if(at){obj.position.x=at.x;obj.position.y=at.y;
+  if(at&&typeof at.x==='number'&&typeof at.y==='number'){obj.position.x=at.x;obj.position.y=at.y;
     if(typeof at.z==='number')obj.position.z=at.z;}  // из проекта — как сохранили
   else autoPlace(it);                                // новая деталь — на свой ярус
   if(at&&at.state){                                  // закрепление, связь и погашенные детали
@@ -5684,7 +5842,8 @@ $('#bFromSch').onclick=buildFromSchema;
 async function dupSel(){if(!sel)return;
   const p=sel.obj.position,r=sel.obj.rotation;
   const h=histBegin('дублирование детали');
-  try{await addItem(sel.d,{x:p.x+200,y:p.y+200,z:p.z},r.z,r.y,r.x);}finally{histEnd(h);}}
+  try{await addItem(sel.d,{x:p.x+200,y:p.y+200,z:p.z,
+    scale:sel.d._user?sel.obj.scale.x:undefined},r.z,r.y,r.x);}finally{histEnd(h);}}
 $('#bDup').onclick=dupSel;
 $('#bClear').onclick=()=>{if(!placed.length)return;
   if(!confirm('Убрать все детали со сцены?'))return;
@@ -5781,6 +5940,7 @@ function projPayload(){
   return {items:placed.map(p=>({uid:p.uid,id:p.id,x:p.obj.position.x,y:p.obj.position.y,
                                 z:p.obj.position.z,r:p.obj.rotation.z,t:p.obj.rotation.y,
                                 k:p.obj.rotation.x,        // v2.45.995: крен вокруг X
+                                s:p.d&&p.d._user&&p.obj.scale&&Math.abs(p.obj.scale.x-1)>.000001?p.obj.scale.x:undefined,
                                 pin:p.pin?1:0,
                                 link:p.link?{to:p.link.to,mount:p.link.mount,
                                              face:p.link.face||'pan',
@@ -5858,13 +6018,14 @@ async function histApply(snapshot){
       if(!p){
         const d=it.tk?tkModel(it.tk):DATA.find(x=>x.id===it.id&&x.ready);
         if(!d)continue;
-        p=await addItem(d,{x:it.x,y:it.y,z:it.z},it.r,it.t,it.k);
+        p=await addItem(d,{x:it.x,y:it.y,z:it.z,scale:it.s},it.r,it.t,it.k);
         if(!p)continue;
         p.uid=it.uid;
         uidSeq=Math.max(uidSeq,it.uid+1);
       }
       p.obj.position.set(it.x,it.y,it.z);
       p.obj.rotation.set(it.k||0,it.t||0,it.r||0);
+      p.obj.scale.setScalar(Math.max(.0001,+(it.s||1)));
       p.obj.updateMatrixWorld(true);
       p.pin=!!it.pin;
       /* v2.46.023: pzi — номер патрубка, которым деталь сидит; без него после
@@ -5919,6 +6080,7 @@ async function loadProjectData(data){
     // z, наклона и закрепления в старых проектах нет — там деталь просто стоит на полу
     const it=await addItem(d,{x:s.x,y:s.y,z:s.z,
       state:{pin:s.pin,off:s.off,link:s.link,pl:s.pl,sch:s.sch,fit:s.fit}},s.r,s.t,s.k);
+    if(it&&d._user&&s.s){it.obj.scale.setScalar(Math.max(.0001,+s.s));it.obj.updateMatrixWorld(true);}
     if(it&&s.uid)map[s.uid]=it.uid;
   }
   placed.forEach(p=>{if(p.link&&map[p.link.to])p.link={to:map[p.link.to],mount:p.link.mount,
@@ -6657,6 +6819,7 @@ function descHtml(d,thumb){
   const gr=(g.rows||[]).concat(mnt);
   if(gr.length)h+='<div class="mdz-h">Модель и посадка</div><table class="mdz-t">'+rows(gr)+'</table>';
   if(g.lod)h+='<div class="mdz-note">'+lnk(g.lod)+'</div>';
+  if(d._user&&d._user.step_url)h+='<div class="mdz-note"><a href="#" data-ustep="1">Скачать исходный STEP</a></div>';
   if(d.dl)h+='<div class="mdz-note"><a href="'+esc(d.dl)+'" target="_blank" rel="noopener">Страница позиции у завода</a></div>';
   return h;
 }
@@ -6664,7 +6827,9 @@ function openDesc(d,acts){
   if(!d)return;
   $('#mdzT').innerHTML=esc((d.brand?d.brand+' ':'')+d.name)+' <span class="x" id="mdzX">✕</span>';
   $('#mdzT').querySelector('#mdzX').onclick=closeDesc;
-  $('#mdzB').innerHTML=descHtml(d,GEOMS[d.g]&&GEOMS[d.g].f);
+  $('#mdzB').innerHTML=descHtml(d,GEOMS[d.g]&&!GEOMS[d.g].user&&GEOMS[d.g].f);
+  const usd=$('#mdzB').querySelector('[data-ustep]');if(usd)usd.onclick=e=>{
+    e.preventDefault();userStepDownload(d);};
   $('#mdzB').scrollTop=0;
   const a=$('#mdzA');a.innerHTML='';
   (acts||[]).forEach(b=>{
@@ -6681,6 +6846,11 @@ function openDesc(d,acts){
 function closeDesc(){$('#mdz').classList.remove('on');}
 $('#mdz').onclick=e=>{if(e.target.id==='mdz')closeDesc();};
 $('#bInfo').onclick=()=>sel&&openDesc(sel.d);
+async function userStepDownload(d){
+  try{const r=await fetch(d._user.step_url,{headers:AUTH});if(!r.ok)throw new Error('HTTP '+r.status);
+    const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());
+    a.download=d._user.original_filename||'model.step';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  }catch(e){toast('STEP не скачался: '+(e.message||e));}}
 /* строка списка базы: артикул, бренд, заводское описание и характеристики */
 function catRow(d,add,tk){
   /* v2.45.1024: характеристики читаемо — мощность голубым бейджем у бренда,
@@ -6691,8 +6861,10 @@ function catRow(d,add,tk){
   const kind=filt?String(d.kind||'').split(',')[0]:d.kind;
   const kwTag=(d.tags||[]).find(t=>/квт/i.test(t));
   const tags=(d.tags||[]).filter(t=>t!==kwTag).slice(0,filt?9:4);
+  const pic=GEOMS[d.g]&&GEOMS[d.g].user?'<span class="uph">STEP</span>'
+    :'<img loading="lazy" data-th="'+esc(GEOMS[d.g].f)+'">';
   return '<div class="ci" data-id="'+esc(d.id)+'">'+
-    '<img loading="lazy" data-th="'+esc(GEOMS[d.g].f)+'">'+
+    pic+
     '<div class="t"><b>'+hlt(d.name,tk)+'</b>'+
     '<span class="meta">'+hlt(d.brand,tk)+(kwTag?'<i class="kwb">'+hlt(kwTag,tk)+'</i>':'')+'</span>'+
     (kind?'<span class="k'+(filt?' one':'')+'">'+hlt(kind,tk)+'</span>':'')+
@@ -7810,7 +7982,8 @@ function nomCard(d){
   const kwTag=(d.tags||[]).find(t=>/квт/i.test(t));
   const tags=(d.tags||[]).filter(t=>t!==kwTag).slice(0,4);
   const inCmp=nomSt.cmp.includes(d.id);
-  const ph='<div class="ph2"><img loading="lazy" data-th="'+esc(GEOMS[d.g].f)+'">'
+  const ph='<div class="ph2">'+(GEOMS[d.g]&&GEOMS[d.g].user?'<span class="uph">STEP</span>'
+    :'<img loading="lazy" data-th="'+esc(GEOMS[d.g].f)+'">')
     +(kwTag?'<span class="kw">'+esc(kwTag)+'</span>':'')+'</div>';
   const acts='<div class="act"><span class="addc" data-add="'+esc(d.id)+'">+ в сцену</span>'
     +'<span class="infc" data-inf="'+esc(d.id)+'" title="Описание позиции">ⓘ</span>'
@@ -8389,6 +8562,7 @@ function chGrow(el){
   }
   DATA=ix.items;GEOMS=ix.geoms;SECTIONS=ix.sections;secNames();
   VER=(ix.version||ix.built||'').replace(/[^0-9a-zA-Z]/g,'');
+  await loadUserModels();
   drawCat();   /* чипы разделов, подразделов и брендов рисует сам каталог */
   if(PAPI){
     $('#fMode').textContent='проект в CRM · автосохранение';
@@ -8447,6 +8621,7 @@ mobGrab($('#right'),'Спецификация проекта');
 const MMI=[
   ['⛶','Во весь экран','#bFS'],
   ['⛁','Проекты Атом Чиллер','#bProjects'],
+  ['⇧','Загрузить свой STEP-корпус','#bStep'],
   ['◫','Бак водяного контура','#bTank'],
   ['💬','Чат по чиллерам','#chatBtn'],
   ['⛶','Каталог во весь экран','#nomOpen'],
