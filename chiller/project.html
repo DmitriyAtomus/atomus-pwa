@@ -1628,8 +1628,16 @@ function userModelData(m){
 }
 function registerUserModel(m){
   const id=USER_PREFIX+m.id,old=DATA.find(d=>d.id===id);
-  if(old)return old;
-  const d=userModelData(m);DATA.unshift(d);HAY.delete(d.id);return d;
+  const wasUrl=old?((GEOMS[old.g]||{}).url||''):'';
+  const d=userModelData(m);              /* GEOMS[g] получает свежий адрес меша */
+  /* v2.46.067: корпус пересобрали или повернули в базе — адрес меша сменился.
+     Раньше запись просто возвращалась как есть: во вкладке оставались старый
+     адрес и разобранная геометрия, и в сцену снова вставлялся прежний корпус. */
+  if(old){
+    if(wasUrl&&wasUrl!==GEOMS[d.g].url)GEO_CACHE.delete(d.g);
+    Object.assign(old,d);HAY.delete(old.id);return old;
+  }
+  DATA.unshift(d);HAY.delete(d.id);return d;
 }
 async function loadUserModels(){
   if(!API)return [];
