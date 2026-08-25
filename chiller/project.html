@@ -3347,6 +3347,19 @@ const TFIT_KEYS=['dis','suc','aux'];   // детали конструктора,
 
 /* зоны бака делаем его собственными: разметка приходит из базы одна на все
    такие баки, а место врезки у каждого своё */
+/* v2.46.034: старые проекты, где бак успели перевернуть, чиним при открытии:
+   ставим на дно, а низ оставляем на прежней отметке — деталь не подпрыгнет. */
+function tankStand(it){
+  if(!it||!isTankAny(it.d))return false;
+  const r=it.obj.rotation;
+  if(!r.x&&!r.y)return false;
+  const z0=new THREE.Box3().setFromObject(it.obj).min.z;
+  r.x=0;r.y=0;it.obj.updateMatrixWorld(true);
+  it.obj.position.z+=z0-new THREE.Box3().setFromObject(it.obj).min.z;
+  it.obj.updateMatrixWorld(true);
+  if(it._pinBox)it._pinBox.update();
+  return true;
+}
 function tankZonesOwn(it){
   it.zn=(it.zn||[]).map(z=>Object.assign({},z,{
     p0:(z.p0||[0,0,0]).slice(),dir:(z.dir||[0,0,1]).slice(),
@@ -3457,6 +3470,17 @@ function tankFitStart(it,zi,e){
   return {it:it,zi:zi,pl:pl,grab:grab,p0:z.p0.slice(),bb:bb,
           pad:Math.max(TFIT_EDGE,(+z.od||26)/2+18)};
 }
+/* v2.46.034: слив режут у самого дна — вода уходит самотёком, и наверху его
+   не делают. Возврат от теплообменника, наоборот, льётся сверху. Поэтому по
+   высоте стенки каждый штуцер ходит в своей полосе, а не по всему листу. */
+const TFIT_BAND={eq:[0,.28],dis:[.55,1]};
+function tankFitLim(z,bb,pad){
+  const b=TFIT_BAND[z&&z.kind];
+  if(!b)return null;
+  const h=bb.max.z-bb.min.z;
+  const a=bb.min.z+Math.max(pad,b[0]*h),c=bb.min.z+Math.min(h-pad,b[1]*h);
+  return a<c?[a,c]:null;
+}
 function tankFitMove(P,e){
   const it=P.it,z=(it.zn||[])[P.zi];
   if(!z)return false;
@@ -3466,9 +3490,11 @@ function tankFitMove(P,e){
   const loc=it.obj.worldToLocal(w.sub(P.grab));
   const d=zDir(z),np=V3(P.p0),bb=P.bb;
   const lo=[bb.min.x,bb.min.y,bb.min.z],hi=[bb.max.x,bb.max.y,bb.max.z];
+  const lim=tankFitLim(z,bb,P.pad);
   for(let i=0;i<3;i++){
     if(Math.abs(d.getComponent(i))>0.5)continue;      // вдоль оси врезки не двигаем
-    const a=lo[i]+P.pad,b=hi[i]-P.pad;
+    let a=lo[i]+P.pad,b=hi[i]-P.pad;
+    if(i===2&&lim){a=Math.max(a,lim[0]);b=Math.min(b,lim[1]);}
     const v=Math.round(loc.getComponent(i)/TFIT_STEP)*TFIT_STEP;
     np.setComponent(i,a<b?Math.max(a,Math.min(b,v)):Math.round((a+b)/2));
   }
@@ -7051,6 +7077,12 @@ function spinSel(ax){
   if(sel.link&&sel.link.mount==='tank'){
     toast('Бак закреплён на чиллере — сначала открепи его');return;
   }
+  /* v2.46.034: бак стоит только на дне. Перевёрнутый бак — это крышки внизу и
+     слив наверху: так не бывает, поэтому завал и крен ему запрещены. */
+  if(ax!=='z'&&isTankAny(sel.d)){
+    toast('Бак ставится только на дно: крышки сверху, слив у дна — завал и крен ему не даём');
+    return;
+  }
   pushHist('поворот детали');
   const r=sel.obj.rotation,z0=new THREE.Box3().setFromObject(sel.obj).min.z;
   r[ax]=(Math.round(r[ax]/(Math.PI/2))+1)%4*(Math.PI/2);
@@ -7291,6 +7323,7 @@ async function histApply(snapshot){
       p.obj.rotation.set(it.k||0,it.t||0,it.r||0);
       p.obj.scale.setScalar(Math.max(.0001,+(it.s||1)));
       p.obj.updateMatrixWorld(true);
+      tankStand(p);
       p.pin=!!it.pin;
       /* v2.46.023: pzi — номер патрубка, которым деталь сидит; без него после
          отмены цепочка «труба → арматура → труба» садиться перестаёт */
@@ -7349,6 +7382,7 @@ async function loadProjectData(data){
     const it=await addItem(d,{x:s.x,y:s.y,z:s.z,
       state:{pin:s.pin,off:s.off,link:s.link,pl:s.pl,sch:s.sch,fit:s.fit,po:s.po}},s.r,s.t,s.k);
     if(it&&d._user&&s.s){it.obj.scale.setScalar(Math.max(.0001,+s.s));it.obj.updateMatrixWorld(true);}
+    if(tankStand(it))toast('Бак стоял вверх дном — поставил его на дно');
     if(it&&s.uid)map[s.uid]=it.uid;
   }
   placed.forEach(p=>{if(p.link&&map[p.link.to])p.link={to:map[p.link.to],mount:p.link.mount,
