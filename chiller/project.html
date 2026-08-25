@@ -10458,6 +10458,18 @@ function chGrow(el){
     await restoreLegacy();
   }
   refresh();
+  /* v2.46.067: «В проект» с карточки витрины — деталь встаёт сразу, чтобы
+     не искать её здесь ещё раз руками */
+  try{
+    const add=new URLSearchParams(location.search).get('add');
+    if(add){
+      const d=DATA.find(x=>x.id===add&&x.ready);
+      if(d){catPick(d);toast('«'+d.name+'» из базы — в сцене');}
+      else toast('Позиция из базы не нашлась — выбери её в каталоге слева');
+      const u=new URL(location.href);u.searchParams.delete('add');
+      history.replaceState(null,'',u.pathname+u.search);
+    }
+  }catch(e){}
   chatArm();     /* чат по чиллерам — если он этому пользователю доступен */
   verWatch();    /* база могла пересобраться, пока вкладка открыта */
 })();
