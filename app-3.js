@@ -18412,7 +18412,7 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
-    version: 'v2.46.073',
+    version: 'v2.46.074',
     date: '25.08.2026',
     title: 'Атом Чиллер: врезку бака можно убрать',
     features: [
@@ -18423,7 +18423,7 @@ const HELP_CHANGELOG = [
   },
 
   {
-    version: 'v2.46.072',
+    version: 'v2.46.073',
     date: '25.08.2026',
     title: 'Атом Чиллер: у бака — наружная резьба',
     features: [
