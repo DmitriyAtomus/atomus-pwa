@@ -184,6 +184,7 @@ body.mob #stray{bottom:60px;left:8px;right:8px;transform:none;max-width:none}
 #vwrap.nofit #plegend{top:88px}
 #nofit b{color:#fff;font-weight:700;white-space:nowrap}
 #nofit span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#nofit .s{display:none}
 #nofit i{font-style:normal;color:#ffb3a6;white-space:nowrap}
 /* v2.46.069: с плашки можно позвать Клода — он разберёт упор и предложит,
    куда двигать. Кнопка отдельной мишенью: клик по самой плашке по-прежнему
@@ -191,8 +192,34 @@ body.mob #stray{bottom:60px;left:8px;right:8px;transform:none;max-width:none}
 #nofit u{text-decoration:none;color:#ffe08a;border:1px solid #8d6a30;border-radius:7px;
   padding:3px 9px;white-space:nowrap;font-size:11.5px;background:rgba(80,58,14,.5)}
 #nofit u:hover{background:rgba(120,88,20,.7)}
-@media(max-width:760px){#nofit{top:auto;bottom:56px;font-size:12px;max-width:94%}
-  #nofit span{white-space:normal}}
+/* v2.46.075: на телефоне плашка занимала пол-сцены — длинное имя детали
+   разворачивалось на пять строк поверх машины. Теперь это одна строка
+   («Конденсатор Belief — упирается в стойку»), а по нажатию она
+   разворачивается в подробность и обратно. */
+body.mob #nofit{top:6px;bottom:auto;left:6px;right:6px;transform:none;
+  max-width:none;font-size:11.5px;padding:6px 8px;gap:6px;line-height:1.3}
+/* страховка, если класс .mob не встал (узкий экран без coarse-pointer) */
+@media(max-width:760px){#nofit{top:6px;bottom:auto;left:6px;right:6px;transform:none;
+    max-width:none;font-size:11.5px;padding:6px 8px;gap:6px}
+  #nofit .f{display:none}#nofit .s{display:block;flex:1;min-width:0;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  #nofit.exp{flex-wrap:wrap;align-items:flex-start}
+  #nofit.exp .s{display:none}
+  #nofit.exp .f{display:block;flex:1 1 100%;order:3;white-space:normal;overflow:visible}}
+body.mob #nofit b{font-size:11.5px}
+/* стрелка говорит, что строка разворачивается нажатием */
+body.mob #nofit b::after{content:'\25be';margin-left:5px;font-weight:400;opacity:.75}
+body.mob #nofit.exp b::after{content:'\25b4'}
+body.mob #nofit .f{display:none}
+body.mob #nofit .s{display:block;flex:1;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+body.mob #nofit i{font-size:11px}
+body.mob #nofit u{padding:6px 10px;font-size:12px;line-height:1}
+body.mob #nofit.exp{flex-wrap:wrap;align-items:flex-start}
+body.mob #nofit.exp .s{display:none}
+body.mob #nofit.exp .f{display:block;flex:1 1 100%;order:3;white-space:normal;
+  overflow:visible;margin-top:2px}
+body.mob #nofit.exp i{order:4}
 /* ═══ v2.46.069: разбор упора — панель Клода ═══ */
 #fadv{position:absolute;right:12px;top:44px;z-index:7;display:none;width:330px;
   max-height:calc(100% - 100px);flex-direction:column;border-radius:11px;
@@ -217,8 +244,24 @@ body.mob #stray{bottom:60px;left:8px;right:8px;transform:none;max-width:none}
 #fadv .again{margin-top:2px;color:var(--faint);font-size:11.5px;cursor:pointer;text-decoration:underline}
 #fadv .wait{color:var(--faint)}
 #fadv .err{color:#f0a9a0}
-body.mob #fadv{right:6px;left:6px;width:auto;top:auto;bottom:52px;max-height:56%}
-@media(max-width:760px){#fadv{right:6px;left:6px;width:auto;top:auto;bottom:52px;max-height:56%}}
+/* v2.46.075: на телефоне разбор упора — нижняя шторка во всю ширину: она
+   больше не спорит с кнопками детали (те прячутся, пока шторка открыта),
+   кнопки вариантов во всю строку, крестик — под палец. */
+body.mob #fadv{right:0;left:0;width:auto;top:auto;bottom:0;max-height:56%;
+  border-radius:14px 14px 0 0;border-bottom:none}
+body.mob #fadv .hd{padding:11px 12px 10px;font-size:13px}
+body.mob #fadv .hd b{font-size:13px}
+body.mob #fadv .hd u{font-size:17px;padding:6px 8px;margin:-6px -4px -6px 0;line-height:1}
+body.mob #fadv .bd{padding:10px 12px 16px;font-size:12.5px;-webkit-overflow-scrolling:touch}
+body.mob #fadv .opt{padding:10px;margin-bottom:9px}
+body.mob #fadv .opt b{font-size:12.5px}
+body.mob #fadv .opt button{width:100%;padding:10px;font-size:13px}
+body.mob #fadv .again{display:block;text-align:center;padding:11px 0 2px;font-size:12.5px}
+/* пока шторка открыта — кнопки детали и кружок чата ей не мешают */
+body.mob.fadv #selbar,body.mob.fadv #chatFab{display:none}
+@media(max-width:760px){#fadv{right:0;left:0;width:auto;top:auto;bottom:0;max-height:56%;
+    border-radius:14px 14px 0 0}
+  #fadv .opt button{width:100%;padding:10px;font-size:13px}}
 #plegend b{color:var(--faint);font-weight:600}
 #plegend span{display:flex;align-items:center;gap:4px;white-space:nowrap}
 #plegend i{width:8px;height:8px;border-radius:50%;display:inline-block}
@@ -1098,15 +1141,22 @@ body.mob #selbar{left:6px;right:6px;bottom:6px;transform:none;flex-wrap:nowrap;p
   overflow-x:auto;justify-content:flex-start;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 body.mob #selbar::-webkit-scrollbar{display:none}
 body.mob #selbar>*{flex:0 0 auto}
-body.mob #selbar button{padding:8px 12px;font-size:12px}
-body.mob #selbar .nm{max-width:34vw}
+body.mob #selbar button{padding:9px 13px;font-size:12.5px;min-height:38px}
+/* v2.46.075: имя детали не уезжает вместе с кнопками — держится слева,
+   кнопки прокручиваются под ним */
+body.mob #selbar .nm{max-width:30vw;position:sticky;left:0;z-index:1;padding-right:9px;
+  background:linear-gradient(90deg,rgba(6,16,32,.97) 74%,rgba(6,16,32,0))}
 body.mob #selbar .z{display:none}
+/* v2.46.075: кружок чата садился ровно на правый край кнопок детали —
+   при выделении он поднимается, а под открытой панелью прячется совсем */
+body.mob:has(#selbar.on) #chatFab{bottom:112px}
+body.mob.sh-view #chatFab,body.mob:has(#pos.on) #chatFab,
+body.mob:has(#mnt.on) #chatFab,body.mob:has(#fadv.on) #chatFab{display:none}
 /* плавающие панели по ширине экрана */
 body.mob #pos,body.mob #mnt{left:6px;right:6px;bottom:6px;transform:none;width:auto;max-width:none;
   min-width:0;max-height:70%;overflow-y:auto}
 body.mob #partsBox{left:6px;right:6px;top:8px;width:auto;max-height:58%}
-body.mob #nofit{top:8px;bottom:auto;left:6px;right:6px;transform:none;max-width:none}
-body.mob #nofit span{white-space:normal}
+/* плашка «не входит» — компактная строка, правила выше (v2.46.075) */
 body.mob #toast{bottom:72px}
 body.mob #verBar{bottom:118px;font-size:12px;padding:7px 10px;gap:8px}
 body.mob #ctx,body.mob #rpick{max-width:calc(100vw - 12px)}
@@ -1585,6 +1635,50 @@ function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';
 
 function b64(s){const b=atob(s),a=new Uint8Array(b.length);
   for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;}
+
+/* ═══ v2.46.075: читаемые имена деталей корпуса ═══
+   Имена деталей приходят из STEP-сборки, и часть из них записана старыми
+   кодировками: крепёж SolidWorks Toolbox — в DOS-866 («£®«®¢ª®©» вместо
+   «головкой»), свои детали — в cp1251 («Ïàíåëü áîêîâàÿ» вместо «Панель
+   боковая»). До сих пор эта каша ехала прямо в плашку «не входит», в состав
+   и в заявку Клоду. Чиним при чтении меша: пробуем оба разбора и берём тот,
+   где вышло больше кириллицы; строки, где кириллица уже есть, не трогаем.
+   Заодно снимаем технический хвост Toolbox («SC GOST 7045_gost_…»). */
+const CP1252={0x20AC:0x80,0x201A:0x82,0x0192:0x83,0x201E:0x84,0x2026:0x85,0x2020:0x86,
+  0x2021:0x87,0x02C6:0x88,0x2030:0x89,0x0160:0x8A,0x2039:0x8B,0x0152:0x8C,0x017D:0x8E,
+  0x2018:0x91,0x2019:0x92,0x201C:0x93,0x201D:0x94,0x2022:0x95,0x2013:0x96,0x2014:0x97,
+  0x02DC:0x98,0x2122:0x99,0x0161:0x9A,0x203A:0x9B,0x0153:0x9C,0x017E:0x9E,0x0178:0x9F};
+const cyrN=t=>(t.match(/[А-Яа-я]/g)||[]).length;
+function deMoji(s){
+  if(!s||/[А-Яа-яЁё]/.test(s))return s;                 // уже по-русски — не трогаем
+  const by=[...s].map(ch=>{const c=ch.charCodeAt(0);return CP1252[c]||c;});
+  if(!by.some(c=>c>=0x80&&c<=0xFF))return s;            // высоких байт нет — чинить нечего
+  const dec=map=>by.map(c=>c<0x80?String.fromCharCode(c):(map(c)||String.fromCharCode(c))).join('');
+  const c866=c=>c<=0x9F?String.fromCharCode(0x410+c-0x80)
+              :c<=0xAF?String.fromCharCode(0x430+c-0xA0)
+              :c>=0xE0&&c<=0xEF?String.fromCharCode(0x440+c-0xE0)
+              :c===0xF0?'Ё':c===0xF1?'ё':'';
+  const c1251=c=>c>=0xC0?String.fromCharCode(0x410+c-0xC0):c===0xA8?'Ё':c===0xB8?'ё':'';
+  const a=dec(c866),b=dec(c1251);
+  const best=cyrN(b)>cyrN(a)?b:a;
+  return cyrN(best)?best:s;                             // ничего не вышло — оставляем как было
+}
+function partNm(s){
+  let t=deMoji(String(s==null?'':s));
+  t=t.replace(/^[^_]*_(?:gost|din|iso|ansi)_/i,'');     // «SC GOST 7045_gost_Винт…» → «Винт…»
+  t=t.replace(/_+\d*$/,'');                             // «Панель боковая_00» → «Панель боковая»
+  t=t.replace(/[\s_]+/g,' ').trim();
+  /* имя, потерянное ещё при импорте STEP (сервер съел байты) — иероглифы
+     в плашке не читает никто: выбрасываем нечитаемое, а если после этого
+     не осталось слова — пишем честное «деталь корпуса» */
+  const OK='\\u0020-\\u04FF\\u2010-\\u2122';
+  const junk=(t.match(new RegExp('[^'+OK+']','g'))||[]).length;
+  if(junk>1&&junk/t.length>0.12){
+    const cl=t.replace(new RegExp('[^'+OK+']+','g'),' ').replace(/\s+/g,' ').trim();
+    return /[A-Za-z\u0410-\u044F0-9]{3,}/.test(cl)?cl:'деталь корпуса';
+  }
+  return t;
+}
 async function meshOf(G){
   if(!G._mesh){
     const r=await fetch(G.url||U.mesh(G.f),{cache:'default',headers:AUTH});
@@ -1623,7 +1717,7 @@ async function geoOf(d){
   const parts=(MS.parts||[]).filter(p=>p.count>0);
   if(parts.length){
     parts.forEach((p,i)=>geo.addGroup(p.start,p.count,i));
-    geo.userData.parts=parts.map(p=>({des:p.des||'—',name:p.name||'деталь',
+    geo.userData.parts=parts.map(p=>({des:partNm(p.des)||'—',name:partNm(p.name)||'деталь',
       col:partCol(p)}));
     geo.userData.zoneMats=false;
   }else{
@@ -4565,7 +4659,10 @@ function checkHits(){
     });
   });
 }
-const hitNames=uid=>[...(hitWho.get(uid)||[])].slice(0,3).join(', ');
+/* v2.46.075: длинные заводские имена («Винт со скруглённой головкой ГОСТ Р
+   ИСО 7045 - M6x14») в строку упора не влезают — режем каждое по слову */
+const hitCut=n=>n.length>34?n.slice(0,33).replace(/[\s,]+\S*$/,'')+'…':n;
+const hitNames=uid=>[...(hitWho.get(uid)||[])].slice(0,3).map(hitCut).join(', ');
 /* ═══ v2.46.026: «не входит» — прямым текстом ═══
    Про упор до сих пор говорили только серая строка подвала («упор в корпус:
    1 дет.») и тост в момент посадки: тост уезжает, строку не читают, и машина
@@ -4603,19 +4700,36 @@ function fitFails(){
 }
 const fitName=it=>(ROLE_NAME[roleOf(it.d)]||'деталь').replace(/^./,c=>c.toUpperCase())+
   ' '+it.d.brand+' '+it.d.name;
+/* v2.46.075: на телефоне у плашки две записи одного и того же — короткая
+   строка («Конденсатор Belief — упирается в стойку») и полная. Полная
+   разворачивается нажатием: раньше она разворачивалась сама и закрывала
+   пол-сцены. */
+const fitBrief=(it,why)=>{
+  const r=(ROLE_NAME[roleOf(it.d)]||'деталь').replace(/^./,c=>c.toUpperCase());
+  const w=String(why||'').split(', ');
+  return (r+' '+(it.d.brand||'')).trim()+' — '+w[0]+(w.length>1?' +'+(w.length-1):'');
+};
+const isMob=()=>document.body.classList.contains('mob')||innerWidth<=760;
 /* плашка над сценой */
 function nofitShow(){
   const el=$('#nofit');if(!el)return;
   const bad=fitFails();
   $('#vwrap').classList.toggle('nofit',!!bad.length);
-  if(!bad.length){el.classList.remove('on');el.innerHTML='';el.onclick=null;return;}
+  if(!bad.length){el.classList.remove('on');el.classList.remove('exp');
+    el.innerHTML='';el.onclick=null;el.dataset.uid='';return;}
   const f=bad[0];
-  el.innerHTML='<b>Не входит</b><span></span>'+(bad.length>1?'<i></i>':'')+
+  /* пересборка плашки не должна схлопывать то, что человек только что раскрыл */
+  const keep=el.dataset.uid===String(f.it.uid)&&el.classList.contains('exp');
+  el.innerHTML='<b>Не входит</b><span class="f"></span><span class="s"></span>'+
+    (bad.length>1?'<i></i>':'')+
     (FIT_API?'<u title="Клод разберёт упор и предложит, куда двигать">🧠 Клод</u>':'');
-  el.querySelector('span').textContent=fitName(f.it)+' — '+f.why;
+  el.querySelector('.f').textContent=fitName(f.it)+' — '+f.why;
+  el.querySelector('.s').textContent=fitBrief(f.it,f.why);
   if(bad.length>1)el.querySelector('i').textContent='и ещё '+(bad.length-1)+' '+plural(bad.length-1);
-  el.classList.add('on');
-  el.onclick=()=>{select(f.it);toast(fitName(f.it)+' не входит: '+f.why);};
+  el.classList.add('on');el.classList.toggle('exp',keep);el.dataset.uid=String(f.it.uid);
+  el.onclick=()=>{select(f.it);
+    if(isMob())el.classList.toggle('exp');
+    else toast(fitName(f.it)+' не входит: '+f.why);};
   const ask=el.querySelector('u');
   if(ask)ask.onclick=e=>{e.stopPropagation();select(f.it);fitAsk(f.it);};
 }
@@ -4797,8 +4911,12 @@ function fadvShow(html,title){
   bd.querySelectorAll('[data-fa]').forEach(b=>b.onclick=()=>fitApply(+b.dataset.fa));
   bd.querySelectorAll('.again').forEach(b=>b.onclick=fitAgain);
   el.classList.add('on');
+  /* v2.46.075: на телефоне это шторка снизу — пока она открыта, кнопки
+     детали и кружок чата под ней прятать нечем, кроме класса на body */
+  document.body.classList.add('fadv');
 }
-function fadvHide(){const el=$('#fadv');if(el)el.classList.remove('on');}
+function fadvHide(){const el=$('#fadv');if(el)el.classList.remove('on');
+  document.body.classList.remove('fadv');}
 /* ключ упора: пока деталь и её упоры те же, сам вопрос второй раз не задаём */
 const fitKey=it=>it.uid+'|'+(fitWhy(it)||'')+'|'+
   Math.round(it.obj.position.x)+','+Math.round(it.obj.position.y)+','+Math.round(it.obj.position.z);
@@ -4839,7 +4957,8 @@ function fitAgain(){if(fitLast&&fitLast.it)fitAsk(fitLast.it);}
    показываем прошлый ответ, он про это же место */
 function fitAuto(it){
   if(!FIT_API||!it||!fitWhy(it))return;
-  if(fitAskKey===fitKey(it)&&fitLast&&fitLast.it===it){$('#fadv').classList.add('on');return;}
+  if(fitAskKey===fitKey(it)&&fitLast&&fitLast.it===it){
+    $('#fadv').classList.add('on');document.body.classList.add('fadv');return;}
   fitAsk(it,true);
 }
 (()=>{const x=$('#fadvX');if(x)x.onclick=fadvHide;})();
