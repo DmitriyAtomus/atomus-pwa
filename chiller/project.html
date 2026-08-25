@@ -249,6 +249,7 @@ body.mob #stray{bottom:60px;left:8px;right:8px;transform:none;max-width:none}
 #empty .in{text-align:center;color:var(--dim);font-size:13px;line-height:1.6;background:rgba(6,16,32,.6);
   padding:18px 26px;border-radius:12px;border:1px dashed var(--line2)}
 #spec{flex:1;overflow-y:auto}
+.sr.hid .nm{color:var(--faint);font-style:italic}
 .sr{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:12px;cursor:pointer}
 .sr:hover{background:var(--panel2)}
 .sr.on{background:var(--panel2);box-shadow:inset 2px 0 0 var(--ice2)}
@@ -1188,6 +1189,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <div class="vb" id="bFit" title="Вписать машину в экран">⤢ Вписать</div>
         <div class="vb" id="bGrid">Сетка 100 мм</div>
         <div class="vb" id="bParts" style="display:none">Детали</div>
+        <div class="vb" id="bShown" style="display:none" title="Вернуть скрытые узлы (Shift+H)">👁 Скрытые</div>
         <div class="vb" id="bHide" title="Наведи на крышу, боковину или дверку — клик её скроет. Клавиша H гасит то, что под курсором, Shift+H возвращает все">👁 Скрыть панель</div>
         <div class="vb" id="bPorts" title="Подписи патрубков: выкл · у выделенной · у всех">Патрубки</div>
         <div class="vb" id="bRl" title="Показывать свободные патрубки: метка «+» — жми и выбирай, что на него поставить">Присоединения</div>
@@ -1205,7 +1207,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <span><i style="background:#6cb4ec"></i>всасывание, выход</span>
         <span><i style="background:#d9b64a"></i>ППК</span>
         <span><i style="background:#6fd3a5"></i>уравнивание</span></div>
-      <div id="hint" class="min"><b>? как управлять</b><div class="hb">ЛКМ по фону — вращение · деталь — тащи мышью<br>Alt+ЛКМ — вращать поверх детали · Shift+ЛКМ/средняя — панорама<br>два пальца — приближение и панорама · колесо — плавный зум к курсору<br>корпус сквозной — за панелью берётся деталь; по пустой панели — сам корпус (тащится вторым нажатием)<br>ПКМ по детали — меню · по фону — панорама (протяни)<br>PgUp/PgDn — выше/ниже · Del — убрать<br>G — точные координаты и углы (шаг 1 мм / 1°)<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>H — скрыть панель под курсором (крыша, боковина, дверка) · Shift+H — вернуть все<br>кнопка «👁 Скрыть панель» — то же мышью и пальцем: наводишь и жмёшь<br>метка «+» на патрубке — свободное присоединение: жми и выбирай, что поставить<br>оттуда же «⇄ протянуть трубу» — ткни во второй патрубок, трасса ляжет по осям</div></div>
+      <div id="hint" class="min"><b>? как управлять</b><div class="hb">ЛКМ по фону — вращение · деталь — тащи мышью<br>Alt+ЛКМ — вращать поверх детали · Shift+ЛКМ/средняя — панорама<br>два пальца — приближение и панорама · колесо — плавный зум к курсору<br>корпус сквозной — за панелью берётся деталь; по пустой панели — сам корпус (тащится вторым нажатием)<br>ПКМ по детали — меню · по фону — панорама (протяни)<br>PgUp/PgDn — выше/ниже · Del — убрать<br>G — точные координаты и углы (шаг 1 мм / 1°)<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>H — скрыть панель под курсором (крыша, боковина, дверка) · Shift+H — вернуть всё скрытое<br>ПКМ по детали → «🚫 Скрыть узел» — убрать её с вида целиком (останется в проекте и в спецификации)<br>кнопка «👁 Скрыть панель» — то же мышью и пальцем: наводишь и жмёшь<br>метка «+» на патрубке — свободное присоединение: жми и выбирай, что поставить<br>оттуда же «⇄ протянуть трубу» — ткни во второй патрубок, трасса ляжет по осям</div></div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="schz"><b data-sz="1" title="Крупнее">+</b><b data-sz="-1" title="Мельче">−</b><b data-sz="0" title="Во всю ширину">↺</b></div>
       <div id="swrap">
@@ -1892,7 +1894,7 @@ let FRMTHRU=(()=>{try{return localStorage.getItem(FRM_KEY)!=='0';}catch(e){retur
 let pickPt=null;
 function pickItem(e,any){
   toNDC(e);ray.setFromCamera(ndc,camera);
-  const hits=ray.intersectObjects(placed.map(p=>p.obj));
+  const hits=ray.intersectObjects(placed.filter(p=>!p.hid).map(p=>p.obj));
   /* v2.45.1002: погашённая деталь узла курсор не ловит — её и гасят затем,
      чтобы дотянуться до того, что за ней (луч сквозь невидимую панель) */
   const list=[],pts=new Map();
@@ -1921,11 +1923,41 @@ let curXY=null;               // где курсор — по нему рабо�
 let HLP=null;                 // подсвеченная деталь: {mat, em, ei}
 let ctxPart=null;             // деталь под правой кнопкой — для меню
 
+/* ═══ v2.46.065: скрыть узел целиком ═══
+   «Скрыть эту деталь» гасит панель внутри сборного корпуса, а целый узел
+   (конденсатор, бак, щит) убрать с глаз было нечем — только удалять из
+   проекта. Теперь ПКМ по любой детали даёт «Скрыть узел»: он пропадает из
+   вида и перестаёт ловить мышь, но остаётся в проекте, в спецификации и в
+   расчётах. Возврат — «Показать скрытые», Shift+H или строка спецификации. */
+function hidItem(it,on){
+  if(!it)return;
+  it.hid=!!on;
+  it.obj.visible=!on;
+  if(it._pinBox)it._pinBox.visible=!on;
+  (it._bolts||[]).forEach(b=>{if(b)b.visible=!on;});
+  if(on&&sel===it)select(null);
+}
+const hidList=()=>placed.filter(p=>p.hid);
+function hidAllShow(){
+  const n=hidList().length;
+  if(!n){toast('Скрытых узлов нет');return;}
+  pushHist('показ скрытых узлов');
+  placed.forEach(p=>{if(p.hid)hidItem(p,false);});
+  refresh();save();
+  toast('Показаны скрытые узлы: '+n);
+}
+function hidOne(it){
+  if(!it)return;
+  pushHist('скрытие узла');
+  hidItem(it,true);
+  refresh();save();
+  toast('«'+it.d.name+'» скрыт — вернуть: кнопка «👁 Скрытые» или Shift+H');
+}
 /* Первая непогашенная деталь сборки под курсором. */
 function partPick(e){
   if(!e)return null;
   toNDC(e);ray.setFromCamera(ndc,camera);
-  const hits=ray.intersectObjects(placed.map(p=>p.obj));
+  const hits=ray.intersectObjects(placed.filter(p=>!p.hid).map(p=>p.obj));
   for(let k=0;k<hits.length;k++){
     const x=hits[k],it=placed.find(q=>q.obj===x.object);
     if(!it)continue;
@@ -1989,11 +2021,13 @@ function hideAt(e){
 }
 /* Вернуть всё погашенное во всей сцене. */
 function showAllHidden(){
-  const list=placed.filter(p=>(p.off||[]).length);
-  if(!list.length){toast('Ничего не скрыто');return;}
+  const list=placed.filter(p=>(p.off||[]).length),hid=placed.filter(p=>p.hid);
+  if(!list.length&&!hid.length){toast('Ничего не скрыто');return;}
   pushHist('показ скрытых деталей');
   list.forEach(p=>{p.off=[];applyOff(p);});
-  buildParts();save();toast('Скрытые детали вернулись');
+  hid.forEach(p=>hidItem(p,false));            // v2.46.065: и узлы целиком
+  buildParts();refresh();save();
+  toast('Скрытое вернулось'+(hid.length?(' · узлов: '+hid.length):''));
 }
 function hideMode(on){
   HIDEM=(on===undefined)?!HIDEM:!!on;
@@ -2637,6 +2671,7 @@ async function addItem(d,at,rot,tilt,roll){
     it.off=Array.isArray(at.state.off)?at.state.off.slice():[];
     it.fit=at.state.fit||null;                     // v2.46.021: пара авто-длины трубы
     it.po=at.state.po?JSON.parse(JSON.stringify(at.state.po)):null;
+    if(at.state.hid)hidItem(it,true);
     applyOff(it);pinMark(it);
   }
   /* v2.46.033: у бака врезки — деталь проекта: разметку делаем его личной
@@ -3815,6 +3850,9 @@ function ctxItems(it){
   if(ctxPart&&ctxPart.it===it)
     L.push({ic:'👁',t:'Скрыть эту деталь',s:partLabel(ctxPart.p),
       go:(h=>()=>hidePart(h))(ctxPart)});
+  L.push({ic:'🚫',t:'Скрыть узел',s:'целиком',go:(x=>()=>hidOne(x))(it)});
+  if(hidList().length)
+    L.push({ic:'👁',t:'Показать скрытые узлы',s:hidList().length+' шт.',go:hidAllShow});
   if((it.off||[]).length)
     L.push({ic:'◉',t:'Показать скрытые',s:(it.off||[]).length+' шт.',
       go:()=>{pushHist('показ деталей узла');it.off=[];applyOff(it);
@@ -3993,6 +4031,7 @@ const HINT_KEY='atomus_chiller_hint';
     try{localStorage.setItem(HINT_KEY,min?'0':'1');}catch(e){}
   };
 })();
+$('#bShown').onclick=hidAllShow;
 $('#bHide').onclick=()=>hideMode();
 $('#bParts').onclick=()=>{
   const on=!$('#partsBox').classList.contains('on');
@@ -7224,8 +7263,11 @@ function refresh(){
   const supBy=new Map();
   Object.keys(schemaData||{}).forEach(k=>{const a=schemaData[k];
     if(a&&a.id&&a.sup&&a.sup!=='ag')supBy.set(a.id,a.sup);});
+  const hidIds=new Set(placed.filter(p=>p.hid).map(p=>p.id));
   const srow=r=>
-    `<div class="sr" data-id="${r.d.id}"><span class="nm">${r.d.brand} ${r.d.name}`+
+    `<div class="sr${hidIds.has(r.d.id)?' hid':''}" data-id="${r.d.id}"`+
+    (hidIds.has(r.d.id)?' title="Узел скрыт с вида — клик вернёт"':'')+
+    `><span class="nm">${hidIds.has(r.d.id)?'👁 ':''}${r.d.brand} ${r.d.name}`+
     (r.mm&&r.n>1?` · ${r.n} отр.`:'')+`</span>`+
     (r.mm?`<span class="n">${(r.mm/1000).toFixed(2).replace('.',',')}</span><span class="u">м</span>`
          :`<span class="n">${r.n}</span><span class="u">шт</span>`)+`</div>`;
@@ -7264,8 +7306,17 @@ function refresh(){
     `<span class="nm">⚠ ${esc(p.d.name)} · нужна разметка отверстий</span>`+
     `<span class="n">0</span><span class="u">креп.</span></div>`).join('');
   $('#spec').querySelectorAll('.sr[data-id]').forEach(row=>row.onclick=()=>{
+    /* скрытый узел строкой спецификации и возвращается: иначе до него никак */
+    const back=placed.filter(p=>p.id===row.dataset.id&&p.hid);
+    if(back.length){pushHist('показ узла');back.forEach(p=>hidItem(p,false));
+      refresh();save();select(back[0]);toast('«'+back[0].d.name+'» снова виден');return;}
     const it=placed.find(p=>p.id===row.dataset.id&&p!==sel)||placed.find(p=>p.id===row.dataset.id);
     if(it)select(it);});
+  /* v2.46.065: скрытые узлы — счётчик в панели вида и пометка в спецификации */
+  {const bs=$('#bShown');
+   if(bs){const n=hidList().length;
+     bs.style.display=n?'':'none';
+     bs.textContent='👁 Скрытые '+(n||'');}}
   $('#hCnt').textContent=placed.length+' '+plural(placed.length);
   {const mc=$('#mbCnt');if(mc)mc.textContent=placed.length||'';}
   $('#fCnt').textContent=placed.length+' '+plural(placed.length)+' · '+rows.length+' наим.';
@@ -7326,6 +7377,7 @@ function projPayload(){
                                 pl:isPipeSeg(p)?pipeLen(p):undefined,
                                 fit:p.fit?{to:p.fit.to,zi:p.fit.zi}:undefined,
                                 sch:p.sch||undefined,   // v2.46.017: позиция схемы
+                                hid:p.hid?1:0,          // v2.46.065: узел скрыт с вида
                                 off:(p.off&&p.off.length)?p.off:undefined})),
           schema:schemaData};
 }
@@ -7413,6 +7465,7 @@ async function histApply(snapshot){
       if(it.pl&&isPipeSeg(p))setPipeLen(p,it.pl);      // длина отрезка тоже в снимке
       p.off=Array.isArray(it.off)?it.off.slice():[];
       p.po=it.po?JSON.parse(JSON.stringify(it.po)):null;
+      hidItem(p,!!it.hid);
       applyOff(p);pinMark(p);
     }
     placed.forEach(p=>{if(p.link&&p.link.mount==='face')faceMate(p);});
@@ -7458,7 +7511,8 @@ async function loadProjectData(data){
     if(!d)continue;
     // z, наклона и закрепления в старых проектах нет — там деталь просто стоит на полу
     const it=await addItem(d,{x:s.x,y:s.y,z:s.z,
-      state:{pin:s.pin,off:s.off,link:s.link,pl:s.pl,sch:s.sch,fit:s.fit,po:s.po}},s.r,s.t,s.k);
+      state:{pin:s.pin,off:s.off,link:s.link,pl:s.pl,sch:s.sch,fit:s.fit,po:s.po,
+             hid:s.hid}},s.r,s.t,s.k);
     if(it&&d._user&&s.s){it.obj.scale.setScalar(Math.max(.0001,+s.s));it.obj.updateMatrixWorld(true);}
     if(tankStand(it))toast('Бак стоял вверх дном — поставил его на дно');
     if(it&&s.uid)map[s.uid]=it.uid;
