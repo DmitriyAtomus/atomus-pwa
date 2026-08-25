@@ -35,6 +35,20 @@ header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px
 /* ═══ навигация каталога: drill-down вместо этажей чипов (v2.46.062) ═══
    Дом — крупные строки разделов; внутри раздела — шапка «‹ назад»,
    подразделы и бренды одной прокручиваемой строкой. */
+/* ═══ предпросмотр характеристик у каталога (v2.46.063) ═══
+   Навёл на строку (или идёшь стрелками) — рядом с панелью карточка с превью
+   и характеристиками; «+ в сцену» ставит не закрывая, «Подробнее» — модалка. */
+#cprev{position:fixed;width:348px;max-height:min(600px,82vh);z-index:14;display:none;
+  flex-direction:column;background:var(--panel);border:1px solid var(--line2);
+  border-radius:12px;box-shadow:0 16px 44px rgba(0,0,0,.55)}
+#cprev.on{display:flex}
+#cprev .cp-h{padding:11px 14px 0;font-weight:700;font-size:13px;line-height:1.35}
+#cprev .cp-b{flex:1;overflow-y:auto;padding:2px 14px 10px;min-height:0}
+#cprev .cp-a{display:flex;gap:8px;padding:9px 14px;border-top:1px solid var(--line)}
+#cprev .cp-a .btn{flex:1;text-align:center;font-size:12px;padding:7px 10px;border-radius:8px;
+  border:1px solid var(--line2);cursor:pointer;color:var(--ink);background:var(--panel2)}
+#cprev .cp-a .btn.pri{background:rgba(27,159,216,.16);border-color:var(--ice2);color:var(--ice)}
+#cprev .cp-a .btn:hover{border-color:var(--ice)}
 #nav{display:flex;flex-direction:column;gap:7px;padding:0 10px 8px}
 #nav:empty{display:none}
 .rc-lab{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
@@ -1146,6 +1160,9 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         placeholder="название, артикул, R404A, 1/2&quot;…" autocomplete="off"><span class="qx" id="qClr" title="Очистить · Esc">✕</span></div>
       <div id="nav"></div>
       <div id="cat"></div>
+      <div id="cprev"><div class="cp-h" id="cprevT"></div><div class="cp-b" id="cprevB"></div>
+        <div class="cp-a"><div class="btn pri" id="cprevAdd">+ В сцену</div>
+        <div class="btn" id="cprevMore">Подробнее</div></div></div>
       <div class="note">Клик или «+» — деталь встаёт на своё место по функции: компрессор на пол,
         арматура на средний ярус, конденсатор на крышу. Дальше её можно двигать руками.<br>
         «/» — поиск · ↑↓ — выбор · Enter — поставить.</div>
@@ -7954,7 +7971,11 @@ function descHtml(d,thumb){
   const has=k=>sp.some(r=>r[0]===k);
   if(sp.length)h+='<div class="mdz-h">Характеристики</div><table class="mdz-t">'+rows(sp)+'</table>';
   const mnt=[];
-  if(g.conn&&g.conn!==d.kind&&!has('Присоединения'))mnt.push(['Присоединения',g.conn]);
+  /* «Присоединения» бывают и в характеристиках, и в строках модели — в
+     карточке они стояли двумя строками подряд, дублируя друг друга */
+  const hasRow=k=>(g.rows||[]).some(r=>String(r[0])===k);
+  if(g.conn&&g.conn!==d.kind&&!has('Присоединения')&&!hasRow('Присоединения'))
+    mnt.push(['Присоединения',g.conn]);
   if((g.ports||[]).length)mnt.push(['Патрубки',g.ports.join(', ')]);
   if(g.bolt&&(g.bolt[0]||g.bolt[1])&&!(g.rows||[]).some(r=>/^Пятно/.test(r[0])))
     mnt.push(['Пятно крепления',g.bolt[0]+' × '+g.bolt[1]+' мм']);
@@ -8037,6 +8058,58 @@ function bindInfo(box,acts){
     if(d)openDesc(d,acts(d));
   });
 }
+/* ═══ предпросмотр характеристик у каталога ═══
+   Модалка ⓘ закрывает сцену и каталог — листать и сравнивать неудобно.
+   Навёл на строку (или ↑↓) — карточка характеристик появляется рядом с
+   панелью и обновляется на лету. Контент — тот же descHtml, что в модалке. */
+let cpTimer=null,cpHideTm=null,cpFor=null;
+const cprevOk=()=>innerWidth>=960&&!document.body.classList.contains('mob');
+function cprevShow(d,rowEl){
+  if(!cprevOk()||!d)return;
+  clearTimeout(cpHideTm);
+  const box=$('#cprev');
+  cpFor=d.id;
+  $('#cprevT').textContent=(d.brand?d.brand+' ':'')+d.name;
+  $('#cprevB').innerHTML=descHtml(d,GEOMS[d.g]&&!GEOMS[d.g].user&&GEOMS[d.g].f);
+  $('#cprevB').scrollTop=0;
+  const pr=$('#cat').getBoundingClientRect();
+  box.style.left=Math.round(pr.right+8)+'px';
+  box.classList.add('on');
+  let t=rowEl?rowEl.getBoundingClientRect().top-6:pr.top;
+  t=Math.max(10,Math.min(t,innerHeight-box.offsetHeight-12));
+  box.style.top=Math.round(t)+'px';
+  fillThumbsIn('#cprev');
+}
+function cprevHide(){clearTimeout(cpTimer);$('#cprev').classList.remove('on');cpFor=null;}
+function cprevSoon(){clearTimeout(cpHideTm);cpHideTm=setTimeout(cprevHide,220);}
+(function cprevBind(){
+  const cat=$('#cat'),box=$('#cprev');
+  if(!cat||!box)return;
+  cat.addEventListener('mouseover',e=>{
+    if(!cprevOk())return;
+    const row=e.target.closest('.ci');
+    if(!row)return;
+    clearTimeout(cpTimer);clearTimeout(cpHideTm);
+    const d=DATA.find(x=>x.id===row.dataset.id);
+    if(!d)return;
+    if(cpFor)cprevShow(d,row);                 // уже открыт — обновляем сразу
+    else cpTimer=setTimeout(()=>cprevShow(d,row),240);
+  });
+  cat.addEventListener('mouseleave',()=>{clearTimeout(cpTimer);cprevSoon();});
+  cat.addEventListener('scroll',cprevHide,{passive:true});
+  box.addEventListener('mouseenter',()=>clearTimeout(cpHideTm));
+  box.addEventListener('mouseleave',cprevSoon);
+  addEventListener('keydown',e=>{if(e.key==='Escape')cprevHide();});
+  $('#cprevAdd').onclick=()=>{
+    const d=DATA.find(x=>x.id===cpFor);
+    if(d)catPick(d);
+  };
+  $('#cprevMore').onclick=()=>{
+    const d=DATA.find(x=>x.id===cpFor);
+    cprevHide();
+    if(d)openDesc(d,[{t:'+ Добавить в сцену',pri:true,go:()=>catPick(d)}]);
+  };
+})();
 
 let asgKey=null;
 /* ═══ подбор модели — конвейер по узлам (v2.45.1018) ═══
@@ -9413,6 +9486,9 @@ function catMove(k){
   catHi=catHi<0?(k>0?0:rows.length-1):Math.max(0,Math.min(rows.length-1,catHi+k));
   rows.forEach((el,i)=>el.classList.toggle('hi',i===catHi));
   rows[catHi].scrollIntoView({block:'nearest'});
+  /* стрелками листаем и характеристики: панель идёт за выделением */
+  const d=DATA.find(x=>x.id===rows[catHi].dataset.id);
+  if(d)cprevShow(d,rows[catHi]);
 }
 $('#q').addEventListener('keydown',e=>{
   if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();catMove(e.key==='ArrowDown'?1:-1);return;}
