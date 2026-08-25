@@ -1389,7 +1389,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <button id="bTankEd" style="display:none"
                 title="Пересчитать бак: размеры, лист, патрубки">✎ Размеры бака</button>
         <button id="bTankLink" style="display:none"
-                title="Поставить бак в свободное место внутри корпуса и жёстко связать с чиллером">⛓ Закрепить бак внутри</button>
+                title="Поставить бак внутрь корпуса и связать с чиллером — поедет вместе с ним">⛓ Встроить бак</button>
         <button id="bPos" title="Точные координаты и углы (G)">⌖ Координаты</button>
         <button id="bSwap" style="display:none" title="Поставить на этот патрубок другую деталь">⇄ Заменить</button>
         <button id="bRot" title="Повернуть вокруг вертикали (R)">⟳ 90°</button>
@@ -3499,65 +3499,185 @@ function tankZone(fr){
   return new THREE.Box3(new THREE.Vector3(s.min.x+WALL,s.min.y+WALL,s.min.z),
                         new THREE.Vector3(s.max.x-WALL,s.max.y-WALL,top));
 }
-/* Ищем ближайшее свободное место в полости. Сначала — текущий разворот,
-   затем 90°: длинный бак часто входит в корпус только поперёк. Пробы
-   временные: история, BOM и save их не видят. */
+/* v2.46.076: металл корпуса под баком проверяем по мешу, а не по габариту.
+   Габаритом это не решается: в пользовательских корпусах вся мелочёвка
+   (242 болта и уголка) приходит одной группой, и её коробка накрывает весь
+   корпус — frameFree честно отвечает «занято» в любой точке полости, поэтому
+   «Закрепить бак внутри» и не срабатывало никогда. */
+const TFIT_JUNK=/крепёж|крепеж|болт|винт|гайк|шайб|саморез|заклёп|заклеп|мелоч/i;
+function tankFrameHit(it,fr,box){
+  const boxes=framePartBoxes(fr);if(!boxes)return [];
+  const PT=fr.obj.geometry.userData.parts;
+  const ms=Array.isArray(fr.obj.material)?fr.obj.material:[fr.obj.material];
+  const b=box.clone().expandByScalar(-HIT_TOL),who=[];
+  if(b.isEmpty())return who;
+  boxes.forEach((fb,i)=>{
+    if(ms[i]&&ms[i].visible===false)return;
+    const nm=(PT[i]&&PT[i].name)||'деталь корпуса';
+    /* головку болта под баком в цеху переставляют, место из-за неё не бракуем:
+       в пользовательских корпусах крепёж приходит одной группой на всю машину
+       и торчит в полость повсюду */
+    if(TFIT_JUNK.test(nm))return;
+    if(seatPart(it,nm)||!fb.intersectsBox(b))return;
+    const T=framePartTris(fr,i);
+    if(!T){who.push(nm);return;}                 // треугольников нет — верим коробке
+    const t=T.b;
+    for(let k=0,o=0;k<T.n;k++,o+=6)
+      if(t[o]<b.max.x&&t[o+3]>b.min.x&&t[o+1]<b.max.y&&t[o+4]>b.min.y&&
+         t[o+2]<b.max.z&&t[o+5]>b.min.z){who.push(nm);return;}
+  });
+  return who;
+}
+/* Ищем место для бака в полости. Сначала — текущий разворот, затем 90°:
+   длинный бак часто входит в корпус только поперёк. Пробы временные: история,
+   BOM и save их не видят.
+   v2.46.076: место ищем в два прохода. Грубый — коробками: чем меньше бак
+   лезет в соседние узлы и в металл, тем лучше место. Точный — мешом, и только
+   для полутора десятка лучших: перебирать сотню проб по треугольникам долго.
+   Если чистого места нет (в собранном чиллере его почти никогда нет — дно
+   занято насосами), отдаём лучшее из занятых: бак всё равно встаёт внутрь, а
+   что ему мешает — говорим прямо, плашкой «не входит» и разбором Клода. */
 function tankInsidePlan(it,fr){
   const op=it.obj.position.clone(),or=it.obj.rotation.clone(),zone=tankZone(fr),fz=floorZ(fr);
   const zc=new THREE.Vector3();zone.getCenter(zc);
   const rz0=Math.round(or.z/(Math.PI/2))*(Math.PI/2),rots=[rz0,rz0+Math.PI/2];
-  let found=null;
+  /* соседние узлы — те же коробки, что видит boxFree */
+  const others=placed.filter(p=>p!==it&&!NOCOLL.has(roleOf(p.d)));
+  const oboxes=others.map(p=>new THREE.Box3().setFromObject(p.obj).expandByScalar(-6));
+  /* металл корпуса грубым ситом: сборные группы, чья коробка накрывает больше
+     половины полости, тут не считаем — их разбирает меш */
+  const zs0=zone.getSize(new THREE.Vector3()),zv=zs0.x*zs0.y*zs0.z;
+  const fparts=[],fb0=framePartBoxes(fr)||[];
+  const FPT=fr.obj.geometry.userData.parts||[];
+  const fms=Array.isArray(fr.obj.material)?fr.obj.material:[fr.obj.material];
+  fb0.forEach((fb,i)=>{
+    if(fms[i]&&fms[i].visible===false)return;
+    const s=fb.getSize(new THREE.Vector3());
+    const nm=(FPT[i]&&FPT[i].name)||'деталь корпуса';
+    if(s.x*s.y*s.z>zv*.5||TFIT_JUNK.test(nm))return;
+    fparts.push({b:fb,nm:nm});
+  });
+  const cross=(b,ob)=>{
+    const x=Math.min(b.max.x,ob.max.x)-Math.max(b.min.x,ob.min.x);
+    const y=Math.min(b.max.y,ob.max.y)-Math.max(b.min.y,ob.min.y);
+    const z=Math.min(b.max.z,ob.max.z)-Math.max(b.min.z,ob.min.z);
+    return (x>0&&y>0&&z>0)?x*y*z:0;
+  };
+  const cands=[];
+  let fits=false;
   for(const rz of rots){
     it.obj.rotation.set(0,0,rz);it.obj.position.set(0,0,0);it.obj.updateMatrixWorld(true);
     const b0=new THREE.Box3().setFromObject(it.obj),sz=b0.getSize(new THREE.Vector3());
     if(sz.x>zone.max.x-zone.min.x+1||sz.y>zone.max.y-zone.min.y+1||
        sz.z>zone.max.z-fz+1)continue;
-    const cand=[];
+    fits=true;                       // по габариту бак в полость входит
+    const grid=[];
     for(let x=zone.min.x+sz.x/2;x<=zone.max.x-sz.x/2+1;x+=40)
       for(let y=zone.min.y+sz.y/2;y<=zone.max.y-sz.y/2+1;y+=40)
-        cand.push([x,y,(x-zc.x)*(x-zc.x)+(y-zc.y)*(y-zc.y)]);
-    cand.push([zc.x,zc.y,-1]);cand.sort((a,b)=>a[2]-b[2]);
-    for(const c of cand){
+        grid.push([x,y,(x-zc.x)*(x-zc.x)+(y-zc.y)*(y-zc.y)]);
+    grid.push([zc.x,zc.y,0]);
+    for(const c of grid){
       const b=placeAt(it,c[0],c[1],fz,rz,0);
       if(b.min.x<zone.min.x-1||b.max.x>zone.max.x+1||
          b.min.y<zone.min.y-1||b.max.y>zone.max.y+1||b.max.z>zone.max.z+1)continue;
-      if(boxFree(b,it)&&frameFree(b,it)){
-        found={p:it.obj.position.clone(),r:it.obj.rotation.clone()};break;
-      }
+      let v=0;const who=[];
+      oboxes.forEach((ob,i)=>{const q=cross(b,ob);if(q){v+=q;who.push(hitCut(others[i].d.name));}});
+      let fv=0;const fwho=[];
+      fparts.forEach(f=>{if(seatPart(it,f.nm))return;
+        const q=cross(b,f.b);if(q){fv+=q;fwho.push(f.nm);}});
+      cands.push({pen:v+fv*4+c[2]*.05,p:it.obj.position.clone(),r:it.obj.rotation.clone(),
+                  who:who.concat(fwho)});
     }
-    if(found)break;
+  }
+  cands.sort((x,y)=>x.pen-y.pen);
+  /* точная проверка металла — у лучших мест по грубому счёту */
+  let best=null,clean=null;
+  for(const c of cands.slice(0,24)){
+    it.obj.position.copy(c.p);it.obj.rotation.copy(c.r);it.obj.updateMatrixWorld(true);
+    const bx=new THREE.Box3().setFromObject(it.obj);
+    c.who=c.who.concat(tankFrameHit(it,fr,bx));
+    if(!best)best=c;
+    if(!c.who.length){clean=c;break;}
   }
   it.obj.position.copy(op);it.obj.rotation.copy(or);it.obj.updateMatrixWorld(true);
-  return found;
+  const r=clean||best;
+  return r?{p:r.p,r:r.r,who:[...new Set(r.who)]}:null;
 }
-function tankLinkSel(){
-  /* v2.46.033: то же и для готового бака из базы — крепим внутрь корпуса
-     любой бак, а не только тот, что собран конструктором */
-  if(!sel||!isTankAny(sel.d))return;
-  if(sel.link&&sel.link.mount==='tank'){
-    pushHist('открепление бака от чиллера');
-    sel.link=null;selBtns();refresh();save();
-    toast('Бак откреплён от чиллера — теперь его можно двигать отдельно');return;
+/* v2.46.076: место снаружи — куда бак выходит после «разъединить». Обходим
+   корпус с четырёх сторон и встаём на первое свободное место у стенки: бак
+   должен остаться на виду и не влезть в другую деталь. */
+function tankOutsideSpot(it,fr){
+  const s=new THREE.Box3().setFromObject(fr.obj),c=s.getCenter(new THREE.Vector3());
+  const op=it.obj.position.clone(),GAP=200,fz=site().min.z;
+  const b0=new THREE.Box3().setFromObject(it.obj),sz=b0.getSize(new THREE.Vector3());
+  const rz=it.obj.rotation.z,tl=it.obj.rotation.y;
+  const spots=[[c.x,s.min.y-GAP-sz.y/2],[s.max.x+GAP+sz.x/2,c.y],
+               [c.x,s.max.y+GAP+sz.y/2],[s.min.x-GAP-sz.x/2,c.y]];
+  let best=null;
+  for(const sp of spots){
+    const b=placeAt(it,sp[0],sp[1],fz,rz,tl);
+    const p=it.obj.position.clone();
+    if(!best)best=p;
+    if(boxFree(b,it)&&frameFree(b,it)){best=p;break;}
   }
-  const fr=frameFor(sel);
+  it.obj.position.copy(op);it.obj.updateMatrixWorld(true);
+  return best;
+}
+/* ═══ бак: встроить в чиллер / разъединить ═══
+   Встроенный бак — часть машины: стоит на дне корпуса, едет и крутится вместе
+   с ним (полный относительный transform в link.rel). Разъединённый — выносной:
+   отдельная позиция рядом с чиллером, двигается сама по себе. */
+function tankBuildIn(it){
+  it=it||sel;
+  if(!it||!isTankAny(it.d))return;
+  const fr=frameFor(it);
   if(!fr){toast('В сцене нет корпуса — сначала добавь чиллер');return;}
-  const plan=tankInsidePlan(sel,fr);
+  const plan=tankInsidePlan(it,fr);
   if(!plan){
-    const tb=new THREE.Box3().setFromObject(sel.obj).getSize(new THREE.Vector3());
+    const tb=new THREE.Box3().setFromObject(it.obj).getSize(new THREE.Vector3());
     const z=tankZone(fr),zs=z.getSize(new THREE.Vector3());
     toast('Бак '+Math.round(tb.x)+'×'+Math.round(tb.y)+'×'+Math.round(tb.z)+
-      ' мм не входит в свободную полость '+Math.round(zs.x)+'×'+Math.round(zs.y)+'×'+
-      Math.round(z.max.z-floorZ(fr))+' мм — уменьши бак или освободи место');return;
+      ' мм больше полости '+Math.round(zs.x)+'×'+Math.round(zs.y)+'×'+
+      Math.round(z.max.z-floorZ(fr))+' мм — уменьши бак или возьми корпус крупнее');return;
   }
-  pushHist('закрепление бака внутри чиллера');
-  const p0=sel.obj.position.clone();
-  sel.obj.rotation.copy(plan.r);sel.obj.updateMatrixWorld(true);
-  moveItem(sel,plan.p.x-p0.x,plan.p.y-p0.y,plan.p.z-p0.z);
-  sel.link={to:fr.uid,mount:'tank',face:'pan'};
-  sel.link.rel=tankRelOf(sel,fr);
-  selBtns();checkCollisions();showSelZ();refresh();save();
-  toast('Бак поставлен в свободное место внутри и закреплён на чиллере — '+
-    'при перемещении корпуса он поедет вместе с ним');
+  pushHist('бак встроен в чиллер');
+  const p0=it.obj.position.clone();
+  it.obj.rotation.copy(plan.r);it.obj.updateMatrixWorld(true);
+  moveItem(it,plan.p.x-p0.x,plan.p.y-p0.y,plan.p.z-p0.z);
+  it.link={to:fr.uid,mount:'tank',face:'pan'};
+  it.link.rel=tankRelOf(it,fr);
+  if(it===sel)selBtns();
+  checkCollisions();showSelZ();refresh();save();
+  const who=plan.who||[];
+  if(who.length){
+    toast('Бак встроен в корпус и поедет вместе с ним, но на этом месте стоят: '+
+      who.slice(0,3).join(', ')+(who.length>3?' и ещё '+(who.length-3):'')+
+      ' — подвинь их или сам бак');
+    select(it);fitAuto(it);
+  }else{
+    toast('Бак встроен: стоит на дне корпуса и едет вместе с чиллером · '+
+      '«Разъединить» вынет его наружу');
+  }
+}
+function tankDetach(it){
+  it=it||sel;
+  if(!it||!isTankAny(it.d))return;
+  const fr=frameFor(it);
+  pushHist('бак разъединён с чиллером');
+  it.link=null;
+  if(fr){
+    const p=tankOutsideSpot(it,fr),p0=it.obj.position.clone();
+    moveItem(it,p.x-p0.x,p.y-p0.y,p.z-p0.z);
+  }
+  if(it===sel)selBtns();
+  checkCollisions();showSelZ();refresh();save();
+  toast(fr?'Бак разъединён и вынесен из корпуса — стоит рядом, двигается отдельно'
+         :'Бак разъединён с чиллером — двигается отдельно');
+}
+const tankBuiltIn=it=>!!(it&&it.link&&it.link.mount==='tank');
+function tankLinkSel(){
+  if(!sel||!isTankAny(sel.d))return;
+  tankBuiltIn(sel)?tankDetach(sel):tankBuildIn(sel);
 }
 /* ═══ v2.46.033: штуцера бака ставит проект ═══
    Врезка в баке — не заводская данность: отверстие режем мы сами, и место
@@ -4069,10 +4189,11 @@ function ctxItems(it){
     L.push({ic:'✎',t:'Размеры бака…',s:Math.round(tkCalc(it.d.tk).Vw)+' л',
       go:()=>{select(it);tkOpen(it);}});
   if(isTankAny(it.d)){
-    L.push({ic:'⛓',t:it.link&&it.link.mount==='tank'
-      ?'Открепить бак от чиллера':'Закрепить бак внутри чиллера',
-      s:it.link&&it.link.mount==='tank'?'связь с корпусом':'автопоиск места',
-      go:()=>{select(it);tankLinkSel();}});
+    L.push(tankBuiltIn(it)
+      ?{ic:'⛔',t:'Разъединить с чиллером',s:'вынести бак наружу',
+        go:()=>{select(it);tankDetach(it);}}
+      :{ic:'⛓',t:'Встроить бак в чиллер',s:'внутрь корпуса, автопоиск места',
+        go:()=>{select(it);tankBuildIn(it);}});
     if(it.po&&Object.keys(it.po).some(k=>it.po[k]&&it.po[k].p0))
       L.push({ic:'↺',t:'Врезки — на штатные места',s:'как в модели базы',
         go:()=>{select(it);tankPortsReset(it);}});
@@ -4276,7 +4397,10 @@ function selBtns(){
   $('#bTankEd').style.display=(sel&&isTank(sel.d))?'':'none';
   const tank=!!(sel&&isTankAny(sel.d)),tankLinked=tank&&sel.link&&sel.link.mount==='tank';
   $('#bTankLink').style.display=tank?'':'none';
-  $('#bTankLink').textContent=tankLinked?'⛓ Открепить бак':'⛓ Закрепить бак внутри';
+  $('#bTankLink').textContent=tankLinked?'⛔ Разъединить':'⛓ Встроить бак';
+  $('#bTankLink').title=tankLinked
+    ?'Вынуть бак из чиллера: встанет рядом с корпусом и будет двигаться отдельно'
+    :'Поставить бак внутрь корпуса и связать с чиллером — поедет вместе с ним';
   $('#bTankLink').classList.toggle('on',!!tankLinked);
   if(roof)$('#bRoof').textContent=rr==='cond'?'⌂ Под крышку · болты М6':'⌂ В крышу · болты М6';
 }
@@ -4613,6 +4737,11 @@ function seatPart(it,nm){
   /* v2.46.011: прибор врезан в панель — лист обшивки ему не упор, а посадка.
      Стойки и балки в этот список не входят: в них прибор попасть не должен. */
   if(it.link&&it.link.mount==='face'&&/панел|дверк|обшив/i.test(nm))return true;
+  /* v2.46.076: бак стоит на дне корпуса, а штуцеры забора и слива врезаны в
+     его днище и уходят ниже опорной кромки — в настиле под них вырез. Лист
+     дна и донные балки баку не упор, а опора: иначе любое место внутри
+     корпуса считалось бы занятым. */
+  if(isTankAny(it.d)&&/дно|поддон|настил|балк|лист дна/i.test(nm))return true;
   const r=roleOf(it.d);
   /* v2.46.015: конденсатор висит под крышкой соосно проёму, и крыльчатка
      штатного вентилятора корпуса уходит в его диффузор — это посадка */
