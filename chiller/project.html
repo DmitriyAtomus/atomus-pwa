@@ -1274,7 +1274,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <div class="t t2">Сверху, на крышку:</div>
         <div class="o" data-m="bolt8" data-f="cap">Болты М8 <small>· по штатным отверстиям, к крышке</small></div>
         <div class="o" data-m="bolt10" data-f="cap">Болты М10 <small>· по штатным отверстиям, к крышке</small></div>
-        <div class="o" data-m="ang6" data-f="cap">Уголки М6 <small>· 4 шт, конденсатор под крышку</small></div>
+        <div class="o" data-m="cap6" data-f="cap">Болты М6 под крышку <small>· 4 шт, конденсатор под крышкой</small></div>
         <div class="o" data-m="bolt6" data-f="cap">Болты М6 <small>· по штатным отверстиям, вентилятор в крышку</small></div>
         <div class="o" data-m="weld" data-f="cap">Сварка <small>· приварить к крышке</small></div>
         <div class="o" data-m="free" data-f="cap">Просто надеть <small>· по проёму, без крепежа</small></div>
@@ -1333,7 +1333,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <button id="bPin" title="Закрепить на этом месте (P)">📌 Закрепить</button>
         <button id="bLink" title="Поставить на дно или надеть на крышку корпуса">⛓ Соединить с корпусом</button>
         <button id="bRoof" style="display:none"
-                title="Собрать верхний узел: конденсатор — внутрь, под крышку, на четыре уголка М6; вентилятор — в проём крышки на четыре М6">⌂ Верхний узел</button>
+                title="Собрать верхний узел: конденсатор — внутрь, под крышку, на четыре болта М6; вентилятор — в проём крышки на четыре М6">⌂ Верхний узел</button>
         <button id="bCondDown" style="display:none"
                 title="Поставить на свободные трубки конденсатора отводы 90° и направить выходы вниз">↳ Отводы вниз</button>
         <button id="bTankEd" style="display:none"
@@ -2796,16 +2796,18 @@ const MOUNT={
   bolt12:{t:'болты М12', hw:'Болт М12×35 с гайкой и шайбами',n:0},
   bolt16:{t:'болты М16', hw:'Болт М16×45 с гайкой и шайбами',n:0},
   bolt20:{t:'болты М20', hw:'Болт М20×55 с гайкой и шайбами',n:0},
-  /* v2.45.1027: верхний узел. Конденсатор в наших чиллерах цепляется к крышке
-     не напрямую, а через гнутые уголки — по два болта М6 на уголок (один в
-     крышку, второй в раму аппарата). Вентилятор садится в крышку сам.
-     v2.46.015: висит он при этом ПОД крышкой, внутри корпуса. */
-  ang6:  {t:'уголки М6', hw:'Уголок монтажный гнутый, лист 2 мм', n:4,
-          hw2:'Болт М6×20 с гайкой и шайбой', n2:8},
+  /* v2.45.1027: верхний узел. Конденсатор висит ПОД крышкой, внутри корпуса.
+     v2.46.073: уголков у него больше нет — аппарат прижат прямо к листу
+     крышки и держится четырьмя болтами М6 в штатные отверстия ряда. Из
+     ведомости ушли и гнутый уголок, и вторая четвёрка болтов. */
+  cap6:  {t:'болты М6 под крышку', hw:'Болт М6×20 с гайкой и шайбой', n:4},
   bolt6: {t:'болты М6',  hw:'Болт М6×20 с гайкой и шайбой',  n:4},
   weld:  {t:'сварка',    hw:null, n:0},
   free:  {t:'без крепежа',hw:null, n:0},
 };
+/* Проекты, сохранённые до v2.46.073, помнят ключ ang6 — читаем его как cap6,
+   чтобы старая связь с корпусом не потерялась, а уголок не вернулся в BOM. */
+MOUNT.ang6=MOUNT.cap6;
 /* Верх дна корпуса: в меше сборки дно — такая же именованная деталь, берём её
    треугольники и считаем по ним отметку и площадку. Дна нет (голая рама) —
    опираемся на низ корпуса. */
@@ -2893,7 +2895,7 @@ function capHole(fr,bb){
        проволочной корзины (исполнение G), они стоят под 45°.
    Раньше деталь садилась «на глаз по проёму»; теперь — по этим отверстиям,
    и крепёж на неё считается сам. */
-const CAP_G={dia:7,hole:490,cond:{span:651,step:125,n:5},fan:{sq:364.16},ang:2};
+const CAP_G={dia:7,hole:490,cond:{span:651,step:125,n:5},fan:{sq:364.16}};
 /* Луч сверху шагает от центра проёма в сторону, пока не наткнётся на металл:
    так находится кромка. Сетка крышки размечена от центра проёма, поэтому
    центр нужен точный — грубого (по клеткам capHole) не хватает. */
@@ -2957,10 +2959,10 @@ function holesHide(){
 /* ═══ v2.46.015: конденсатор монтируется ВНУТРЬ корпуса, под крышку ═══
    Раньше кнопка ставила его сверху на крышку: аппарат стоял вертикально и
    торчал над чиллером. В наших машинах он лежит внутри, прямо под крышкой —
-   панелью вентилятора вверх и соосно проёму обдува Ø490, а держат его четыре
-   гнутых уголка М6: одна полка под крышкой, вторая на раме аппарата.
+   панелью вентилятора вверх и соосно проёму обдува Ø490, прижатый к листу
+   крышки: держат его четыре болта М6 (v2.46.073, уголки сняты).
    Вентилятор сидит в крышке и тянет воздух через конденсатор снизу вверх. */
-const CAP_T=1;               // крышка — лист 1 мм, снизу к нему прижат уголок
+const CAP_T=1;               // крышка — лист 1 мм, снизу к нему прижат аппарат
 /* Круглый проём в верхней плоскости детали: сетка лучей сверху вниз, глубже
    листа не смотрим. Из пустых клеток собираем связные пятна, выкидываем те,
    что выходят на кромку сетки (это край листа, а не проём), и берём самое
@@ -3016,7 +3018,7 @@ function condLay(it,rz){
   }
   return null;
 }
-/* Конденсатор под крышку: лёжа, соосно проёму обдува, на четырёх уголках М6. */
+/* Конденсатор под крышку: лёжа, соосно проёму обдува, на четырёх болтах М6. */
 function seatCond(it,fr,g){
   const st=g?g.st:capTop(fr,true);
   const rz0=g?g.rz:(fr.obj.rotation.z||0);
@@ -3052,27 +3054,17 @@ function seatCond(it,fr,g){
   const hw=ax?it.obj.localToWorld(ax.clone()):c;
   const tx=g?g.cx:zone.getCenter(new THREE.Vector3()).x,
         ty=g?g.cy:zone.getCenter(new THREE.Vector3()).y;
-  const dz=Math.round(st.z-CAP_T-CAP_G.ang-b.max.z);
+  const dz=Math.round(st.z-CAP_T-b.max.z);
   /* строго соосно проёму: вентилятор из крышки уходит в диффузор аппарата,
      и сдвигать аппарат вбок нельзя. Не влезает в корпус — про это скажет
      проверка упора, это вопрос подбора аппарата, а не места. */
   moveItem(it,Math.round(tx-hw.x),Math.round(ty-hw.y),dz);
-  /* Пятно уголков. Вдоль аппарата — два ряда крышки (651 мм), это ровно
-     разнос пазов его рамы (653). Поперёк — уголок идёт в ближайшее отверстие
-     ряда: шаг 125, крайние на ±250, а край аппарата 523/2 = 261,5 — полка
-     уголка 40 мм эту разницу перекрывает. hx/hy — полуразмеры аппарата
-     в системе корпуса: он лежит на боку, поэтому вдоль — длина модели,
-     поперёк — её высота. */
-  const gb=it.obj.geometry.boundingBox,
-        gx=gb.max.x-gb.min.x,gz=gb.max.z-gb.min.z,C=CAP_G.cond;
-  const bl=(it.d.geom||{}).bolt||[];
-  const hy=gz/2,ay=g?Math.min(Math.round(hy/C.step),(C.n-1)/2)*C.step:hy;
-  it.link={to:fr.uid,mount:'ang6',face:'cap',under:1,rz:rz0+pick.k*Math.PI/2,
-           pad:{hx:gx/2,hy:hy,ay:ay,h:sz.z,
-                px:Math.min(g?C.span:(bl[0]||gx-80),gx-40)}};
+  /* v2.46.073: пятна уголков больше нет — крепёж идёт болтами М6 в те же
+     ряды отверстий крышки (651 × 125), их и подсвечиваем кольцами. */
+  it.link={to:fr.uid,mount:'cap6',face:'cap',under:1,rz:rz0+pick.k*Math.PI/2};
   pinMark(it);
   const msg=['Конденсатор под крышкой, панелью вверх, отм. низа '+
-    Math.round(b.min.z+dz)+' мм, 4 уголка М6'];
+    Math.round(b.min.z+dz)+' мм, 4 болта М6'];
   if(!lay)msg.push('проём вентилятора у аппарата не нашёлся — проверь крен');
   if(!g)msg.push('в крышке нет проёма обдува — поставлен по центру полости');
   else msg.push('соосно проёму Ø'+Math.round(g.dia));
@@ -3317,11 +3309,10 @@ function reseatLink(it){
   if(typeof it.link.drop==='number'){
     moveItem(it,0,0,Math.round(st.z+it.link.drop-it.obj.position.z));return;}
   /* v2.46.015: конденсатор висит под крышкой — равняем его по верху,
-     а не по низу: между ним и листом крышки полка уголка */
+     а не по низу; v2.46.073: без уголков он прижат прямо к листу крышки */
   if(it.link.under){
-    moveItem(it,0,0,Math.round(st.z-CAP_T-CAP_G.ang-b.max.z));return;}
-  const up=it.link.mount==='ang6'?CAP_G.ang:0;   // конденсатор стоит на полке уголка
-  moveItem(it,0,0,Math.round(st.z+up-b.min.z));
+    moveItem(it,0,0,Math.round(st.z-CAP_T-b.max.z));return;}
+  moveItem(it,0,0,Math.round(st.z-b.min.z));
 }
 /* Посадить выделенную деталь на корпус и запомнить крепление.
    face='pan' — внутрь, на дно; face='cap' — сверху, на крышку (так у нас
@@ -3333,9 +3324,9 @@ function linkSel(mount,face){
     sel.link=null;selBtns();refresh();save();toast('Отсоединено от корпуса');return;
   }
   if(mount==='face'){hideMnt();faceSel();return;}
-  /* v2.46.015: «уголки М6» — это и есть верхний узел: конденсатор садится
+  /* v2.46.015: «под крышку» — это и есть верхний узел: конденсатор садится
      под крышку сам, вручную его на верх крышки больше не ставим */
-  if(mount==='ang6'&&roleOf(sel.d)==='cond'){hideMnt();roofSel();return;}
+  if((mount==='cap6'||mount==='ang6')&&roleOf(sel.d)==='cond'){hideMnt();roofSel();return;}
   const fr=frameFor(sel);
   if(!fr){toast('В сцене нет корпуса — добавь его из раздела «Корпуса и рамы»');return;}
   pushHist('посадку на корпус');
@@ -3863,37 +3854,7 @@ function boltClear(it){
   it._bolts.traverse(o=>{if(o.geometry)o.geometry.dispose();});
   it._bolts=null;
 }
-/* ═══ v2.46.015: уголки конденсатора видно в сцене ═══
-   Крепление «уголки М6» до сих пор жило только в ведомости крепежа: аппарат
-   просто висел под крышкой, и было непонятно, чем он держится. Рисуем сами
-   уголки — гнутый лист 2 мм: полка вниз по боку рамы аппарата, полка наружу
-   под крышку. Как и болты, они живут отдельной группой сцены и в габарит
-   детали не попадают. */
-function angMark(it){
-  const pad=it.link&&it.link.pad;
-  if(!pad)return false;
-  const key='ang6|'+[pad.px,pad.hy,pad.ay,pad.h].map(Math.round).join('x');
-  if(it._boltKey===key){boltSync(it);return true;}
-  it._boltKey=key;boltClear(it);
-  const W=40,T=2,DN=Math.min(50,Math.max(20,pad.h-20)),OUT=40;
-  const grp=new THREE.Group();grp.userData.ang=1;
-  const box=(sx,sy,sz,x,y,z)=>{
-    const g=new THREE.BoxGeometry(sx,sy,sz);g.translate(x,y,z);
-    grp.add(new THREE.Mesh(g,boltMat));
-  };
-  [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([kx,ky])=>{
-    const x=kx*pad.px/2,y=ky*(pad.hy+T/2);
-    box(W,T,DN,x,y,-DN/2);                    // полка по боку рамы аппарата
-    /* вторая полка ложится под крышку внутрь, над аппаратом: её болт М6
-       приходится в отверстие ряда (ay), а не за габарит — снаружи он упёрся
-       бы в стенку корпуса */
-    box(W,OUT,T,x,ky*(pad.ay||pad.hy),T/2);
-  });
-  grp.renderOrder=1;scene.add(grp);it._bolts=grp;boltSync(it);
-  return true;
-}
 function boltMark(it){
-  if(it.link&&it.link.mount==='ang6'&&angMark(it))return;
   const m=it.link&&it.link.mount&&BOLT[it.link.mount];
   const H=m?holesOf(it):[];
   /* крепёж не пересобираем на каждый чих: тот же болт на том же пятне —
@@ -3920,9 +3881,8 @@ function boltSync(it){
   }
   const bb=new THREE.Box3().setFromObject(it.obj);
   const c=bb.getCenter(new THREE.Vector3());
-  const ang=it._bolts.userData.ang;
-  it._bolts.position.set(c.x,c.y,ang?bb.max.z:bb.min.z);
-  it._bolts.rotation.z=ang?(it.link&&it.link.rz||0):it.obj.rotation.z;
+  it._bolts.position.set(c.x,c.y,bb.min.z);
+  it._bolts.rotation.z=it.obj.rotation.z;
   it._bolts.updateMatrixWorld(true);
 }
 function boltsSync(){placed.forEach(boltSync);}
@@ -3971,7 +3931,7 @@ function ctxItems(it){
   }
   else L.push({ic:'⛓',t:lk?('Крепление · '+lk.t):'Соединить с корпусом',go:showMnt});
   if((roleOf(it.d)==='cond'||roleOf(it.d)==='fan')&&placed.some(p=>roleOf(p.d)==='frame'))
-    L.push({ic:'⌂',t:roleOf(it.d)==='cond'?'Под крышку · уголки М6':'В крышу · болты М6',
+    L.push({ic:'⌂',t:roleOf(it.d)==='cond'?'Под крышку · болты М6':'В крышу · болты М6',
             s:'штатные отверстия',go:()=>{select(it);roofSel();}});
   if(roleOf(it.d)==='cond')
     L.push({ic:'↳',t:'Сделать отводы вниз',s:'со свободных трубок',
@@ -4177,7 +4137,7 @@ function selBtns(){
   $('#bTankLink').style.display=tank?'':'none';
   $('#bTankLink').textContent=tankLinked?'⛓ Открепить бак':'⛓ Закрепить бак внутри';
   $('#bTankLink').classList.toggle('on',!!tankLinked);
-  if(roof)$('#bRoof').textContent=rr==='cond'?'⌂ Под крышку · уголки М6':'⌂ В крышу · болты М6';
+  if(roof)$('#bRoof').textContent=rr==='cond'?'⌂ Под крышку · болты М6':'⌂ В крышу · болты М6';
 }
 function select(it){
   const prev=sel;
@@ -4765,7 +4725,7 @@ function fitDigest(it){
                              под_крышкой:!!it.link.under}:null},
     почему:fitWhy(it)||'',
     примечание:(it.link&&it.link.face==='cap')
-      ?'узел висит под крышкой на уголках соосно проёму обдува: сдвиг по X/Y уводит его от проёма, подъём отрывает от крышки'
+      ?'узел прижат к крышке соосно проёму обдува: сдвиг по X/Y уводит его от проёма, подъём отрывает от крышки'
       :'',
     упоры:fitHardHits(it),
     пробные_сдвиги:fitEscapes(it),
