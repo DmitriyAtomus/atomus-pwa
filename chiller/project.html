@@ -3574,14 +3574,14 @@ function thrCoils(r,len,pitch,mat,from){
 function tankFitMesh(it,z,zi){
   const od=Math.max(14,+z.od||26);
   const len=Math.max(26,(+z.seat||18)*1.6);
-  const inner=(z.sex||'f')!=='m';          // по умолчанию врезка внутренняя
+  const inner=(z.sex||'m')==='f';          // по умолчанию врезка наружная
   const col=tankFitCol(it,z);
   /* DoubleSide: у муфты открытые торцы — без него отверстие «проваливается» */
   const mat=new THREE.MeshStandardMaterial({color:col,metalness:.62,roughness:.42,
     flatShading:true,side:THREE.DoubleSide});
   const g=new THREE.Group();
-  const rOut=od/2+(inner?5:2.5);           // наружная стенка муфты
-  const rIn=od/2-(inner?0:2.2);            // проходное отверстие
+  const rOut=od/2+(inner?5:0);             // муфта толще штуцера на стенку
+  const rIn=od/2-(inner?0:3.2);            // проходное отверстие
   /* тело: труба со сквозным отверстием — торец открыт, видно резьбу внутри */
   const body=new THREE.Mesh(tkCylZ(rOut,rOut,len,24,true),mat);
   body.position.z=len/2-6;
@@ -3592,6 +3592,11 @@ function tankFitMesh(it,z,zi){
   const seat=new THREE.Mesh(new THREE.RingGeometry(rIn,rOut,24),mat);
   seat.position.z=-6;seat.rotateX(Math.PI); // прилегание к стенке бака
   g.add(body);g.add(bore);g.add(face);g.add(seat);
+  /* у наружного штуцера — сварной поясок в месте приварки к стенке */
+  if(!inner){
+    const weld=new THREE.Mesh(tkCylZ(rOut+3.5,rOut+5.5,5,22),mat);
+    weld.position.z=-3.5;g.add(weld);
+  }
   /* резьба: внутри отверстия или снаружи штуцера */
   if((z.ctype||'thr')==='thr'||z.ctype==='rot'){
     const pitch=thrPitch(z);
@@ -9343,7 +9348,9 @@ function tkId(P){
 function tkZones(P){
   return tkPorts(P).map(pt=>{
     const v=V3(pt.dir).normalize();
-    return {kind:pt.kind,od:pt.od,ctype:'thr',sex:'f',
+    /* v2.46.072: врезка бака — приварной штуцер с наружной резьбой:
+       на него накручивают американку или угольник с внутренней */
+    return {kind:pt.kind,od:pt.od,ctype:'thr',sex:'m',
             name:pt.nm+' '+pt.conn,conn:pt.conn,seat:62,
             p0:[pt.p[0],pt.p[1],pt.p[2]],dir:[v.x,v.y,v.z],
             r:pt.od/2+10,t0:-10,t1:66,
