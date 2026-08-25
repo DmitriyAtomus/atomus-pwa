@@ -3520,12 +3520,19 @@ function tankZonesOwn(it){
   if(!po)return;
   Object.keys(po).forEach(k=>{
     const o=po[k],z=it.zn[+k];
-    if(!z||!o||!o.p0)return;
+    if(!z||!o)return;
     /* v2.46.035: врезка ходит по своему листу, поперёк листа — никогда.
        Если поправка проекта сидит не в плоскости врезки, она осталась от
        старой разметки (бак в базе стоял вверх дном) — выбрасываем её. */
-    const d=z.dir,off=(o.p0[0]-z.p0[0])*d[0]+(o.p0[1]-z.p0[1])*d[1]+
-                      (o.p0[2]-z.p0[2])*d[2];
+    const d=z.dir;
+    /* v2.46.073: врезку можно убрать совсем — обратку, например, заливают
+       сверху с разрывом струи, и отверстие в стенке не нужно. Зона остаётся
+       на своём номере (на них ссылаются посадки), но без точки выхода: её не
+       рисуют, не подписывают и не предлагают под присоединение. */
+    if(o.off){z.off=true;z.p0=null;z.tip=null;return;}
+    if(!o.p0)return;
+    const off=(o.p0[0]-z.p0[0])*d[0]+(o.p0[1]-z.p0[1])*d[1]+
+              (o.p0[2]-z.p0[2])*d[2];
     if(Math.abs(off)>3){delete po[k];return;}
     z.p0=o.p0.slice();
     if(o.tip)z.tip=o.tip.slice();
@@ -3533,6 +3540,34 @@ function tankZonesOwn(it){
   });
 }
 const tankFitOf=(it,zi)=>it._fits?it._fits.children.find(g=>g.userData.zi===zi):null;
+/* v2.46.073: убрать врезку из бака (и вернуть её обратно) */
+function tankPortDrop(it,zi){
+  const z=(it.zn||[])[zi];
+  if(!z)return;
+  const nm=z.name||('врезка '+(zi+1));
+  pushHist('врезка убрана');
+  it.po=Object.assign({},it.po||{});
+  it.po[zi]=Object.assign({},it.po[zi]||{},{off:1});
+  delete it.po[zi].p0;delete it.po[zi].tip;
+  tankZonesOwn(it);tankFits(it);
+  refresh();save();
+  toast('«'+nm+'» убрана из бака · Ctrl+Z вернёт');
+}
+function tankPortBack(it,zi){
+  if(!it.po||!it.po[zi])return;
+  pushHist('врезка возвращена');
+  const o=Object.assign({},it.po[zi]);delete o.off;
+  if(Object.keys(o).length)it.po[zi]=o;else delete it.po[zi];
+  if(!Object.keys(it.po).length)it.po=null;
+  const base=(it.obj.geometry.userData.zones)||[];
+  const b=base[zi];
+  if(b){const z=it.zn[zi];z.off=false;
+    z.p0=(b.p0||[0,0,0]).slice();z.tip=(b.tip||b.p0||[0,0,0]).slice();
+    if(b.dir)z.dir=b.dir.slice();}
+  tankZonesOwn(it);tankFits(it);
+  refresh();save();
+  toast('Врезка вернулась на штатное место');
+}
 /* новая точка врезки: пишем и в зону детали, и в поправку проекта */
 function tankPortPut(it,zi,p){
   const z=(it.zn||[])[zi];
@@ -3987,6 +4022,18 @@ function ctxItems(it){
     if(it.po&&Object.keys(it.po).some(k=>it.po[k]&&it.po[k].p0))
       L.push({ic:'↺',t:'Врезки — на штатные места',s:'как в модели базы',
         go:()=>{select(it);tankPortsReset(it);}});
+    /* v2.46.073: врезку можно убрать — например, обратку, если её заливают
+       сверху с разрывом струи */
+    (it.zn||[]).forEach((z,zi)=>{
+      if(!z||z.off||!z.p0)return;
+      L.push({ic:'⊘',t:'Убрать врезку',s:(z.name||('№'+(zi+1))),
+        go:((x,i)=>()=>{select(x);tankPortDrop(x,i);})(it,zi)});
+    });
+    (it.zn||[]).forEach((z,zi)=>{
+      if(!z||!z.off)return;
+      L.push({ic:'⊕',t:'Вернуть врезку',s:(z.name||('№'+(zi+1))),
+        go:((x,i)=>()=>{select(x);tankPortBack(x,i);})(it,zi)});
+    });
   }
   if(isPipeSeg(it)){
     const pt=ctxPt?ctxPt.clone():null,cx=ctxXY.x,cy=ctxXY.y;
@@ -5005,7 +5052,10 @@ function portsRebuild(){
   portsClear();
   if(!PORTS)return;
   const list=PORTS===2?placed:(sel?[sel]:[]);
-  const keep=(it,z,i)=>it===sel||PORTS===1||(!portDumb(z)&&!portBusy(it,i));
+  /* v2.46.073: убранная врезка бака (z.off) точки выхода не имеет — ни
+     подписи, ни выноски у неё быть не может */
+  const keep=(it,z,i)=>!!z&&!z.off&&!!z.tip&&
+    (it===sel||PORTS===1||(!portDumb(z)&&!portBusy(it,i)));
   let zones=0;
   list.forEach(it=>(it.zn||[]).forEach((base,i)=>{const z=zoneAt(it,i);if(z&&keep(it,z,i))zones++;}));
   // много деталей — оставляем только газовые линии, иначе сцена в подписях
@@ -5015,6 +5065,21 @@ function portsRebuild(){
     /* v2.46.010: у трубы оба конца названы в базе одинаково («ТРУБА Ø20») —
        вторая такая же подпись ничего не добавляет, только спорит с первой за
        место. У трубы подпись одна, посередине отрезка. */
+    if(zs.some(z=>!z||!z.tip)&&!zs.every(z=>z&&z.tip)){
+      /* часть зон убрана — рисуем только оставшиеся, парную склейку пропускаем */
+      zs.forEach((z,zi)=>{
+        if(!keep(it,z,zi))return;
+        const col=ZONE_CSS[z.kind]||'#8FD3F4';
+        const txt=portText(z,it===sel);
+        const rec=portTex(txt,col);
+        const spr=mkSprite(rec);spr.center.set(.5,-.28);
+        const dot=mkSprite(portDotTex(col));
+        portGrp.add(spr);portGrp.add(dot);
+        portTags.push({it:it,loc:new THREE.Vector3(z.tip[0],z.tip[1],z.tip[2]),
+          spr:spr,dot:dot,w2h:rec.w2h,kind:z.kind,txt:txt});
+      });
+      return;
+    }
     const one=zs.length===2&&roleOf(it.d)==='pipe'&&
               portText(zs[0],it===sel)===portText(zs[1],it===sel);
     if(one){
@@ -9196,11 +9261,12 @@ function tkPorts(P){
   const out=[];
   const put=(nm,kind,p,dir,d,du)=>out.push({nm,kind,p,dir,od:d,du,conn:G(du)});
   const hTop=z0+P.H-140, hBot=z0+120;
-  put('ВХОД ОБРАТКИ','dis',[0,P.B/2,hTop],[0,1,0],od,P.du);
   put('ВЫХОД К МАШИНЕ','suc',[0,-P.B/2,hBot],[0,-1,0],od,P.du);
   put('СЛИВ','eq',[P.L/2,0,z0+60],[1,0,0],aux,25);
   /* v2.46.033: врезок в баке три и всё — откуда забирает насос, куда подаёт
-     и слив. Перелив и воздушник убраны: лишние отверстия в баке не режем. */
+     и слив. Перелив и воздушник убраны: лишние отверстия в баке не режем.
+     v2.46.073: возврат от теплообменника тоже убран — обратка заливается
+     сверху, с разрывом струи, отверстие в стенке под неё не режем. */
   return out;
 }
 
