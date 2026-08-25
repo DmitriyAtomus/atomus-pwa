@@ -185,8 +185,40 @@ body.mob #stray{bottom:60px;left:8px;right:8px;transform:none;max-width:none}
 #nofit b{color:#fff;font-weight:700;white-space:nowrap}
 #nofit span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #nofit i{font-style:normal;color:#ffb3a6;white-space:nowrap}
+/* v2.46.068: с плашки можно позвать Клода — он разберёт упор и предложит,
+   куда двигать. Кнопка отдельной мишенью: клик по самой плашке по-прежнему
+   выделяет деталь. */
+#nofit u{text-decoration:none;color:#ffe08a;border:1px solid #8d6a30;border-radius:7px;
+  padding:3px 9px;white-space:nowrap;font-size:11.5px;background:rgba(80,58,14,.5)}
+#nofit u:hover{background:rgba(120,88,20,.7)}
 @media(max-width:760px){#nofit{top:auto;bottom:56px;font-size:12px;max-width:94%}
   #nofit span{white-space:normal}}
+/* ═══ v2.46.068: разбор упора — панель Клода ═══ */
+#fadv{position:absolute;right:12px;top:44px;z-index:7;display:none;width:330px;
+  max-height:calc(100% - 100px);flex-direction:column;border-radius:11px;
+  background:rgba(8,20,38,.97);border:1px solid var(--ice2);
+  box-shadow:0 10px 30px rgba(0,0,0,.5);overflow:hidden}
+#fadv.on{display:flex}
+#fadv .hd{display:flex;align-items:center;gap:8px;padding:8px 11px;border-bottom:1px solid var(--line2);
+  font-size:12.5px;color:var(--ice)}
+#fadv .hd b{font-weight:700;color:#fff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#fadv .hd u{text-decoration:none;cursor:pointer;color:var(--faint);padding:0 3px}
+#fadv .bd{padding:9px 11px 12px;overflow:auto;font-size:12px;color:var(--dim);line-height:1.45}
+#fadv .who{color:var(--faint);font-size:11px;margin-bottom:6px}
+#fadv .diag{color:#e9f1ff;margin-bottom:9px}
+#fadv .opt{border:1px solid var(--line2);border-radius:9px;padding:8px 9px;margin-bottom:8px;
+  background:rgba(255,255,255,.02)}
+#fadv .opt b{display:block;color:var(--ice);font-size:12px;margin-bottom:3px}
+#fadv .opt p{margin:0 0 7px;color:var(--dim)}
+#fadv .opt button{background:rgba(46,120,180,.25);color:#dcefff;border:1px solid var(--ice2);
+  border-radius:7px;padding:4px 11px;font-size:11.5px;cursor:pointer;font-family:inherit}
+#fadv .opt button:hover{background:rgba(46,120,180,.45)}
+#fadv .opt button.hand{background:transparent;color:var(--faint);border-color:var(--line2);cursor:default}
+#fadv .again{margin-top:2px;color:var(--faint);font-size:11.5px;cursor:pointer;text-decoration:underline}
+#fadv .wait{color:var(--faint)}
+#fadv .err{color:#f0a9a0}
+body.mob #fadv{right:6px;left:6px;width:auto;top:auto;bottom:52px;max-height:56%}
+@media(max-width:760px){#fadv{right:6px;left:6px;width:auto;top:auto;bottom:52px;max-height:56%}}
 #plegend b{color:var(--faint);font-weight:600}
 #plegend span{display:flex;align-items:center;gap:4px;white-space:nowrap}
 #plegend i{width:8px;height:8px;border-radius:50%;display:inline-block}
@@ -1206,6 +1238,10 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
       </div>
       <div id="hideTip"></div>
       <div id="nofit" title="Нажми — выделю деталь и покажу, во что упёрлась"></div>
+      <div id="fadv">
+        <div class="hd"><b id="fadvT">Клод смотрит, почему не входит</b><u id="fadvX" title="Закрыть">✕</u></div>
+        <div class="bd" id="fadvBd"></div>
+      </div>
       <div id="stray" title="Нажми — верну деталь на её место по функции"></div>
       <div id="lost" title="Нажми — верну машину в кадр"><b>Машина не в кадре</b>
         <span>Вид увели в сторону — в кадре пусто.</span><u>⤢ Вернуть машину</u></div>
@@ -3093,6 +3129,9 @@ function roofSel(){
   const hn=hitNames(sel.uid);
   if(hn)msg.push('⚠ не входит в этот корпус — упирается в '+hn);
   toast(msg.join(' · '));
+  /* v2.46.068: упёрлось — сразу зовём разбор, а не ждём, пока Дмитрий
+     заметит красную плашку и начнёт двигать аппарат на глаз */
+  if(hn)fitAuto(sel);
 }
 /* Найти корпус, к которому сажаем: сначала тот, над которым деталь стоит,
    иначе единственный (или ближайший) в сцене. */
@@ -3343,6 +3382,7 @@ function linkSel(mount,face){
   if(face==='cap')toast((st.part?'Надето на крышку '+st.part.des:'Поставлено на верх корпуса')
     +(st.hole?' по проёму Ø'+Math.round((st.hole.w+st.hole.d)/2)+' мм,':',')+z);
   else toast((st.part?'Поставлено на дно '+st.part.des+',':'Поставлено на низ корпуса,')+z);
+  fitAuto(sel);                       // не влезло — разбор подхватит сам
 }
 /* Жёсткая связь бака с чиллером. Обычная link-связь уже двигает
    дочернюю деталь в moveItem. Для бака дополнительно храним полный
@@ -4517,11 +4557,248 @@ function nofitShow(){
   $('#vwrap').classList.toggle('nofit',!!bad.length);
   if(!bad.length){el.classList.remove('on');el.innerHTML='';el.onclick=null;return;}
   const f=bad[0];
-  el.innerHTML='<b>Не входит</b><span></span>'+(bad.length>1?'<i></i>':'');
+  el.innerHTML='<b>Не входит</b><span></span>'+(bad.length>1?'<i></i>':'')+
+    (FIT_API?'<u title="Клод разберёт упор и предложит, куда двигать">🧠 Клод</u>':'');
   el.querySelector('span').textContent=fitName(f.it)+' — '+f.why;
   if(bad.length>1)el.querySelector('i').textContent='и ещё '+(bad.length-1)+' '+plural(bad.length-1);
   el.classList.add('on');
   el.onclick=()=>{select(f.it);toast(fitName(f.it)+' не входит: '+f.why);};
+  const ask=el.querySelector('u');
+  if(ask)ask.onclick=e=>{e.stopPropagation();select(f.it);fitAsk(f.it);};
+}
+/* ═══ v2.46.068: не входит — дальше думают мозги ═══
+   Плашка говорила только, ЧТО упёрлось, а дальше Дмитрий двигал аппарат
+   руками и на глаз. Теперь после команды «надеть» упор уходит на разбор:
+   сцена сама перебирает пробные сдвиги (коробка детали против деталей корпуса
+   и соседних узлов), а Клод выбирает из уже проверенного и говорит
+   по-инженерному — куда сдвинуть, что подвинуть в ответ или что этот корпус
+   мал. Миллиметры он не выдумывает: в заявку уходят только те сдвиги, которые
+   сцена проверила сама, и у каждого написано, свободен он или во что упрётся.
+   Коробка судит строже меша: обещанный сдвиг заведомо освобождает деталь. */
+const FIT_API=API?'/api/chiller/fit-advice':null;
+const FIT_STEP=20,FIT_MAX=300;               // шаг и предел пробного сдвига, мм
+let fitAskKey='';                            // на что уже спрашивали — второй раз не дёргаем сам
+const mm=v=>Math.round(v);
+const fitShort=p=>((ROLE_NAME[roleOf(p.d)]||'деталь')+' '+(p.d.brand||'')+' '+(p.d.name||'')).trim();
+const fitBox=b=>({x:[mm(b.min.x),mm(b.max.x)],y:[mm(b.min.y),mm(b.max.y)],
+                  z:[mm(b.min.z),mm(b.max.z)],
+                  габарит:[mm(b.max.x-b.min.x),mm(b.max.y-b.min.y),mm(b.max.z-b.min.z)]});
+/* перекрытие двух коробок по осям, мм: на сколько деталь влезла в металл */
+const boxOver=(a,b)=>({x:mm(Math.min(a.max.x,b.max.x)-Math.max(a.min.x,b.min.x)),
+                       y:mm(Math.min(a.max.y,b.max.y)-Math.max(a.min.y,b.min.y)),
+                       z:mm(Math.min(a.max.z,b.max.z)-Math.max(a.min.z,b.min.z))});
+/* видимые детали корпуса с габаритами и именами */
+function frameParts(fr){
+  const boxes=framePartBoxes(fr);if(!boxes)return [];
+  const PT=fr.obj.geometry.userData.parts||[];
+  const ms=Array.isArray(fr.obj.material)?fr.obj.material:[fr.obj.material];
+  return boxes.map((b,i)=>({i:i,box:b,nm:(PT[i]&&PT[i].name)||'деталь корпуса',
+                            des:(PT[i]&&PT[i].des)||''}))
+              .filter(p=>!(ms[p.i]&&ms[p.i].visible===false));
+}
+/* соседние узлы, которые вообще могут упереться (корпус, опоры и трубы — нет) */
+const fitNeighbors=it=>placed.filter(p=>p!==it&&!NOCOLL.has(roleOf(p.d))&&
+  !isPipeSeg(p)&&!p.hid&&!matedPair(it,p));
+/* во что упирается деталь, стоя коробкой box — грубо и быстро, для перебора */
+function fitBoxHits(it,box){
+  const out=[],b=box.clone().expandByScalar(-HIT_TOL);
+  if(b.isEmpty())return out;
+  placed.forEach(fr=>{
+    if(roleOf(fr.d)!=='frame')return;
+    frameParts(fr).forEach(p=>{
+      if(seatPart(it,p.nm)||!p.box.intersectsBox(b))return;
+      out.push({nm:p.nm,что:'корпус',перекрытие:boxOver(b,p.box)});
+    });
+  });
+  fitNeighbors(it).forEach(p=>{
+    const pb=new THREE.Box3().setFromObject(p.obj);
+    if(!pb.intersectsBox(b))return;
+    out.push({nm:fitShort(p),что:'узел',uid:p.uid,перекрытие:boxOver(b,pb)});
+  });
+  return out;
+}
+/* то же, но со спором по мешу — как в checkHits. Для отчёта, не для перебора:
+   коробка задела, а металл мог и разминуться */
+function fitHardHits(it){
+  const out=[],ib=new THREE.Box3().setFromObject(it.obj),b=ib.clone().expandByScalar(-HIT_TOL);
+  if(b.isEmpty())return out;
+  placed.forEach(fr=>{
+    if(roleOf(fr.d)!=='frame')return;
+    frameParts(fr).forEach(p=>{
+      if(seatPart(it,p.nm)||!p.box.intersectsBox(b))return;
+      if(!frameRealHit(it,fr,p.i,b,p.box))return;
+      out.push({nm:p.nm,обозначение:p.des,что:'деталь корпуса',
+                перекрытие:boxOver(b,p.box),габарит:fitBox(p.box)});
+    });
+  });
+  fitNeighbors(it).forEach(p=>{
+    const pb=new THREE.Box3().setFromObject(p.obj);
+    if(!pb.intersectsBox(ib)||!realHit(it,p,ib,pb))return;
+    out.push({nm:fitShort(p),что:'узел',uid:p.uid,перекрытие:boxOver(ib,pb),габарит:fitBox(pb)});
+  });
+  return out;
+}
+/* насколько коробка вылезает из полости корпуса, мм по осям (0 — вся внутри) */
+function fitOutside(b,z){
+  const o={};
+  ['x','y'].forEach(a=>{
+    const d=Math.max(z.min[a]-b.min[a],b.max[a]-z.max[a],0);
+    if(d>2)o[a]=mm(d);
+  });
+  return Object.keys(o).length?o:null;
+}
+/* пробные сдвиги по шести направлениям: на каком отступе деталь перестаёт
+   задевать металл. Двигаем коробку, а не сцену: узел с места не трогается */
+function fitEscapes(it){
+  const b0=new THREE.Box3().setFromObject(it.obj),z=siteIn(),ins=INSIDE.has(roleOf(it.d));
+  const cap=!!(it.link&&it.link.face==='cap');   // сидит на крышке, соосно проёму
+  const DIRS=[['x',1,'вправо'],['x',-1,'влево'],['y',1,'назад'],['y',-1,'вперёд'],
+              ['z',1,'вверх'],['z',-1,'вниз']];
+  return DIRS.map(D=>{
+    const ax=D[0],sg=D[1],o={куда:D[2],ось:(sg>0?'+':'−')+ax};
+    let stop='';
+    for(let d=FIT_STEP;d<=FIT_MAX;d+=FIT_STEP){
+      const v=new THREE.Vector3(0,0,0);v[ax]=sg*d;
+      const hits=fitBoxHits(it,b0.clone().translate(v));
+      if(!hits.length){
+        o.мм=d;o.свободно=true;
+        o.действие={kind:'move',uid:it.uid,dx:ax==='x'?sg*d:0,dy:ax==='y'?sg*d:0,dz:ax==='z'?sg*d:0};
+        if(ins){const out=fitOutside(b0.clone().translate(v),z);if(out)o.вылезет_из_полости=out;}
+        if(cap&&ax!=='z')o.уйдёт_от_проёма_обдува=d;
+        if(cap&&ax==='z'&&sg>0)o.замечание='оторвётся от крышки';
+        return o;
+      }
+      stop=hits.map(h=>h.nm).slice(0,2).join(', ');
+    }
+    o.свободно=false;o.итог='и на '+FIT_MAX+' мм упирается в '+stop;
+    return o;
+  });
+}
+/* разворот вокруг вертикали: длинный аппарат часто входит только поперёк */
+function fitRotProbe(it,deg){
+  const o=it.obj,r0=o.rotation.z;
+  o.rotation.z=r0+deg*Math.PI/180;o.updateMatrixWorld(true);
+  const b=new THREE.Box3().setFromObject(o),hits=fitBoxHits(it,b);
+  o.rotation.z=r0;o.updateMatrixWorld(true);
+  const res={градусов:deg,свободно:!hits.length,
+             действие:{kind:'rot',uid:it.uid,deg:deg}};
+  if(hits.length)res.итог='упрётся в '+hits.map(h=>h.nm).slice(0,2).join(', ');
+  return res;
+}
+/* снимок сцены для разбора: всё в миллиметрах, ноль — центр опорной плоскости */
+function fitDigest(it){
+  const fr=frameFor(it),g=fr?capGrid(fr):null,z=siteIn();
+  const deg=v=>Math.round(v*180/Math.PI);
+  const d={
+    узел:{uid:it.uid,название:fitShort(it),роль:ROLE_NAME[roleOf(it.d)]||'деталь',
+          обозначение:it.d.des||'',габарит:fitBox(new THREE.Box3().setFromObject(it.obj)),
+          повороты:{вокруг_Z:deg(it.obj.rotation.z),завал:deg(it.obj.rotation.y),крен:deg(it.obj.rotation.x)},
+          закреплён:!!it.pin,
+          крепление:it.link?{вид:(MOUNT[it.link.mount]||{}).t||it.link.mount,
+                             куда:it.link.face==='cap'?'на крышку':'на дно',
+                             под_крышкой:!!it.link.under}:null},
+    почему:fitWhy(it)||'',
+    примечание:(it.link&&it.link.face==='cap')
+      ?'узел висит под крышкой на уголках соосно проёму обдува: сдвиг по X/Y уводит его от проёма, подъём отрывает от крышки'
+      :'',
+    упоры:fitHardHits(it),
+    пробные_сдвиги:fitEscapes(it),
+    развороты:[fitRotProbe(it,90),fitRotProbe(it,-90)],
+  };
+  if(fr)d.корпус={название:fitShort(fr),наружный:fitBox(new THREE.Box3().setFromObject(fr.obj)),
+                  полость:fitBox(z),отметка_дна:mm(floorZ(fr)),отметка_крышки:mm(capTop(fr).z),
+                  проём_обдува:g?{x:mm(g.cx),y:mm(g.cy),диаметр:mm(g.dia)}:null};
+  d.соседи=placed.filter(p=>p!==it&&roleOf(p.d)!=='frame'&&!isPipeSeg(p)).slice(0,24)
+    .map(p=>({uid:p.uid,название:fitShort(p),габарит:fitBox(new THREE.Box3().setFromObject(p.obj)),
+              закреплён:!!p.pin}));
+  return d;
+}
+/* ═══ панель разбора ═══ */
+let fitLast=null;
+function fadvShow(html,title){
+  const el=$('#fadv');if(!el)return;
+  if(title)$('#fadvT').textContent=title;
+  const bd=$('#fadvBd');bd.innerHTML=html;
+  /* обработчики вешаем руками: inline-onclick в этой странице не принято */
+  bd.querySelectorAll('[data-fa]').forEach(b=>b.onclick=()=>fitApply(+b.dataset.fa));
+  bd.querySelectorAll('.again').forEach(b=>b.onclick=fitAgain);
+  el.classList.add('on');
+}
+function fadvHide(){const el=$('#fadv');if(el)el.classList.remove('on');}
+/* ключ упора: пока деталь и её упоры те же, сам вопрос второй раз не задаём */
+const fitKey=it=>it.uid+'|'+(fitWhy(it)||'')+'|'+
+  Math.round(it.obj.position.x)+','+Math.round(it.obj.position.y)+','+Math.round(it.obj.position.z);
+async function fitAsk(it,auto){
+  if(!it||!FIT_API){toast('Разбор упора работает только в CRM');return;}
+  if(!fitWhy(it)){fadvHide();return;}
+  fitAskKey=fitKey(it);
+  fadvShow('<div class="wait">Смотрю сцену: полость, упоры и пробные сдвиги…</div>',
+           'Клод: почему не входит');
+  let dig;
+  try{dig=fitDigest(it);}
+  catch(e){fadvShow('<div class="err">Не смог собрать снимок сцены: '+(e.message||e)+'</div>');return;}
+  let res;
+  try{res=await capi(FIT_API,'POST',{scene:dig,question:auto?'':'Дмитрий нажал разбор с плашки.'});}
+  catch(e){
+    fadvShow('<div class="err">Запрос не прошёл: '+(e.message||e)+'</div>'+
+             '<div class="again">Попробовать ещё раз</div>');return;
+  }
+  if(!res||!res.ok){
+    fadvShow('<div class="err">'+esc((res&&res.diag)||'Разбор не получился')+'</div>'+
+             '<div class="again">Попробовать ещё раз</div>');return;
+  }
+  fitLast={it:it,res:res};
+  const H=['<div class="who">'+esc(fitName(it))+'</div>',
+           '<div class="diag">'+esc(res.diag||'')+'</div>'];
+  (res.options||[]).forEach((o,i)=>{
+    const has=(o.actions||[]).length;
+    H.push('<div class="opt"><b>'+esc(o.title||('Вариант '+(i+1)))+'</b>'+
+           '<p>'+esc(o.why||'')+'</p>'+
+           (has?'<button data-fa="'+i+'">Применить</button>'
+               :'<button class="hand">Руками</button>')+'</div>');
+  });
+  H.push('<div class="again">Посмотреть ещё раз</div>');
+  fadvShow(H.join(''),'Клод: почему не входит');
+}
+function fitAgain(){if(fitLast&&fitLast.it)fitAsk(fitLast.it);}
+/* сам разбор после команды «надеть»: тот же упор второй раз в мозг не гоняем —
+   показываем прошлый ответ, он про это же место */
+function fitAuto(it){
+  if(!FIT_API||!it||!fitWhy(it))return;
+  if(fitAskKey===fitKey(it)&&fitLast&&fitLast.it===it){$('#fadv').classList.add('on');return;}
+  fitAsk(it,true);
+}
+(()=>{const x=$('#fadvX');if(x)x.onclick=fadvHide;})();
+/* применить вариант: двигаем то, что предложено, и сразу говорим, вошло ли */
+function fitApply(i){
+  if(!fitLast||!fitLast.res)return;
+  const o=(fitLast.res.options||[])[i];if(!o)return;
+  /* uid в ответе — строка (так описан инструмент), в сцене — число:
+     сравниваем по строке, иначе «Применить» молча ничего не двигает */
+  const find=u=>placed.find(p=>String(p.uid)===String(u));
+  const acts=(o.actions||[]).filter(a=>find(a.uid));
+  if(!acts.length){toast('В этом варианте двигать нечего — он про руки');return;}
+  const h=histBegin('совет Клода: '+(o.title||'правка компоновки'));
+  try{
+    acts.forEach(a=>{
+      const p=find(a.uid);if(!p)return;
+      if(a.kind==='move')moveItem(p,Math.round(a.dx||0),Math.round(a.dy||0),Math.round(a.dz||0));
+      else if(a.kind==='rot'||a.kind==='tilt'){
+        const r=(a.deg||0)*Math.PI/180;
+        if(a.kind==='rot')p.obj.rotation.z+=r;else p.obj.rotation.y+=r;
+        p.obj.updateMatrixWorld(true);
+        if(p._pinBox)p._pinBox.update();
+      }
+    });
+  }finally{histEnd(h);}
+  checkCollisions();showSelZ();refresh();save();
+  const why=fitWhy(fitLast.it);
+  toast(why?('Сделал: '+(o.title||'правку')+' · ещё не входит — '+why)
+           :('Сделал: '+(o.title||'правку')+' · вошло'));
+  if(!why)fadvHide();
+  else fadvShow('<div class="who">'+esc(fitName(fitLast.it))+'</div>'+
+    '<div class="err">После правки всё ещё не входит: '+esc(why)+'</div>'+
+    '<div class="again">Посмотреть ещё раз</div>');
 }
 /* ═══ патрубки: где всас, где нагнетание ═══
    Меш покупной позиции приходит из базы 3D уже размеченным: треугольники
@@ -5501,6 +5778,20 @@ function portHideSync(){
     });
   });
 }
+/* деталь, сидящая на патрубке, обнимает бобышку аппарата — это посадка,
+   а не наезд, иначе пара светилась бы красным сразу после установки.
+   v2.46.068: вынесено из checkCollisions — тем же правилом пользуется разбор
+   упора, когда перебирает пробные сдвиги. */
+function matedPair(a,b){
+  return (a.link&&a.link.mount==='rot'&&a.link.to===b.uid)||
+         (b.link&&b.link.mount==='rot'&&b.link.to===a.uid)||
+  /* v2.46.015: вентилятор сидит в крышке, а конденсатор под ней соосно —
+     крыльчатка и уходит в его проём, габариты пересекаются по делу */
+         (roleOf(a.d)!==roleOf(b.d)&&
+          ['cond','fan'].indexOf(roleOf(a.d))>=0&&
+          ['cond','fan'].indexOf(roleOf(b.d))>=0&&
+          !!(a.link&&a.link.face==='cap'&&b.link&&b.link.face==='cap'));
+}
 function checkCollisions(){
   /* v2.46.021: авто-длина трубы. Через эту функцию проходит любое изменение
      геометрии сцены — перетаскивание, точный ввод, поворот, посадка на
@@ -5516,16 +5807,7 @@ function checkCollisions(){
   // v2.45.974: корпус, виброопоры и трубы не считаем — деталь внутри рамы это норма
   const chk=placed.filter(p=>!NOCOLL.has(roleOf(p.d)));
   const boxes=chk.map(p=>new THREE.Box3().setFromObject(p.obj));
-  // деталь, сидящая на патрубке, обнимает бобышку аппарата — это посадка,
-  // а не наезд, иначе пара светилась бы красным сразу после установки
-  const mated=(a,b)=>(a.link&&a.link.mount==='rot'&&a.link.to===b.uid)||
-                     (b.link&&b.link.mount==='rot'&&b.link.to===a.uid)||
-  /* v2.46.015: вентилятор сидит в крышке, а конденсатор под ней соосно —
-     крыльчатка и уходит в его проём, габариты пересекаются по делу */
-                     (roleOf(a.d)!==roleOf(b.d)&&
-                      ['cond','fan'].indexOf(roleOf(a.d))>=0&&
-                      ['cond','fan'].indexOf(roleOf(b.d))>=0&&
-                      !!(a.link&&a.link.face==='cap'&&b.link&&b.link.face==='cap'));
+  const mated=matedPair;
   for(let i=0;i<chk.length;i++)
     for(let j=i+1;j<chk.length;j++)
       if(!mated(chk[i],chk[j])&&boxes[i].intersectsBox(boxes[j])&&
