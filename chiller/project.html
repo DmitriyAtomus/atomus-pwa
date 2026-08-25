@@ -4674,6 +4674,26 @@ function fitEscapes(it){
     return o;
   });
 }
+/* просадка по месту: конденсатор с вентилятором ставят соосно проёму обдува,
+   узел в полости — по её центру. Это первое, что делает сборщик руками, и
+   именно этого сдвига не было среди шести направлений: он идёт наискось. */
+function fitCenter(it){
+  const fr=frameFor(it);if(!fr)return null;
+  const b=new THREE.Box3().setFromObject(it.obj),c=b.getCenter(new THREE.Vector3());
+  const g=(it.link&&it.link.face==='cap')?capGrid(fr):null;
+  let tx,ty,nm;
+  if(g){tx=g.cx;ty=g.cy;nm='соосно проёму обдува Ø'+mm(g.dia);}
+  else if(INSIDE.has(roleOf(it.d))){const z=siteIn(),zc=z.getCenter(new THREE.Vector3());
+    tx=zc.x;ty=zc.y;nm='по центру полости';}
+  else return null;
+  const dx=Math.round((tx-c.x)/SNAP)*SNAP,dy=Math.round((ty-c.y)/SNAP)*SNAP;
+  if(!dx&&!dy)return {куда:nm,уже_стоит:true};
+  const hits=fitBoxHits(it,b.clone().translate(new THREE.Vector3(dx,dy,0)));
+  const o={куда:nm,dx:dx,dy:dy,свободно:!hits.length,
+           действие:{kind:'move',uid:it.uid,dx:dx,dy:dy,dz:0}};
+  if(hits.length)o.итог='упрётся в '+hits.map(h=>h.nm).slice(0,2).join(', ');
+  return o;
+}
 /* разворот вокруг вертикали: длинный аппарат часто входит только поперёк */
 function fitRotProbe(it,deg){
   const o=it.obj,r0=o.rotation.z;
@@ -4703,6 +4723,7 @@ function fitDigest(it){
       :'',
     упоры:fitHardHits(it),
     пробные_сдвиги:fitEscapes(it),
+    посадка_по_месту:fitCenter(it),
     развороты:[fitRotProbe(it,90),fitRotProbe(it,-90)],
   };
   if(fr)d.корпус={название:fitShort(fr),наружный:fitBox(new THREE.Box3().setFromObject(fr.obj)),
