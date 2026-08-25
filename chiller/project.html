@@ -1406,7 +1406,6 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
     <div class="frow"><span class="lb">Перегородка</span>
       <div class="chips" id="tkPart"></div>
       <span class="fhint">делит бак на подачу и обратку</span></div>
-    <div class="frow"><span class="lb">Перелив</span><div class="chips" id="tkOver"></div></div>
     <div class="frow"><span class="lb">Изоляция</span><div class="chips" id="tkIns"></div>
       <span class="fhint">+ обшивка нерж 0,5 мм</span></div>
     <div class="frow"><span class="lb">Опоры</span><div class="chips" id="tkLeg"></div>
@@ -1899,6 +1898,7 @@ function panClamp(){
 }
 function bindCtl(cv){
   let mode=null,last=null,dragOff=null,dragSnap=null;   // dragSnap — снимок до перетаскивания
+  let fitP=null;                                        // тащим штуцер бака
   let rmb=null,lpT=null;                                // rmb — где нажали правую; lpT — долгое касание
   const lpOff=()=>{if(lpT){clearTimeout(lpT);lpT=null;}};
   /* v2.46.029: на телефоне нет ни колеса, ни правой кнопки — их заменяют два
@@ -1922,6 +1922,15 @@ function bindCtl(cv){
     if(e.button===1||(e.button===0&&e.shiftKey)){e.preventDefault();mode='pan';return;}
     if(e.button===0&&e.altKey){e.preventDefault();mode='orbit';return;}
     if(e.button!==0)return;
+    /* v2.46.033: штуцер бака ловится раньше самого бака — по нему и тащим,
+       место врезки от места бака не зависит и закрепление ему не мешает */
+    const tf=pickTankFit(e);
+    if(tf){
+      lpOff();select(tf.it);
+      const P=tankFitStart(tf.it,tf.zi,e);
+      if(P){mode='fit';fitP=P;cv.classList.add('drag');
+        dragSnap={s:histSnap(),t:'перенос штуцера бака'};return;}
+    }
     const hit=pickItem(e);
     /* с телефона правой кнопки нет — то же меню даёт долгое касание детали.
        Корпус курсор не ловит, но меню по долгому касанию отдаёт */
@@ -1965,6 +1974,11 @@ function bindCtl(cv){
     if(lpT&&(Math.abs(dx)>3||Math.abs(dy)>3))lpOff();
     if(mode==='orbit'){theta-=dx*0.007;phi=Math.max(0.04,Math.min(Math.PI-0.04,phi-dy*0.007));}
     else if(mode==='pan'){pan(dx,dy);}
+    else if(mode==='fit'&&fitP){
+      if(!tankFitMove(fitP,e))return;
+      if(dragSnap){pushHistRaw(dragSnap);dragSnap=null;}
+      portsRebuild();
+    }
     else if(mode==='item'&&sel){
       const fp=planePoint(e,sel.obj.position.z);if(!fp)return;
       const nx=snap(fp.x+dragOff.x),ny=snap(fp.y+dragOff.y);
@@ -1978,6 +1992,7 @@ function bindCtl(cv){
     if(e&&e.pointerId!=null)tps.delete(e.pointerId);
     if(tps.size<2)pin=null;
     if(mode==='item')pipeAfterDrag();   // отпустили узел — что стало с трубой
+    if(mode==='fit'&&fitP){const P=fitP;fitP=null;tankFitDone(P);}
     mode=null;dragSnap=null;lpOff();cv.classList.remove('drag');};
   cv.addEventListener('pointerup',off);cv.addEventListener('pointercancel',off);
   cv.addEventListener('contextmenu',e=>{
@@ -2449,6 +2464,9 @@ async function addItem(d,at,rot,tilt,roll){
     it.po=at.state.po?JSON.parse(JSON.stringify(at.state.po)):null;
     applyOff(it);pinMark(it);
   }
+  /* v2.46.033: у бака врезки — деталь проекта: разметку делаем его личной
+     и рисуем муфты, которые можно таскать по стенке */
+  if(isTankAny(d)){tankZonesOwn(it);tankFits(it);}
   select(it);refresh();save();
   /* v2.46.032: меши приезжают из базы вразнобой. Подгонка кадра раньше могла
      остановиться на полупустой сцене — и камера оставалась внутри корпуса,
@@ -3162,7 +3180,9 @@ function tankInsidePlan(it,fr){
   return found;
 }
 function tankLinkSel(){
-  if(!sel||!isTank(sel.d))return;
+  /* v2.46.033: то же и для готового бака из базы — крепим внутрь корпуса
+     любой бак, а не только тот, что собран конструктором */
+  if(!sel||!isTankAny(sel.d))return;
   if(sel.link&&sel.link.mount==='tank'){
     pushHist('открепление бака от чиллера');
     sel.link=null;selBtns();refresh();save();
@@ -3188,6 +3208,181 @@ function tankLinkSel(){
   toast('Бак поставлен в свободное место внутри и закреплён на чиллере — '+
     'при перемещении корпуса он поедет вместе с ним');
 }
+/* ═══ v2.46.033: штуцера бака ставит проект ═══
+   Врезка в баке — не заводская данность: отверстие режем мы сами, и место
+   штуцера решает обвязка, а не модель. Поэтому муфты бака рисует сцена, а не
+   меш: их видно, за них можно взяться мышью и протащить по стенке. Точка
+   врезки живёт в проекте — в той же поправке зоны it.po, которой конструктор
+   уточняет параметры патрубка, — а в базе остаётся штатное место. Врезки,
+   вшитые в меш, при этом гасим: иначе на стенке было бы две муфты — своя
+   и нарисованная. */
+const isTankAny=d=>!!(d&&(isTank(d)||roleOf(d)==='tank'));
+const TFIT_COL={dis:C_DIS,suc:C_SUC,ppk:C_PPK,eq:C_EQ};
+const TFIT_STEP=5;          // штуцер двигается по стенке с шагом 5 мм
+const TFIT_EDGE=45;         // отступ от кромки: врезку надо где-то варить
+const TFIT_KEYS=['dis','suc','aux'];   // детали конструктора, которые и есть муфты
+
+/* зоны бака делаем его собственными: разметка приходит из базы одна на все
+   такие баки, а место врезки у каждого своё */
+function tankZonesOwn(it){
+  it.zn=(it.zn||[]).map(z=>Object.assign({},z,{
+    p0:(z.p0||[0,0,0]).slice(),dir:(z.dir||[0,0,1]).slice(),
+    tip:(z.tip||z.p0||[0,0,0]).slice()}));
+  const po=it.po;
+  if(!po)return;
+  Object.keys(po).forEach(k=>{
+    const o=po[k],z=it.zn[+k];
+    if(!z||!o||!o.p0)return;
+    z.p0=o.p0.slice();
+    if(o.tip)z.tip=o.tip.slice();
+    if(o.dir)z.dir=o.dir.slice();
+  });
+}
+const tankFitOf=(it,zi)=>it._fits?it._fits.children.find(g=>g.userData.zi===zi):null;
+/* новая точка врезки: пишем и в зону детали, и в поправку проекта */
+function tankPortPut(it,zi,p){
+  const z=(it.zn||[])[zi];
+  if(!z)return;
+  const d=zDir(z),tl=Math.max(20,V3(z.tip).sub(V3(z.p0)).length());
+  z.p0=[p[0],p[1],p[2]];
+  z.tip=[p[0]+d.x*tl,p[1]+d.y*tl,p[2]+d.z*tl];
+  it.po=Object.assign({},it.po||{});
+  it.po[zi]=Object.assign({},it.po[zi]||{},{p0:z.p0.slice(),tip:z.tip.slice()});
+  const g=tankFitOf(it,zi);
+  if(g)g.position.set(p[0],p[1],p[2]);
+}
+/* муфта: труба по оси врезки и бурт под резьбу — как сварная врезка в изделии */
+function tankFitMesh(it,z,zi){
+  const od=Math.max(14,+z.od||26),len=Math.max(28,(+z.seat||18)*2);
+  const col=PORTS?(TFIT_COL[z.kind]||C_EQ):modelCol(it.d);
+  const mat=new THREE.MeshStandardMaterial({color:col,metalness:.55,roughness:.48,
+    flatShading:true});
+  const g=new THREE.Group();
+  const tube=new THREE.Mesh(tkCylZ(od/2,od/2,len,20),mat);
+  tube.position.z=len/2-8;
+  const rim=new THREE.Mesh(tkCylZ(od/2+5,od/2+5,7,20),mat);
+  rim.position.z=len-14;
+  g.add(tube);g.add(rim);
+  g.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),zDir(z));
+  g.position.set(z.p0[0],z.p0[1],z.p0[2]);
+  g.traverse(o=>{o.userData.zi=zi;});
+  return g;
+}
+function tankFitsClear(it){
+  if(!it._fits)return;
+  it._fits.traverse(o=>{if(o.geometry)o.geometry.dispose();
+    if(o.material&&o.material.dispose)o.material.dispose();});
+  it.obj.remove(it._fits);it._fits=null;
+}
+/* врезки, вшитые в меш, гасим — их же рисуем сами и по своим точкам */
+function tankHideBaked(it){
+  const ms=Array.isArray(it.obj.material)?it.obj.material:[it.obj.material];
+  const PT=it.obj.geometry.userData.parts;
+  ms.forEach((m,i)=>{
+    const fit=PT?(TFIT_KEYS.indexOf((PT[i]||{}).key)>=0):(it.zm&&i>0);
+    if(fit)m.visible=false;
+  });
+}
+function tankFits(it){
+  if(!isTankAny(it.d))return;
+  tankFitsClear(it);
+  const g=new THREE.Group();
+  (it.zn||[]).forEach((z,zi)=>{if(z&&z.p0&&z.dir)g.add(tankFitMesh(it,z,zi));});
+  it._fits=g;it.obj.add(g);
+  tankHideBaked(it);
+}
+/* цвет муфт живёт по тем же правилам, что и вшитые патрубки: подписи выключены —
+   штуцер идёт цветом изделия */
+function tankFitPaint(it){
+  if(!it._fits)return;
+  const base=modelCol(it.d);
+  it._fits.children.forEach(g=>{
+    const z=(it.zn||[])[g.userData.zi];
+    const c=PORTS?(TFIT_COL[z&&z.kind]||C_EQ):base;
+    g.traverse(o=>{if(o.material&&o.material.color)o.material.color.setHex(c);});
+  });
+}
+/* ── перетаскивание штуцера ─────────────────────────────────────────────── */
+function pickTankFit(e){
+  const list=placed.filter(p=>p._fits&&p._fits.children.length);
+  if(!list.length)return null;
+  toNDC(e);ray.setFromCamera(ndc,camera);
+  const hits=ray.intersectObjects(list.map(p=>p._fits),true);
+  for(const h of hits){
+    const zi=h.object.userData.zi;
+    if(zi==null)continue;
+    const it=list.find(q=>{let o=h.object;
+      while(o){if(o===q._fits)return true;o=o.parent;}return false;});
+    if(it)return {it:it,zi:zi};
+  }
+  return null;
+}
+/* Тащим в плоскости стенки: вдоль своей оси врезка не двигается, поперёк —
+   с шагом 5 мм и с отступом от кромки. */
+function tankFitStart(it,zi,e){
+  const z=(it.zn||[])[zi];
+  if(!z||!z.p0||!z.dir)return null;
+  it.obj.updateMatrixWorld(true);
+  const n=zDir(z).applyQuaternion(it.obj.getWorldQuaternion(new THREE.Quaternion())).normalize();
+  const w0=V3(z.p0).applyMatrix4(it.obj.matrixWorld);
+  const pl=new THREE.Plane().setFromNormalAndCoplanarPoint(n,w0);
+  toNDC(e);ray.setFromCamera(ndc,camera);
+  const w=new THREE.Vector3();
+  const grab=ray.ray.intersectPlane(pl,w)?w.clone().sub(w0):new THREE.Vector3();
+  const bb=it.obj.geometry.boundingBox;
+  if(!bb)return null;
+  return {it:it,zi:zi,pl:pl,grab:grab,p0:z.p0.slice(),bb:bb,
+          pad:Math.max(TFIT_EDGE,(+z.od||26)/2+18)};
+}
+function tankFitMove(P,e){
+  const it=P.it,z=(it.zn||[])[P.zi];
+  if(!z)return false;
+  toNDC(e);ray.setFromCamera(ndc,camera);
+  const w=new THREE.Vector3();
+  if(!ray.ray.intersectPlane(P.pl,w))return false;
+  const loc=it.obj.worldToLocal(w.sub(P.grab));
+  const d=zDir(z),np=V3(P.p0),bb=P.bb;
+  const lo=[bb.min.x,bb.min.y,bb.min.z],hi=[bb.max.x,bb.max.y,bb.max.z];
+  for(let i=0;i<3;i++){
+    if(Math.abs(d.getComponent(i))>0.5)continue;      // вдоль оси врезки не двигаем
+    const a=lo[i]+P.pad,b=hi[i]-P.pad;
+    const v=Math.round(loc.getComponent(i)/TFIT_STEP)*TFIT_STEP;
+    np.setComponent(i,a<b?Math.max(a,Math.min(b,v)):Math.round((a+b)/2));
+  }
+  if(Math.abs(np.x-z.p0[0])<.5&&Math.abs(np.y-z.p0[1])<.5&&
+     Math.abs(np.z-z.p0[2])<.5)return false;
+  /* по своей оси врезка остаётся ровно там, где сидит в стенке: округлять
+     эту координату нельзя — муфта уйдёт из листа на десятые доли */
+  tankPortPut(it,P.zi,np.toArray());
+  return true;
+}
+/* врезки на штатные места: поправки проекта снимаем, точки берём из базы */
+function tankPortsReset(it){
+  if(!it.po)return;
+  pushHist('врезки бака на штатные места');
+  const po={};
+  Object.keys(it.po).forEach(k=>{
+    const o=Object.assign({},it.po[k]);
+    delete o.p0;delete o.tip;
+    if(Object.keys(o).length)po[k]=o;
+  });
+  it.po=Object.keys(po).length?po:null;
+  const geo=it.obj.geometry,base=(geo.userData.zones)||[];
+  it.zn=(it.zn||[]).map((z,i)=>{
+    const b=base[i];
+    return b?Object.assign({},z,{p0:b.p0.slice(),dir:b.dir.slice(),tip:b.tip.slice()}):z;
+  });
+  tankFits(it);portsRebuild();routeRebuild();checkCollisions();refresh();save();
+  toast('Врезки вернулись на штатные места');
+}
+function tankFitDone(P){
+  const z=(P.it.zn||[])[P.zi];
+  portsRebuild();routeRebuild();checkCollisions();refresh();save();
+  if(!z)return;
+  toast('Штуцер «'+(z.name||'врезка')+'» — отм. '+Math.round(z.p0[2])+
+        ' мм, вдоль бака '+Math.round(z.p0[0])+' мм');
+}
+
 /* ═══ болты крепления видно в сцене ═══
    Выбор болтов раньше менял только спецификацию: в сцене узел просто
    стоял на дне, и проверить, попадают ли болты в лапы и не лезут ли они в
@@ -3415,13 +3610,17 @@ function ctxItems(it){
   if(roleOf(it.d)==='cond')
     L.push({ic:'↳',t:'Сделать отводы вниз',s:'со свободных трубок',
             go:()=>{select(it);condElbowsDown(it);}});
-  if(isTank(it.d)){
+  if(isTank(it.d))
     L.push({ic:'✎',t:'Размеры бака…',s:Math.round(tkCalc(it.d.tk).Vw)+' л',
       go:()=>{select(it);tkOpen(it);}});
+  if(isTankAny(it.d)){
     L.push({ic:'⛓',t:it.link&&it.link.mount==='tank'
       ?'Открепить бак от чиллера':'Закрепить бак внутри чиллера',
       s:it.link&&it.link.mount==='tank'?'связь с корпусом':'автопоиск места',
       go:()=>{select(it);tankLinkSel();}});
+    if(it.po&&Object.keys(it.po).some(k=>it.po[k]&&it.po[k].p0))
+      L.push({ic:'↺',t:'Врезки — на штатные места',s:'как в модели базы',
+        go:()=>{select(it);tankPortsReset(it);}});
   }
   if(isPipeSeg(it)){
     const pt=ctxPt?ctxPt.clone():null,cx=ctxXY.x,cy=ctxXY.y;
@@ -3497,6 +3696,7 @@ function partGroups(it){
   if(!PT)return null;
   const by=new Map();
   PT.forEach((x,i)=>{
+    if(it._fits&&TFIT_KEYS.indexOf(x.key)>=0)return;   // муфты бака рисует сцена
     const k=x.des+'|'+x.name;
     if(!by.has(k))by.set(k,{k:k,des:x.des,name:x.name,idx:[]});
     by.get(k).idx.push(i);
@@ -3511,6 +3711,7 @@ function applyOff(it){
     const g=gs.find(x=>x.k===k);
     if(g)g.idx.forEach(i=>{if(ms[i])ms[i].visible=false;});
   });
+  if(it._fits)tankHideBaked(it);       // v2.46.033: муфты бака рисуем сами
 }
 function buildParts(){
   const box=$('#partsBox'),btn=$('#bParts');
@@ -3596,7 +3797,7 @@ function selBtns(){
   $('#bRoof').style.display=roof?'':'none';
   $('#bCondDown').style.display=rr==='cond'?'':'none';
   $('#bTankEd').style.display=(sel&&isTank(sel.d))?'':'none';
-  const tank=!!(sel&&isTank(sel.d)),tankLinked=tank&&sel.link&&sel.link.mount==='tank';
+  const tank=!!(sel&&isTankAny(sel.d)),tankLinked=tank&&sel.link&&sel.link.mount==='tank';
   $('#bTankLink').style.display=tank?'':'none';
   $('#bTankLink').textContent=tankLinked?'⛓ Открепить бак':'⛓ Закрепить бак внутри';
   $('#bTankLink').classList.toggle('on',!!tankLinked);
@@ -4315,7 +4516,8 @@ function portsPaint(){
       if(i>0)m.color.setHex(PORTS?ZONE_COL[i]:modelCol(p.d));});
   });
 }
-function portsOn(){portsPaint();placed.forEach(applyTint);portsRebuild();}
+function portsOn(){portsPaint();placed.forEach(p=>{applyTint(p);tankFitPaint(p);});
+  portsRebuild();}
 function portsBtn(){
   const b=$('#bPorts');if(!b)return;
   // на телефоне ряд кнопок и так уезжает вбок — там только слово
@@ -8184,7 +8386,7 @@ const TK_PROF=2.5;         // труба профильная 40×40×2 нерж
 const TK_C=4.19, TK_TAU=180, TK_DT=4;   // вода, спиральный компрессор, перепад на баке
 
 const TKD={L:800,B:600,H:700,s:1.5,mark:'304',lid:'none',
-           part:0,ins:0,leg:'adj',legH:120,du:32,over:1,ull:60,fix:'none'};
+           part:0,ins:0,leg:'adj',legH:120,du:32,ull:60,fix:'none'};
 let TKP=Object.assign({},TKD);
 let tkEdit=null;           // uid бака, который правим (иначе — новый)
 let tkPreview=null,tkPreviewOld=null; // временный меш не входит в placed/BOM/save
@@ -8256,8 +8458,8 @@ function tkPorts(P){
   put('ВХОД ОБРАТКИ','dis',[0,P.B/2,hTop],[0,1,0],od,P.du);
   put('ВЫХОД К МАШИНЕ','suc',[0,-P.B/2,hBot],[0,-1,0],od,P.du);
   put('СЛИВ','eq',[P.L/2,0,z0+60],[1,0,0],aux,25);
-  if(P.over)put('ПЕРЕЛИВ','eq',[-P.L/2,0,z0+P.H-70],[-1,0,0],aux+6,32);
-  if(P.lid!=='none')put('ВОЗДУШНИК','ppk',[P.L/2-120,-P.B/2+120,z0+P.H],[0,0,1],aux,25);
+  /* v2.46.033: врезок в баке три и всё — откуда забирает насос, куда подаёт
+     и слив. Перелив и воздушник убраны: лишние отверстия в баке не режем. */
   return out;
 }
 
@@ -8373,6 +8575,7 @@ function tkPack(acc){
   geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
   geo.computeVertexNormals();geo.computeBoundingBox();
   geo.userData.parts=used.map(mi=>({des:TK_PART[mi].des,name:TK_PART[mi].name,
+                                    key:TK_PART[mi].key,
                                     col:parseInt(TK_PART[mi].col.slice(1),16)}));
   geo.userData.zoneMats=false;
   return geo;
@@ -8742,7 +8945,6 @@ function tkDraw(){
   tkChips('#tkLeg',TK_LEG,'leg');
   tkChips('#tkDu',TK_DU.map(v=>[v,'Ду'+v]),'du');
   tkChips('#tkPart',[[0,'нет'],[1,'есть']],'part');
-  tkChips('#tkOver',[[0,'нет'],[1,'есть']],'over');
   tkFixDraw();
   /* Не переписываем поле, в котором человек сейчас печатает. Раньше первый
      символ "4" сразу зажимался Math.max до 200, tkDraw возвращал в input
