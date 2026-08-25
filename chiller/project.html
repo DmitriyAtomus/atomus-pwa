@@ -267,6 +267,12 @@ footer .m{font-family:var(--mono)}
 footer .save{margin-left:auto;color:var(--faint)}
 #toast{position:fixed;left:50%;bottom:46px;transform:translateX(-50%);background:#102138;color:var(--ink);
   border:1px solid var(--line2);border-radius:9px;padding:8px 16px;font-size:12.5px;display:none;z-index:9}
+/* v2.46.065: база пересобралась, а вкладка открыта со старой */
+#verBar{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);display:none;align-items:center;gap:12px;
+  background:#2a1f0d;color:#ffd9a0;border:1px solid #6b4d16;border-radius:9px;padding:8px 14px;
+  font-size:12.5px;z-index:12;max-width:min(92vw,620px)}
+#verBar .go{color:#0b1220;background:#ffcf7a;border-radius:7px;padding:4px 12px;cursor:pointer;white-space:nowrap}
+#verBar .x{color:#b08a4a;cursor:pointer;padding:0 2px}
 /* вкладки режимов */
 .mtabs{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:3px}
 .mtab{padding:5px 14px;border-radius:7px;font-size:12.5px;color:var(--dim);cursor:pointer;user-select:none}
@@ -1070,6 +1076,7 @@ body.mob #partsBox{left:6px;right:6px;top:8px;width:auto;max-height:58%}
 body.mob #nofit{top:8px;bottom:auto;left:6px;right:6px;transform:none;max-width:none}
 body.mob #nofit span{white-space:normal}
 body.mob #toast{bottom:72px}
+body.mob #verBar{bottom:118px;font-size:12px;padding:7px 10px;gap:8px}
 body.mob #ctx,body.mob #rpick{max-width:calc(100vw - 12px)}
 /* схема: пальцами приближается, кнопки масштаба под рукой */
 body.mob #swrap{-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
@@ -1341,6 +1348,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
 <div id="msh"></div>
 <div id="mmenu"></div>
 <div id="toast"></div>
+<div id="verBar"><span id="verBarT"></span><span class="go" id="verBarGo">Обновить</span><span class="x" id="verBarX">✕</span></div>
 
 <!-- ===================== чат по чиллерам ===================== -->
 <button id="chatFab" onclick="toggleChat()" title="Чат по чиллерам"><span id="chatFabI">💬</span><span class="n" id="chatFabN"></span></button>
@@ -10443,7 +10451,41 @@ function chGrow(el){
   }
   refresh();
   chatArm();     /* чат по чиллерам — если он этому пользователю доступен */
+  verWatch();    /* база могла пересобраться, пока вкладка открыта */
 })();
+
+/* ═══ v2.46.065: вкладка со вчерашней базой ═══
+   Меши и разметку врезок страница берёт один раз, при загрузке. База же
+   пересобирается по нескольку раз в день: врезка переехала в дно, лишний
+   штуцер снят, роль патрубка переименована. Открытая вкладка про это не
+   знает и продолжает показывать старую модель — по ней потом и ставят
+   задачи «перенеси слив», хотя в базе он давно перенесён.
+   Раз в минуту (и на возврат к вкладке) спрашиваем версию пакета: сменилась
+   — показываем плашку с кнопкой «Обновить». Сами страницу не перезагружаем:
+   в сцене может быть несохранённая правка. */
+let _verBusy=false;
+async function verWatch(){
+  if(!API||!VER||_verBusy)return;
+  if($('#verBar').style.display==='flex')return;   // уже позвали обновиться
+  _verBusy=true;
+  try{
+    const r=await fetch(API+'/version',{cache:'no-store',headers:AUTH});
+    if(r.ok){
+      const j=await r.json();
+      const v=String(j.version||j.built||'').replace(/[^0-9a-zA-Z]/g,'');
+      if(v&&v!==VER){
+        $('#verBarT').textContent='База 3D пересобрана '+(j.built||'')+
+          ' — в сцене ещё старые модели и врезки';
+        $('#verBar').style.display='flex';
+      }
+    }
+  }catch(e){}
+  finally{_verBusy=false;}
+}
+setInterval(verWatch,60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)verWatch();});
+$('#verBarGo').onclick=()=>location.reload();
+$('#verBarX').onclick=()=>{$('#verBar').style.display='none';};
 
 /* ═══════════ ТЕЛЕФОН: шторки, нижняя панель, лист «Ещё» (v2.46.029) ═══════════
    Раздел открывают с телефона, а раскладка была рассчитана на монитор: каталог
