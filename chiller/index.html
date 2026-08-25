@@ -692,6 +692,9 @@ function toggleFS(){
    Хранилища своего не заводим: это тот же чат проекта «Атом Чиллер», что на
    экране «Клод», — переписка одна и там, и тут. */
 const CHAT_API = API ? '/api/dev-chat' : null;   /* локально (с флешки) чата нет */
+/* тяжёлое сообщение может не пролезть через Vercel-прокси (лимит тела
+   ~4,5 МБ) или упереться в Security Checkpoint — повтор напрямую в Railway */
+const CHAT_DIRECT = 'https://worker-production-9b70.up.railway.app/api/dev-chat';
 const CH_TKEY = 'atomus_chiller_thread';
 const CH_OPEN = {uploading:1, new:1, running:1, stopping:1};
 const CH_ST = {uploading:'загружаю файлы…', new:'в очереди', running:'работает…',
@@ -1019,6 +1022,22 @@ function chAttDraw(){
   });
 }
 
+/* Отправка с запасным путём: сначала same-origin прокси, при 403/413/429/5xx
+   или обрыве сети — напрямую в Railway тем же телом. */
+async function chSendReq(body, isForm){
+  const opts = {method:'POST', cache:'no-store',
+    headers: isForm ? AUTH : Object.assign({'Content-Type':'application/json'}, AUTH),
+    body: body};
+  let r = null, err = null;
+  try{ r = await fetch(CHAT_API + '/send', opts); }catch(e){ err = e; }
+  if(!r || r.status === 403 || r.status === 413 || r.status === 429 || r.status >= 500){
+    try{ const r2 = await fetch(CHAT_DIRECT + '/send', opts); if(!r || r2.ok) r = r2; }
+    catch(e){ if(!r) err = e; }
+  }
+  if(!r) throw err || new Error('нет сети');
+  if(!r.ok) throw Object.assign(new Error('HTTP '+r.status), {status:r.status});
+  return r.json();
+}
 async function chatSend(){
   const inp = chEl('chIn'); if(!inp || !ch.tid) return;
   const text = (inp.value||'').trim();
@@ -1035,12 +1054,9 @@ async function chatSend(){
       fd.append('thread_id', String(ch.tid));
       fd.append('context', JSON.stringify(chContext()));
       files.forEach(f => fd.append('files', f, f.name || 'снимок.png'));
-      const r = await fetch(CHAT_API + '/send', {method:'POST', cache:'no-store',
-        headers:AUTH, body:fd});
-      if(!r.ok) throw Object.assign(new Error('HTTP '+r.status), {status:r.status});
-      d = await r.json();
+      d = await chSendReq(fd, true);
     }else{
-      d = await chPost('/send', {text:text, thread_id:ch.tid, context:chContext()});
+      d = await chSendReq(JSON.stringify({text:text, thread_id:ch.tid, context:chContext()}), false);
     }
     if(d && d.message){ chDraw(d.message); ch.pend.add(d.message.id); ch.since = Math.max(ch.since, d.message.id); }
     chWork(true);
@@ -1049,7 +1065,7 @@ async function chatSend(){
     /* не потерять набранное и приложенное: сеть моргнула — всё на месте */
     inp.value = text; chGrow(inp);
     ch.files = files.concat(ch.files).slice(0, CH_MAXF); chAttDraw();
-    chEl('chSt').textContent = 'не отправилось';
+    chEl('chSt').textContent = 'не отправилось' + (e && e.status ? ' (HTTP '+e.status+')' : ' (нет сети)');
   }
 }
 async function chatStop(){

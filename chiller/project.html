@@ -9371,6 +9371,10 @@ addEventListener('keydown',e=>{if(e.key==='F11'){e.preventDefault();toggleFS();}
    Главное отличие от базы 3D: вместе с задачей уезжает вся сцена — что стоит,
    на какой отметке, что закреплено и что на корпусе, — плюс снимок вида. */
 const CHAT_API=API?'/api/dev-chat':null;
+/* Тяжёлое сообщение (свой скрин + автоснимок сцены) может не пролезть через
+   Vercel-прокси (лимит тела ~4,5 МБ) или упереться в Security Checkpoint —
+   тогда повторяем напрямую в Railway, как это делает сама CRM (v2.46.028). */
+const CHAT_DIRECT='https://worker-production-9b70.up.railway.app/api/dev-chat';
 const CH_TKEY='atomus_chiller_thread';
 const CH_OPEN={uploading:1,new:1,running:1,stopping:1};
 const CH_ST={uploading:'загружаю файлы…',new:'в очереди',running:'работает…',
@@ -9517,15 +9521,25 @@ function chContext(){
   if(asg.length)c.назначено_на_схеме=asg.length+' узл. из '+SCH_NODES.length;
   return c;
 }
-/* Снимок сцены: то же изображение, что на экране, — уходит вложением. */
+/* Снимок сцены: то же изображение, что на экране, — уходит вложением.
+   Полноразмерный PNG с ретины весит мегабайты и вместе со скрином Дмитрия
+   не пролезал через прокси — ужимаем до 1600px и отдаём JPEG (~200 КБ). */
 function sceneShot(){
   return new Promise(res=>{
     try{
       if(!renderer||!placed.length)return res(null);
       renderer.render(scene,camera);
-      renderer.domElement.toBlob(b=>{
-        try{res(b?new File([b],'scene.png',{type:'image/png'}):null);}catch(e){res(null);}
-      },'image/png');
+      const src=renderer.domElement;
+      const k=Math.min(1,1600/Math.max(src.width||1,src.height||1));
+      const c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round((src.width||1)*k));
+      c.height=Math.max(1,Math.round((src.height||1)*k));
+      const g=c.getContext('2d');
+      g.fillStyle='#0D1B30';g.fillRect(0,0,c.width,c.height); // JPEG без альфы
+      g.drawImage(src,0,0,c.width,c.height);
+      c.toBlob(b=>{
+        try{res(b?new File([b],'scene.jpg',{type:'image/jpeg'}):null);}catch(e){res(null);}
+      },'image/jpeg',0.85);
     }catch(e){res(null);}
   });
 }
@@ -9701,6 +9715,21 @@ function chAttDraw(){
     box.appendChild(a);
   });
 }
+/* Отправка с запасным путём: сначала same-origin прокси, при 403/413/429/5xx
+   или обрыве сети — напрямую в Railway тем же телом. */
+async function chSendReq(body,isForm){
+  const opts={method:'POST',cache:'no-store',
+    headers:isForm?AUTH:Object.assign({'Content-Type':'application/json'},AUTH),
+    body:body};
+  let r=null,err=null;
+  try{r=await fetch(CHAT_API+'/send',opts);}catch(e){err=e;}
+  if(!r||r.status===403||r.status===413||r.status===429||r.status>=500){
+    try{const r2=await fetch(CHAT_DIRECT+'/send',opts);if(!r||r2.ok)r=r2;}catch(e){if(!r)err=e;}
+  }
+  if(!r)throw err||new Error('нет сети');
+  if(!r.ok)throw Object.assign(new Error('HTTP '+r.status),{status:r.status});
+  return r.json();
+}
 async function chatSend(){
   const inp=chEl('chIn');if(!inp||!ch.tid)return;
   const text=(inp.value||'').trim();
@@ -9719,21 +9748,20 @@ async function chatSend(){
       fd.append('text',text);
       fd.append('thread_id',String(ch.tid));
       fd.append('context',JSON.stringify(chContext()));
-      files.forEach(f=>fd.append('files',f,f.name||'снимок.png'));
-      const r=await fetch(CHAT_API+'/send',{method:'POST',cache:'no-store',headers:AUTH,body:fd});
-      if(!r.ok)throw Object.assign(new Error('HTTP '+r.status),{status:r.status});
-      d=await r.json();
+      files.forEach(f=>fd.append('files',f,f.name||'снимок.jpg'));
+      d=await chSendReq(fd,true);
     }else{
-      d=await chPost('/send',{text:text,thread_id:ch.tid,context:chContext()});
+      d=await chSendReq(JSON.stringify({text:text,thread_id:ch.tid,context:chContext()}),false);
     }
     if(d&&d.message){chDraw(d.message);ch.pend.add(d.message.id);ch.since=Math.max(ch.since,d.message.id);}
     chWork(true);chWatch(true);
   }catch(e){
     /* не потерять набранное: сеть моргнула — текст и вложения на месте */
     inp.value=text;chGrow(inp);
-    ch.files=files.filter(f=>f.name!=='scene.png').concat(ch.files).slice(0,CH_MAXF);
+    ch.files=files.filter(f=>f.name!=='scene.jpg').concat(ch.files).slice(0,CH_MAXF);
     chAttDraw();
-    chEl('chSt').textContent='не отправилось';
+    /* с кодом: «HTTP 413» — тело больше лимита, «HTTP 401» — перелогиниться */
+    chEl('chSt').textContent='не отправилось'+(e&&e.status?' (HTTP '+e.status+')':' (нет сети)');
   }
 }
 async function chatStop(){
