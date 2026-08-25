@@ -4606,6 +4606,15 @@ function connOf(z){
   }
   return {t:t,size:size,sex:z.sex||'',txt:txt};
 }
+/* подпись с полом резьбы: «резьба G1 нар» — без него не понять, что куда
+   вкручивается (врезка бака внутренняя, фитинг к ней наружный) */
+function connTxt(c){
+  if(!c)return '';
+  let t=c.txt;
+  if(c.t==='thr'||c.t==='rot'||c.t==='flg')
+    t+=c.sex==='m'?' нар':(c.sex==='f'?' вн':'');
+  return t;
+}
 /* Пара сходится: тот же тип, тот же размер, и одна часть наружная, другая
    ответная — труба в трубу не садится. Пайку сверяем с допуском: 1-1/8" у
    компрессора записан как Ø22,22, а у арматуры бывает Ø22,23. */
@@ -4878,7 +4887,7 @@ function rotPick(host,zi,x,y,cur,opt){
     (opt&&opt.kind==='coupling'?'Прямо через муфту':
       (opt&&opt.kind==='tee'?'Ответвление тройником':
         (opt&&opt.kind==='tube'?'Продолжить трубой':'')));
-  box.querySelector('.hd b').textContent=(mode?(mode+' · '):(cur?'Заменить на патрубке · ':''))+c.txt+
+  box.querySelector('.hd b').textContent=(mode?(mode+' · '):(cur?'Заменить на патрубке · ':''))+connTxt(c)+
     (list.length?(' · подходит '+list.length):'');
   box.querySelector('.hd span').textContent=z.name+' · '+host.d.brand+' '+host.d.name+
     (cur?' · сейчас '+cur.d.name:'');
@@ -4907,7 +4916,7 @@ function rotPick(host,zi,x,y,cur,opt){
           r.innerHTML='<img data-th="'+esc(GEOMS[d.g].f)+'"><div class="t"><b></b><small></small></div>';
           r.querySelector('b').textContent=d.name;
           r.querySelector('small').textContent=(now?'стоит сейчас · ':'')+
-            String(d.kind||'').replace(/\s*,.*$/,'')+' · '+m.c.txt;
+            String(d.kind||'').replace(/\s*,.*$/,'')+' · '+connTxt(m.c);
           r.onclick=()=>{
             if(now){rotPickClose();toast('Эта деталь на патрубке и стоит');return;}
             rotPickClose();
@@ -6599,7 +6608,7 @@ function cutPick(it,x,y,pt){
   box.innerHTML='<div class="hd"><b></b><span></span></div>'+
     (list.length>10?'<input class="fx" placeholder="фильтр по названию">':'')+
     '<div class="rl"></div><div class="nt"></div>';
-  box.querySelector('.hd b').textContent='Врезать в разрыв · '+c.txt+
+  box.querySelector('.hd b').textContent='Врезать в разрыв · '+connTxt(c)+
     (list.length?(' · подходит '+list.length):'');
   box.querySelector('.hd span').textContent=it.d.brand+' '+it.d.name+
     ' · отрезок '+pipeLen(it)+' мм';
