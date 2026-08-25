@@ -32,6 +32,40 @@ header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px
 .search{margin:10px 10px 8px;display:flex;align-items:center;gap:7px;background:var(--panel2);
   border:1px solid var(--line2);border-radius:8px;padding:6px 10px}
 .search input{flex:1;background:none;border:0;outline:none;color:var(--ink);font-size:12.5px}
+/* ═══ навигация каталога: drill-down вместо этажей чипов (v2.46.062) ═══
+   Дом — крупные строки разделов; внутри раздела — шапка «‹ назад»,
+   подразделы и бренды одной прокручиваемой строкой. */
+#nav{display:flex;flex-direction:column;gap:7px;padding:0 10px 8px}
+#nav:empty{display:none}
+.rc-lab{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.rc-strip{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.rc-strip::-webkit-scrollbar{display:none}
+.rc-it{flex:0 0 auto;width:60px;cursor:pointer;text-align:center}
+.rc-it img,.rc-it .uph{display:block;width:58px;height:42px;object-fit:contain;background:#0D1B30;
+  border:1px solid var(--line);border-radius:7px}
+.rc-it .uph{display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--faint)}
+.rc-it:hover img,.rc-it:hover .uph{border-color:var(--ice2)}
+.rc-it span{display:block;font-size:8.5px;color:var(--faint);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;margin-top:2px}
+.nv-sec{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);
+  border-radius:10px;background:var(--panel2);cursor:pointer;font-size:12.5px}
+.nv-sec:hover{border-color:var(--ice2)}
+.nv-sec .ic{width:28px;height:28px;border-radius:8px;background:rgba(27,159,216,.10);color:var(--ice);
+  display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.nv-sec b{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nv-sec .n{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.nv-sec .ch{color:var(--faint);font-size:13px}
+.nv-head{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;padding:2px 0;min-width:0}
+.nv-head .bk{width:27px;height:27px;border-radius:8px;border:1px solid var(--line);display:flex;
+  align-items:center;justify-content:center;cursor:pointer;color:var(--ice);font-size:15px;
+  background:var(--panel2);flex-shrink:0}
+.nv-head .bk:hover{border-color:var(--ice2)}
+.nv-head .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nv-head small{color:var(--faint);font-weight:400;font-family:var(--mono);font-size:10px;flex-shrink:0}
+.nv-row{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding:1px 0}
+.nv-row::-webkit-scrollbar{display:none}
+.nv-row .chip{flex:0 0 auto}
+.nv-row .flab{flex:0 0 auto;align-self:center}
 .chips{display:flex;gap:5px;flex-wrap:wrap;padding:0 10px 8px}
 .chip{font-size:10.5px;color:var(--dim);border:1px solid var(--line);border-radius:14px;
   padding:2px 9px;cursor:pointer;user-select:none}
@@ -1110,9 +1144,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
       <div class="ph">База 3D <span class="m" id="catCnt"></span><span id="nomOpen" title="Каталог во весь экран · Ctrl+K">⛶ каталог</span></div>
       <div class="search" id="qBox"><span style="color:var(--faint)">⌕</span><input id="q"
         placeholder="название, артикул, R404A, 1/2&quot;…" autocomplete="off"><span class="qx" id="qClr" title="Очистить · Esc">✕</span></div>
-      <div class="chips" id="secs"></div>
-      <div class="chips sub" id="subs"></div>
-      <div class="chips brnd" id="brands"></div>
+      <div id="nav"></div>
       <div id="cat"></div>
       <div class="note">Клик или «+» — деталь встаёт на своё место по функции: компрессор на пол,
         арматура на средний ярус, конденсатор на крышу. Дальше её можно двигать руками.<br>
@@ -9120,7 +9152,7 @@ $('#flt').onclick=e=>{if(e.target.id==='flt')fltClose();};
    с числом позиций в каждом чипе; поиск ищет по нескольким словам сразу — по
    артикулу, названию, характеристикам и патрубкам, прощает латинскую
    раскладку и подсвечивает, что совпало. Сверху — недавно поставленные. */
-const CAT_PAGE=60,CAT_PREV=3,RKEY='chiller.recent';
+const CAT_PAGE=60,RKEY='chiller.recent';
 let fSec=null,fSub=null,fBrand=null,fQ='',catLim=CAT_PAGE,catHi=-1;
 let RECENT=[];try{RECENT=JSON.parse(localStorage.getItem(RKEY)||'[]');}catch(e){RECENT=[];}
 
@@ -9192,43 +9224,68 @@ function catGo(sec,sub){
   fSec=sec||null;fSub=sub||null;fBrand=null;catLim=CAT_PAGE;catHi=-1;
   drawCat();$('#cat').scrollTop=0;
 }
-function drawSecs(found){
+/* иконка раздела для строк навигации */
+const SEC_ICON={compressors:'⛭',hx:'▤',vessels:'◍',valves:'⌬',pumps:'↺',frames:'▣',
+  heat:'♨',pipe:'⌇',automation:'◉',mounts:'⌗',supports:'⌗',electro:'⚡'};
+const secIcon=id=>SEC_ICON[id]||'◇';
+/* Дом каталога: полоса «недавние» + крупные строки разделов. Карточек нет —
+   вместо бесконечной ленты сперва выбирается раздел. */
+function renderHome(found){
+  const nav=$('#nav');
+  const rc=RECENT.map(id=>DATA.find(d=>d.id===id)).filter(d=>d&&d.ready);
+  nav.innerHTML=rc.length?('<div class="rc-lab">недавние</div><div class="rc-strip">'+
+    rc.map(d=>{
+      const G=GEOMS[d.g]||{};
+      const pic=G.user?'<span class="uph">STEP</span>':'<img loading="lazy" data-th="'+esc(G.f||'')+'">';
+      return '<div class="rc-it" data-rc="'+esc(d.id)+'" title="'+esc(d.name)+' — поставить в сцену">'+
+        pic+'<span>'+esc(d.name)+'</span></div>';
+    }).join('')+'</div>'):'';
+  nav.querySelectorAll('[data-rc]').forEach(el=>el.onclick=()=>{
+    const d=DATA.find(x=>x.id===el.dataset.rc);if(d)catPick(d);});
+  fillThumbsIn('#nav');
   const c={};found.forEach(d=>{c[d.section]=(c[d.section]||0)+1;});
-  const el=$('#secs');
-  el.innerHTML='<div class="chip'+(fSec?'':' on')+'" data-s="">Все<span class="n">'+found.length+'</span></div>'+
-    SECTIONS.map(s=>{const n=c[s[0]]||0;
-      return '<div class="chip'+(fSec===s[0]?' on':'')+(n?'':' z')+'" data-s="'+esc(s[0])+'">'+
-        esc(s[1])+'<span class="n">'+n+'</span></div>';}).join('');
-  el.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{
-    if(ch.classList.contains('z'))return;
-    const s=ch.dataset.s||null;
-    catGo(fSec===s?null:s,null);});
+  $('#cat').innerHTML=SECTIONS.filter(s=>c[s[0]]).map(s=>
+    '<div class="nv-sec" data-sec="'+esc(s[0])+'"><span class="ic">'+secIcon(s[0])+'</span><b>'+
+    esc(s[1])+'</b><span class="n">'+c[s[0]]+'</span><span class="ch">›</span></div>').join('');
+  $('#cat').querySelectorAll('.nv-sec').forEach(el=>el.onclick=()=>catGo(el.dataset.sec,null));
+  catHi=-1;
 }
-function drawSubs(inSec){
-  const el=$('#subs');
-  if(!fSec){el.innerHTML='';return;}
-  const S=SECTIONS.find(x=>x[0]===fSec)||[],subs=S[2]||[];
-  const c={};inSec.forEach(d=>{c[d.sub]=(c[d.sub]||0)+1;});
-  const av=subs.filter(b=>c[b[0]]);
-  if(av.length<2){el.innerHTML='';return;}
-  el.innerHTML=av.map(b=>'<div class="chip'+(fSub===b[0]?' on':'')+'" data-b="'+esc(b[0])+'">'+
-      esc(b[1])+'<span class="n">'+c[b[0]]+'</span></div>').join('');
-  el.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{
-    fSub=fSub===ch.dataset.b?null:ch.dataset.b;fBrand=null;catLim=CAT_PAGE;catHi=-1;
+/* Навигация над карточками: в разделе — «‹ назад», подразделы и бренды
+   прокручиваемыми строками; при поиске по всей базе — чипы разделов
+   с числом найденного (сужение). */
+function renderNav(found,inSec,inSub){
+  const nav=$('#nav');
+  if(!fSec){
+    const c={};found.forEach(d=>{c[d.section]=(c[d.section]||0)+1;});
+    nav.innerHTML='<div class="nv-row">'+SECTIONS.filter(s=>c[s[0]]).map(s=>
+      '<div class="chip" data-s="'+esc(s[0])+'">'+esc(s[1])+'<span class="n">'+c[s[0]]+'</span></div>').join('')+'</div>';
+    nav.querySelectorAll('[data-s]').forEach(ch=>ch.onclick=()=>catGo(ch.dataset.s,null));
+    return;
+  }
+  const S=SECTIONS.find(x=>x[0]===fSec)||[fSec,fSec,[]];
+  let h='<div class="nv-head"><span class="bk" data-bk title="Ко всем разделам">‹</span>'+
+    '<span class="ttl">'+secIcon(fSec)+' '+esc(S[1])+'</span><small>'+inSec.length+'</small></div>';
+  const subs=S[2]||[],cs={};inSec.forEach(d=>{cs[d.sub]=(cs[d.sub]||0)+1;});
+  const av=subs.filter(b=>cs[b[0]]);
+  if(av.length>1){
+    h+='<div class="nv-row"><div class="chip'+(fSub?'':' on')+'" data-b="">Все<span class="n">'+
+      inSec.length+'</span></div>'+av.map(b=>'<div class="chip'+(fSub===b[0]?' on':'')+'" data-b="'+
+      esc(b[0])+'">'+esc(b[1])+'<span class="n">'+cs[b[0]]+'</span></div>').join('')+'</div>';
+  }
+  const cb={};inSub.forEach(d=>{cb[d.brand]=(cb[d.brand]||0)+1;});
+  const ks=Object.keys(cb).sort((a,b)=>cb[b]-cb[a]);
+  if(ks.length>1||fBrand){
+    h+='<div class="nv-row"><span class="flab">бренд</span>'+ks.map(b=>
+      '<div class="chip'+(fBrand===b?' on':'')+'" data-r="'+esc(b)+'">'+esc(b)+
+      '<span class="n">'+cb[b]+'</span></div>').join('')+'</div>';
+  }
+  nav.innerHTML=h;
+  nav.querySelector('[data-bk]').onclick=()=>catReset(!!fQ.trim());
+  nav.querySelectorAll('[data-b]').forEach(ch=>ch.onclick=()=>{
+    const b=ch.dataset.b||null;
+    fSub=fSub===b?null:b;fBrand=null;catLim=CAT_PAGE;catHi=-1;
     drawCat();$('#cat').scrollTop=0;});
-}
-function drawBrands(inSub,tk){
-  const el=$('#brands'),c={};
-  /* на витрине бренды не нужны — там и так вся база; чипы появляются,
-     когда сузили до раздела или что-то ищут */
-  if(!fSec&&!fBrand&&!(tk&&tk.length)){el.innerHTML='';return;}
-  inSub.forEach(d=>{c[d.brand]=(c[d.brand]||0)+1;});
-  const ks=Object.keys(c).sort((a,b)=>c[b]-c[a]);
-  if(ks.length<2&&!fBrand){el.innerHTML='';return;}
-  el.innerHTML='<span class="flab">бренд</span>'+ks.map(b=>
-    '<div class="chip'+(fBrand===b?' on':'')+'" data-r="'+esc(b)+'">'+esc(b)+
-    '<span class="n">'+c[b]+'</span></div>').join('');
-  el.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{
+  nav.querySelectorAll('[data-r]').forEach(ch=>ch.onclick=()=>{
     fBrand=fBrand===ch.dataset.r?null:ch.dataset.r;catLim=CAT_PAGE;catHi=-1;
     drawCat();$('#cat').scrollTop=0;});
 }
@@ -9254,24 +9311,19 @@ function drawCat(){
   const inSec=fSec?found.filter(d=>d.section===fSec):found;
   const inSub=fSub?inSec.filter(d=>d.sub===fSub):inSec;
   const list=fBrand?inSub.filter(d=>d.brand===fBrand):inSub;
-  drawSecs(found);drawSubs(inSec);drawBrands(inSub,tk);
   const total=catAll().length;
   $('#catCnt').textContent=list.length===total?total:list.length+' / '+total;
-  /* витрина: поиск пуст и фильтров нет — показываем каждый раздел «лицом» */
-  const prev=!tk.length&&!fSec&&!fBrand;
+  /* поиск пуст и фильтров нет — дом: недавние и крупные строки разделов */
+  if(!tk.length&&!fSec&&!fBrand){renderHome(found);return;}
+  renderNav(found,inSec,inSub);
   const groups=catGroups(list);
   let h='',shown=0,rest=0;
-  if(prev&&RECENT.length){
-    const rc=RECENT.map(id=>DATA.find(d=>d.id===id)).filter(d=>d&&d.ready);
-    if(rc.length)h+='<div class="cgh"><b>Недавние</b><i>'+rc.length+'</i></div>'+
-      rc.map(d=>catRow(d,'+')).join('');
-  }
   /* фильтр-осушитель выбирают не глазами, а по киловаттам — из его раздела
      сразу зовём подбор (v2.46.003) */
   if(fSub==='filt'||(fSec==='vessels'&&/фильтр/i.test(fQ)))
     h+='<div class="cmore" data-act="flt">&#8983; Подобрать по мощности и хладагенту</div>';
   groups.forEach(g=>{
-    const cap=prev?CAT_PREV:Math.max(0,catLim-shown);
+    const cap=Math.max(0,catLim-shown);
     const part=g.items.slice(0,cap),more=g.items.length>part.length;
     if(g.t)h+='<div class="cgh"'+(more?' data-go="'+esc(g.k)+'" data-sub="'+(g.sub?1:0)+'"':'')+
       '><b>'+esc(g.t)+'</b><i>'+g.items.length+'</i>'+
@@ -9296,7 +9348,7 @@ function drawCat(){
     h='<div class="cempty"><b>Ничего не нашлось</b>'+
       (fSec||fBrand||fSub?'В этом разделе по запросу пусто.<br><span data-act="wide">Искать по всей базе</span>'
                          :'Проверь слово или артикул — поиск смотрит и в характеристики.')+drop+'</div>';
-  }else if(!prev&&rest>0){
+  }else if(rest>0){
     h+='<div class="cmore" id="cMore">Показать ещё '+Math.min(CAT_PAGE,rest)+
        ' <span style="opacity:.6">· осталось '+rest+'</span></div>';
   }
