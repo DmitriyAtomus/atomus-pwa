@@ -536,11 +536,15 @@ const AUTH = TOKEN ? {'Authorization':'Bearer '+TOKEN} : {};
    Поэтому к адресу добавляем версию пакета: сменилась база — сменился адрес. */
 let VER = '';
 const vq = u => VER ? (u + (u.indexOf('?') < 0 ? '?' : '&') + 'v=' + VER) : u;
+/* правка базы на месте (поворот заводской модели, новое превью) не меняет имя
+   файла — свежесть доносит ревизия geom.v из индекса, вклеенная в адрес */
+const RV = {};
+const rvq = (u,f) => RV[f] ? (u + (u.indexOf('?') < 0 ? '?' : '&') + 'r=' + RV[f]) : u;
 const U = {
   index: ()   => API ? API+'/index'  : BASE+'index.json',
   version: () => API ? API+'/version': BASE+'version.json',
-  mesh:  f    => vq(API ? API+'/mesh/'+encodeURIComponent(f)  : BASE+'mesh/'+f+'.json.gz'),
-  thumb: f    => vq(API ? API+'/thumb/'+encodeURIComponent(f) : BASE+'thumb/'+f+'.webp'),
+  mesh:  f    => rvq(vq(API ? API+'/mesh/'+encodeURIComponent(f)  : BASE+'mesh/'+f+'.json.gz'), f),
+  thumb: f    => rvq(vq(API ? API+'/thumb/'+encodeURIComponent(f) : BASE+'thumb/'+f+'.webp'), f),
   step:  f    => API ? API+'/step/'+encodeURIComponent(f)  : BASE+'step/'+encodeURIComponent(f),
 };
 let DATA = [], GEOMS = {}, SECTIONS = [], VERSION = '';
@@ -1115,6 +1119,7 @@ async function boot(){
   const ix = await r.json();
   DATA = ix.items; GEOMS = ix.geoms; SECTIONS = ix.sections; VERSION = ix.built;
   VER = (ix.version || ix.built || '').replace(/[^0-9a-zA-Z]/g,'');
+  Object.values(GEOMS).forEach(g=>{ if(g && g.f && g.v) RV[g.f]=g.v; });
   const nUser = await mergeUserModels();
   draw();
   const c=document.querySelector('.hcount');
@@ -1172,8 +1177,7 @@ function userGeo(MS){
   geo.computeVertexNormals();geo.computeBoundingBox();
   return geo;
 }
-async function userThumbMake(d){
-  const G=GEOMS[d.g];
+async function thumbRender(G){
   const MS=await meshOf(G);
   const geo=userGeo(MS);
   const cnv=document.createElement('canvas');
@@ -1193,11 +1197,54 @@ async function userThumbMake(d){
   ren.render(sc,cam);
   const blob=await new Promise(res=>cnv.toBlob(res,'image/webp',.82));
   geo.dispose();ren.dispose();
+  return blob;
+}
+async function userThumbMake(d){
+  const blob=await thumbRender(GEOMS[d.g]);
   if(blob&&d._uid){
     try{await fetch(U.index().replace('/index','/user-models/'+d._uid+'/thumb'),
       {method:'POST',headers:AUTH,body:blob});}catch(e){}
   }
   return blob?URL.createObjectURL(blob):null;
+}
+/* превью заводской модели после правки базы: рендерим свежий вид и кладём
+   его на место старого — ревизия из ответа обновляет адрес у всех */
+async function baseThumbMake(G){
+  const blob=await thumbRender(G);
+  if(blob){
+    try{
+      const r=await fetch(U.index().replace('/index','/thumb/'+encodeURIComponent(G.f)),
+        {method:'POST',headers:AUTH,body:blob});
+      const j=await r.json().catch(()=>null);
+      if(j&&j.v)RV[G.f]=j.v;
+    }catch(e){}
+  }
+  return blob?URL.createObjectURL(blob):null;
+}
+/* поворот модели БАЗЫ (не загруженного корпуса): меш переписывается в
+   хранилище вместе с зонами патрубков — так модель встанет у всех и в
+   конструкторе тоже */
+async function baseOrient(id,rot){
+  const d=DATA.find(x=>x.id===id);
+  if(!d)return;
+  const G=GEOMS[d.g];
+  if(!G||!G.f)return;
+  try{
+    const r=await fetch(U.index().replace('/index','/mesh/'+encodeURIComponent(G.f)+'/orient'),
+      {method:'POST',headers:Object.assign({'Content-Type':'application/json'},AUTH),
+       body:JSON.stringify({rot:rot})});
+    const m=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(m.message||m.error||('HTTP '+r.status));
+    RV[G.f]=m.v;G._mesh=null;
+    if(m.bbox&&m.bbox.min&&m.bbox.max)G.bb={lo:m.bbox.min,hi:m.bbox.max};
+    openDet(d.id);          // карточка перерисуется уже повернутым мешем
+    THUMB_CACHE.delete(G.f);
+    try{
+      const u=await baseThumbMake(G);
+      if(u){THUMB_CACHE.set(G.f,u);
+        document.querySelectorAll('img[data-th="'+G.f+'"]').forEach(im=>{im.src=u;});}
+    }catch(e){}
+  }catch(err){alert('Поворот не применился: '+(err.message||err));}
 }
 let _uthBusy=false;
 async function fillUserThumbs(){
@@ -1301,7 +1348,7 @@ $('#upFile').addEventListener('change',async e=>{
 /* ===================== 3D ===================== */
 let renderer, scene, camera, mesh, wire, boxH, mats, bolt, labels=[], cur=null;
 let PARTS=null, partMats=null, hidden=new Set();
-let theta=-0.95, phi=1.18, dist=1500, dMin=300, dMax=5000,
+let theta=-0.95, phi=1.18, dist=1500, dMin=300, dMax=5000, fogR=600,
     spin=true, showPorts=true, target=new THREE.Vector3();
 const C_BODY=0x8d959d, C_DIS=0xd94f3d, C_SUC=0x3d8fd9, C_PPK=0xC9A227,
       C_EQ=0x4FBF8B;
@@ -1433,13 +1480,21 @@ async function loadMesh(d){
       z.name||(z.kind==='dis'?'НАГНЕТАНИЕ':'ВСАСЫВАНИЕ'),'port',col);});
 
   target.set(0,0,sz.z*.47); theta=-0.95; phi=1.18;
-  // масштабируем камеру, туман и пределы зума под габарит изделия,
-  // иначе крупные позиции стартуют за плоскостью тумана и экран чёрный
+  // масштабируем камеру и пределы зума под габарит изделия; туман идёт за
+  // камерой в tick (fogSync) — раньше он стоял на месте, и при отдалении
+  // модель уходила в него и чернела
   const RAD=Math.max(sz.x,sz.y,sz.z);
   const cvv=$('#cv'), asp=(cvv.clientWidth||16)/(cvv.clientHeight||9);
   dist=RAD*2.2*(asp<1.35?1.28:1); dMin=RAD*0.22; dMax=RAD*8.0;
-  scene.fog.near=dist*0.8; scene.fog.far=dist*3.0;
+  fogR=RAD; fogSync();
   camera.near=Math.max(1,RAD*0.02); camera.far=RAD*20; camera.updateProjectionMatrix();
+}
+/* туман всегда начинается ЗА моделью: модель у target радиуса fogR, камера в
+   dist от него — до dist+fogR всё чистое, дальше сетка растворяется */
+function fogSync(){
+  if(!scene||!scene.fog)return;
+  scene.fog.near=dist+fogR*1.2;
+  scene.fog.far=Math.max(dist+fogR*6, dist*2.4);
 }
 function addLabel(p,t,g,c){
   const e=document.createElement('div'); e.className='lbl'; e.textContent=t;
@@ -1581,6 +1636,7 @@ function tick(){
   if(cv.width!==Math.round(w*renderer.getPixelRatio())){
     renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();}
   if(spin) theta+=0.0032;
+  fogSync();
   camera.position.set(target.x+dist*Math.sin(phi)*Math.cos(theta),
                       target.y+dist*Math.sin(phi)*Math.sin(theta),
                       target.z+dist*Math.cos(phi));
@@ -1758,6 +1814,15 @@ function side(d){
       <button onclick="userReconvert('${d._uid}')" title="Пересобрать модель из исходного STEP: сборка разрежется на детали — их можно будет скрывать (панели, крышки)">⚙ Пересобрать с деталями</button>
     </div>
     <div class="note">Для корпусов, загруженных до появления деталей. Пересборка вернёт исходную ориентацию из STEP — потом поверни заново.</div>`:''}
+    ${!d._uid&&GEOMS[d.g]&&GEOMS[d.g].f?`<div class="hr"></div>
+    <div class="st">Ориентация</div>
+    <div class="dl">
+      <button onclick="baseOrient('${d.id}','x180')" title="Перевернуть вверх ногами">⟲ 180°</button>
+      <button onclick="baseOrient('${d.id}','x90')" title="Завал вперёд-назад">X 90°</button>
+      <button onclick="baseOrient('${d.id}','y90')" title="Крен вбок">Y 90°</button>
+      <button onclick="baseOrient('${d.id}','z90')" title="Поворот вокруг вертикали">Z 90°</button>
+    </div>
+    <div class="note">Правка базы: поворот запекается насовсем и для всех — патрубки и метки едут вместе с моделью, в конструкторе она тоже встанет по-новому.</div>`:''}
     <div class="hr"></div>
     <div class="warn">${d.geom.lod}</div>`;
 }

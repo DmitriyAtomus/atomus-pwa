@@ -853,6 +853,18 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
   color:var(--dim);font-size:11px;line-height:1.4}
 .tk-live:before{content:'\25CF';color:var(--ok);font-size:10px}
 .tk-live b{color:var(--ok);font-weight:600}
+/* готовые баки из базы 3D — ставятся как обычные модели, минуя размеры */
+.tk-ready{margin:0 0 11px;padding:8px 10px;border:1px solid var(--line2);
+  border-radius:8px;background:rgba(8,24,45,.62)}
+.tk-ready .lb{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--faint);display:block;margin-bottom:6px}
+.tk-ready-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11.5px}
+.tk-ready-row b{font-weight:600;color:var(--ink);flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tk-ready-row i{font-style:normal;color:var(--dim);white-space:nowrap}
+.tk-ready-row button{border:1px solid var(--line2);border-radius:7px;padding:4px 9px;
+  background:var(--panel2);color:var(--ink);font:inherit;font-size:11px;cursor:pointer;flex:none}
+.tk-ready-row button:hover{border-color:var(--ice2);color:var(--ice)}
 .tk-view{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 11px}
 .tk-view .lb{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);
   margin-right:3px}
@@ -1375,6 +1387,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
     <span class="sub">прямоугольный сварной · размеры свои</span><span class="x" id="tkX">✕</span></div>
   <div class="flt-body">
     <div class="tk-live" id="tkLive"><b>Живой 3D-предпросмотр</b> — временный меш виден в сцене, но пока не входит в проект и BOM.</div>
+    <div class="tk-ready" id="tkReady" style="display:none"></div>
     <div class="tk-view">
       <span class="lb">Вид в сцене</span>
       <button id="tkFocus" title="Показать бак крупно">◎ Фокус на бак</button>
@@ -1450,9 +1463,13 @@ const TOKEN=(()=>{try{return localStorage.getItem('atomus_token')}catch(e){retur
 const AUTH=TOKEN?{'Authorization':'Bearer '+TOKEN}:{};
 let VER='';
 const vq=u=>VER?(u+(u.indexOf('?')<0?'?':'&')+'v='+VER):u;
+/* ревизия правки базы (поворот заводской модели из витрины): меш и превью
+   с вечным кэшем, свежесть доносится сменой адреса через geom.v из индекса */
+const RV={};
+const rvq=(u,f)=>RV[f]?(u+(u.indexOf('?')<0?'?':'&')+'r='+RV[f]):u;
 const U={index:()=>API?API+'/index':BASE+'index.json',
-  mesh:f=>vq(API?API+'/mesh/'+encodeURIComponent(f):BASE+'mesh/'+f+'.json.gz'),
-  thumb:f=>vq(API?API+'/thumb/'+encodeURIComponent(f):BASE+'thumb/'+f+'.webp'),
+  mesh:f=>rvq(vq(API?API+'/mesh/'+encodeURIComponent(f):BASE+'mesh/'+f+'.json.gz'),f),
+  thumb:f=>rvq(vq(API?API+'/thumb/'+encodeURIComponent(f):BASE+'thumb/'+f+'.webp'),f),
   users:()=>API?API+'/user-models':null};
 const $=s=>document.querySelector(s);
 let DATA=[],GEOMS={},SECTIONS=[];
@@ -8783,6 +8800,26 @@ function tkFieldCommit(e){
   tkSmartInvalidate('Размеры изменились — пересчитай варианты.');
   tkDraw();
 }
+/* готовые (запечённые в базе 3D) баки — ставим в сцену как обычную модель,
+   без конструктора размеров: Дмитрий заводит típовые баки в базу карточками */
+function tkReadyDraw(){
+  const el=$('#tkReady');
+  if(!el)return;
+  /* по роли (vessels/tank) и — на случай другого подраздела — по имени */
+  const ready=(DATA||[]).filter(d=>d.ready&&
+    (roleOf(d)==='tank'||/^бак(\s|$)/i.test(d.name||'')));
+  if(!ready.length||tkEdit){el.style.display='none';el.innerHTML='';return;}
+  el.style.display='block';
+  el.innerHTML='<span class="lb">Готовые баки из базы 3D</span>'+
+    ready.slice(0,8).map(d=>'<div class="tk-ready-row"><b>'+esc(d.name)+'</b>'+
+      (d.brand?'<i>'+esc(d.brand)+'</i>':'')+
+      '<button data-tkr="'+esc(d.id)+'">+ в сцену</button></div>').join('');
+  el.querySelectorAll('[data-tkr]').forEach(b=>b.onclick=()=>{
+    const d=DATA.find(x=>x.id===b.dataset.tkr);
+    if(!d)return;
+    tkClose();catPick(d);
+  });
+}
 function tkOpen(it){
   tkPreviewClear(false);tkViewClose();tkPreviewOld=null;
   tkViewCapture();tkViewNeedFocus=true;tkViewMode='dim';tkSmartPlans=[];tkSmartChosen=null;
@@ -8792,6 +8829,7 @@ function tkOpen(it){
   else{TKP=tkNorm(TKP);tkFixChoice='auto';}
   $('#tnk').classList.add('on');
   $('#tkHd').textContent=tkEdit?'◫ Размеры бака':'◫ Бак из нержавейки';
+  tkReadyDraw();
   tkSmartRender();tkDraw();tkViewSet('dim');
 }
 function tkClose(){
@@ -9755,6 +9793,7 @@ function chGrow(el){
   }
   DATA=ix.items;GEOMS=ix.geoms;SECTIONS=ix.sections;secNames();fixPprRoutePorts();fixPprTurnPorts();
   VER=(ix.version||ix.built||'').replace(/[^0-9a-zA-Z]/g,'');
+  Object.values(GEOMS).forEach(g=>{if(g&&g.f&&g.v)RV[g.f]=g.v;});
   await loadUserModels();
   drawCat();   /* чипы разделов, подразделов и брендов рисует сам каталог */
   if(PAPI){
