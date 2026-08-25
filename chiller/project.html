@@ -2345,7 +2345,10 @@ function placeAt(it,x,y,z,rot,tilt){
   const o=it.obj;
   o.rotation.set(o.rotation.x,tilt||0,rot||0);o.position.set(0,0,0);o.updateMatrixWorld(true);
   const b0=new THREE.Box3().setFromObject(o),c=new THREE.Vector3();b0.getCenter(c);
-  o.position.set(snap(x-c.x),snap(y-c.y),Math.round(z-b0.min.z));
+  /* v2.46.035: бак ставим на дно опорной кромкой (ноль его модели): штуцеры
+     забора и слива врезаны в дно и уходят ниже неё — сквозь лист корпуса */
+  const bz=isTankAny(it.d)?Math.max(b0.min.z,Math.min(0,b0.max.z)):b0.min.z;
+  o.position.set(snap(x-c.x),snap(y-c.y),Math.round(z-bz));
   o.updateMatrixWorld(true);
   return new THREE.Box3().setFromObject(o);
 }
@@ -3347,6 +3350,15 @@ const TFIT_KEYS=['dis','suc','aux'];   // детали конструктора,
 
 /* зоны бака делаем его собственными: разметка приходит из базы одна на все
    такие баки, а место врезки у каждого своё */
+/* v2.46.035: низ бака — его опорная плоскость (ноль модели, нижняя кромка
+   стенок), а не кончики штуцеров: забор и слив врезаны в дно и висят ниже
+   опоры — в дне корпуса под них вырез. Стоит бак на кромке, не на штуцерах. */
+function tankBase(it){
+  const b=new THREE.Box3().setFromObject(it.obj);
+  if(!isTankAny(it.d))return b.min.z;
+  const org=it.obj.localToWorld(new THREE.Vector3(0,0,0)).z;
+  return Math.max(b.min.z,Math.min(org,b.max.z));
+}
 /* v2.46.034: старые проекты, где бак успели перевернуть, чиним при открытии:
    ставим на дно, а низ оставляем на прежней отметке — деталь не подпрыгнет. */
 function tankStand(it){
@@ -3355,7 +3367,7 @@ function tankStand(it){
   if(!r.x&&!r.y)return false;
   const z0=new THREE.Box3().setFromObject(it.obj).min.z;
   r.x=0;r.y=0;it.obj.updateMatrixWorld(true);
-  it.obj.position.z+=z0-new THREE.Box3().setFromObject(it.obj).min.z;
+  it.obj.position.z+=z0-tankBase(it);
   it.obj.updateMatrixWorld(true);
   if(it._pinBox)it._pinBox.update();
   return true;
@@ -3369,6 +3381,12 @@ function tankZonesOwn(it){
   Object.keys(po).forEach(k=>{
     const o=po[k],z=it.zn[+k];
     if(!z||!o||!o.p0)return;
+    /* v2.46.035: врезка ходит по своему листу, поперёк листа — никогда.
+       Если поправка проекта сидит не в плоскости врезки, она осталась от
+       старой разметки (бак в базе стоял вверх дном) — выбрасываем её. */
+    const d=z.dir,off=(o.p0[0]-z.p0[0])*d[0]+(o.p0[1]-z.p0[1])*d[1]+
+                      (o.p0[2]-z.p0[2])*d[2];
+    if(Math.abs(off)>3){delete po[k];return;}
     z.p0=o.p0.slice();
     if(o.tip)z.tip=o.tip.slice();
     if(o.dir)z.dir=o.dir.slice();
@@ -3472,7 +3490,9 @@ function tankFitStart(it,zi,e){
 }
 /* v2.46.034: слив режут у самого дна — вода уходит самотёком, и наверху его
    не делают. Возврат от теплообменника, наоборот, льётся сверху. Поэтому по
-   высоте стенки каждый штуцер ходит в своей полосе, а не по всему листу. */
+   высоте стенки каждый штуцер ходит в своей полосе, а не по всему листу.
+   Врезки в дно (ось по Z) полосы не касаются: они ездят по дну, а не по
+   стенке — у нашего бака так сделаны забор на насос и слив. */
 const TFIT_BAND={eq:[0,.28],dis:[.55,1]};
 function tankFitLim(z,bb,pad){
   const b=TFIT_BAND[z&&z.kind];
