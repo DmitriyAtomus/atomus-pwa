@@ -495,6 +495,16 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 .mdz-act{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
 .mdz-act .btn{flex:1}
 
+/* ═══ v2.46.062: скрыть панель прямо в сцене — подсказка под курсором ═══ */
+#cv.hidem{cursor:crosshair}
+#hideTip{position:fixed;z-index:60;pointer-events:none;display:none;
+  background:rgba(8,20,36,.95);border:1px solid var(--ice2);border-radius:9px;
+  padding:5px 9px;font-size:11.5px;color:#fff;box-shadow:0 10px 24px rgba(0,0,0,.5);
+  max-width:260px}
+#hideTip.on{display:block}
+#hideTip .d{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-right:6px}
+#hideTip .h{display:block;font-size:10.5px;color:var(--ice);margin-top:2px}
+
 /* ═══ панель деталей: гасим стойки и панели, как в базе 3D (v2.45.994) ═══ */
 #partsBox{position:absolute;left:10px;top:44px;width:296px;max-height:calc(100% - 130px);z-index:5;
   display:none;flex-direction:column;background:rgba(8,20,36,.94);border:1px solid var(--line2);
@@ -1129,12 +1139,14 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <div class="vb" id="bFit" title="Вписать машину в экран">⤢ Вписать</div>
         <div class="vb" id="bGrid">Сетка 100 мм</div>
         <div class="vb" id="bParts" style="display:none">Детали</div>
+        <div class="vb" id="bHide" title="Наведи на крышу, боковину или дверку — клик её скроет. Клавиша H гасит то, что под курсором, Shift+H возвращает все">👁 Скрыть панель</div>
         <div class="vb" id="bPorts" title="Подписи патрубков: выкл · у выделенной · у всех">Патрубки</div>
         <div class="vb" id="bRl" title="Показывать свободные патрубки: метка «+» — жми и выбирай, что на него поставить">Присоединения</div>
         <div class="vb" id="bFrm" title="Мышь берёт деталь за панелью корпуса. Сам корпус подсвечивается кликом по пустой панели, а тащится вторым нажатием">Корпус сквозной</div>
         <div class="vb hist off" id="bUndo" title="Отменять нечего">↶ Отменить</div>
         <div class="vb hist off" id="bRedo" title="Возвращать нечего">↷ Вернуть</div>
       </div>
+      <div id="hideTip"></div>
       <div id="nofit" title="Нажми — выделю деталь и покажу, во что упёрлась"></div>
       <div id="stray" title="Нажми — верну деталь на её место по функции"></div>
       <div id="lost" title="Нажми — верну машину в кадр"><b>Машина не в кадре</b>
@@ -1144,7 +1156,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <span><i style="background:#6cb4ec"></i>всасывание, выход</span>
         <span><i style="background:#d9b64a"></i>ППК</span>
         <span><i style="background:#6fd3a5"></i>уравнивание</span></div>
-      <div id="hint" class="min"><b>? как управлять</b><div class="hb">ЛКМ по фону — вращение · деталь — тащи мышью<br>Alt+ЛКМ — вращать поверх детали · Shift+ЛКМ/средняя — панорама<br>два пальца — приближение и панорама · колесо — плавный зум к курсору<br>корпус сквозной — за панелью берётся деталь; по пустой панели — сам корпус (тащится вторым нажатием)<br>ПКМ по детали — меню · по фону — панорама (протяни)<br>PgUp/PgDn — выше/ниже · Del — убрать<br>G — точные координаты и углы (шаг 1 мм / 1°)<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>метка «+» на патрубке — свободное присоединение: жми и выбирай, что поставить<br>оттуда же «⇄ протянуть трубу» — ткни во второй патрубок, трасса ляжет по осям</div></div>
+      <div id="hint" class="min"><b>? как управлять</b><div class="hb">ЛКМ по фону — вращение · деталь — тащи мышью<br>Alt+ЛКМ — вращать поверх детали · Shift+ЛКМ/средняя — панорама<br>два пальца — приближение и панорама · колесо — плавный зум к курсору<br>корпус сквозной — за панелью берётся деталь; по пустой панели — сам корпус (тащится вторым нажатием)<br>ПКМ по детали — меню · по фону — панорама (протяни)<br>PgUp/PgDn — выше/ниже · Del — убрать<br>G — точные координаты и углы (шаг 1 мм / 1°)<br>Ctrl+Z — отменить · Ctrl+Y — вернуть<br>P — закрепить · «Детали» — гасить стойки и панели<br>H — скрыть панель под курсором (крыша, боковина, дверка) · Shift+H — вернуть все<br>кнопка «👁 Скрыть панель» — то же мышью и пальцем: наводишь и жмёшь<br>метка «+» на патрубке — свободное присоединение: жми и выбирай, что поставить<br>оттуда же «⇄ протянуть трубу» — ткни во второй патрубок, трасса ляжет по осям</div></div>
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="schz"><b data-sz="1" title="Крупнее">+</b><b data-sz="-1" title="Мельче">−</b><b data-sz="0" title="Во всю ширину">↺</b></div>
       <div id="swrap">
@@ -1848,6 +1860,100 @@ function pickItem(e,any){
   pickPt=out?(pts.get(out)||null):null;
   return out;
 }
+/* ═══ v2.46.062: «навёл на крышу — скрыл» ═══
+   У сборного корпуса каждая деталь меша — своя группа и свой материал, поэтому
+   крышу, боковину или дверку можно погасить прямо в сцене: наводишь — она
+   подсвечивается и подписывается, клик (или клавиша H) её убирает и видно, что
+   внутри. Погашённая деталь курсор не ловит — за ней сразу берётся следующая.
+   Хранится это там же, где гашение из панели «Детали узла» (it.off), только
+   ключ у одиночной детали — «#индекс», а не «обозначение|имя». */
+let HIDEM=false;              // режим «скрыть панель» под мышью и пальцем
+let curXY=null;               // где курсор — по нему работает клавиша H
+let HLP=null;                 // подсвеченная деталь: {mat, em, ei}
+let ctxPart=null;             // деталь под правой кнопкой — для меню
+
+/* Первая непогашенная деталь сборки под курсором. */
+function partPick(e){
+  if(!e)return null;
+  toNDC(e);ray.setFromCamera(ndc,camera);
+  const hits=ray.intersectObjects(placed.map(p=>p.obj));
+  for(let k=0;k<hits.length;k++){
+    const x=hits[k],it=placed.find(q=>q.obj===x.object);
+    if(!it)continue;
+    const PT=it.obj.geometry.userData.parts;
+    if(!PT)continue;                                 // деталь цельная — гасить в ней нечего
+    const ms=Array.isArray(it.obj.material)?it.obj.material:[it.obj.material];
+    const pi=x.face?x.face.materialIndex:0;
+    if(!ms[pi]||ms[pi].visible===false)continue;     // сквозь уже погашенную
+    if(!PT[pi])continue;
+    return {it:it,pi:pi,p:PT[pi]};
+  }
+  return null;
+}
+const partLabel=p=>((p.des&&p.des!=='—')?p.des+' ':'')+(p.name||'деталь');
+function hlOff(){
+  if(!HLP)return;
+  HLP.mat.emissive.setHex(HLP.em);HLP.mat.emissiveIntensity=HLP.ei;HLP=null;
+}
+function hlOn(h){
+  const ms=Array.isArray(h.it.obj.material)?h.it.obj.material:[h.it.obj.material];
+  const m=ms[h.pi];if(!m||!m.emissive)return;
+  if(HLP&&HLP.mat===m)return;
+  hlOff();
+  HLP={mat:m,em:m.emissive.getHex(),ei:m.emissiveIntensity};
+  m.emissive.setHex(0x2b7fc2);m.emissiveIntensity=.9;
+}
+function hideTip(h,x,y){
+  const t=$('#hideTip');if(!t)return;
+  if(!h){t.classList.remove('on');return;}
+  t.innerHTML='<span class="d"></span><span class="n"></span><span class="h">клик — скрыть</span>';
+  t.querySelector('.d').textContent=(h.p.des&&h.p.des!=='—')?h.p.des:'';
+  t.querySelector('.n').textContent=h.p.name||'деталь';
+  t.classList.add('on');
+  const w=t.offsetWidth,ht=t.offsetHeight;
+  t.style.left=Math.max(8,Math.min(x+14,innerWidth-w-8))+'px';
+  t.style.top =Math.max(8,Math.min(y+16,innerHeight-ht-8))+'px';
+}
+function hideHover(e){
+  if(!HIDEM){hlOff();hideTip(null);return;}
+  const h=partPick(e);
+  if(!h){hlOff();hideTip(null);return;}
+  hlOn(h);hideTip(h,e.clientX,e.clientY);
+}
+/* Погасить одну деталь сборки. */
+function hidePart(h){
+  if(!h)return false;
+  const ms=Array.isArray(h.it.obj.material)?h.it.obj.material:[h.it.obj.material];
+  hlOff();
+  pushHist('скрытие детали корпуса');
+  h.it.off=(h.it.off||[]).concat('#'+h.pi);
+  if(ms[h.pi])ms[h.pi].visible=false;
+  if(sel===h.it)buildParts();
+  save();
+  toast(partLabel(h.p)+' скрыта · Ctrl+Z вернёт, Shift+H — все');
+  return true;
+}
+function hideAt(e){
+  const h=partPick(e);
+  if(!h){toast('Под курсором нет сборной детали — наведи на панель корпуса');return false;}
+  return hidePart(h);
+}
+/* Вернуть всё погашенное во всей сцене. */
+function showAllHidden(){
+  const list=placed.filter(p=>(p.off||[]).length);
+  if(!list.length){toast('Ничего не скрыто');return;}
+  pushHist('показ скрытых деталей');
+  list.forEach(p=>{p.off=[];applyOff(p);});
+  buildParts();save();toast('Скрытые детали вернулись');
+}
+function hideMode(on){
+  HIDEM=(on===undefined)?!HIDEM:!!on;
+  const b=$('#bHide');if(b)b.classList.toggle('on',HIDEM);
+  $('#cv').classList.toggle('hidem',HIDEM);
+  if(!HIDEM){hlOff();hideTip(null);}
+  else toast('Наведи на крышу или панель — клик её скроет. Esc — выйти');
+}
+
 /* v2.45.974: тащим деталь в плоскости её собственной отметки, а не по полу —
    иначе поднятый наверх конденсатор прыгал бы вниз при первом же перетаскивании */
 function planePoint(e,z){toNDC(e);ray.setFromCamera(ndc,camera);
@@ -1916,6 +2022,12 @@ function bindCtl(cv){
     }
     camTouched=true;
     last={x:e.clientX,y:e.clientY};
+    /* v2.46.062: в режиме «скрыть панель» нажатие по детали её гасит,
+       а мимо детали — как обычно, вращает вид */
+    if(HIDEM&&e.button===0){
+      const h=partPick(e);
+      if(h){e.preventDefault();hidePart(h);hideTip(null);mode=null;return;}
+    }
     if(e.button===2){mode='pan';rmb={x:e.clientX,y:e.clientY};return;}
     /* Средняя кнопка и Shift+ЛКМ панорамируют даже поверх модели;
        Alt+ЛКМ там же вращает. Обычный ЛКМ на детали остаётся её перетаскиванием. */
@@ -1938,6 +2050,7 @@ function bindCtl(cv){
     if(lph){lpOff();
       const x=e.clientX,y=e.clientY;
       lpT=setTimeout(()=>{lpT=null;mode=null;dragSnap=null;cv.classList.remove('drag');
+        ctxPart=partPick({clientX:x,clientY:y});
         select(lph);ctxOpen(lph,x,y);},550);}
     if(hit){
       /* v2.45.1008: корпус — площадка, а не деталь, которую таскают каждым движением.
@@ -1969,7 +2082,9 @@ function bindCtl(cv){
         pan(m.x-pin.x,m.y-pin.y);pin=m;return;
       }
     }
-    if(!mode)return;
+    curXY={clientX:e.clientX,clientY:e.clientY};   // по нему работает клавиша H
+    if(!mode){if(HIDEM&&e.pointerType!=='touch')hideHover(e);return;}
+    if(HIDEM){hlOff();hideTip(null);}
     const dx=e.clientX-last.x,dy=e.clientY-last.y;last={x:e.clientX,y:e.clientY};
     if(lpT&&(Math.abs(dx)>3||Math.abs(dy)>3))lpOff();
     if(mode==='orbit'){theta-=dx*0.007;phi=Math.max(0.04,Math.min(Math.PI-0.04,phi-dy*0.007));}
@@ -2002,6 +2117,7 @@ function bindCtl(cv){
     rmb=null;
     const hit=pickItem(e,true);           // правой кнопкой берётся и корпус
     if(!hit){ctxClose();return;}          // по фону — только панорама, меню не нужно
+    ctxPart=partPick(e);                  // v2.46.062: какую именно панель задели
     select(hit);ctxOpen(hit,e.clientX,e.clientY);
   });
   cv.addEventListener('wheel',e=>{e.preventDefault();camTouched=true;
@@ -2046,6 +2162,7 @@ function bindCtl(cv){
       if(kz||ky){e.preventDefault();(kz&&!e.shiftKey)?undoAct():redoAct();return;}
     }
     if(e.key==='Escape'){
+      if(HIDEM){hideMode(false);return;}
       if($('#pas').classList.contains('on')){pasCancel();return;}
       if(pullOn()){pullStop();return;}
       if(ctxOn()){ctxClose();return;}
@@ -2059,6 +2176,12 @@ function bindCtl(cv){
       hideMnt();select(null);
     }
     if(e.key==='p'||e.key==='P'||e.key==='з'||e.key==='З')togglePin();
+    /* v2.46.062: H — скрыть панель под курсором, Shift+H — вернуть все */
+    if(/^[hHрР]$/.test(e.key)){
+      e.preventDefault();
+      if(e.shiftKey)showAllHidden(); else hideAt(curXY);
+      return;
+    }
     if(!sel)return;
     if(e.key==='r'||e.key==='R'||e.key==='к'||e.key==='К')rotSel();
     if(e.key==='t'||e.key==='T'||e.key==='е'||e.key==='Е')tiltSel();
@@ -3593,6 +3716,14 @@ function ctxItems(it){
   const L=[
     {ic:'ⓘ',t:'Карточка позиции',pri:1,go:()=>openDesc(it.d)},
   ];
+  /* v2.46.062: правой кнопкой по крыше или боковине — сразу «скрыть эту деталь» */
+  if(ctxPart&&ctxPart.it===it)
+    L.push({ic:'👁',t:'Скрыть эту деталь',s:partLabel(ctxPart.p),
+      go:(h=>()=>hidePart(h))(ctxPart)});
+  if((it.off||[]).length)
+    L.push({ic:'◉',t:'Показать скрытые',s:(it.off||[]).length+' шт.',
+      go:()=>{pushHist('показ деталей узла');it.off=[];applyOff(it);
+        if(sel===it)buildParts();save();}});
   if(gs)L.push({ic:'☰',t:'Детали узла',s:gs.length+' наим.',go:()=>{
     $('#partsBox').classList.add('on');$('#bParts').classList.add('on');buildParts();}});
   L.push({sep:1},
@@ -3708,6 +3839,9 @@ function applyOff(it){
   const ms=Array.isArray(it.obj.material)?it.obj.material:[it.obj.material];
   ms.forEach(m=>m.visible=true);
   (it.off||[]).forEach(k=>{
+    /* «#индекс» — одна деталь, погашенная прямо в сцене (v2.46.062);
+       остальные ключи — вся строка списка «Детали узла» */
+    if(k.charAt(0)==='#'){const i=+k.slice(1);if(ms[i])ms[i].visible=false;return;}
     const g=gs.find(x=>x.k===k);
     if(g)g.idx.forEach(i=>{if(ms[i])ms[i].visible=false;});
   });
@@ -3721,19 +3855,24 @@ function buildParts(){
   const PT=sel.obj.geometry.userData.parts;
   $('#pTitle').textContent=sel.d.name;
   $('#pCount').textContent=PT.length+' дет. · '+gs.length+' наим.';
-  $('#pList').innerHTML=gs.map((g,i)=>
-    '<div class="prow'+((sel.off||[]).indexOf(g.k)>=0?' off':'')+'" data-g="'+i+'">'+
+  /* v2.46.062: строка знает и про панель, погашенную прямо в сцене —
+     тогда у неё «скрыто 1 из 4», а кнопка возвращает всю строку целиком */
+  const nOff=g=>((sel.off||[]).indexOf(g.k)>=0)?g.idx.length
+    :g.idx.filter(i=>(sel.off||[]).indexOf('#'+i)>=0).length;
+  $('#pList').innerHTML=gs.map((g,i)=>{
+    const n=nOff(g),all=n>=g.idx.length;
+    return '<div class="prow'+(all?' off':'')+'" data-g="'+i+'">'+
     '<span class="d">'+esc(g.des)+'</span><span class="n" title="'+esc(g.name)+'">'+esc(g.name)+'</span>'+
-    '<span class="q">'+(g.idx.length>1?'×'+g.idx.length:'')+'</span>'+
-    '<button class="b">'+((sel.off||[]).indexOf(g.k)>=0?'показать':'скрыть')+'</button></div>').join('');
+    '<span class="q">'+(n&&!all?('скрыто '+n+' из '+g.idx.length)
+      :(g.idx.length>1?'×'+g.idx.length:''))+'</span>'+
+    '<button class="b">'+(n?'показать':'скрыть')+'</button></div>';}).join('');
   $('#pList').querySelectorAll('.prow').forEach(row=>{
     row.querySelector('.b').onclick=()=>{
-      const g=gs[+row.dataset.g],off=(sel.off||[]).indexOf(g.k)<0;
+      const g=gs[+row.dataset.g],off=nOff(g)===0;
       pushHist(off?'гашение детали узла':'показ детали узла');
-      if(off)sel.off.push(g.k); else sel.off=sel.off.filter(k=>k!==g.k);
-      row.classList.toggle('off',off);
-      row.querySelector('.b').textContent=off?'показать':'скрыть';
-      applyOff(sel);pAllLabel();save();
+      if(off)sel.off.push(g.k);
+      else sel.off=sel.off.filter(k=>k!==g.k&&g.idx.indexOf(+k.slice(1))<0);
+      applyOff(sel);buildParts();save();
     };
   });
   pAllLabel();
@@ -3759,6 +3898,7 @@ const HINT_KEY='atomus_chiller_hint';
     try{localStorage.setItem(HINT_KEY,min?'0':'1');}catch(e){}
   };
 })();
+$('#bHide').onclick=()=>hideMode();
 $('#bParts').onclick=()=>{
   const on=!$('#partsBox').classList.contains('on');
   $('#partsBox').classList.toggle('on',on);$('#bParts').classList.toggle('on',on);
