@@ -185,7 +185,7 @@ body.mob #stray{bottom:60px;left:8px;right:8px;transform:none;max-width:none}
 #nofit b{color:#fff;font-weight:700;white-space:nowrap}
 #nofit span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #nofit i{font-style:normal;color:#ffb3a6;white-space:nowrap}
-/* v2.46.068: с плашки можно позвать Клода — он разберёт упор и предложит,
+/* v2.46.069: с плашки можно позвать Клода — он разберёт упор и предложит,
    куда двигать. Кнопка отдельной мишенью: клик по самой плашке по-прежнему
    выделяет деталь. */
 #nofit u{text-decoration:none;color:#ffe08a;border:1px solid #8d6a30;border-radius:7px;
@@ -193,7 +193,7 @@ body.mob #stray{bottom:60px;left:8px;right:8px;transform:none;max-width:none}
 #nofit u:hover{background:rgba(120,88,20,.7)}
 @media(max-width:760px){#nofit{top:auto;bottom:56px;font-size:12px;max-width:94%}
   #nofit span{white-space:normal}}
-/* ═══ v2.46.068: разбор упора — панель Клода ═══ */
+/* ═══ v2.46.069: разбор упора — панель Клода ═══ */
 #fadv{position:absolute;right:12px;top:44px;z-index:7;display:none;width:330px;
   max-height:calc(100% - 100px);flex-direction:column;border-radius:11px;
   background:rgba(8,20,38,.97);border:1px solid var(--ice2);
@@ -3129,7 +3129,7 @@ function roofSel(){
   const hn=hitNames(sel.uid);
   if(hn)msg.push('⚠ не входит в этот корпус — упирается в '+hn);
   toast(msg.join(' · '));
-  /* v2.46.068: упёрлось — сразу зовём разбор, а не ждём, пока Дмитрий
+  /* v2.46.069: упёрлось — сразу зовём разбор, а не ждём, пока Дмитрий
      заметит красную плашку и начнёт двигать аппарат на глаз */
   if(hn)fitAuto(sel);
 }
@@ -4566,7 +4566,7 @@ function nofitShow(){
   const ask=el.querySelector('u');
   if(ask)ask.onclick=e=>{e.stopPropagation();select(f.it);fitAsk(f.it);};
 }
-/* ═══ v2.46.068: не входит — дальше думают мозги ═══
+/* ═══ v2.46.069: не входит — дальше думают мозги ═══
    Плашка говорила только, ЧТО упёрлось, а дальше Дмитрий двигал аппарат
    руками и на глаз. Теперь после команды «надеть» упор уходит на разбор:
    сцена сама перебирает пробные сдвиги (коробка детали против деталей корпуса
@@ -5780,7 +5780,7 @@ function portHideSync(){
 }
 /* деталь, сидящая на патрубке, обнимает бобышку аппарата — это посадка,
    а не наезд, иначе пара светилась бы красным сразу после установки.
-   v2.46.068: вынесено из checkCollisions — тем же правилом пользуется разбор
+   v2.46.069: вынесено из checkCollisions — тем же правилом пользуется разбор
    упора, когда перебирает пробные сдвиги. */
 function matedPair(a,b){
   return (a.link&&a.link.mount==='rot'&&a.link.to===b.uid)||
@@ -10740,6 +10740,18 @@ function chGrow(el){
     await restoreLegacy();
   }
   refresh();
+  /* v2.46.067: «В проект» с карточки витрины — деталь встаёт сразу, чтобы
+     не искать её здесь ещё раз руками */
+  try{
+    const add=new URLSearchParams(location.search).get('add');
+    if(add){
+      const d=DATA.find(x=>x.id===add&&x.ready);
+      if(d){catPick(d);toast('«'+d.name+'» из базы — в сцене');}
+      else toast('Позиция из базы не нашлась — выбери её в каталоге слева');
+      const u=new URL(location.href);u.searchParams.delete('add');
+      history.replaceState(null,'',u.pathname+u.search);
+    }
+  }catch(e){}
   chatArm();     /* чат по чиллерам — если он этому пользователю доступен */
   verWatch();    /* база могла пересобраться, пока вкладка открыта */
 })();

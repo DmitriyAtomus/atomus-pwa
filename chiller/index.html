@@ -37,22 +37,25 @@ header{grid-column:1/3;display:flex;align-items:center;gap:18px;padding:0 18px;
   font:inherit;font-size:12px;padding:6px 11px;border-radius:8px;cursor:pointer}
 .fsbtn:hover{border-color:var(--cyan);color:#fff;background:rgba(27,159,216,.10)}
 
-/* ---------- сайдбар ---------- */
+/* ---------- сайдбар (v2.46.067: иконки разделов, раскрывающиеся подразделы) ---------- */
 aside{background:#08182D;border-right:1px solid var(--line);overflow-y:auto;padding:14px 0 24px}
 .grp{padding:0 16px;margin-bottom:6px}
 .grp>.gt{font-size:10.5px;letter-spacing:1.3px;text-transform:uppercase;color:var(--dim2);
   margin:14px 0 7px}
-.sec{display:flex;align-items:center;gap:8px;padding:6px 16px;cursor:pointer;
-  font-size:13px;color:#C6D5E6;border-left:2px solid transparent}
-.sec:hover{background:rgba(255,255,255,.04)}
-.sec.on{background:rgba(27,159,216,.12);border-left-color:var(--cyan);color:#fff}
-.sec .n{margin-left:auto;font-size:11px;color:var(--dim2);
-  background:rgba(255,255,255,.06);border-radius:9px;padding:1px 7px;min-width:24px;text-align:center}
-.sec.on .n{background:rgba(27,159,216,.25);color:#BFE4F8}
-.sub{padding:5px 16px 5px 36px;font-size:12.5px;color:var(--dim);cursor:pointer;display:flex;gap:8px}
+.sec{display:flex;align-items:center;gap:10px;margin:0 8px 3px;padding:8px 9px;border-radius:9px;
+  cursor:pointer;font-size:13px;color:#C6D5E6}
+.sec:hover{background:rgba(255,255,255,.05)}
+.sec.on{background:rgba(27,159,216,.14);color:#CDE9F8}
+.sec .ic{width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,.05);
+  display:flex;align-items:center;justify-content:center;font-size:14px;color:#8FD3F4;flex-shrink:0}
+.sec.on .ic{background:rgba(27,159,216,.22)}
+.sec b{font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sec .n{font-family:Consolas,monospace;font-size:10.5px;color:var(--dim2)}
+.sec.on .n{color:#8FD3F4}
+.sub{padding:4px 16px 4px 44px;font-size:12.5px;color:var(--dim);cursor:pointer;display:flex;gap:8px}
 .sub:hover{color:#fff}
 .sub.on{color:var(--cyan)}
-.sub .n{margin-left:auto;font-size:11px;color:var(--dim2)}
+.sub .n{margin-left:auto;font-size:11px;color:var(--dim2);font-family:Consolas,monospace}
 .chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px}
 .chip{font-size:11.5px;padding:3px 9px;border-radius:12px;cursor:pointer;
   border:1px solid var(--line2);color:var(--dim);background:rgba(255,255,255,.03)}
@@ -60,32 +63,84 @@ aside{background:#08182D;border-right:1px solid var(--line);overflow-y:auto;padd
 .chip.on{background:rgba(27,159,216,.18);border-color:var(--cyan);color:#CDE9F8}
 
 /* ---------- основная область ---------- */
-main{overflow-y:auto;padding:20px 22px 40px}
-.crumb{font-size:12px;color:var(--dim);margin-bottom:3px}
-.h1{font-size:19px;font-weight:600;letter-spacing:.2px;color:#fff;margin-bottom:16px}
+main{overflow-y:auto;padding:0 22px 40px}
+.hero{position:sticky;top:0;z-index:6;background:linear-gradient(180deg,var(--bg) 74%,transparent);
+  padding:18px 0 12px}
+.crumb{font-size:12px;color:var(--dim2);margin-bottom:3px}
+.hrow{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.h1{font-size:23px;font-weight:600;letter-spacing:-.2px;color:#fff}
 .h1 small{font-size:12.5px;font-weight:400;color:var(--dim);margin-left:10px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:14px}
-.card{background:linear-gradient(170deg,#0E2242,#0A1A31);border:1px solid var(--line);
-  border-radius:11px;overflow:hidden;cursor:pointer;transition:.14s;position:relative}
-.card:hover{border-color:var(--cyan);transform:translateY(-2px);
-  box-shadow:0 10px 26px rgba(0,0,0,.45)}
-.card .ph{height:146px;display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(ellipse at 50% 38%,rgba(27,159,216,.11),transparent 62%)}
-.card .ph img{max-height:138px;max-width:88%;filter:drop-shadow(0 8px 14px rgba(0,0,0,.5))}
+.views{margin-left:auto;display:flex;gap:2px;background:rgba(255,255,255,.05);
+  border:1px solid var(--line);border-radius:9px;padding:3px}
+.views div{padding:5px 12px;border-radius:7px;font-size:12px;color:var(--dim);cursor:pointer;white-space:nowrap}
+.views div.on{background:rgba(27,159,216,.18);color:#8FD3F4}
+.fbar{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px;align-items:center}
+.flab{font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim2);margin-right:2px}
+.pill{font-size:11.5px;color:var(--dim);border:1px solid var(--line);border-radius:15px;
+  padding:4px 11px;cursor:pointer;white-space:nowrap;background:rgba(255,255,255,.03)}
+.pill:hover{border-color:var(--line2);color:var(--text)}
+.pill.on{color:#8FD3F4;border-color:var(--cyan);background:rgba(27,159,216,.13)}
+.pill .n{font-family:Consolas,monospace;font-size:9.5px;opacity:.62;margin-left:5px}
+
+/* ---------- плитки ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  cursor:pointer;transition:.14s;position:relative;display:flex;flex-direction:column}
+.card:hover{border-color:var(--cyan);transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.45)}
+.card .ph{position:relative;height:158px;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(120% 90% at 50% 15%,#22405f 0%,#132b48 55%,#0e2340 100%)}
+.card .ph img{max-height:142px;max-width:88%;filter:drop-shadow(0 8px 14px rgba(0,0,0,.45))}
 .card .ph .none{color:var(--dim2);font-size:11.5px;text-align:center;line-height:1.7}
 .card .ph .none i{display:block;font-size:26px;font-style:normal;opacity:.45;margin-bottom:2px}
-.card .body{padding:11px 13px 13px;border-top:1px solid var(--line)}
-.card .brand{font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--cyan)}
-.card .nm{font-size:14px;font-weight:600;color:#fff;margin:2px 0 3px}
-.card .kd{font-size:11.5px;color:var(--dim);line-height:1.35;min-height:31px}
+.card .body{padding:11px 13px 13px}
+.card .brand{font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;color:var(--dim2)}
+.card .nm{font-size:13.5px;font-weight:600;color:#fff;margin:3px 0 2px;line-height:1.3}
+.card .kd{font-size:11.5px;color:var(--dim);line-height:1.35}
 .card .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}
-.tag{font-size:10.5px;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,.06);
-  color:#9DB3CA}
-.badge{position:absolute;top:9px;right:9px;font-size:10px;letter-spacing:.6px;
-  padding:2px 7px;border-radius:4px;font-weight:600}
-.b-ok{background:rgba(27,159,216,.22);color:#8FD3F4;border:1px solid rgba(27,159,216,.45)}
-.b-q{background:rgba(201,162,39,.16);color:var(--gold);border:1px solid rgba(201,162,39,.4)}
+.tag{font-size:10.5px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.04);
+  border:1px solid var(--line);color:#9DB3CA}
+.tag.key{color:#8FD3F4;background:rgba(27,159,216,.11);border-color:rgba(27,159,216,.28);
+  font-family:Consolas,monospace}
+.badge{position:absolute;top:9px;right:9px;font-size:9.5px;letter-spacing:.6px;
+  padding:3px 8px;border-radius:12px;font-weight:600;background:rgba(6,18,35,.78)}
+.b-ok{color:#8FD3F4;border:1px solid rgba(27,159,216,.45)}
+.b-q{color:var(--gold);border:1px solid rgba(201,162,39,.4)}
+.b-my{color:var(--gold);border:1px solid rgba(201,162,39,.5)}
+.acts{position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;padding:8px;
+  background:linear-gradient(0deg,rgba(6,18,35,.94),transparent);opacity:0;transition:.12s}
+.card:hover .acts{opacity:1}
+.acts button{flex:1;border:1px solid var(--line2);background:rgba(10,30,60,.9);color:var(--text);
+  border-radius:8px;padding:5px 0;font:inherit;font-size:11px;cursor:pointer}
+.acts button:hover{border-color:var(--cyan);color:#8FD3F4}
+/* ---------- список ---------- */
+.grid.list{grid-template-columns:1fr;gap:8px}
+.list .card{flex-direction:row;border-radius:12px}
+.list .card .ph{width:150px;height:96px;flex-shrink:0}
+.list .card .ph img{max-height:88px}
+.list .acts,.list .badge{display:none}
+.list .card .body{flex:1;display:flex;align-items:center;gap:16px;padding:10px 14px;min-width:0}
+.list .lmain{flex:1;min-width:0}
+.list .card .kd{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list .card .tags{margin-top:0;flex-wrap:nowrap}
+.list .lgo{border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--text);
+  border-radius:8px;padding:6px 14px;font-size:12px;white-space:nowrap}
+/* ---------- таблица ---------- */
+table.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th{position:sticky;top:104px;background:var(--bg);text-align:left;font-size:9.5px;
+  letter-spacing:1px;text-transform:uppercase;color:var(--dim2);padding:8px 10px;
+  border-bottom:1px solid var(--line2);cursor:pointer;white-space:nowrap;z-index:4}
+.tbl th:hover{color:#8FD3F4}
+.tbl td{padding:9px 10px;border-bottom:1px solid var(--line)}
+.tbl tbody tr{cursor:pointer}
+.tbl tbody tr:hover{background:rgba(27,159,216,.07)}
+.tbl td.num{font-family:Consolas,monospace;text-align:right;white-space:nowrap;color:#C6D5E6}
+.tbl td.nm b{font-weight:600;color:#fff}
+.tbl td.nm span{display:block;font-size:10px;color:var(--dim2);letter-spacing:1.1px;text-transform:uppercase}
+.tmini{width:54px;height:40px;border-radius:7px;background:#122a46;display:flex;
+  align-items:center;justify-content:center;overflow:hidden}
+.tmini img{max-width:100%;max-height:100%}
 
+/* ---------- футер ---------- */
 /* ---------- футер ---------- */
 footer{grid-column:1/3;display:flex;align-items:center;gap:16px;padding:0 18px;
   background:#08182D;border-top:1px solid var(--line);font-size:11.5px;color:var(--dim2)}
@@ -402,18 +457,22 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
     <button id="navx" onclick="closeNav()">×</button>
     <div class="grp"><div class="gt">Рубрикатор</div></div>
     <div id="tree"></div>
-    <div class="grp"><div class="gt">Производитель</div></div>
-    <div class="chips" id="fBrand"></div>
-    <div class="grp"><div class="gt">Статус</div></div>
-    <div class="chips" id="fState">
+    <div class="chips" id="fBrand" style="display:none"></div>
+    <div class="chips" id="fState" style="display:none">
       <div class="chip" data-st="ready">есть модель</div>
       <div class="chip" data-st="queued">в очереди</div>
     </div>
   </aside>
 
   <main>
-    <div class="crumb" id="crumb">Все разделы</div>
-    <div class="h1" id="title">База 3D-моделей <small id="sub"></small></div>
+    <div class="hero">
+      <div class="crumb" id="crumb">Все разделы</div>
+      <div class="hrow"><div class="h1" id="title">База 3D-моделей <small id="sub"></small></div>
+        <div class="views" id="views">
+          <div data-v="grid" class="on">▦ Плитки</div><div data-v="list">☰ Список</div>
+          <div data-v="table">▤ Таблица</div></div></div>
+      <div class="fbar" id="fbar"></div>
+    </div>
     <div class="grid" id="grid"></div>
   </main>
 
@@ -565,48 +624,169 @@ function match(d){
 }
 function cnt(sec,sub){return DATA.filter(d=>d.section===sec&&(!sub||d.sub===sub)).length;}
 
+/* ═══ v2.46.067: витрина заново ═══
+   Плоский список разделов и мелкие тёмные карточки читались плохо: чтобы
+   выбрать компрессор на 12 кВт, приходилось открывать позиции по одной.
+   Теперь рубрикатор с иконками, характеристики видны прямо на карточке и
+   три вида — плитки, список и таблица с сортировкой по колонкам. */
+const SEC_IC={compressors:'⛭',hx:'▤',vessels:'◍',valves:'⌬',pumps:'↺',
+  frames:'▣',heat:'♨',pipe:'⌇',automation:'◉',mounts:'⌗',
+  supports:'⌗',electro:'⚡'};
+const secIc=id=>SEC_IC[id]||'◇';
+let view='grid',sortK=null,sortD=1;
+try{view=localStorage.getItem('chiller.view')||'grid';}catch(e){}
+
+/* ── чипы и колонки: тянем из тегов, характеристик и геометрии ── */
+const tagFind=(d,re)=>((d.tags||[]).find(t=>re.test(t))||'');
+const specFind=(d,re)=>{const r=(d.specs||[]).find(x=>re.test(String(x[0])));return r?String(r[1]):'';};
+const keyVal=d=>tagFind(d,/кВт|л\b|м³|бар/i)||
+  specFind(d,/^(Холодопроизвод|Мощность|Объём|Подача|Тепловая)/i);
+const refVal=d=>tagFind(d,/^R\d/i)||specFind(d,/^Хладагент/i);
+function connVal(d){
+  const g=d.geom||{};
+  return tagFind(d,/пайк|резьб|Ø|SAE|G\d/i)||
+    specFind(d,/^Присоединени/i)||
+    ((g.conn&&g.conn!==d.kind)?String(g.conn):'');
+}
+function sizeVal(d){
+  const g=d.geom||{},r=(g.rows||[]).find(x=>/^Габарит/i.test(String(x[0])));
+  if(r)return String(r[1]);
+  const bb=(GEOMS[d.g]||{}).bb;
+  if(bb&&bb.lo&&bb.hi)return [0,1,2].map(i=>Math.round(bb.hi[i]-bb.lo[i])).join('×')+' мм';
+  return specFind(d,/^Габарит/i);
+}
+const COLS=[['Основное',keyVal],
+  ['Хладагент',refVal],
+  ['Присоединение',connVal],
+  ['Габарит',sizeVal]];
+
 function drawTree(){
-  $('#tree').innerHTML = SECTIONS.map(([id,nm,subs])=>
-    `<div class="sec${f.sec===id?' on':''}" data-sec="${id}">${nm}<span class="n">${cnt(id)}</span></div>`+
-    (f.sec===id ? subs.map(([sid,snm])=>
-      `<div class="sub${f.sub===sid?' on':''}" data-sec="${id}" data-sub="${sid}">${snm}
-       <span class="n">${cnt(id,sid)}</span></div>`).join('') : '')
+  const secs=SECTIONS.map(([id,nm,subs])=>({id,nm,subs:subs||[],n:cnt(id)})).filter(x=>x.n);
+  $('#tree').innerHTML = secs.map(x=>
+    `<div class="sec${f.sec===x.id?' on':''}" data-sec="${x.id}">`+
+      `<span class="ic">${secIc(x.id)}</span><b>${x.nm}</b><span class="n">${x.n}</span></div>`+
+    (f.sec===x.id ? x.subs.filter(([sid])=>cnt(x.id,sid)).map(([sid,snm])=>
+      `<div class="sub${f.sub===sid?' on':''}" data-sec="${x.id}" data-sub="${sid}">${snm}`+
+      `<span class="n">${cnt(x.id,sid)}</span></div>`).join('') : '')
   ).join('');
   $('#tree').querySelectorAll('.sec').forEach(e=>e.onclick=()=>{
-    f.sec = f.sec===e.dataset.sec?null:e.dataset.sec; f.sub=null; draw();});
+    f.sec = f.sec===e.dataset.sec?null:e.dataset.sec; f.sub=null; f.brand=null; draw();});
   $('#tree').querySelectorAll('.sub').forEach(e=>e.onclick=ev=>{
     ev.stopPropagation(); f.sub = f.sub===e.dataset.sub?null:e.dataset.sub; draw();});
 }
-function drawBrands(){
-  const bs=[...new Set(DATA.map(d=>d.brand))].sort();
-  $('#fBrand').innerHTML = bs.map(b=>`<div class="chip${f.brand===b?' on':''}" data-b="${b}">${b}</div>`).join('');
-  $('#fBrand').querySelectorAll('.chip').forEach(e=>e.onclick=()=>{
-    f.brand = f.brand===e.dataset.b?null:e.dataset.b; draw();});
+/* панель над карточками: подразделы, производители, статус */
+function drawFbar(){
+  const inSec = f.sec?DATA.filter(d=>d.section===f.sec):DATA;
+  const S = f.sec?SECTIONS.find(x=>x[0]===f.sec):null;
+  let h='';
+  if(S){
+    const subs=(S[2]||[]).filter(([sid])=>cnt(S[0],sid));
+    if(subs.length>1)h+='<span class="flab">подраздел</span>'+
+      `<div class="pill${f.sub?'':' on'}" data-b="">Все<span class="n">${inSec.length}</span></div>`+
+      subs.map(([sid,snm])=>`<div class="pill${f.sub===sid?' on':''}" data-b="${sid}">${snm}`+
+        `<span class="n">${cnt(S[0],sid)}</span></div>`).join('');
+  }
+  const pool = f.sub?inSec.filter(d=>d.sub===f.sub):inSec, bs={};
+  pool.forEach(d=>{bs[d.brand]=(bs[d.brand]||0)+1;});
+  const ks=Object.keys(bs).sort((a,b)=>bs[b]-bs[a]);
+  if(ks.length>1)h+='<span class="flab" style="margin-left:8px">производитель</span>'+
+    ks.map(b=>`<div class="pill${f.brand===b?' on':''}" data-r="${b}">${b}`+
+      `<span class="n">${bs[b]}</span></div>`).join('');
+  const nq=pool.filter(d=>!d.ready).length;
+  if(nq)h+='<span class="flab" style="margin-left:8px">статус</span>'+
+    `<div class="pill${f.st==='ready'?' on':''}" data-s="ready">есть модель`+
+    `<span class="n">${pool.length-nq}</span></div>`+
+    `<div class="pill${f.st==='queued'?' on':''}" data-s="queued">в очереди<span class="n">${nq}</span></div>`;
+  $('#fbar').innerHTML=h;
+  $('#fbar').querySelectorAll('[data-b]').forEach(e=>e.onclick=()=>{f.sub=e.dataset.b||null;f.brand=null;draw();});
+  $('#fbar').querySelectorAll('[data-r]').forEach(e=>e.onclick=()=>{
+    f.brand=f.brand===e.dataset.r?null:e.dataset.r;draw();});
+  $('#fbar').querySelectorAll('[data-s]').forEach(e=>e.onclick=()=>{
+    f.st=f.st===e.dataset.s?null:e.dataset.s;draw();});
+}
+function drawBrands(){}          /* производители переехали в панель над карточками */
+
+const phOf = d => d.ready
+  ? (GEOMS[d.g]&&GEOMS[d.g].user
+      ? `<img loading="lazy" data-uth="${d._uid}">`
+      : `<img loading="lazy" data-th="${GEOMS[d.g].f}">`)
+  : `<div class="none"><i>◻</i>модель<br>не выпущена</div>`;
+const badgeOf = d => d._uid?`<span class="badge b-my">МОЙ STEP</span>`
+  :(d.ready?`<span class="badge b-ok">LOD ${d.lod}</span>`
+           :`<span class="badge b-q">в очереди</span>`);
+function tagsOf(d){
+  const key=keyVal(d), rest=(d.tags||[]).filter(t=>t!==key).slice(0,2);
+  return (key?`<span class="tag key">${key}</span>`:'')+
+    rest.map(t=>`<span class="tag">${t}</span>`).join('');
+}
+function cardHtml(d){
+  return `<div class="card" data-id="${d.id}"><div class="ph">${phOf(d)}${badgeOf(d)}`+
+    (d.ready?`<div class="acts"><button data-act="open">Открыть 3D</button>`+
+      `<button data-act="proj">В проект</button>`+
+      `<button data-act="step">STEP</button></div>`:'')+
+    `</div><div class="body"><div class="brand">${d.brand}</div><div class="nm">${d.name}</div>`+
+    `<div class="kd">${d.kind}</div><div class="tags">${tagsOf(d)}</div></div></div>`;
+}
+function rowHtml(d){
+  return `<div class="card" data-id="${d.id}"><div class="ph">${phOf(d)}</div>`+
+    `<div class="body"><div class="lmain"><div class="brand">${d.brand}</div>`+
+    `<div class="nm">${d.name}</div><div class="kd">${d.kind}</div></div>`+
+    `<div class="tags">${tagsOf(d)}</div>`+
+    `<div class="lgo">Открыть →</div></div></div>`;
+}
+function tableHtml(list){
+  const cols=COLS.filter(([,fn])=>list.some(d=>fn(d)));
+  const rows=list.slice(0,200);
+  return `<table class="tbl"><thead><tr><th style="width:70px"></th>`+
+    `<th>Позиция</th>`+
+    cols.map(([t])=>`<th data-k="${t}" style="text-align:right">${t}`+
+      (sortK===t?(sortD>0?' ↑':' ↓'):'')+`</th>`).join('')+`</tr></thead><tbody>`+
+    rows.map(d=>`<tr data-id="${d.id}"><td><div class="tmini">${phOf(d)}</div></td>`+
+      `<td class="nm"><span>${d.brand}</span><b>${d.name}</b></td>`+
+      cols.map(([,fn])=>`<td class="num">${fn(d)||'—'}</td>`).join('')+`</tr>`).join('')+
+    `</tbody></table>`+
+    (list.length>rows.length?`<div style="padding:14px 4px;color:var(--dim2);font-size:12px">`+
+      `показаны первые ${rows.length} из ${list.length}</div>`:'');
 }
 function drawCards(){
   const list = DATA.filter(match);
-  $('#grid').innerHTML = list.map(d=>`
-    <div class="card" data-id="${d.id}">
-      <span class="badge ${d.ready?'b-ok':'b-q'}">${d.ready?'STEP · LOD '+d.lod:'в очереди'}</span>
-      <div class="ph">${d.ready
-        ? (GEOMS[d.g]&&GEOMS[d.g].user
-            ? `<img loading="lazy" data-uth="${d._uid}">`
-            : `<img loading="lazy" data-th="${GEOMS[d.g].f}">`)
-        : `<div class="none"><i>◻</i>модель<br>не выпущена</div>`}</div>
-      <div class="body">
-        <div class="brand">${d.brand}</div>
-        <div class="nm">${d.name}</div>
-        <div class="kd">${d.kind}</div>
-        <div class="tags">${(d.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
-      </div>
-    </div>`).join('') ||
-    `<div style="color:var(--dim);padding:30px 4px">Ничего не найдено — сними часть фильтров.</div>`;
-  $('#grid').querySelectorAll('.card').forEach(e=>e.onclick=()=>openDet(e.dataset.id));
+  if(sortK){
+    const fn=(COLS.find(c=>c[0]===sortK)||[])[1];
+    if(fn)list.sort((a,b)=>{
+      const va=fn(a)||'',vb=fn(b)||'';
+      const na=parseFloat(String(va).replace(',','.')),nb=parseFloat(String(vb).replace(',','.'));
+      return (isNaN(na)||isNaN(nb)?String(va).localeCompare(String(vb),'ru'):na-nb)*sortD;});
+  }
+  const g=$('#grid');
+  g.classList.toggle('list',view==='list');
+  g.style.display=(view==='table'&&list.length)?'block':'';
+  if(!list.length){
+    g.classList.remove('list');
+    g.innerHTML=`<div style="color:var(--dim);padding:30px 4px">Ничего не найдено — сними часть фильтров.</div>`;
+  }else if(view==='table'){
+    g.classList.remove('list');
+    g.innerHTML=tableHtml(list);
+    g.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{
+      const k=th.dataset.k;
+      if(sortK===k)sortD=-sortD; else {sortK=k;sortD=1;}
+      draw();});
+  }else{
+    g.innerHTML=list.map(view==='list'?rowHtml:cardHtml).join('');
+  }
+  g.querySelectorAll('[data-id]').forEach(e=>e.onclick=ev=>{
+    const a=ev.target.closest('[data-act]');
+    const d=DATA.find(x=>x.id===e.dataset.id);
+    if(a&&d){
+      ev.stopPropagation();
+      if(a.dataset.act==='step')return dlStep(d);
+      if(a.dataset.act==='proj'){location.href='project.html?add='+encodeURIComponent(d.id);return;}
+    }
+    openDet(e.dataset.id);});
 
   const secNm = f.sec ? SECTIONS.find(s=>s[0]===f.sec) : null;
-  const subNm = secNm && f.sub ? secNm[2].find(s=>s[0]===f.sub) : null;
+  const subNm = secNm && f.sub ? (secNm[2]||[]).find(s=>s[0]===f.sub) : null;
   $('#crumb').textContent = ['Все разделы', secNm&&secNm[1], subNm&&subNm[1]].filter(Boolean).join('  ·  ');
-  $('#title').firstChild.textContent = subNm?subNm[1]:(secNm?secNm[1]:'База 3D-моделей ');
+  $('#title').firstChild.textContent = (subNm?subNm[1]:(secNm?secNm[1]:'База 3D-моделей'))+' ';
   $('#sub').textContent = 'позиций: '+list.length+' · с моделями: '+list.filter(d=>d.ready).length;
 }
 const THUMB_CACHE = new Map();
@@ -634,7 +814,9 @@ function fillVisible(){
   let started = 0;
   for(const img of list){
     if(img.src || img.dataset.busy) continue;
-    const r = img.closest('.ph').getBoundingClientRect();
+    /* v2.46.067: превью живёт и в строке списка, и в ячейке таблицы */
+    const box = img.closest('.ph') || img.closest('.tmini') || img;
+    const r = box.getBoundingClientRect();
     if(r.bottom < -600 || r.top > H) continue;
     fillThumb(img);
     if(++started > 40) break;          // порциями, чтобы не забить сеть
@@ -654,8 +836,12 @@ function bindThumbs(){
       _thumbTimer = setTimeout(fillVisible, 120); }, {passive:true});
   }
 }
-function draw(){drawTree();drawBrands();drawCards();bindThumbs();
-  $('#fState').querySelectorAll('.chip').forEach(e=>e.classList.toggle('on',f.st===e.dataset.st));}
+function draw(){drawTree();drawFbar();drawCards();bindThumbs();
+  $('#views').querySelectorAll('[data-v]').forEach(e=>e.classList.toggle('on',e.dataset.v===view));}
+$('#views').querySelectorAll('[data-v]').forEach(el=>el.onclick=()=>{
+  view=el.dataset.v;
+  try{localStorage.setItem('chiller.view',view);}catch(e){}
+  draw();document.querySelector('main').scrollTop=0;});
 
 /* после поиска список другой, а превью в нём ещё пустые: без bindThumbs они
    подтягивались только после первой прокрутки, и найденное выглядело пустым */
