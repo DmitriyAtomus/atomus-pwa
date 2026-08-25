@@ -3545,18 +3545,58 @@ function tankPortPut(it,zi,p){
   const g=tankFitOf(it,zi);
   if(g)g.position.set(p[0],p[1],p[2]);
 }
-/* муфта: труба по оси врезки и бурт под резьбу — как сварная врезка в изделии */
-function tankFitMesh(it,z,zi){
-  const od=Math.max(14,+z.od||26),len=Math.max(28,(+z.seat||18)*2);
-  const col=PORTS?(TFIT_COL[z.kind]||C_EQ):modelCol(it.d);
-  const mat=new THREE.MeshStandardMaterial({color:col,metalness:.55,roughness:.48,
-    flatShading:true});
+/* ═══ v2.46.069: врезка бака — настоящая резьбовая муфта ═══
+   Раньше это были два цилиндра: труба и бурт — в сцене читалось как
+   заглушка, и по картинке нельзя было понять, какая там резьба и есть ли
+   она вообще. Теперь муфта — кольцо со сквозным отверстием, фаской и
+   витками резьбы: внутренними (у нашего бака врезки внутренние, G1/G1½)
+   или наружными, если так размечено в базе. Шаг витков — по ГОСТ 6357 для
+   трубной резьбы, чтобы «на глаз» совпадало с настоящей деталью. */
+const THR_PITCH={'G1/2':1.814,'G3/4':1.814,'G1':2.309,'G11/4':2.309,
+  'G11/2':2.309,'G2':2.309,'G21/2':2.309};
+function thrPitch(z){
+  const c=String((z&&z.conn)||'').replace(/[\s-]+/g,'').toUpperCase();
+  return THR_PITCH[c]||(+z.od>34?2.309:1.814);
+}
+/* витки: тонкие торы по шагу резьбы — дёшево по треугольникам и читается
+   как резьба даже на общем виде */
+function thrCoils(r,len,pitch,mat,from){
   const g=new THREE.Group();
-  const tube=new THREE.Mesh(tkCylZ(od/2,od/2,len,20),mat);
-  tube.position.z=len/2-8;
-  const rim=new THREE.Mesh(tkCylZ(od/2+5,od/2+5,7,20),mat);
-  rim.position.z=len-14;
-  g.add(tube);g.add(rim);
+  const n=Math.min(14,Math.max(3,Math.floor(len/pitch)));
+  const geo=new THREE.TorusGeometry(r,Math.max(.5,pitch*.26),5,22);
+  for(let i=0;i<n;i++){
+    const m=new THREE.Mesh(geo,mat);
+    m.position.z=from+pitch*(i+.5);
+    g.add(m);
+  }
+  return g;
+}
+function tankFitMesh(it,z,zi){
+  const od=Math.max(14,+z.od||26);
+  const len=Math.max(26,(+z.seat||18)*1.6);
+  const inner=(z.sex||'f')!=='m';          // по умолчанию врезка внутренняя
+  const col=tankFitCol(it,z);
+  /* DoubleSide: у муфты открытые торцы — без него отверстие «проваливается» */
+  const mat=new THREE.MeshStandardMaterial({color:col,metalness:.62,roughness:.42,
+    flatShading:true,side:THREE.DoubleSide});
+  const g=new THREE.Group();
+  const rOut=od/2+(inner?5:2.5);           // наружная стенка муфты
+  const rIn=od/2-(inner?0:2.2);            // проходное отверстие
+  /* тело: труба со сквозным отверстием — торец открыт, видно резьбу внутри */
+  const body=new THREE.Mesh(tkCylZ(rOut,rOut,len,24,true),mat);
+  body.position.z=len/2-6;
+  const bore=new THREE.Mesh(tkCylZ(rIn,rIn,len,24,true),mat);
+  bore.position.z=len/2-6;
+  const face=new THREE.Mesh(new THREE.RingGeometry(rIn,rOut,24),mat);
+  face.position.z=len-6;                    // торцевое кольцо
+  const seat=new THREE.Mesh(new THREE.RingGeometry(rIn,rOut,24),mat);
+  seat.position.z=-6;seat.rotateX(Math.PI); // прилегание к стенке бака
+  g.add(body);g.add(bore);g.add(face);g.add(seat);
+  /* резьба: внутри отверстия или снаружи штуцера */
+  if((z.ctype||'thr')==='thr'||z.ctype==='rot'){
+    const pitch=thrPitch(z);
+    g.add(thrCoils(inner?rIn+pitch*.2:rOut+pitch*.2,len-10,pitch,mat,-2));
+  }
   g.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),zDir(z));
   g.position.set(z.p0[0],z.p0[1],z.p0[2]);
   g.traverse(o=>{o.userData.zi=zi;});
@@ -3585,14 +3625,15 @@ function tankFits(it){
   it._fits=g;it.obj.add(g);
   tankHideBaked(it);
 }
-/* цвет муфт живёт по тем же правилам, что и вшитые патрубки: подписи выключены —
-   штуцер идёт цветом изделия */
+/* v2.46.069: муфты бака — водяной контур, а не фреоновая линия. Красная
+   «труба нагнетания» на баке путала: цвета dis/suc — это про хладагент.
+   Врезки бака идут сталью, а среду по-прежнему видно по подписи патрубка. */
+const tankFitCol=(it,z)=>modelCol(it.d);
 function tankFitPaint(it){
   if(!it._fits)return;
-  const base=modelCol(it.d);
   it._fits.children.forEach(g=>{
     const z=(it.zn||[])[g.userData.zi];
-    const c=PORTS?(TFIT_COL[z&&z.kind]||C_EQ):base;
+    const c=tankFitCol(it,z);
     g.traverse(o=>{if(o.material&&o.material.color)o.material.color.setHex(c);});
   });
 }
