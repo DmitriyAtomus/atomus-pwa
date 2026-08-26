@@ -22754,6 +22754,17 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
     text-align: left; color: var(--text);
   }
   .pd-ral-btn:hover, .pd-mat-btn:hover { border-color: var(--brand); color: var(--brand); }
+  /* v2.46.083: фактура покрытия — глянец / шагрень рядом с цветом */
+  .pg-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pg-seg button { border: 1.5px solid var(--border); border-radius: 9px; background: #fff;
+                   padding: 7px 11px; font-size: 12px; font-weight: 600; cursor: pointer;
+                   color: var(--text-mid); font-family: inherit; }
+  .pg-seg button:hover { border-color: var(--brand); color: var(--brand); }
+  .pg-seg button.on { border-color: var(--brand); background: var(--brand-bg); color: var(--brand); }
+  .pg-seg button.dim { color: var(--text-light); font-weight: 500; }
+  .pdx-coat { color: var(--text-light); font-size: 11px; margin-top: 2px;
+              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
   .mat-lead { font-size: 12.5px; color: var(--text-mid); background: var(--bg);
               border-radius: 8px; padding: 9px 11px; margin-bottom: 12px; line-height: 1.5; }
   .mat-list { display: flex; flex-direction: column; gap: 5px; max-height: 300px; overflow-y: auto; }

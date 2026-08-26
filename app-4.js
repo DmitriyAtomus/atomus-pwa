@@ -16581,7 +16581,9 @@ function renderPaintCalcList() {
         '<div class="pc-meta">' +
           (c.contract_number ? '<span><i class="ti ti-file-text"></i> ' + escapeHtml(c.contract_number) + '</span>' : '') +
           '<span><i class="ti ti-list"></i> позиций ' + (c.items_count || 0) + '</span>' +
-          (c.ral ? '<span><i class="ti ti-palette"></i> ' + escapeHtml(c.ral) + '</span>' : '') +
+          (_paintCoatLabel(c.ral, c.gloss)
+            ? '<span><i class="ti ti-palette"></i> ' +
+              escapeHtml(_paintCoatLabel(c.ral, c.gloss)) + '</span>' : '') +
           '<span><i class="ti ti-calendar"></i> ' + escapeHtml((c.created_at || '').slice(0, 10)) + '</span>' +
         '</div>' +
       '</div>' +
@@ -16603,7 +16605,8 @@ function openNewPaintCalc() {
 
 function editPaintCalcRal(calcId) {
   const c = state.currentPaintCalc || {};
-  _paintOpenCalcModal({ mode: 'ral', calcId: calcId, ral: c.ral || '', title: c.title || '' });
+  _paintOpenCalcModal({ mode: 'ral', calcId: calcId, ral: c.ral || '',
+                        gloss: c.gloss || '', title: c.title || '' });
 }
 
 function _paintOpenCalcModal(opts) {
@@ -16646,6 +16649,12 @@ function _paintOpenCalcModal(opts) {
             'внутри расчёта.<br>Цех считает по цвету: другой RAL — другая загрузка и другой ценник. ' +
             'Если цвет ещё не согласован, оставьте пустым — в ведомости будет видно, что он не указан.</div>' +
         '</div>' +
+        // Фактуру спрашиваем сразу: заказывать порошок без неё нельзя.
+        '<div class="form-group">' +
+          '<label>Фактура покрытия</label>' +
+          _glossRowHtml('paint-gloss', opts.gloss || '', true) +
+          '<div class="paint-ral-hint">Шагрень прячет неровности металла и швы, глянец их подчёркивает.</div>' +
+        '</div>' +
         '<div class="modal-actions">' +
           '<button class="btn btn-secondary" onclick="closePaintCalcModal()">Отмена</button>' +
           '<button class="btn btn-primary" id="paint-save-btn" onclick="_paintSubmitCalcModal(' +
@@ -16675,6 +16684,7 @@ async function _paintSubmitCalcModal(calcId) {
   const titleEl = document.getElementById('paint-title');
   const ralEl = document.getElementById('paint-ral');
   const ral = ((ralEl && ralEl.value) || '').trim();
+  const gloss = _glossValue('paint-gloss');
   const btn = document.getElementById('paint-save-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…'; }
   try {
@@ -16683,7 +16693,7 @@ async function _paintSubmitCalcModal(calcId) {
       const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ ral: ral }),
+        body: JSON.stringify({ ral: ral, gloss: gloss }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { showToast('Не сохранилось', 'error'); return; }
@@ -16692,7 +16702,7 @@ async function _paintSubmitCalcModal(calcId) {
       renderPaintCalcDetail(d);
     } else {
       const title = ((titleEl && titleEl.value) || '').trim() || 'Расчёт окраски';
-      const r = await apiPost('/api/paint-calcs', { title: title, ral: ral });
+      const r = await apiPost('/api/paint-calcs', { title: title, ral: ral, gloss: gloss });
       const body = (r && r.data) || {};
       if (!(r && r.ok && body.id)) {
         showToast(body.message || 'Не удалось создать расчёт', 'error');
@@ -16828,13 +16838,10 @@ function renderPaintCalcDetail(c) {
       '<button class="btn btn-secondary btn-small" onclick="paintManualOpen(' + c.id + ')">' +
         '<i class="ti ti-plus"></i> Своя деталь</button>' +
       '<button class="btn btn-secondary btn-small ral-head-btn" ' +
-        'title="Выбрать цвет: белый, серый, чёрный или код RAL" ' +
+        'title="' + escapeHtml(_coatBtnTitle(c.ral, c.gloss)) + '" ' +
         'onclick="openPaintRalPicker(' + c.id + ', null, &quot;' +
-        escapeHtml(c.ral || '') + '&quot;)">' +
-        (c.ral ? '<span class="ral-dot" style="background:' + (_ralHex(c.ral) || '#CBD5E1') + '"></span>' +
-                 escapeHtml(c.ral) +
-                 (_ralName(c.ral) ? '<span class="ral-btn-name">' + escapeHtml(_ralName(c.ral)) + '</span>' : '')
-               : '<i class="ti ti-palette"></i> Цвет не указан') + '</button>' +
+        escapeHtml(c.ral || '') + '&quot;, &quot;' + escapeHtml(c.gloss || '') + '&quot;)">' +
+        _coatBtnHtml(c.ral, c.gloss, '<i class="ti ti-palette"></i> Цвет не указан') + '</button>' +
       '<button class="btn btn-primary btn-small" onclick="openPaintVedomost(' + c.id + ')">' +
         '<i class="ti ti-file-type-pdf"></i> Ведомость PDF</button>' +
       '<button class="btn btn-secondary btn-small" onclick="deletePaintCalc(' + c.id + ')">' +
@@ -16876,6 +16883,8 @@ function renderPaintCalcDetail(c) {
           '<span class="pd-dim">при слое 60…80 мкм</span></div>' +
         (t.ral_list && t.ral_list.length
           ? '<div><b>Цвет:</b> ' + t.ral_list.map(escapeHtml).join(', ') + '</div>' : '') +
+        (t.gloss_labels && t.gloss_labels.length
+          ? '<div><b>Фактура:</b> ' + t.gloss_labels.map(escapeHtml).join(', ') + '</div>' : '') +
       '</div>' +
     '</div>';
 
@@ -16901,6 +16910,7 @@ function renderPaintCalcDetail(c) {
   // предупреждения и провалы контроля по массе
   const warns = (c.warnings || []).concat(t.mass_control_failed || []);
   if (t.ral_note) warns.push(t.ral_note);
+  if (t.gloss_note) warns.push(t.gloss_note);
   if (warns.length) {
     h += '<div class="pd-warns">';
     warns.forEach(w => {
@@ -16936,7 +16946,7 @@ function renderPaintCalcDetail(c) {
     h += '<div class="pd-table-wrap"><table class="pd-table">' +
       '<thead><tr>' +
         '<th></th><th>Обозначение</th><th>Наименование</th><th>Кол-во</th><th>Толщина</th>' +
-        '<th>Материал</th><th>RAL</th><th>S нетто, м²</th><th>S окраски 1 дет</th>' +
+        '<th>Материал</th><th>RAL и фактура</th><th>S нетто, м²</th><th>S окраски 1 дет</th>' +
         '<th>S всего</th><th>Масса: расчёт / штамп</th><th></th>' +
       '</tr></thead><tbody>';
     items.forEach(it => {
@@ -16956,13 +16966,11 @@ function renderPaintCalcDetail(c) {
         '<td class="pd-mat-cell"><button class="pd-mat-btn" onclick="openPaintMaterialPicker(' +
           it.calc_id + ',' + it.id + ',&quot;' + escapeHtml(it.material || '') + '&quot;)">' +
           escapeHtml(it.material || 'указать') + '</button></td>' +
-        '<td><button class="pd-ral-btn" title="Выбрать цвет: белый, серый, чёрный или код RAL" ' +
+        '<td><button class="pd-ral-btn" title="' +
+          escapeHtml(_coatBtnTitle(it.ral, it.gloss)) + '" ' +
           'onclick="openPaintRalPicker(' + it.calc_id + ',' + it.id + ',&quot;' +
-          escapeHtml(it.ral || '') + '&quot;)">' +
-          (it.ral ? '<span class="ral-dot" style="background:' + (_ralHex(it.ral) || '#CBD5E1') + '"></span>' +
-                    escapeHtml(it.ral) +
-                    (_ralName(it.ral) ? '<span class="ral-btn-name">' + escapeHtml(_ralName(it.ral)) + '</span>' : '')
-                  : '<span class="pd-dim">выбрать</span>') + '</button></td>' +
+          escapeHtml(it.ral || '') + '&quot;, &quot;' + escapeHtml(it.gloss || '') + '&quot;)">' +
+          _coatBtnHtml(it.ral, it.gloss, '<span class="pd-dim">выбрать</span>') + '</button></td>' +
         '<td>' + Number(it.net_area_m2 || 0).toFixed(4) + '</td>' +
         '<td>' + Number(it.paint_per_part_m2 || 0).toFixed(4) + '</td>' +
         '<td class="pd-strong">' + Number(it.paint_total_m2 || 0).toFixed(4) + '</td>' +
@@ -16989,7 +16997,8 @@ function renderPaintCalcDetail(c) {
   const selItems = items.filter(it => sel[it.id]);
   if (selItems.length) {
     const area = selItems.reduce((a, it) => a + Number(it.paint_total_m2 || 0), 0);
-    const rals = Array.from(new Set(selItems.map(it => (it.ral || '').trim()).filter(Boolean)));
+    const rals = Array.from(new Set(selItems.map(it => _paintCoatLabel(it.ral, it.gloss))
+                                     .filter(Boolean)));
     h += '<div class="pdx-batch">' +
       '<span style="font-size:20px;">🚚</span>' +
       '<div><div class="n">В покраску сейчас: ' + selItems.length + ' ' +
@@ -17046,6 +17055,8 @@ function _paintTileHtml(it, isSel) {
       '<div class="m"><b>' + Number(it.paint_total_m2 || 0).toFixed(2) + ' м²</b>' +
         (it.thickness_mm ? ' · ' + it.thickness_mm + ' мм' : '') +
         ' · ' + escapeHtml(String(matShort).slice(0, 14)) +
+        (_paintCoatLabel(it.ral, it.gloss)
+          ? '<div class="pdx-coat">' + escapeHtml(_paintCoatLabel(it.ral, it.gloss)) + '</div>' : '') +
         (_paintStatusChip(it) ? '<div style="margin-top:3px;">' + _paintStatusChip(it) + '</div>' : '') +
       '</div>' +
     '</div>' +
@@ -17233,12 +17244,16 @@ async function paintManualOpen(calcId) {
           '</datalist></div>' +
         '<div class="form-group" style="flex:1;margin:0;"><label class="form-label">Цвет RAL</label>' +
           '<input class="form-input" id="pm-ral" list="pm-ral-list" ' +
-            'placeholder="белый / серый / RAL 9016" autocomplete="off">' +
+            'placeholder="белый / серый / RAL 9016" autocomplete="off" value="' +
+            escapeHtml(((state.currentPaintCalc || {}).ral) || '') + '">' +
           // список с названиями: можно начать набирать «сер» и выбрать из подсказки
           '<datalist id="pm-ral-list">' + RAL_CATALOG.map(r =>
             '<option value="' + r.c + '">' + escapeHtml(r.n) + '</option>').join('') +
           '</datalist></div>' +
       '</div>' +
+      // Фактура по умолчанию — как у всей партии: отдельно эту деталь никто не красит.
+      '<div class="form-group" style="margin:0;"><label class="form-label">Фактура покрытия</label>' +
+        _glossRowHtml('pm-gloss', ((state.currentPaintCalc || {}).gloss) || '', true) + '</div>' +
     '</div>' +
     '<div class="modal-footer">' +
       '<button class="btn btn-secondary" onclick="document.getElementById(\'paint-manual-modal\').remove()">Отмена</button>' +
@@ -17298,6 +17313,7 @@ async function paintManualSave(calcId) {
       paint_per_part_m2: p.per,
       material: ((document.getElementById('pm-mat') || {}).value || '').trim(),
       ral: ((document.getElementById('pm-ral') || {}).value || '').trim(),
+      gloss: _glossValue('pm-gloss'),
     });
     if (r && r.ok) {
       showToast('Деталь добавлена в расчёт', 'success');
@@ -17449,6 +17465,81 @@ const RAL_CATALOG = [
   { c: 'RAL 8017', h: '#442F29', n: 'шоколадно-коричневый', g: 'Цветные' },
 ];
 
+// ============ ФАКТУРА ПОКРЫТИЯ ============
+// RAL 7035 бывает глянцевым и шагренью — это разный порошок и разная цена,
+// поэтому фактуру спрашиваем там же, где цвет. Ключи те же, что у бэкенда
+// (razvertka.GLOSS_KINDS), иначе ведомость и карточка скажут разное.
+const PAINT_GLOSS_KINDS = [
+  { v: 'gloss', n: 'глянец', hint: 'блеск 80…90 %, гладкая плёнка' },
+  { v: 'semi', n: 'полуглянец', hint: 'блеск 40…60 %' },
+  { v: 'matt', n: 'матовая', hint: 'блеск 10…30 %, без бликов' },
+  { v: 'shagreen', n: 'шагрень', hint: 'мелкая структура, прячет неровности металла' },
+];
+
+function _glossName(v) {
+  const g = PAINT_GLOSS_KINDS.find(x => x.v === (v || '').trim());
+  return g ? g.n : '';
+}
+
+// «RAL 7035 · шагрень» — одна подпись на цвет и фактуру, как их называют в цехе.
+function _paintCoatLabel(ral, gloss) {
+  const g = _glossName(gloss);
+  const r = (ral || '').trim();
+  if (r && g) return r + ' · ' + g;
+  return r || g || '';
+}
+
+// Подпись на кнопке цвета: фактура важнее названия оттенка — по ней заказывают
+// порошок, а «светло-серый» остаётся в подсказке, чтобы строка не обрезалась.
+function _coatBtnHtml(ral, gloss, emptyHtml) {
+  const r = (ral || '').trim();
+  const g = _glossName(gloss);
+  if (!r && !g) return emptyHtml;
+  const tail = g || _ralName(r);
+  return (r ? '<span class="ral-dot" style="background:' + (_ralHex(r) || '#CBD5E1') + '"></span>' +
+              escapeHtml(r)
+            : '<i class="ti ti-palette"></i>') +
+    (tail ? '<span class="ral-btn-name">' + escapeHtml(tail) + '</span>' : '');
+}
+
+function _coatBtnTitle(ral, gloss) {
+  const bits = [_paintCoatLabel(ral, gloss) || 'цвет не выбран'];
+  const n = _ralName(ral);
+  if (n && _glossName(gloss)) bits.push(n);
+  return 'Цвет и фактура: ' + bits.join(' · ') + '. Нажми, чтобы изменить';
+}
+
+// Ряд кнопок фактуры для любой модалки: выбранное лежит в data-val хоста.
+function _glossRowHtml(hostId, current, withEmpty) {
+  const cur = (current || '').trim();
+  return '<div class="pg-seg" id="' + hostId + '" data-val="' + escapeHtml(cur) + '">' +
+    PAINT_GLOSS_KINDS.map(g =>
+      '<button type="button" class="' + (g.v === cur ? 'on' : '') + '" data-val="' + g.v + '" ' +
+        'title="' + escapeHtml(g.hint) + '" ' +
+        'onclick="_glossPick(&quot;' + hostId + '&quot;,&quot;' + g.v + '&quot;)">' +
+        escapeHtml(g.n) + '</button>').join('') +
+    (withEmpty
+      ? '<button type="button" class="dim' + (cur ? '' : ' on') + '" data-val="" ' +
+        'title="Фактуру выберет цех по тому порошку, что есть" ' +
+        'onclick="_glossPick(&quot;' + hostId + '&quot;,&quot;&quot;)">не указана</button>'
+      : '') +
+  '</div>';
+}
+
+function _glossPick(hostId, v) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  host.dataset.val = v || '';
+  host.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', (b.dataset.val || '') === (v || ''));
+  });
+}
+
+function _glossValue(hostId) {
+  const host = document.getElementById(hostId);
+  return host ? (host.dataset.val || '') : '';
+}
+
 function _ralName(code) {
   const r = RAL_CATALOG.find(x => x.c === (code || '').trim());
   return r ? r.n : '';
@@ -17478,7 +17569,13 @@ async function _loadPaintCatalogs() {
   return state._paintMaterials;
 }
 
-function openPaintRalPicker(calcId, itemId, current) {
+function openPaintRalPicker(calcId, itemId, current, currentGloss) {
+  // Фактуру подставляем ту, что уже стоит: у позиции — своя, у расчёта — общая.
+  const _c = state.currentPaintCalc || {};
+  const _it = itemId ? ((_c.items || []).find(x => x.id === itemId) || {}) : null;
+  const curGloss = (currentGloss !== undefined && currentGloss !== null)
+    ? currentGloss
+    : (_it ? (_it.gloss || '') : (_c.gloss || ''));
   let m = document.getElementById('ral-picker-modal');
   if (!m) {
     m = document.createElement('div');
@@ -17521,14 +17618,14 @@ function openPaintRalPicker(calcId, itemId, current) {
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:620px;">' +
       '<div class="modal-header">' +
-        '<h3><i class="ti ti-palette"></i> Цвет покрытия' +
+        '<h3><i class="ti ti-palette"></i> Цвет и фактура покрытия' +
           (itemId ? '' : ' — на весь расчёт') + '</h3>' +
         '<button class="modal-close" onclick="closeRalPicker()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content">' +
         (itemId ? '' :
-          '<div class="mat-lead">Выберите цвет партии и нажмите «Применить ко всем» — ' +
-          'он ляжет на все позиции. Отдельные детали потом можно перекрасить поштучно ' +
+          '<div class="mat-lead">Выберите цвет и фактуру партии и нажмите «Применить ко всем» — ' +
+          'они лягут на все позиции. Отдельные детали потом можно перекрасить поштучно ' +
           'в своей строке.</div>') +
         '<input type="text" id="ral-search" class="ral-search" autocomplete="off" ' +
           'placeholder="Найти: серый, белый, чёрный или код RAL" ' +
@@ -17540,6 +17637,13 @@ function openPaintRalPicker(calcId, itemId, current) {
           '<label>Или впишите код вручную</label>' +
           '<input type="text" id="ral-manual" maxlength="60" placeholder="RAL 7038" value="' +
             escapeHtml(current || '') + '">' +
+        '</div>' +
+        // Фактура — вторая половина заказа краски, цех спрашивает её вместе с цветом.
+        '<div class="form-group" style="margin-top:12px;">' +
+          '<label>Фактура покрытия</label>' +
+          _glossRowHtml('ral-gloss', curGloss, true) +
+          '<div class="paint-ral-hint">Шагрень прячет неровности металла и сварные швы, ' +
+            'глянец их подчёркивает. Разная фактура в одной партии — разные загрузки в цехе.</div>' +
         '</div>' +
         '<div class="modal-actions">' +
           (current ? '<button class="btn btn-secondary storage-off-btn" onclick="_pickRal(' +
@@ -17597,23 +17701,30 @@ async function _pickRal(calcId, itemId, code, applyAll) {
     const f = document.getElementById('ral-manual');
     ral = ((f && f.value) || '').trim();
   }
+  // Клик по плитке цвета применяет сразу — фактуру, выбранную выше в этой же
+  // модалке, забираем с собой, иначе она пропала бы вместе с закрытием.
+  const gloss = _glossValue('ral-gloss');
   closeRalPicker();
   if (itemId) {
-    await savePaintItem(calcId, itemId, { ral: ral });
+    await savePaintItem(calcId, itemId, { ral: ral, gloss: gloss });
     return;
   }
   const token = localStorage.getItem(TOKEN_KEY);
   const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    body: JSON.stringify({ ral: ral, apply_to_all: !!applyAll }),
+    body: JSON.stringify({ ral: ral, gloss: gloss, apply_to_all: !!applyAll }),
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) { showToast('Не сохранилось', 'error'); return; }
   state.currentPaintCalc = d;
   renderPaintCalcDetail(d);
   const n = (d.items || []).filter(i => (i.ral || '').trim() === ral).length;
-  showToast(ral ? ('Цвет ' + ral + ' — на ' + n + ' позициях') : 'Цвет убран', 'success');
+  const gName = _glossName(gloss);
+  showToast(ral
+    ? ('Цвет ' + ral + (gName ? ' · ' + gName : '') + ' — на ' + n + ' позициях')
+    : (gName ? ('Фактура: ' + gName + ' — на ' + (d.items || []).length + ' позициях')
+             : 'Цвет убран'), 'success');
 }
 
 function openPaintMaterialPicker(calcId, itemId, current) {
