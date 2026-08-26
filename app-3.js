@@ -13562,35 +13562,70 @@ function _edoKpi(cls, emoji, num, lbl) {
 function _edoSec(emoji, title, count) {
   return '<div class="edo-sec"><span class="em">' + emoji + '</span> ' + escapeHtml(title) + ' <span class="cnt">' + count + '</span></div>';
 }
+// v2.46.x: из ЭДО приходят и УПД (на склад), и счета на оплату (директору
+// на согласование) — тип документа приезжает в doc_kind.
+function _edoIsInvoice(u) { return (u && u.doc_kind) === 'invoice'; }
+const EDO_SRC_LABELS = {
+  edo_auto:   'ЭДО, авто',
+  edo_manual: 'ЭДО, вручную',
+  mail:       'Почта',
+};
+function _edoSrcChip(u) {
+  const lbl = EDO_SRC_LABELS[u && u.source] || '';
+  return lbl ? '<span class="edo-chip src">' + escapeHtml(lbl) + '</span>' : '';
+}
+function _edoApprovalChip(u) {
+  if (!u.payment_order_id) {
+    return '<span class="edo-chip nolink"><span class="em">⏳</span> не заведён в CRM</span>';
+  }
+  const lbl = u.payment_order_label || ('#' + u.payment_order_id);
+  const st = u.payment_order_status || '';
+  const txt = st === 'approval' ? 'ждёт директора'
+    : st === 'to_pay' ? 'на оплате'
+    : st === 'paid' ? 'оплачен'
+    : st === 'rejected' ? 'отклонён' : 'в CRM';
+  return '<span class="edo-chip link"><span class="em">🧾</span> ' + escapeHtml(lbl) +
+         ' · ' + escapeHtml(txt) + '</span>';
+}
 function _edoInitials(name) {
   return (typeof _updSupInitials === 'function') ? _updSupInitials(name) : (typeof _supInitials === 'function' ? _supInitials(name) : '—');
 }
 function _edoCard(u, inIntake) {
+  const isInv = _edoIsInvoice(u);
   const total = (u.total_with_vat != null && Number(u.total_with_vat) > 0)
     ? Number(u.total_with_vat).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) : '';
-  const num = 'УПД № ' + escapeHtml(u.number || 'б/н') + (u.doc_date ? ' от ' + escapeHtml(_edoDateRu(u.doc_date)) : '');
+  const num = (isInv ? 'Счёт № ' : 'УПД № ') + escapeHtml(u.number || 'б/н') +
+    (u.doc_date ? ' от ' + escapeHtml(_edoDateRu(u.doc_date)) : '');
   const supplier = u.seller_name || '—';
   const ava = '<div class="edo-ava">' + escapeHtml(_edoInitials(supplier)) + '</div>';
-  const typeChip = u.function ? '<span class="edo-chip type">' + escapeHtml(u.function) + '</span>' : '';
-  const linkChip = u.matched_order_id
+  const typeChip = isInv
+    ? '<span class="edo-chip type"><span class="em">🧾</span> счёт на оплату</span>'
+    : (u.function ? '<span class="edo-chip type">' + escapeHtml(u.function) + '</span>' : '');
+  const linkChip = isInv ? _edoApprovalChip(u) : (u.matched_order_id
     ? '<span class="edo-chip link"><span class="em">✅</span> привязан → ' + escapeHtml(u.order_label || ('#' + u.matched_order_id)) + '</span>'
-    : '<span class="edo-chip nolink"><span class="em">🔗</span> не привязан</span>';
+    : '<span class="edo-chip nolink"><span class="em">🔗</span> не привязан</span>');
   const intakeChip = inIntake ? '<span class="edo-chip intake"><span class="em">📦</span> в приёмке</span>' : '';
   const subParts = ['<b>' + escapeHtml(supplier) + '</b>'];
   if (u.seller_inn) subParts.push('ИНН ' + escapeHtml(u.seller_inn));
   let acts;
-  if (inIntake) {
+  if (isInv) {
+    // Счёт на склад не приходуется: он ждёт согласования директора
+    acts = u.payment_order_id
+      ? '<button class="btn" onclick="event.stopPropagation();openSupplyOrderFromEdo(' + u.payment_order_id + ')"><span class="em">🧾</span> Открыть счёт</button>'
+      : '<button class="btn btn-primary" onclick="event.stopPropagation();edoDocToApproval(' + u.id + ')"><span class="em">✅</span> На согласование</button>';
+  } else if (inIntake) {
     acts = '<button class="btn" onclick="event.stopPropagation();selectSidebarItem(\'supply-invoice-intake\')"><span class="em">➡</span> Открыть приёмку</button>';
   } else {
     acts = '<button class="btn btn-primary" onclick="event.stopPropagation();edoUpdToIntake(' + u.id + ')"><span class="em">📦</span> Оприходовать</button>';
     if (!u.matched_order_id) acts += '<button class="btn edo-link-btn" onclick="event.stopPropagation();openEdoUpdOrderPicker(' + u.id + ')"><span class="em">🔗</span> Привязать</button>';
+    acts += '<button class="btn edo-icon" title="Это счёт на оплату — отправить директору на согласование" onclick="event.stopPropagation();edoDocToApproval(' + u.id + ')"><span class="em">🧾</span></button>';
   }
   acts += '<button class="btn edo-icon" title="Открыть карточку" onclick="event.stopPropagation();openEdoUpdDetail(' + u.id + ')"><span class="em">👁</span></button>';
   return '<div class="edo-upd' + (inIntake ? ' ok' : '') + '" onclick="openEdoUpdDetail(' + u.id + ')">' +
     '<input type="checkbox" class="edo-cb" data-id="' + u.id + '" title="Выбрать" onclick="event.stopPropagation();_edoToggle(' + u.id + ',this.checked)">' +
     ava +
     '<div class="edo-body">' +
-      '<div class="edo-top"><span class="edo-num">' + num + '</span>' + typeChip + intakeChip + linkChip + '</div>' +
+      '<div class="edo-top"><span class="edo-num">' + num + '</span>' + typeChip + intakeChip + linkChip + _edoSrcChip(u) + '</div>' +
       '<div class="edo-sub">' + subParts.join(' · ') + '</div>' +
     '</div>' +
     (total ? '<div class="edo-sum">' + total + ' ₽<small>с НДС</small></div>' : '') +
@@ -13606,7 +13641,7 @@ function toggleEdoV2() {
 async function loadEdoUpd() {
   const box = document.getElementById('edo-upd-list');
   if (!box) return;
-  box.innerHTML = '<div class="loading-block">Загружаем УПД из ЭДО…</div>';
+  box.innerHTML = '<div class="loading-block">Загружаем документы из ЭДО…</div>';
   try {
     const d = await apiGet('/api/edo/upd');
     const items = d.items || [];
@@ -13620,7 +13655,7 @@ async function loadEdoUpd() {
     }
     window.EDO_V2 = localStorage.getItem('edoV2') !== '0';
     if (!items.length) {
-      box.innerHTML = '<div class="empty-block"><i class="ti ti-cloud-download"></i>УПД из ЭДО пока не приходили.<br>' +
+      box.innerHTML = '<div class="empty-block"><i class="ti ti-cloud-download"></i>Документы из ЭДО пока не приходили.<br>' +
         '<span style="font-size:12px;color:var(--text-light);">Как только 1С отправит документ — он появится здесь и придёт пуш.</span></div>';
       return;
     }
@@ -13636,17 +13671,25 @@ async function loadEdoUpd() {
         '<button class="sv2-toggle-btn" onclick="toggleEdoV2()">' + (window.EDO_V2 ? 'Вернуть старый' : 'Включить новый') + '</button>' +
       '</div>';
     if (!window.EDO_V2) { box.innerHTML = toggle + bulkBar + _renderEdoOld(items); _edoUpdateBar(); return; }
-    // Группировка: ещё не в приёмке (нужно оприходовать) / уже в приёмке
+    // Группировка: счета на оплату (согласование) / УПД: нужно оприходовать / в приёмке
+    const invoices = items.filter(_edoIsInvoice);
+    const upds = items.filter(u => !_edoIsInvoice(u));
     const need = [], inIntake = [];
-    items.forEach(u => { (u.intake_invoice_id ? inIntake : need).push(u); });
-    const noLink = items.filter(u => !u.matched_order_id).length;
+    upds.forEach(u => { (u.intake_invoice_id ? inIntake : need).push(u); });
+    const noLink = upds.filter(u => !u.matched_order_id).length;
+    const waiting = invoices.filter(u => (u.payment_order_status || '') === 'approval').length;
     let html = toggle + bulkBar;
     html += '<div class="edo-kpis">' +
       _edoKpi('act', '📥', need.length, 'Нужно оприходовать') +
       _edoKpi('link', '🔗', noLink, 'Не привязаны к заказу') +
       _edoKpi('ok', '📦', inIntake.length, 'В приёмке') +
-      _edoKpi('tot', '📄', items.length, 'Всего за период') +
+      _edoKpi('tot', '🧾', waiting || invoices.length, 'Счета на согласовании') +
     '</div>';
+    if (invoices.length) {
+      html += _edoSec('🧾', 'Счета на оплату', invoices.length) +
+        '<div class="edo-hint">Счета из ЭДО на склад не приходуются — они уходят директору на согласование, и только после одобрения попадают в «На оплате».</div>';
+      invoices.forEach(u => { html += _edoCard(u, false); });
+    }
     if (need.length) {
       html += _edoSec('📥', 'Нужно оприходовать', need.length) +
         '<div class="edo-hint">Документы из ЭДО, ещё не отправленные на склад. Привяжи к заказу и оприходуй.</div>';
@@ -13708,6 +13751,7 @@ async function openEdoUpdDetail(updId) {
   m.id = 'edo-upd-modal';
   m.className = 'modal-overlay visible';
   m.onclick = (e) => { if (e.target === m) m.remove(); };
+  const isInv = _edoIsInvoice(u);
   const total = u.total_with_vat ? Number(u.total_with_vat).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) : '';
   const rows = (u.items || []).map((it, i) =>
     '<tr><td style="text-align:right;color:var(--text-light);">' + (i + 1) + '</td>' +
@@ -13723,7 +13767,7 @@ async function openEdoUpdDetail(updId) {
   m.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:760px;max-height:92vh;display:flex;flex-direction:column;">' +
       '<div class="modal-header">' +
-        '<h3><i class="ti ti-file-text"></i> УПД № ' + escapeHtml(u.number || 'б/н') + (u.doc_date ? ' от ' + escapeHtml(_edoDateRu(u.doc_date)) : '') + '</h3>' +
+        '<h3><i class="ti ti-' + (isInv ? 'receipt' : 'file-text') + '"></i> ' + (isInv ? 'Счёт № ' : 'УПД № ') + escapeHtml(u.number || 'б/н') + (u.doc_date ? ' от ' + escapeHtml(_edoDateRu(u.doc_date)) : '') + '</h3>' +
         '<button class="modal-close" onclick="document.getElementById(\'edo-upd-modal\').remove()"><i class="ti ti-x"></i></button>' +
       '</div>' +
       '<div class="modal-content" style="overflow-y:auto;">' +
@@ -13731,10 +13775,17 @@ async function openEdoUpdDetail(updId) {
           '<span><b>' + escapeHtml(u.seller_name || '—') + '</b>' + (u.seller_inn ? ' · ИНН ' + escapeHtml(u.seller_inn) : '') + '</span>' +
           (u.function ? '<span style="color:var(--text-light);">' + escapeHtml(u.function) + '</span>' : '') +
           (total ? '<span style="font-weight:700;">' + total + ' ₽</span>' : '') +
+          (EDO_SRC_LABELS[u.source] ? '<span style="color:var(--text-light);">Источник: ' + escapeHtml(EDO_SRC_LABELS[u.source]) + '</span>' : '') +
         '</div>' +
         (u.linked_doc ? '<div style="font-size:12px;color:var(--text-light);margin-bottom:8px;">1С: ' + escapeHtml(u.linked_doc) + '</div>' : '') +
         '<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
-          (u.matched_order_id
+          (isInv ? (u.payment_order_id
+            ? '<span style="font-size:12px;font-weight:700;color:#065F46;background:#D1FAE5;padding:2px 10px;border-radius:6px;">Счёт в CRM: ' + escapeHtml(u.payment_order_label || ('#' + u.payment_order_id)) +
+                ((u.payment_order_status || '') === 'approval' ? ' · ждёт директора' : '') + '</span> ' +
+              '<button class="btn btn-secondary btn-small" onclick="openSupplyOrderFromEdo(' + u.payment_order_id + ')"><i class="ti ti-receipt"></i> Открыть счёт</button>'
+            : '<span style="font-size:12px;font-weight:700;color:#7F1D1D;background:#FEE2E2;padding:2px 10px;border-radius:6px;">Ещё не заведён в CRM</span> ' +
+              '<button class="btn btn-primary btn-small" onclick="edoDocToApproval(' + u.id + ')"><i class="ti ti-checks"></i> На согласование директору</button>')
+          : ((u.matched_order_id
             ? '<span style="font-size:12px;font-weight:700;color:#065F46;background:#D1FAE5;padding:2px 10px;border-radius:6px;">Привязан к заказу ' + escapeHtml(u.order_label || ('#' + u.matched_order_id)) + '</span> ' +
               '<button class="btn btn-secondary btn-small" onclick="state.currentSupplyOrderId=' + u.matched_order_id + ';document.getElementById(\'edo-upd-modal\').remove();selectSidebarItem(\'supply-order-detail\');">Открыть заказ</button> ' +
               '<button class="btn btn-secondary btn-small" onclick="attachEdoUpd(' + u.id + ', null)">Отвязать</button>'
@@ -13745,6 +13796,8 @@ async function openEdoUpdDetail(updId) {
             ? '<span style="font-size:12px;font-weight:700;color:#1E40AF;background:#DBEAFE;padding:2px 10px;border-radius:6px;">Отправлен в приёмку</span> ' +
               '<button class="btn btn-secondary btn-small" onclick="document.getElementById(\'edo-upd-modal\').remove();selectSidebarItem(\'supply-invoice-intake\');"><i class="ti ti-arrow-right"></i> Открыть приёмку</button>'
             : '<button class="btn btn-primary btn-small" id="edo-intake-btn-' + u.id + '" onclick="edoUpdToIntake(' + u.id + ')"><i class="ti ti-package-import"></i> Оприходовать (на склад)</button>') +
+          // документ приняли за УПД, а это счёт — увести на согласование
+          '<button class="btn btn-secondary btn-small" onclick="edoDocToApproval(' + u.id + ')"><i class="ti ti-receipt"></i> Это счёт → на согласование</button>')) +
         '</div>' +
         (rows
           ? '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:12.5px;" class="xls-tbl">' +
@@ -13836,6 +13889,38 @@ async function edoUpdToIntake(updId) {
     showToast('Сеть: ' + (e.message || e), 'error');
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-package-import"></i> Оприходовать (на склад)'; }
   }
+}
+
+// v2.46.x: счёт на оплату из ЭДО — завести в CRM и отправить директору
+// на согласование (на склад счёт не приходуется).
+async function edoDocToApproval(updId) {
+  if (!confirm('Отправить счёт директору на согласование?\n\nСчёт заведётся в CRM (поставщик, номер, сумма, файл) и появится во вкладке «На согласовании». В «На оплате» он попадёт только после одобрения.')) return;
+  try {
+    const r = await fetch(API_BASE + '/api/edo/upd/' + updId + '/to-approval', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+                 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(j.message || 'Не удалось отправить счёт на согласование', 'error'); return; }
+    showToast(j.already
+      ? ('Счёт уже в CRM — ' + (j.order_label || ''))
+      : ('Счёт ' + (j.order_label || '') + ' ждёт согласования директора'), 'success');
+    const dm = document.getElementById('edo-upd-modal');
+    if (dm) dm.remove();
+    loadEdoUpd();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
+// Открыть счёт (заказ поставщику), заведённый из документа ЭДО
+function openSupplyOrderFromEdo(orderId) {
+  const dm = document.getElementById('edo-upd-modal');
+  if (dm) dm.remove();
+  try { state.currentSupplyOrderId = orderId; } catch (_) {}
+  selectSidebarItem('supply-order-detail');
 }
 
 async function attachEdoUpd(updId, orderId) {
@@ -18411,6 +18496,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.46.090',
+    date: '26.08.2026',
+    title: 'Счета из ЭДО приезжают в CRM сами',
+    features: [
+      'Раздел «Приём УПД от ЭДО» стал <b>«Поступления по ЭДО»</b>: 1С шлёт туда и УПД, и счета на оплату — счета больше не заводят руками',
+      'Счёт из ЭДО распознаётся по типу документа и сразу заводится в CRM: поставщик по ИНН, номер, дата, сумма, PDF — и уходит директору <b>на согласование</b>',
+      'Счёт на склад не приходуется: кнопка «Оприходовать» для него закрыта, а если счёт ждал заказ поставщику — садится на него, а не плодит дубль',
+      'У каждого документа виден источник: <b>ЭДО авто</b>, <b>ЭДО вручную</b> или <b>Почта</b>; документ, принятый за УПД, можно перевести в счёт кнопкой «Это счёт → на согласование»',
+    ],
+  },
   {
     version: 'v2.46.089',
     date: '26.08.2026',
