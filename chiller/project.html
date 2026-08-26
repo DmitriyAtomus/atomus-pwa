@@ -1331,6 +1331,9 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <div class="t t2" id="mntFaceT" style="display:none">В лицевую панель:</div>
         <div class="o" data-m="face" data-f="front" id="mntFace" style="display:none">Врезать в панель
           <small>· циферблат наружу, штуцер внутрь</small></div>
+        <div class="t t2" id="mntShelfT" style="display:none">Поднять на полки:</div>
+        <div class="o" data-m="shelf" id="mntShelf" style="display:none">Полки к стойкам
+          <small>· два кронштейна лист 2 мм, болты М6</small></div>
         <div class="o" data-m="off" id="mntOff" style="color:#f0a9a0">✕ Отсоединить</div>
       </div>
       <div id="pos">
@@ -1390,6 +1393,8 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
                 title="Пересчитать бак: размеры, лист, патрубки">✎ Размеры бака</button>
         <button id="bTankLink" style="display:none"
                 title="Поставить бак внутрь корпуса и связать с чиллером — поедет вместе с ним">⛓ Встроить бак</button>
+        <button id="bTankShelf" style="display:none"
+                title="Поднять бак на два кронштейна из листа 2 мм, прикрученные болтами М6 к стойкам той стенки, к которой бак придвинут">▤ Бак на полки</button>
         <button id="bPos" title="Точные координаты и углы (G)">⌖ Координаты</button>
         <button id="bSwap" style="display:none" title="Поставить на этот патрубок другую деталь">⇄ Заменить</button>
         <button id="bRot" title="Повернуть вокруг вертикали (R)">⟳ 90°</button>
@@ -3419,6 +3424,7 @@ function linkSel(mount,face){
     sel.link=null;selBtns();refresh();save();toast('Отсоединено от корпуса');return;
   }
   if(mount==='face'){hideMnt();faceSel();return;}
+  if(mount==='shelf'){hideMnt();tankShelfPut(sel);return;}
   /* v2.46.015: «под крышку» — это и есть верхний узел: конденсатор садится
      под крышку сам, вручную его на верх крышки больше не ставим */
   if((mount==='cap6'||mount==='ang6')&&roleOf(sel.d)==='cond'){hideMnt();roofSel();return;}
@@ -3541,6 +3547,13 @@ function tankFrameHit(it,fr,box){
 function tankInsidePlan(it,fr){
   const op=it.obj.position.clone(),or=it.obj.rotation.clone(),zone=tankZone(fr),fz=floorZ(fr);
   const zc=new THREE.Vector3();zone.getCenter(zc);
+  /* v2.46.088: якорь поиска — там, где бак стоит сейчас, а не середина
+     полости. Конструктор подтаскивает бак к нужной стенке и жмёт «встроить»;
+     старая версия перекидывала его через всю машину в центр дна. */
+  const cb=new THREE.Box3().setFromObject(it.obj).getCenter(new THREE.Vector3());
+  const anch=new THREE.Vector3(
+    Math.min(Math.max(cb.x,zone.min.x),zone.max.x),
+    Math.min(Math.max(cb.y,zone.min.y),zone.max.y),0);
   const rz0=Math.round(or.z/(Math.PI/2))*(Math.PI/2),rots=[rz0,rz0+Math.PI/2];
   /* соседние узлы — те же коробки, что видит boxFree */
   const others=placed.filter(p=>p!==it&&!NOCOLL.has(roleOf(p.d)));
@@ -3575,8 +3588,8 @@ function tankInsidePlan(it,fr){
     const grid=[];
     for(let x=zone.min.x+sz.x/2;x<=zone.max.x-sz.x/2+1;x+=40)
       for(let y=zone.min.y+sz.y/2;y<=zone.max.y-sz.y/2+1;y+=40)
-        grid.push([x,y,(x-zc.x)*(x-zc.x)+(y-zc.y)*(y-zc.y)]);
-    grid.push([zc.x,zc.y,0]);
+        grid.push([x,y,(x-anch.x)*(x-anch.x)+(y-anch.y)*(y-anch.y)]);
+    grid.push([anch.x,anch.y,0]);
     for(const c of grid){
       const b=placeAt(it,c[0],c[1],fz,rz,0);
       if(b.min.x<zone.min.x-1||b.max.x>zone.max.x+1||
@@ -3679,6 +3692,279 @@ const tankBuiltIn=it=>!!(it&&it.link&&it.link.mount==='tank');
 function tankLinkSel(){
   if(!sel||!isTankAny(sel.d))return;
   tankBuiltIn(sel)?tankDetach(sel):tankBuildIn(sel);
+}
+/* ═══ v2.46.088: бак на полках к стойкам ═══
+   Бак 36 л, поставленный на настил, съедает место насоса, поэтому его
+   поднимают: два гнутых кронштейна из листа 2 мм прикручены болтами М6 к двум
+   стойкам одной стенки, бак ложится на них торцами. Полки — деталь проекта,
+   как и сам бак: их геометрия считается по стойкам корпуса, живёт в связи
+   (link.sh) в координатах корпуса и потому едет и крутится вместе с чиллером.
+   Считаем всё в системе координат корпуса: тогда поворот машины полки не
+   пересчитывает, а рисуются они одной группой по матрице корпуса. */
+const SH_T=2;          // лист полки
+const SH_LEG=55;       // вертикальная стенка кронштейна над полкой — под болты
+const SH_LAP=25;       // выпуск полки наружу за торец бака
+const SH_UNDER=80;     // заход полки ПОД торец бака — на нём бак и лежит
+const SH_REACH=320;    // дальше стойки полку не вылетаем: консоль из листа 2 мм
+const SH_STEP=10;      // шаг подбора отметки
+const SH_CLR=3;        // зазор между баком и стенкой кронштейна
+const SH_MIN=40;       // ниже этой высоты над настилом полки не имеют смысла
+const SH_BOLT='Болт М6×20 с гайкой и шайбой';
+/* коробки деталей корпуса в его собственных координатах (framePartBoxes даёт
+   их в координатах сцены — те пересчитываются на каждый сдвиг машины) */
+function framePartLocalBoxes(fr){
+  const geo=fr.obj.geometry,PT=geo.userData.parts;
+  if(!PT||!geo.groups.length||!geo.index)return null;
+  if(fr._flBox&&fr._flKey===geo.uuid)return fr._flBox;
+  const pos=geo.attributes.position,ix=geo.index,v=new THREE.Vector3();
+  const boxes=geo.groups.map(()=>new THREE.Box3());
+  geo.groups.forEach((g,gi)=>{const bb=boxes[gi];
+    for(let i=g.start;i<g.start+g.count;i++)
+      bb.expandByPoint(v.fromBufferAttribute(pos,ix.getX(i)));});
+  fr._flKey=geo.uuid;fr._flBox=boxes;return boxes;
+}
+/* коробка из сцены — в координаты корпуса (по восьми углам: корпус может
+   стоять повёрнутым и в масштабе) */
+function boxToFrame(fr,bw){
+  const bl=new THREE.Box3(),v=new THREE.Vector3();
+  for(let k=0;k<8;k++){
+    v.set(k&1?bw.max.x:bw.min.x,k&2?bw.max.y:bw.min.y,k&4?bw.max.z:bw.min.z);
+    bl.expandByPoint(fr.obj.worldToLocal(v));
+  }
+  return bl;
+}
+/* Стойки корпуса — несущие вертикали. Сначала по имени («Стойка»), а если
+   корпус приехал из STEP без имён — по форме: высокая тонкая деталь. */
+function framePosts(fr){
+  const PT=fr.obj.geometry.userData.parts||[],B=framePartLocalBoxes(fr)||[];
+  if(!B.length)return [];
+  const all=new THREE.Box3();B.forEach(b=>{if(!b.isEmpty())all.union(b);});
+  const H=all.max.z-all.min.z,S=new THREE.Vector3();
+  const named=[],shaped=[];
+  B.forEach((b,i)=>{
+    if(b.isEmpty())return;
+    b.getSize(S);
+    if(S.z<H*0.55)return;                       // не во всю высоту — не стойка
+    if(S.x>240||S.y>240)return;                 // панель или сборная группа
+    const nm=(PT[i]||{}).name||'';
+    if(/стойк/i.test(nm))named.push({nm:nm,b:b.clone()});
+    else if(S.x>=25&&S.y>=25)shaped.push({nm:nm||'стойка корпуса',b:b.clone()});
+  });
+  return named.length>=2?named:shaped;
+}
+const SH_WALLS=[{a:'x',s:-1,t:'левой'},{a:'x',s:1,t:'правой'},
+                {a:'y',s:-1,t:'задней'},{a:'y',s:1,t:'передней'}];
+/* Куда положить бак и как выкроить полки. Возвращает место бака в сцене,
+   разметку полок в координатах корпуса и список того, что на этом месте
+   мешает (пусто — место чистое). */
+function tankShelfPlan(it,fr){
+  const geo=fr.obj.geometry,PT=geo.userData.parts||[],B=framePartLocalBoxes(fr);
+  if(!B)return {err:'у корпуса нет разбора по деталям — полки крепить не к чему'};
+  const posts=framePosts(fr);
+  if(posts.length<2)return {err:'в корпусе не нашлись стойки — полкам не за что держаться'};
+  const all=new THREE.Box3();B.forEach(b=>{if(!b.isEmpty())all.union(b);});
+  const iFloor=PT.findIndex(x=>/дно|поддон|настил/i.test((x&&x.name)||''));
+  const iCap=PT.findIndex(x=>/крышк/i.test((x&&x.name)||''));
+  const zFloor=iFloor>=0?B[iFloor].max.z:all.min.z;
+  const zCap=iCap>=0?B[iCap].min.z:all.max.z;
+  const cs=all.getSize(new THREE.Vector3());
+  const cavV=cs.x*cs.y*(zCap-zFloor);
+  const frRz=fr.obj.rotation.z;
+  const op=it.obj.position.clone(),or=it.obj.rotation.clone();
+  const cur=boxToFrame(fr,new THREE.Box3().setFromObject(it.obj)).getCenter(new THREE.Vector3());
+  const V=()=>new THREE.Vector3();
+  /* v2.46.088: стенку выбирает конструктор, а не программа. Берём ту, к
+     которой бак придвинут сейчас; к другой уходим, только если у этой бак
+     между стойками вообще не встаёт (тогда скажем об этом вслух). */
+  let pref=SH_WALLS[0],pd=Infinity;
+  SH_WALLS.forEach(W=>{
+    /* заход внутрь от этой стенки: у бака, вынесенного наружу, он
+       отрицательный — значит именно к ней его и подтащили */
+    const d=W.s<0?cur[W.a]-all.min[W.a]:all.max[W.a]-cur[W.a];
+    if(d<pd){pd=d;pref=W;}
+  });
+  let best=null;
+  SH_WALLS.forEach(W=>{
+    const a=W.a,w=a==='x'?'y':'x';
+    const edge=W.s<0?all.min[a]:all.max[a];
+    const on=posts.filter(p=>Math.abs((W.s<0?p.b.min[a]:p.b.max[a])-edge)<=45);
+    if(on.length<2)return;
+    on.sort((p,q)=>p.b.min[w]-q.b.min[w]);
+    const P0=on[0],P1=on[on.length-1];
+    // грань стоек, смотрящая внутрь машины, и направление «внутрь»
+    const face=W.s<0?Math.max(P0.b.max[a],P1.b.max[a]):Math.min(P0.b.min[a],P1.b.min[a]);
+    const dir=-W.s;
+    [0,Math.PI/2].forEach(rzL=>{
+      const rzW=frRz+rzL;
+      // габарит бака в координатах корпуса при этом развороте
+      const bl0=boxToFrame(fr,placeAt(it,0,0,0,rzW,0));
+      const sz=bl0.getSize(V());
+      const fw=sz[w],fa=sz[a],fh=sz.z;
+      if(fw>cs[w]-10||fa>cs[a]-10||fh>zCap-zFloor-SH_MIN)return;
+      if(fw<fa)return;                            // бак ложится вдоль стенки, а не поперёк
+      const cw=(P0.b.getCenter(V())[w]+P1.b.getCenter(V())[w])/2;
+      const ca=face+dir*(SH_T+SH_CLR+fa/2);
+      const c={};c[w]=cw;c[a]=ca;
+      /* торец бака должен быть у стойки: полка — консоль из листа 2 мм, тянуть
+         её через полкорпуса нельзя */
+      const gap0=Math.abs((cw-fw/2)-P0.b.max[w]),gap1=Math.abs((cw+fw/2)-P1.b.min[w]);
+      if(gap0>SH_REACH*0.6||gap1>SH_REACH*0.6)return;
+      /* Полки нужны, чтобы бак встал НАД тем, что уже стоит на настиле:
+         начинаем подбор с верха того, что попадает под его пятно. */
+      const w0=fr.obj.localToWorld(new THREE.Vector3(c.x,c.y,zFloor));
+      const foot=boxToFrame(fr,placeAt(it,w0.x,w0.y,w0.z,rzW,0));
+      let zStart=zFloor+SH_MIN;
+      placed.forEach(pp=>{
+        if(pp===it||NOCOLL.has(roleOf(pp.d)))return;
+        const pb=boxToFrame(fr,new THREE.Box3().setFromObject(pp.obj));
+        if(pb.min.z>zFloor+80)return;             // висящее сверху не поднимает полку
+        if(pb.max.x<foot.min.x+8||pb.min.x>foot.max.x-8)return;
+        if(pb.max.y<foot.min.y+8||pb.min.y>foot.max.y-8)return;
+        zStart=Math.max(zStart,pb.max.z+5);       // над насосом, а не сквозь него
+      });
+      // отметку подбираем снизу вверх: чем ниже полки, тем спокойнее машина
+      for(let z0=Math.round(zStart);z0<=zCap-fh;z0+=SH_STEP){
+        const wp=fr.obj.localToWorld(new THREE.Vector3(c.x,c.y,z0));
+        const bw=placeAt(it,wp.x,wp.y,wp.z,rzW,0);
+        const who=[];
+        placed.forEach(p=>{
+          if(p===it||NOCOLL.has(roleOf(p.d)))return;
+          if(new THREE.Box3().setFromObject(p.obj).expandByScalar(-6).intersectsBox(bw))
+            who.push(hitCut(p.d.name));
+        });
+        const bl=boxToFrame(fr,bw).expandByScalar(-4);
+        const S=V();
+        B.forEach((bb,i)=>{
+          if(bb.isEmpty())return;
+          const nm=(PT[i]||{}).name||'деталь корпуса';
+          if(TFIT_JUNK.test(nm))return;             // головки болтов место не бракуют
+          bb.getSize(S);
+          if(S.x*S.y*S.z>cavV*0.6)return;           // сборная группа «мелочь»
+          if(bb.max.z<=bl.min.z+1)return;           // всё ниже дна бака — опора, не упор
+          if(bb.intersectsBox(bl))who.push(nm);
+        });
+        const pen=(W===pref?0:1e9)+who.length*1e6+(z0-zFloor)+(gap0+gap1)*0.6+
+                  Math.abs(cur[w]-cw)*0.05+Math.abs(cur[a]-ca)*0.05;
+        if(!best||pen<best.pen)
+          best={pen:pen,who:[...new Set(who)],z:z0,rzW:rzW,wall:W,a:a,w:w,dir:dir,
+                face:face,cw:cw,ca:ca,fw:fw,fa:fa,P0:P0,P1:P1};
+        if(!who.length)break;                       // выше чистого места не ищем
+      }
+    });
+  });
+  it.obj.position.copy(op);it.obj.rotation.copy(or);it.obj.updateMatrixWorld(true);
+  if(!best)return {err:'бак не входит между стойками ни у одной стенки — уменьши бак или возьми корпус крупнее'};
+  // ── раскрой полок: по кронштейну на каждую крайнюю стойку
+  const a=best.a,w=best.w,pl=[],lg=[],bo=[];
+  [best.P0,best.P1].forEach((P,n)=>{
+    const low=n===0;                              // стойка со стороны меньших w
+    const pf=low?P.b.max[w]:P.b.min[w];           // её грань к середине бака
+    const end=low?best.cw-best.fw/2:best.cw+best.fw/2;   // торец бака с этой стороны
+    const ON=60;                                  // заход кронштейна на стойку
+    let A,Bb;
+    if(low){A=Math.min(pf-ON,end-SH_LAP);Bb=Math.max(pf,end+SH_UNDER);
+            A=Math.max(A,P.b.min[w]);}
+    else   {Bb=Math.max(pf+ON,end+SH_LAP);A=Math.min(pf,end-SH_UNDER);
+            Bb=Math.min(Bb,P.b.max[w]);}
+    const reach=Math.min(SH_T+SH_CLR+best.fa+SH_LAP,SH_REACH);
+    const a0=best.face,a1=best.face+best.dir*reach;
+    const r={};r[w+'0']=A;r[w+'1']=Bb;r[a+'0']=Math.min(a0,a1);r[a+'1']=Math.max(a0,a1);
+    pl.push({x0:r.x0,x1:r.x1,y0:r.y0,y1:r.y1});
+    // вертикальная стенка — только там, где она правда лежит на стойке
+    const L0=Math.max(A,P.b.min[w]),L1=Math.min(Bb,P.b.max[w]);
+    const g={};g[w+'0']=L0;g[w+'1']=L1;
+    g[a+'0']=Math.min(best.face,best.face+best.dir*SH_T);
+    g[a+'1']=Math.max(best.face,best.face+best.dir*SH_T);
+    lg.push({x0:g.x0,x1:g.x1,y0:g.y0,y1:g.y1});
+    // два болта М6 в стойку — по краям стенки, но внутри её пятна
+    const m=Math.max(12,(L1-L0)*0.2);
+    [L0+m,L1-m].forEach(t=>{
+      const b={};b[w]=t;b[a]=best.face;
+      bo.push([b.x,b.y,best.z+SH_LEG*0.55]);
+    });
+  });
+  const sh={z:best.z,ax:a,dir:best.dir,t:SH_T,leg:SH_LEG,pl:pl,lg:lg,bo:bo};
+  const lp=new THREE.Vector3();lp[a]=best.ca;lp[w]=best.cw;lp.z=best.z;
+  const wp=fr.obj.localToWorld(lp);
+  return {sh:sh,rz:best.rzW,x:wp.x,y:wp.y,z:wp.z,who:best.who,wall:best.wall.t,
+          far:best.wall!==pref,prefWall:pref.t,
+          zLoc:best.z,posts:[best.P0.nm,best.P1.nm]};
+}
+/* ── полки в сцене: одна группа на бак, матрица берётся у корпуса ── */
+const shMat=new THREE.MeshStandardMaterial({color:0x8d959c,metalness:.6,roughness:.42,
+  flatShading:true});
+function shelfClear(it){
+  if(!it||!it._shelf)return;
+  scene.remove(it._shelf);
+  it._shelf.traverse(o=>{if(o.geometry)o.geometry.dispose();});
+  it._shelf=null;it._shKey='';
+}
+function shelfMark(it){
+  const sh=it&&it.link&&it.link.sh;
+  const fr=sh?placed.find(p=>p.uid===it.link.to):null;
+  if(!sh||!fr||it.hid){shelfClear(it);return;}
+  const key=JSON.stringify(sh)+'|'+fr.uid;
+  if(it._shKey!==key){
+    shelfClear(it);it._shKey=key;
+    const g=new THREE.Group();g.matrixAutoUpdate=false;
+    const box=(r,z0,z1)=>{
+      const w=Math.abs(r.x1-r.x0),d=Math.abs(r.y1-r.y0),h=Math.abs(z1-z0);
+      if(w<1||d<1||h<0.5)return;
+      const m=new THREE.Mesh(new THREE.BoxGeometry(w,d,h),shMat);
+      m.position.set((r.x0+r.x1)/2,(r.y0+r.y1)/2,(z0+z1)/2);
+      g.add(m);
+    };
+    (sh.pl||[]).forEach(r=>box(r,sh.z-(sh.t||SH_T),sh.z));
+    (sh.lg||[]).forEach(r=>box(r,sh.z,sh.z+(sh.leg||SH_LEG)));
+    (sh.bo||[]).forEach(p=>{
+      const put=(rad,len,off)=>{
+        const gm=new THREE.CylinderGeometry(rad,rad,len,12);
+        gm.rotateX(Math.PI/2);gm.translate(0,0,len/2);
+        const o=new THREE.Mesh(gm,boltMat);
+        if(sh.ax==='x')o.rotation.y=Math.PI/2;
+        else o.rotation.x=-Math.PI/2;
+        o.position.set(p[0],p[1],p[2]);
+        o.translateZ(sh.dir>0?off:-off-len);
+        g.add(o);
+      };
+      put(3,26,-6);            // стержень сквозь стенку кронштейна и стойку
+      put(5,4,0);              // головка со стороны бака
+    });
+    scene.add(g);it._shelf=g;
+  }
+  fr.obj.updateMatrixWorld(true);
+  it._shelf.matrix.copy(fr.obj.matrixWorld);
+  it._shelf.matrixWorldNeedsUpdate=true;
+  it._shelf.updateMatrixWorld(true);
+}
+/* Поставить бак на полки: подбор места, полки в 3D и в ведомость. */
+function tankShelfPut(it){
+  it=it||sel;
+  if(!it||!isTankAny(it.d))return;
+  const fr=frameFor(it);
+  if(!fr){toast('В сцене нет корпуса — сначала добавь чиллер');return;}
+  const plan=tankShelfPlan(it,fr);
+  if(plan.err){toast(plan.err);return;}
+  pushHist('бак на полки к стойкам');
+  const p0=it.obj.position.clone();
+  it.obj.rotation.set(0,0,plan.rz);it.obj.updateMatrixWorld(true);
+  placeAt(it,plan.x,plan.y,plan.z,plan.rz,0);
+  const p1=it.obj.position.clone();
+  it.obj.position.copy(p0);it.obj.updateMatrixWorld(true);
+  moveItem(it,p1.x-p0.x,p1.y-p0.y,p1.z-p0.z);
+  it.link={to:fr.uid,mount:'tank',face:'pan',sh:plan.sh};
+  it.link.rel=tankRelOf(it,fr);
+  if(it===sel)selBtns();
+  shelfMark(it);checkCollisions();showSelZ();refresh();save();
+  const head=(plan.far?'У '+plan.prefWall+' стенки бак между стойками не встал — ':'')+
+    'Бак на двух полках у '+plan.wall+' стенки · опора отм. '+
+    Math.round(new THREE.Box3().setFromObject(it.obj).min.z)+
+    ' мм · кронштейны лист 2 мм, по 2 болта М6 в стойку';
+  if(plan.who.length){
+    toast(head+'. На этом месте стоят: '+plan.who.slice(0,3).join(', ')+
+      (plan.who.length>3?' и ещё '+(plan.who.length-3):'')+' — подвинь их или бак');
+    select(it);fitAuto(it);
+  }else toast(head+' — место чистое');
 }
 /* ═══ v2.46.033: штуцера бака ставит проект ═══
    Врезка в баке — не заводская данность: отверстие режем мы сами, и место
@@ -4224,6 +4510,10 @@ function showMnt(){
   const inst=!!sel&&roleOf(sel.d)==='instr';
   $('#mntFace').style.display=inst?'block':'none';
   $('#mntFaceT').style.display=inst?'block':'none';
+  /* v2.46.088: полки предлагаем только баку и только когда в сцене есть корпус */
+  const shOk=!!sel&&isTankAny(sel.d)&&placed.some(p=>roleOf(p.d)==='frame');
+  $('#mntShelf').style.display=shOk?'block':'none';
+  $('#mntShelfT').style.display=shOk?'block':'none';
   box.classList.add('on');
 }
 function hideMnt(){$('#mnt').classList.remove('on');}
@@ -4276,6 +4566,10 @@ function ctxItems(it){
         go:()=>{select(it);tankDetach(it);}}
       :{ic:'⛓',t:'Встроить бак в чиллер',s:'внутрь корпуса, автопоиск места',
         go:()=>{select(it);tankBuildIn(it);}});
+    /* v2.46.088: поднять бак на кронштейны, прикрученные к стойкам */
+    if(placed.some(p=>roleOf(p.d)==='frame'))
+      L.push({ic:'▤',t:'На полки к стойкам',s:'кронштейны 2 мм + болты М6',
+        go:()=>{select(it);tankShelfPut(it);}});
     if(it.po&&Object.keys(it.po).some(k=>it.po[k]&&it.po[k].p0))
       L.push({ic:'↺',t:'Врезки — на штатные места',s:'как в модели базы',
         go:()=>{select(it);tankPortsReset(it);}});
@@ -4446,6 +4740,7 @@ $('#bParts').onclick=()=>{
 };
 $('#bPin').onclick=togglePin;
 $('#bTankLink').onclick=tankLinkSel;
+$('#bTankShelf').onclick=()=>{if(sel&&isTankAny(sel.d))tankShelfPut(sel);};
 $('#bLink').onclick=()=>{
   // деталь на патрубке эта кнопка снимает, а не сажает на корпус
   if(sel&&sel.link&&sel.link.mount==='rot'){rotOff(sel);return;}
@@ -4464,7 +4759,8 @@ function selBtns(){
   const bm=sel&&sel.link&&BOLT[sel.link.mount],bi=bm?boltIssue(sel,bm):'';
   $('#bLink').textContent=rl?'⤫ Снять с патрубка'
     :bi?'⚠ Нужна разметка крепежа'
-    :lk?('⛓ '+(sel.link.face==='cap'?'на крышке':'на дне')+' · '+lk.t)
+    :lk?('⛓ '+(sel.link.sh?'на полках':(sel.link.face==='cap'?'на крышке':'на дне'))+' · '+
+         (sel.link.sh?'кронштейны к стойкам':lk.t))
        :'⛓ Соединить с корпусом';
   $('#bLink').classList.toggle('on',rl||!!lk);
   $('#bLink').title=rl?'Деталь сидит на патрубке аппарата — снять'
@@ -4484,6 +4780,10 @@ function selBtns(){
     ?'Вынуть бак из чиллера: встанет рядом с корпусом и будет двигаться отдельно'
     :'Поставить бак внутрь корпуса и связать с чиллером — поедет вместе с ним';
   $('#bTankLink').classList.toggle('on',!!tankLinked);
+  /* v2.46.088: полки — соседняя кнопка, а не только пункт меню креплений */
+  const onSh=!!(sel&&sel.link&&sel.link.sh);
+  $('#bTankShelf').style.display=(tank&&placed.some(p=>roleOf(p.d)==='frame'))?'':'none';
+  $('#bTankShelf').classList.toggle('on',onSh);
   if(roof)$('#bRoof').textContent=rr==='cond'?'⌂ Под крышку · болты М6':'⌂ В крышу · болты М6';
 }
 function select(it){
@@ -7961,7 +8261,7 @@ const rollSel=()=>spinSel('x');
 function delSel(){if(!sel)return;
   pushHist('удаление детали');
   if(sel._pinBox){scene.remove(sel._pinBox);sel._pinBox=null;}
-  boltClear(sel);
+  boltClear(sel);shelfClear(sel);
   placed.forEach(p=>{if(p.link&&p.link.to===sel.uid)p.link=null;});
   scene.remove(sel.obj);placed.splice(placed.indexOf(sel),1);
   select(null);refresh();save();}
@@ -7983,7 +8283,8 @@ $('#bDup').onclick=dupSel;
 $('#bClear').onclick=()=>{if(!placed.length)return;
   if(!confirm('Убрать все детали со сцены?'))return;
   pushHist('очистку сцены');
-  placed.forEach(p=>{scene.remove(p.obj);if(p._pinBox)scene.remove(p._pinBox);boltClear(p);});
+  placed.forEach(p=>{scene.remove(p.obj);if(p._pinBox)scene.remove(p._pinBox);
+    boltClear(p);shelfClear(p);});
   placed.length=0;select(null);refresh();save();};
 $('#bBom').onclick=()=>toast('Следующий шаг: спецификация → BOM модели ЧИЛ и чертёж сборки');
 
@@ -8020,7 +8321,7 @@ function refresh(){
       (theirs.length?head('ВНЕ КОМПЛЕКТА · ЗАКАЗЧИК И МОНТАЖ')+theirs.map(srow).join(''):''))
     :'<div style="padding:14px 12px;font-size:12px;color:var(--faint)">Пока пусто — добавь детали из базы слева.</div>';
   // v2.45.994: крепёж посадки на корпус — отдельными строками
-  const hw=new Map();
+  const hw=new Map(),pc=new Map();   // компл. крепежа и штучные детали проекта
   placed.forEach(p=>{
     const m=p.link?MOUNT[p.link.mount]:null;
     /* Для координатно размеченных отверстий размер берём из их штатного thr:
@@ -8035,7 +8336,19 @@ function refresh(){
       const fr=placed.find(x=>x.uid===p.link.to),ck=fr?tankSupportCheck(p,fr):{ok:false};
       if(ck.ok){const fx=tkFixData(p.d.tk);hw.set('Крепление бака · '+fx.name,
         (hw.get('Крепление бака · '+fx.name)||0)+1);}
+    }
+    /* v2.46.088: полки под баком — деталь проекта: их режут и гнут из листа,
+       поэтому в ведомость идут отдельной строкой вместе со своими болтами */
+    const sh=p.link&&p.link.sh;
+    if(sh&&(sh.pl||[]).length){
+      const r0=sh.pl[0],w=Math.round(Math.abs(r0.x1-r0.x0)),d=Math.round(Math.abs(r0.y1-r0.y0));
+      const nm='Полка бака гнутая '+Math.max(w,d)+'×'+Math.min(w,d)+', лист '+(sh.t||2)+' мм';
+      pc.set(nm,(pc.get(nm)||0)+sh.pl.length);
+      if((sh.bo||[]).length)hw.set(SH_BOLT,(hw.get(SH_BOLT)||0)+sh.bo.length);
     }});
+  if(pc.size)$('#spec').innerHTML+=[...pc.entries()].map(([t,n])=>
+    `<div class="sr" style="color:var(--dim)"><span class="nm">${esc(t)}</span>`+
+    `<span class="n">${n}</span><span class="u">шт</span></div>`).join('');
   if(hw.size)$('#spec').innerHTML+=[...hw.entries()].map(([t,n])=>
     `<div class="sr" style="color:var(--dim)"><span class="nm">${esc(t)}</span>`+
     `<span class="n">${n}</span><span class="u">компл</span></div>`).join('');
@@ -8069,6 +8382,7 @@ function refresh(){
   } else $('#fDims').textContent='';
   $('#empty').style.display=placed.length?'none':'flex';
   placed.forEach(boltMark);         // болты крепления — по выбранной посадке
+  placed.forEach(shelfMark);        // v2.46.088: полки под баком — по связи с корпусом
   portsPaint();portsRebuild();      // деталь ушла или приехала — подписи следом
   rotRebuild();                     // и метки свободных ротолоков
   checkCollisions();
@@ -8111,6 +8425,7 @@ function projPayload(){
                                              rel:p.link.rel?{p:p.link.rel.p.slice(),
                                                              q:p.link.rel.q.slice()}:undefined,
                                              hole:p.link.hole,
+                                             sh:p.link.sh?JSON.parse(JSON.stringify(p.link.sh)):undefined,
                                              lp:Array.isArray(p.link.lp)?p.link.lp.slice():undefined,
                                              d:p.link.d}:null,
                                 tk:isTank(p.d)?p.d.tk:undefined,   // бак: размеры и исполнение
@@ -8240,7 +8555,8 @@ function setProjName(n){
 }
 function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function clearScene(){
-  placed.forEach(p=>{scene.remove(p.obj);if(p._pinBox)scene.remove(p._pinBox);boltClear(p);});
+  placed.forEach(p=>{scene.remove(p.obj);if(p._pinBox)scene.remove(p._pinBox);
+    boltClear(p);shelfClear(p);});
   placed.length=0;select(null);
 }
 async function loadProjectData(data){
