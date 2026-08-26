@@ -3754,9 +3754,24 @@ function tankPortDrop(it,zi){
   it.po=Object.assign({},it.po||{});
   it.po[zi]=Object.assign({},it.po[zi]||{},{off:1});
   delete it.po[zi].p0;delete it.po[zi].tip;
+  /* v2.46.075: врезки не стало — фитинг, который на ней сидел, уходит вместе
+     с ней (иначе угольник висит в воздухе). То, что сидело на самом фитинге
+     (труба, вентиль), остаётся в сцене, но откручивается — иначе одним
+     нажатием можно снести пол-обвязки. */
+    const gone=placed.filter(p=>p.link&&p.link.mount==='rot'&&
+      p.link.to===it.uid&&p.link.zi===zi);
+  gone.forEach(p=>{
+    placed.forEach(q=>{if(q.link&&q.link.to===p.uid)q.link=null;});
+    if(p._pinBox){scene.remove(p._pinBox);p._pinBox=null;}
+    boltClear(p);scene.remove(p.obj);
+    const i=placed.indexOf(p);if(i>=0)placed.splice(i,1);
+    if(sel===p)select(null);
+  });
   tankZonesOwn(it);tankFits(it);
   refresh();save();
-  toast('«'+nm+'» убрана из бака · Ctrl+Z вернёт');
+  toast('«'+nm+'» убрана из бака'+
+    (gone.length?(' вместе с деталью: '+gone.map(p=>p.d.name).join(', ')):'')+
+    ' · Ctrl+Z вернёт');
 }
 function tankPortBack(it,zi){
   if(!it.po||!it.po[zi])return;
@@ -8166,6 +8181,15 @@ async function loadProjectData(data){
     if(!p.fit)return;
     if(map[p.fit.to])p.fit={to:map[p.fit.to],zi:p.fit.zi};
     else if(!placed.some(x=>x.uid===p.fit.to))p.fit=null;});
+  /* v2.46.075: врезки, которой деталь держалась, могло не остаться (её убрали
+     в проекте или поправили в базе) — такую посадку снимаем, иначе фитинг
+     висит в воздухе на месте пропавшего штуцера */
+  placed.forEach(p=>{
+    if(!p.link||p.link.mount!=='rot')return;
+    const host=placed.find(x=>x.uid===p.link.to);
+    const hz=host&&(host.zn||[])[p.link.zi];
+    if(host&&isTankAny(host.d)&&(!hz||hz.off||!hz.p0))p.link=null;
+  });
   rotReseat();                      // связи починены — вентили садятся на свои штуцеры
   placed.forEach(p=>{if(p.link&&p.link.mount==='face')faceMate(p);});
   _loading=false;
