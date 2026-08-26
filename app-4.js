@@ -16815,6 +16815,9 @@ function renderPaintCalcDetail(c) {
   const t = c.totals || {};
   const sel = _paintSelMap(c);
   const view = _paintView();
+  // v2.46.085: штуки в позициях — на один комплект изделия, комплектов может быть
+  // несколько. Множитель живёт у расчёта, состав изделия при этом не переписывается.
+  const sets = Math.max(1, parseInt(c.sets_qty, 10) || 1);
 
   let h = '<div class="paint-detail">';
 
@@ -16835,6 +16838,7 @@ function renderPaintCalcDetail(c) {
           '<button class="' + (view === 'tiles' ? 'on' : '') + '" onclick="paintSetView(\'tiles\')"><i class="ti ti-layout-grid"></i> Плитки</button>' +
           '</span>'
         : '') +
+      _paintSetsHtml(c) +
       '<button class="btn btn-secondary btn-small" onclick="paintManualOpen(' + c.id + ')">' +
         '<i class="ti ti-plus"></i> Своя деталь</button>' +
       '<button class="btn btn-secondary btn-small ral-head-btn" ' +
@@ -16875,8 +16879,14 @@ function renderPaintCalcDetail(c) {
     const powder = t.powder || {};
     h += '<div class="pd-totals">' +
       '<div class="pd-total-main">' +
-        '<div class="pd-total-label">ПЛОЩАДЬ ОКРАСКИ ВСЕГО</div>' +
+        '<div class="pd-total-label">ПЛОЩАДЬ ОКРАСКИ ВСЕГО' +
+          (sets > 1 ? ' · ' + sets + ' ' + _plural(sets, ['КОМПЛЕКТ', 'КОМПЛЕКТА', 'КОМПЛЕКТОВ']) : '') +
+        '</div>' +
         '<div class="pd-total-value">' + Number(c.total_paint_m2 || 0).toFixed(2) + ' м²</div>' +
+        (sets > 1
+          ? '<div class="pd-total-sub">на один комплект ' +
+            Number(t.per_set_paint_m2 || (Number(c.total_paint_m2 || 0) / sets)).toFixed(2) + ' м²</div>'
+          : '') +
       '</div>' +
       '<div class="pd-total-side">' +
         '<div><b>Порошок:</b> ' + (powder.min_kg || 0) + '…' + (powder.max_kg || 0) + ' кг ' +
@@ -16945,9 +16955,11 @@ function renderPaintCalcDetail(c) {
   } else if (items.length) {
     h += '<div class="pd-table-wrap"><table class="pd-table">' +
       '<thead><tr>' +
-        '<th></th><th>Обозначение</th><th>Наименование</th><th>Кол-во</th><th>Толщина</th>' +
+        '<th></th><th>Обозначение</th><th>Наименование</th>' +
+        '<th>' + (sets > 1 ? 'Кол-во на компл.' : 'Кол-во') + '</th><th>Толщина</th>' +
         '<th>Материал</th><th>RAL и фактура</th><th>S нетто, м²</th><th>S окраски 1 дет</th>' +
-        '<th>S всего</th><th>Масса: расчёт / штамп</th><th></th>' +
+        '<th>' + (sets > 1 ? 'S всего (× ' + sets + ')' : 'S всего') + '</th>' +
+        '<th>Масса: расчёт / штамп</th><th></th>' +
       '</tr></thead><tbody>';
     items.forEach(it => {
       const dev = it.mass_dev_pct;
@@ -16961,7 +16973,9 @@ function renderPaintCalcDetail(c) {
           (it.holes_count ? '<small> · вырезов ' + it.holes_count + '</small>' : '') +
           (_paintStatusChip(it) ? '<div style="margin-top:2px;">' + _paintStatusChip(it) + '</div>' : '') + '</td>' +
         '<td><input type="number" min="1" class="pd-qty" value="' + (it.qty || 1) + '" ' +
-          'onchange="savePaintItem(' + it.calc_id + ',' + it.id + ',{qty:this.value})"></td>' +
+          'onchange="savePaintItem(' + it.calc_id + ',' + it.id + ',{qty:this.value})">' +
+          (sets > 1 ? '<div class="pd-dim">× ' + sets + ' = ' + ((it.qty || 1) * sets) + ' шт</div>' : '') +
+        '</td>' +
         '<td>' + (it.thickness_mm ? it.thickness_mm + ' мм' : '<span class="pd-dim">?</span>') + '</td>' +
         '<td class="pd-mat-cell"><button class="pd-mat-btn" onclick="openPaintMaterialPicker(' +
           it.calc_id + ',' + it.id + ',&quot;' + escapeHtml(it.material || '') + '&quot;)">' +
@@ -16973,7 +16987,7 @@ function renderPaintCalcDetail(c) {
           _coatBtnHtml(it.ral, it.gloss, '<span class="pd-dim">выбрать</span>') + '</button></td>' +
         '<td>' + Number(it.net_area_m2 || 0).toFixed(4) + '</td>' +
         '<td>' + Number(it.paint_per_part_m2 || 0).toFixed(4) + '</td>' +
-        '<td class="pd-strong">' + Number(it.paint_total_m2 || 0).toFixed(4) + '</td>' +
+        '<td class="pd-strong">' + Number((it.paint_total_m2 || 0) * sets).toFixed(4) + '</td>' +
         '<td class="' + (devBad ? 'pd-bad' : '') + '">' +
           (it.mass_calc_kg ? Number(it.mass_calc_kg).toFixed(3) : '—') + ' / ' +
           (it.mass_stamp_kg ? Number(it.mass_stamp_kg).toFixed(3) : '—') +
@@ -16990,19 +17004,22 @@ function renderPaintCalcDetail(c) {
     h += '<div class="pd-note">Площадь окраски = 2 × площадь развёртки + периметр реза × толщина. ' +
       'Контроль: расчётная масса против массы в основной надписи, допуск 1 %.<br>' +
       'Количество штук ставится прямо на плитке кнопками <b>−</b> / <b>+</b> ' +
-      '(или числом в поле), в таблице — в колонке «Кол-во». Площадь и порошок пересчитываются сразу.</div>';
+      '(или числом в поле), в таблице — в колонке «Кол-во»: это штуки на <b>один комплект</b> изделия.<br>' +
+      'Сколько комплектов красим — кнопка <b>«Комплектов»</b> в шапке расчёта, ' +
+      'рядом с цветом. Площадь, порошок и ведомость пересчитываются сразу.</div>';
   }
 
   // липкая панель партии
   const selItems = items.filter(it => sel[it.id]);
   if (selItems.length) {
-    const area = selItems.reduce((a, it) => a + Number(it.paint_total_m2 || 0), 0);
+    const area = selItems.reduce((a, it) => a + Number(it.paint_total_m2 || 0), 0) * sets;
     const rals = Array.from(new Set(selItems.map(it => _paintCoatLabel(it.ral, it.gloss))
                                      .filter(Boolean)));
     h += '<div class="pdx-batch">' +
       '<span style="font-size:20px;">🚚</span>' +
       '<div><div class="n">В покраску сейчас: ' + selItems.length + ' ' +
-        _plural(selItems.length, ['деталь', 'детали', 'деталей']) + '</div>' +
+        _plural(selItems.length, ['деталь', 'детали', 'деталей']) +
+        (sets > 1 ? ' × ' + sets + ' ' + _plural(sets, ['комплект', 'комплекта', 'комплектов']) : '') + '</div>' +
         '<div class="m">площадь <b>' + area.toFixed(2) + ' м²</b> · порошок <b>' +
         (area * 0.15).toFixed(1) + '…' + (area * 0.2).toFixed(1) + ' кг</b>' +
         (rals.length ? ' · ' + rals.map(escapeHtml).join(', ') : '') + '</div></div>' +
@@ -17029,6 +17046,8 @@ function _paintTileHtml(it, isSel) {
       ? '<text x="85" y="68" text-anchor="middle" font-size="10" fill="#C084FC">добавлена вручную</text>' : '') +
     '</svg>';
   const matShort = _paintMatName(it);
+  const c0 = state.currentPaintCalc;
+  const sets = Math.max(1, parseInt(c0 && c0.sets_qty, 10) || 1);
   return '<div class="pdx-tile' + (isSel ? ' sel' : '') + '" onclick="paintToggleSel(' + it.id + ')">' +
     '<span class="pdx-cb tile' + (isSel ? ' on' : '') + '">' + (isSel ? '✓' : '') + '</span>' +
     (it.svg ? '<span class="pdx-zoom' + (it.drawing_file_id ? ' shift' : '') + '" title="Открыть крупно" ' +
@@ -17049,10 +17068,15 @@ function _paintTileHtml(it, isSel) {
         'onblur="paintQtyFlush(' + it.calc_id + ',' + it.id + ')">' +
       '<button class="s" onclick="event.stopPropagation();paintQtyStep(' + it.calc_id + ',' + it.id + ',1)" title="Больше">+</button>' +
     '</span>' +
+    // при партии в несколько комплектов на плитке видно, сколько штук уедет в цех
+    (sets > 1
+      ? '<span class="pdx-sets-mul" title="Штук на всю партию: ' + (it.qty || 1) + ' × ' + sets + ' комплектов">×' +
+        sets + ' = ' + ((it.qty || 1) * sets) + ' шт</span>'
+      : '') +
     '<div class="pdx-info">' +
       '<div class="d">' + escapeHtml(it.designation || '—') + '</div>' +
       '<div class="n">' + escapeHtml(it.name || '—') + _paintManualTag(it) + '</div>' +
-      '<div class="m"><b>' + Number(it.paint_total_m2 || 0).toFixed(2) + ' м²</b>' +
+      '<div class="m"><b>' + Number((it.paint_total_m2 || 0) * sets).toFixed(2) + ' м²</b>' +
         (it.thickness_mm ? ' · ' + it.thickness_mm + ' мм' : '') +
         ' · ' + escapeHtml(String(matShort).slice(0, 14)) +
         (_paintCoatLabel(it.ral, it.gloss)
@@ -17061,6 +17085,87 @@ function _paintTileHtml(it, isSel) {
       '</div>' +
     '</div>' +
   '</div>';
+}
+
+// ============ v2.46.085: СКОЛЬКО КОМПЛЕКТОВ КРАСИМ ============
+// Штуки в позициях — состав одного изделия (их даёт ведомость деталей или
+// «Изготовление корпусов»). В цех уезжает партия: три одинаковых корпуса —
+// это те же позиции × 3. Множитель держим у расчёта, чтобы не переписывать
+// количество в каждой строке и не терять состав изделия.
+let _paintSetsTimer = null;
+
+function _paintSetsHtml(c) {
+  const sets = Math.max(1, parseInt(c.sets_qty, 10) || 1);
+  return '<span class="pd-sets" id="pd-sets" title="Сколько комплектов изделия красим — ' +
+      'количество в позициях указано на один комплект">' +
+    '<span class="lb">Комплектов</span>' +
+    '<button class="s" onclick="paintSetsStep(' + c.id + ',-1)" title="Меньше">−</button>' +
+    '<input class="v" type="number" min="1" step="1" inputmode="numeric" value="' + sets + '" ' +
+      'oninput="paintSetsTyped(this.value)" ' +
+      'onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}" ' +
+      'onblur="paintSetsFlush(' + c.id + ')">' +
+    '<button class="s" onclick="paintSetsStep(' + c.id + ',1)" title="Больше">+</button>' +
+  '</span>';
+}
+
+function _paintSetsInput() {
+  const host = document.getElementById('pd-sets');
+  return host ? host.querySelector('input.v') : null;
+}
+
+function _paintSetsCurrent() {
+  const c = state.currentPaintCalc;
+  return Math.max(1, parseInt(c && c.sets_qty, 10) || 1);
+}
+
+async function _paintSetsSave(calcId, sets) {
+  clearTimeout(_paintSetsTimer);
+  _paintSetsTimer = null;
+  if (sets === _paintSetsCurrent()) return;
+  const wasFocused = document.activeElement === _paintSetsInput();
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/paint-calcs/' + calcId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ sets_qty: sets }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(d.message || 'Не сохранилось', 'error'); return; }
+    state.currentPaintCalc = d;
+    renderPaintCalcDetail(d);
+    if (wasFocused) {
+      const el = _paintSetsInput();
+      if (el) { el.focus(); el.select(); }
+    }
+  } catch (e) {
+    showToast('Ошибка: ' + String((e && e.message) || e), 'error');
+  }
+}
+
+// Клики по ± копим: каждый пересчитывает весь расчёт на сервере.
+function paintSetsStep(calcId, delta) {
+  const inp = _paintSetsInput();
+  if (!inp) return;
+  const next = Math.max(1, (parseInt(inp.value, 10) || _paintSetsCurrent()) + delta);
+  inp.value = next;
+  clearTimeout(_paintSetsTimer);
+  _paintSetsTimer = setTimeout(() => _paintSetsSave(calcId, next), 700);
+}
+
+function paintSetsTyped(value) {
+  const clean = String(value || '').replace(/\D/g, '');
+  const inp = _paintSetsInput();
+  if (inp && clean !== String(value)) inp.value = clean;
+  clearTimeout(_paintSetsTimer);
+}
+
+function paintSetsFlush(calcId) {
+  const inp = _paintSetsInput();
+  if (!inp) return;
+  const sets = parseInt(inp.value, 10);
+  if (!sets || sets < 1) { inp.value = _paintSetsCurrent(); return; }
+  _paintSetsSave(calcId, sets);
 }
 
 // ============ v2.45.878: КОЛИЧЕСТВО ШТУК ПРЯМО НА ПЛИТКЕ ============
