@@ -19473,6 +19473,8 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 #edo-upd-list .edo-chip.nolink{background:var(--danger-bg);color:var(--danger);}
 #edo-upd-list .edo-chip.link{background:var(--success-bg);color:var(--success);}
 #edo-upd-list .edo-chip.intake{background:#E7EEFB;color:#3257B0;}
+/* v2.46.089: откуда приехал документ — ЭДО авто / ЭДО вручную / почта */
+#edo-upd-list .edo-chip.src{background:#FFF4E5;color:#9A6300;}
 @media(max-width:760px){#edo-upd-list .edo-kpis{grid-template-columns:repeat(2,1fr);}#edo-upd-list .edo-upd{flex-wrap:wrap;}#edo-upd-list .edo-acts{width:100%;}#edo-upd-list .edo-sum{text-align:left;}}
 
 /* ============ v2.45.x: «Поставщики» — карточки справочника ============ */
