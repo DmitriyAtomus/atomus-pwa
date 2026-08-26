@@ -3877,11 +3877,44 @@ function tankHideBaked(it){
     if(fit)m.visible=false;
   });
 }
+/* v2.46.078: врезку убрали — отверстие под неё осталось вырезанным в меше
+   бака, и в стенке зияла дыра. Закрываем её пробкой: короткий цилиндр по
+   толщине стенки и два торцевых диска, цветом изделия — снаружи и изнутри
+   стенка выглядит целой, как будто отверстие и не резали. */
+function tankHolePlug(it,base,zi){
+  const od=Math.max(14,+base.od||26),r=od/2+1.2;
+  /* цвет берём у самой стенки бака, а не «типовой металл»: заплатка не должна
+     выделяться пятном на изделии */
+  const ms=Array.isArray(it.obj.material)?it.obj.material:[it.obj.material];
+  const skin=ms.find(m=>m&&m.visible!==false&&m.color)||ms[0];
+  const mat=new THREE.MeshStandardMaterial({
+    color:(skin&&skin.color)?skin.color.getHex():modelCol(it.d),
+    metalness:(skin&&skin.metalness!=null)?skin.metalness:.5,
+    roughness:(skin&&skin.roughness!=null)?skin.roughness:.55,
+    flatShading:true,side:THREE.DoubleSide});
+  const g=new THREE.Group();
+  const wall=new THREE.Mesh(tkCylZ(r,r,7,20,true),mat);
+  const f1=new THREE.Mesh(new THREE.CircleGeometry(r,20),mat);f1.position.z=3.5;
+  const f2=new THREE.Mesh(new THREE.CircleGeometry(r,20),mat);f2.position.z=-3.5;
+  g.add(wall);g.add(f1);g.add(f2);
+  g.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),
+    V3(base.dir||[0,0,1]).normalize());
+  const p=base.p0||[0,0,0];
+  g.position.set(p[0],p[1],p[2]);
+  g.traverse(o=>{o.userData.plug=zi;});
+  return g;
+}
 function tankFits(it){
   if(!isTankAny(it.d))return;
   tankFitsClear(it);
   const g=new THREE.Group();
-  (it.zn||[]).forEach((z,zi)=>{if(z&&z.p0&&z.dir)g.add(tankFitMesh(it,z,zi));});
+  const base=(it.obj.geometry.userData.zones)||[];
+  (it.zn||[]).forEach((z,zi)=>{
+    if(z&&z.p0&&z.dir){g.add(tankFitMesh(it,z,zi));return;}
+    /* убранная врезка: на её штатном месте — заглушка отверстия */
+    const b=base[zi];
+    if(z&&z.off&&b&&b.p0)g.add(tankHolePlug(it,b,zi));
+  });
   it._fits=g;it.obj.add(g);
   tankHideBaked(it);
 }
@@ -3892,6 +3925,7 @@ const tankFitCol=(it,z)=>modelCol(it.d);
 function tankFitPaint(it){
   if(!it._fits)return;
   it._fits.children.forEach(g=>{
+    if(g.userData.plug!=null)return;            // заглушка идёт цветом изделия
     const z=(it.zn||[])[g.userData.zi];
     const c=tankFitCol(it,z);
     g.traverse(o=>{if(o.material&&o.material.color)o.material.color.setHex(c);});
@@ -3904,6 +3938,7 @@ function pickTankFit(e){
   toNDC(e);ray.setFromCamera(ndc,camera);
   const hits=ray.intersectObjects(list.map(p=>p._fits),true);
   for(const h of hits){
+    if(h.object.userData.plug!=null)continue;   // заглушка отверстия не таскается
     const zi=h.object.userData.zi;
     if(zi==null)continue;
     const it=list.find(q=>{let o=h.object;
