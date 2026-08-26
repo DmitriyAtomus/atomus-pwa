@@ -3776,6 +3776,14 @@ function tankPortDrop(it,zi){
 function tankPortBack(it,zi){
   if(!it.po||!it.po[zi])return;
   pushHist('врезка возвращена');
+  /* детали, погашенные вместе с врезкой, возвращаем — их пересчитает
+     tankHideBaked уже без этой зоны */
+  const ms0=Array.isArray(it.obj.material)?it.obj.material:[it.obj.material];
+  const PT0=it.obj.geometry.userData.parts;
+  ms0.forEach((m,i)=>{
+    const fit=PT0?(TFIT_KEYS.indexOf((PT0[i]||{}).key)>=0):(it.zm&&i>0);
+    if(!fit&&m.visible===false)m.visible=true;
+  });
   const o=Object.assign({},it.po[zi]);delete o.off;
   if(Object.keys(o).length)it.po[zi]=o;else delete it.po[zi];
   if(!Object.keys(it.po).length)it.po=null;
@@ -3869,13 +3877,49 @@ function tankFitsClear(it){
   it.obj.remove(it._fits);it._fits=null;
 }
 /* врезки, вшитые в меш, гасим — их же рисуем сами и по своим точкам */
+/* коробки деталей самого бака в его локальных координатах — по ним ищем,
+   что относится к убранной врезке (накладка, бортик, остаток муфты) */
+function tankPartBoxes(it){
+  const geo=it.obj.geometry,PT=geo.userData.parts;
+  if(!PT||!geo.groups||!geo.groups.length)return null;
+  if(it._tpBox)return it._tpBox;
+  const pos=geo.attributes.position,ix=geo.index,v=new THREE.Vector3();
+  const boxes=geo.groups.map(()=>new THREE.Box3());
+  geo.groups.forEach((g,gi)=>{
+    const bb=boxes[gi];
+    for(let i=g.start;i<g.start+g.count;i++)
+      bb.expandByPoint(v.fromBufferAttribute(pos,ix?ix.getX(i):i));
+  });
+  it._tpBox=boxes;return boxes;
+}
 function tankHideBaked(it){
   const ms=Array.isArray(it.obj.material)?it.obj.material:[it.obj.material];
   const PT=it.obj.geometry.userData.parts;
+  /* v2.46.082: у убранной врезки в модели остаются не только муфта, но и
+     накладка с бортиком — на стенке висело кольцо в рамке. Гасим всё, что
+     сидит в её пятне: деталь целиком внутри шара вокруг штатной точки
+     врезки — это её обвязка, а не стенка (стенка много больше). */
+  const base=(it.obj.geometry.userData.zones)||[];
+  const boxes=tankPartBoxes(it);
+  const dead=new Set();
+  (it.zn||[]).forEach((z,zi)=>{
+    if(!z||!z.off)return;
+    const b=base[zi];if(!b||!b.p0||!boxes)return;
+    const c=V3(b.p0),R=Math.max(60,(+b.od||26)*2.2);
+    boxes.forEach((bb,i)=>{
+      if(bb.isEmpty())return;
+      const sz=bb.getSize(new THREE.Vector3());
+      if(Math.max(sz.x,sz.y,sz.z)>R*2)return;         // это стенка, не врезка
+      if(bb.getCenter(new THREE.Vector3()).distanceTo(c)<=R)dead.add(i);
+    });
+  });
   ms.forEach((m,i)=>{
     const fit=PT?(TFIT_KEYS.indexOf((PT[i]||{}).key)>=0):(it.zm&&i>0);
-    if(fit)m.visible=false;
+    if(fit||dead.has(i))m.visible=false;
+    else if(dead.size&&m.visible===false&&!fit&&it._tankShown&&it._tankShown.has(i))
+      m.visible=true;
   });
+  it._tankShown=dead;
 }
 function tankFits(it){
   if(!isTankAny(it.d))return;
