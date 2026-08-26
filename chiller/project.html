@@ -3864,10 +3864,8 @@ function tankFitMesh(it,z,zi){
 }
 function tankFitsClear(it){
   if(!it._fits)return;
-  const ms=Array.isArray(it.obj.material)?it.obj.material:[it.obj.material];
   it._fits.traverse(o=>{if(o.geometry)o.geometry.dispose();
-    /* материалом заплатки владеет сама деталь — его не трогаем */
-    if(o.material&&o.material.dispose&&ms.indexOf(o.material)<0)o.material.dispose();});
+    if(o.material&&o.material.dispose)o.material.dispose();});
   it.obj.remove(it._fits);it._fits=null;
 }
 /* врезки, вшитые в меш, гасим — их же рисуем сами и по своим точкам */
@@ -3879,42 +3877,15 @@ function tankHideBaked(it){
     if(fit)m.visible=false;
   });
 }
-/* v2.46.079: убрал врезку — остаётся обычный лист. Отверстие вырезано в
-   самой модели бака, поэтому «зарастить» его можно только геометрией: два
-   плоских диска ровно в плоскости стенки, снаружи и изнутри, тем же
-   материалом, что и стенка. Ни толщины, ни выступа — накладной детали не
-   видно, только сплошной лист. */
-function tankHolePatch(it,base,zi){
-  const od=Math.max(14,+base.od||26),r=od/2+1.2;
-  const ms=Array.isArray(it.obj.material)?it.obj.material:[it.obj.material];
-  /* материал берём у самой стенки: тогда заплатка живёт с баком одной
-     жизнью — и подсветка выделения, и перекраска ложатся на неё сами */
-  const mat=ms.find(m=>m&&m.visible!==false&&m.color)||ms[0];
-  if(!mat)return null;
-  const g=new THREE.Group();
-  const geo=new THREE.CircleGeometry(r,24);
-  const out=new THREE.Mesh(geo,mat);out.position.z=.08;
-  const inn=new THREE.Mesh(geo,mat);inn.position.z=-.08;inn.rotateX(Math.PI);
-  g.add(out);g.add(inn);
-  g.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),
-    V3(base.dir||[0,0,1]).normalize());
-  const p=base.p0||[0,0,0];
-  g.position.set(p[0],p[1],p[2]);
-  g.traverse(o=>{o.userData.patch=zi;});
-  return g;
-}
 function tankFits(it){
   if(!isTankAny(it.d))return;
   tankFitsClear(it);
   const g=new THREE.Group();
-  const base=(it.obj.geometry.userData.zones)||[];
-  (it.zn||[]).forEach((z,zi)=>{
-    if(z&&z.p0&&z.dir){g.add(tankFitMesh(it,z,zi));return;}
-    /* только у баков из базы: в параметрическом лист строится по врезкам,
-       и без врезки отверстия там нет — заращивать нечего */
-    const b=base[zi];
-    if(z&&z.off&&b&&b.p0&&!it.d.tk){const q=tankHolePatch(it,b,zi);if(q)g.add(q);}
-  });
+  /* v2.46.081: на месте убранной врезки не рисуем ничего. Заплатка-диск не
+     ложилась ровно на вырез заводского меша и вылезала серпом — хуже, чем
+     сам вырез. По-настоящему лист закрывается перевыпуском модели бака в
+     базе, без этой врезки. */
+  (it.zn||[]).forEach((z,zi)=>{if(z&&z.p0&&z.dir)g.add(tankFitMesh(it,z,zi));});
   it._fits=g;it.obj.add(g);
   tankHideBaked(it);
 }
@@ -3925,7 +3896,6 @@ const tankFitCol=(it,z)=>modelCol(it.d);
 function tankFitPaint(it){
   if(!it._fits)return;
   it._fits.children.forEach(g=>{
-    if(g.userData.patch!=null)return;            // заплатка идёт цветом стенки
     const z=(it.zn||[])[g.userData.zi];
     const c=tankFitCol(it,z);
     g.traverse(o=>{if(o.material&&o.material.color)o.material.color.setHex(c);});
@@ -3938,7 +3908,6 @@ function pickTankFit(e){
   toNDC(e);ray.setFromCamera(ndc,camera);
   const hits=ray.intersectObjects(list.map(p=>p._fits),true);
   for(const h of hits){
-    if(h.object.userData.patch!=null)continue;   // заплатка листа — не штуцер
     const zi=h.object.userData.zi;
     if(zi==null)continue;
     const it=list.find(q=>{let o=h.object;
