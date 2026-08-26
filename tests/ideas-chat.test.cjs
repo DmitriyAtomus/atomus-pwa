@@ -67,6 +67,24 @@ test('карточка ТЗ в ленте разработки: решение �
   assert.match(css, /\.dchat-idea/);
 });
 
+test('чип на карточке показывает ход задачи, а не только «в очереди»', () => {
+  // задача внедрения лежит в той же ленте и помнит идею в context —
+  // по нему чип и переписывается: в очереди → внедряется → внедрено
+  const fn = app1.slice(app1.indexOf('function _devChatIdeaTaskChip'),
+                        app1.indexOf('function _devChatIdeaCard'));
+  assert.match(fn, /ctx\.source !== 'idea'/);
+  assert.match(fn, /data-idea-decision="' \+ Number\(ctx\.idea_id\)/);
+  assert.match(app1, /_IDEA_TASK_CHIP = \{[\s\S]*running:[\s\S]*done:[\s\S]*error:/);
+  // карточка помечает свой чип адресом, иначе искать нечего
+  const card = app1.slice(app1.indexOf('function _devChatIdeaCard'),
+                          app1.indexOf('// Итог работы Клавы'));
+  assert.match(card, /data-idea-decision="' \+ Number\(idea\.id\)/);
+  // чип обновляется и при догрузке ленты, и при опросе статусов
+  assert.ok(app1.split('_devChatIdeaTaskChip(m)').length - 1 >= 2);
+  assert.match(css, /\.di-decision\.is-work/);
+  assert.match(css, /\.di-decision\.is-done/);
+});
+
 test('внедрение спрашивает правку и зовёт бэкенд, а не правит само', () => {
   const fn = app4.slice(app4.indexOf('async function ideaImplement'),
                         app4.indexOf('async function ideaDecline'));
