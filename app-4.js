@@ -20499,6 +20499,7 @@ async function ujFetch(method, path, body) {
   return { ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) };
 }
 function ujPatch(path, body) { return ujFetch('PATCH', path, body || {}); }
+function ujPost(path, body) { return ujFetch('POST', path, body || {}); }
 function ujDelete(path) { return ujFetch('DELETE', path); }
 
 async function loadUnitsJournal() {
@@ -20771,6 +20772,7 @@ async function openUnitCard(id) {
   m.classList.add('visible');
   const body = document.getElementById('unit-card-body');
   body.innerHTML = '<div class="loading-block">Загружаем карточку…</div>';
+  ujResetPicks();          // иначе в слот следующего агрегата уедет чужой выбор
   try {
     UJ_STATE.card = await apiGet('/api/units/' + id);
     renderUnitCard();
@@ -20911,49 +20913,302 @@ async function ujDeleteUnit() {
 
 // ---------------- вкладка «Комплектующие»
 
-function ujCardParts(d, can) {
+// Что набрано в слоте до сохранения: источник, подсказки, выбранная позиция.
+// Живёт между перерисовками карточки, чтобы не терять набранное при смене вкладок.
+const UJ_PICK = {};
+const UJ_NOMEN_SLOTS = ['compressor', 'hx', 'pump'];
+const UJ_SRC_LABELS = [
+  ['supply', 'Из счёта снабжения'],
+  ['nomen', 'Из номенклатуры (склад)'],
+  ['manual', 'Вписать вручную'],
+];
+let ujNomenTimer = null;
+
+function ujResetPicks() {
+  Object.keys(UJ_PICK).forEach(k => { delete UJ_PICK[k]; });
+}
+
+function ujPick(slot) {
+  if (!UJ_PICK[slot]) UJ_PICK[slot] = { src: '', q: '', items: [], chosen: null, qty: '1' };
+  return UJ_PICK[slot];
+}
+
+function ujSlotMeta(key) {
   const slots = (UJ_STATE.catalogs || {}).slots || [];
-  const slotName = k => (slots.find(s => s.key === k) || {}).label || k;
-  let html = '<div class="ujr-sub">В агрегате</div>';
+  return slots.find(s => s.key === key) || { key: key, label: key, column_label: '' };
+}
+
+function ujSourceLabel(p) {
+  if (p.source_kind === 'nomenclature') return 'номенклатура';
+  if (p.source_kind === 'manual') return 'вручную';
+  return p.source_label || 'из счёта';
+}
+
+function ujStockText(v) {
+  if (v === null || v === undefined) return '—';
+  return String(v).replace('.', ',');
+}
+
+function ujCardParts(d, can) {
+  const cands = d.candidates || [];
+  let html = '<div class="ujr-sub">Список комплектующих агрегата</div>';
   if (!(d.parts || []).length) {
-    html += '<div class="ujr-empty-line">Пока ничего не отмечено.</div>';
+    html += '<div class="ujr-empty-line">Пока ничего не выбрано. Ниже выберите позицию ' +
+            'для слота — она попадёт в свою колонку журнала.</div>';
   } else {
-    html += '<table class="ujr-sm"><thead><tr><th>Куда</th><th>Позиция</th><th>Кол-во</th>' +
-            '<th>Из счёта</th>' + (can ? '<th></th>' : '') + '</tr></thead><tbody>' +
-      d.parts.map(p => '<tr><td>' + escapeHtml(slotName(p.slot)) + '</td><td>' +
-        escapeHtml(p.name) + '</td><td>' +
-        escapeHtml(((p.qty || '') + ' ' + (p.unit_name || '')).trim()) + '</td><td>' +
-        escapeHtml(p.source_label || (p.source_kind === 'manual' ? 'вручную' : '')) + '</td>' +
+    html += '<table class="ujr-sm"><thead><tr><th>Слот</th><th>Название</th><th>Артикул</th>' +
+            '<th>Кол-во</th><th>Источник</th><th>Остаток (справочно)</th>' +
+            (can ? '<th></th>' : '') + '</tr></thead><tbody>' +
+      d.parts.map(p => '<tr><td>' + escapeHtml(ujSlotMeta(p.slot).label) + '</td><td>' +
+        escapeHtml(p.name) + '</td><td>' + escapeHtml(p.article || '—') + '</td><td>' +
+        escapeHtml(((p.qty || '') + ' ' + (p.unit_name || '')).trim() || '—') + '</td><td>' +
+        escapeHtml(ujSourceLabel(p)) + '</td><td>' + escapeHtml(ujStockText(p.stock)) + '</td>' +
         (can ? '<td><button class="ujr-x" onclick="ujDeletePart(' + p.id + ')" ' +
                'title="Убрать">×</button></td>' : '') + '</tr>').join('') +
       '</tbody></table>';
   }
 
-  html += '<div class="ujr-sub">Из оплаченных счетов по этому объекту и заданию</div>';
+  if (can) {
+    UJ_NOMEN_SLOTS.forEach(key => { html += ujSlotBlock(key, cands); });
+    html += '<details class="ujr-more"><summary>Другие слоты из оплаченных счетов — ' +
+            'конденсатор, ТЗ на ТО, хладагент, прочее</summary>' +
+            ujCandidatesTable(d, can) + '</details>';
+  }
+  html += '<div class="ujr-hint">Выбранные позиции попадают в колонки журнала: «Компрессор», ' +
+          '«ТО», «ТЗ на ТО/Поверхность ТО», «Конденсатор», «Насос». Складские остатки при ' +
+          'этом не меняются — списание идёт своим порядком.</div>';
+  return html;
+}
+
+function ujSlotBlock(key, cands) {
+  const meta = ujSlotMeta(key);
+  const p = ujPick(key);
+  if (!p.src) p.src = cands.length ? 'supply' : 'nomen';
+  let html = '<div class="ujr-slot"><div class="ujr-slot-head"><b>' + escapeHtml(meta.label) +
+    '</b><span class="ujr-slot-col">→ в колонку журнала «' +
+    escapeHtml(meta.column_label || meta.label) + '»</span></div>';
+  html += '<div class="ujr-src">' + UJ_SRC_LABELS.map(s =>
+    '<label><input type="radio" name="uj-src-' + key + '" value="' + s[0] + '"' +
+    (p.src === s[0] ? ' checked' : '') + ' onchange="ujSlotSource(\'' + key + '\', \'' +
+    s[0] + '\')"> ' + escapeHtml(s[1]) + '</label>').join('') + '</div>';
+  html += '<div class="ujr-slot-body" id="uj-body-' + key + '">' + ujSlotBody(key, cands) +
+          '</div></div>';
+  return html;
+}
+
+function ujSlotBody(key, cands) {
+  const p = ujPick(key);
+  if (p.src === 'supply') return ujSlotSupply(key, cands);
+  if (p.src === 'manual') return ujSlotManual(key);
+  return ujSlotNomen(key);
+}
+
+function ujSlotSupply(key, cands) {
+  const list = cands || (UJ_STATE.card && UJ_STATE.card.candidates) || [];
+  if (!list.length) {
+    return '<div class="ujr-empty-line">Оплаченных счетов по этому объекту не нашлось. ' +
+           'Проверьте в «Паспорте» договор или задание — или выберите из номенклатуры.</div>';
+  }
+  return '<table class="ujr-sm"><thead><tr><th>Позиция</th><th>Кол-во</th><th>Из счёта</th>' +
+    '<th></th></tr></thead><tbody>' + list.map((c, i) =>
+      '<tr><td>' + escapeHtml(c.name) + '</td><td>' +
+      escapeHtml(((c.qty || '') + ' ' + (c.unit_name || '')).trim()) + '</td><td>' +
+      escapeHtml(c.source_label + (c.supplier ? ' · ' + c.supplier : '')) + '</td>' +
+      '<td><button class="btn btn-secondary btn-sm" onclick="ujAddCandTo(\'' + key + '\', ' +
+      i + ')">В агрегат</button></td></tr>').join('') + '</tbody></table>';
+}
+
+function ujSlotManual(key) {
+  return '<div class="ujr-pick-row">' +
+    '<input type="text" id="uj-man-' + key + '" placeholder="Название позиции">' +
+    '<input type="text" id="uj-manq-' + key + '" class="ujr-qty" placeholder="Кол-во" value="1">' +
+    '<button class="btn btn-primary btn-sm" onclick="ujManualSave(\'' + key + '\')">' +
+    'Сохранить комплектующие</button></div>' +
+    '<div class="ujr-hint">складские остатки не меняются</div>';
+}
+
+function ujSlotNomen(key) {
+  const p = ujPick(key);
+  return '<div class="ujr-pick-row">' +
+    '<input type="text" id="uj-q-' + key + '" autocomplete="off" value="' + ujAttr(p.q) + '" ' +
+    'placeholder="Название или артикул — подсказки от 2 символов" ' +
+    'oninput="ujNomenInput(\'' + key + '\', this.value)"></div>' +
+    '<div class="ujr-drop" id="uj-drop-' + key + '">' + ujNomenDrop(key) + '</div>' +
+    '<div id="uj-sel-' + key + '">' + ujNomenChosen(key) + '</div>';
+}
+
+function ujNomenDrop(key) {
+  const p = ujPick(key);
+  if (p.q.trim().length < 2) return '';
+  if (p.loading) return '<div class="ujr-drop-note">Ищем…</div>';
+  if (!p.items.length) return '<div class="ujr-drop-note">Ничего не нашлось.</div>';
+  return p.items.map((it, i) =>
+    '<button type="button" class="ujr-drop-item" onclick="ujNomenPick(\'' + key + '\', ' + i +
+    ')"><span class="ujr-drop-name">' + escapeHtml(it.name) + '</span>' +
+    '<span class="ujr-drop-meta">' + escapeHtml(it.article || 'без артикула') + ' · ' +
+    escapeHtml(it.kind_label) + ' · остаток ' +
+    escapeHtml(it.has_stock ? ujStockText(it.stock) + ' ' + (it.unit_name || '') : '—') +
+    '</span></button>').join('');
+}
+
+function ujNomenChosen(key) {
+  const p = ujPick(key);
+  if (!p.chosen) return '';
+  const c = p.chosen;
+  return '<div class="ujr-chosen"><div class="ujr-chosen-h">Выбрано</div>' +
+    '<div class="ujr-chosen-n">' + escapeHtml(c.name) + '</div>' +
+    '<div class="ujr-chosen-m">артикул: ' + escapeHtml(c.article || 'без артикула') +
+    ' · остаток: ' + escapeHtml(c.has_stock ? ujStockText(c.stock) + ' ' + (c.unit_name || '')
+                                            : 'не складская позиция') + '</div>' +
+    '<div class="ujr-pick-row"><label class="ujr-qty-lbl">Кол-во' +
+    '<input type="text" id="uj-qty-' + key + '" class="ujr-qty" value="' + ujAttr(p.qty) +
+    '"></label>' +
+    '<button class="btn btn-primary btn-sm" onclick="ujNomenSave(\'' + key + '\')">' +
+    'Сохранить комплектующие</button>' +
+    '<button class="btn btn-secondary btn-sm" onclick="ujNomenCancel(\'' + key + '\')">' +
+    'Отмена</button></div>' +
+    '<div class="ujr-hint">складские остатки не меняются</div></div>';
+}
+
+function ujSlotSource(key, src) {
+  const p = ujPick(key);
+  p.src = src;
+  const box = document.getElementById('uj-body-' + key);
+  if (box) box.innerHTML = ujSlotBody(key, (UJ_STATE.card || {}).candidates || []);
+}
+
+function ujRedrawDrop(key) {
+  const drop = document.getElementById('uj-drop-' + key);
+  if (drop) drop.innerHTML = ujNomenDrop(key);
+  const sel = document.getElementById('uj-sel-' + key);
+  if (sel) sel.innerHTML = ujNomenChosen(key);
+}
+
+function ujNomenInput(key, value) {
+  const p = ujPick(key);
+  p.q = value;
+  if (value.trim().length < 2) {
+    p.items = []; p.loading = false; ujRedrawDrop(key); return;
+  }
+  p.loading = true;
+  ujRedrawDrop(key);
+  clearTimeout(ujNomenTimer);
+  ujNomenTimer = setTimeout(() => ujNomenSearch(key), 250);
+}
+
+async function ujNomenSearch(key) {
+  const p = ujPick(key);
+  const q = p.q.trim();
+  if (q.length < 2) return;
+  try {
+    const d = await apiGet('/api/units/nomenclature?q=' + encodeURIComponent(q) + '&limit=20');
+    if (p.q.trim() !== q) return;         // пока искали, набрали дальше
+    p.items = d.items || [];
+  } catch (e) {
+    p.items = [];
+  }
+  p.loading = false;
+  ujRedrawDrop(key);
+}
+
+function ujNomenPick(key, idx) {
+  const p = ujPick(key);
+  const it = p.items[idx];
+  if (!it) return;
+  p.chosen = it;
+  p.items = [];
+  p.q = it.name;
+  const inp = document.getElementById('uj-q-' + key);
+  if (inp) inp.value = it.name;
+  ujRedrawDrop(key);
+}
+
+function ujNomenCancel(key) {
+  const p = ujPick(key);
+  p.chosen = null; p.items = []; p.q = ''; p.qty = '1';
+  const inp = document.getElementById('uj-q-' + key);
+  if (inp) inp.value = '';
+  ujRedrawDrop(key);
+}
+
+async function ujNomenSave(key) {
+  const d = UJ_STATE.card;
+  const p = ujPick(key);
+  if (!d || !d.unit || !p.chosen) return;
+  const qtyInput = document.getElementById('uj-qty-' + key);
+  p.qty = qtyInput ? qtyInput.value : p.qty;
+  const c = p.chosen;
+  const res = await ujPost('/api/units/' + d.unit.id + '/parts', {
+    slot: key, name: c.name, article: c.article, qty: p.qty, unit_name: c.unit_name,
+    source_kind: 'nomenclature', nomen_kind: c.kind, nomen_id: c.id,
+  });
+  if (!res.ok) {
+    showToast((res.data && res.data.message) || 'Не сохранилось', 'error');
+    return;
+  }
+  UJ_STATE.card.parts = (res.data && res.data.parts) || [];
+  ujNomenCancel(key);
+  renderUnitCard();
+  loadUnitsJournal();
+  showToast('Комплектующие сохранены', 'success');
+}
+
+async function ujManualSave(key) {
+  const d = UJ_STATE.card;
+  if (!d || !d.unit) return;
+  const nameInput = document.getElementById('uj-man-' + key);
+  const name = nameInput ? nameInput.value.trim() : '';
+  if (!name) { showToast('Впишите название', 'error'); return; }
+  const qtyInput = document.getElementById('uj-manq-' + key);
+  const res = await ujPost('/api/units/' + d.unit.id + '/parts', {
+    slot: key, name: name, qty: qtyInput ? qtyInput.value : '', source_kind: 'manual',
+  });
+  if (!res.ok) { showToast('Не сохранилось', 'error'); return; }
+  UJ_STATE.card.parts = (res.data && res.data.parts) || [];
+  renderUnitCard();
+  loadUnitsJournal();
+  showToast('Комплектующие сохранены', 'success');
+}
+
+// Позиции из счетов — как раньше, добавляются в конкретный слот.
+async function ujAddCandTo(key, idx) {
+  const d = UJ_STATE.card;
+  const c = (d.candidates || [])[idx];
+  if (!c) return;
+  const res = await ujPost('/api/units/' + d.unit.id + '/parts', {
+    slot: key, name: c.name, qty: c.qty, unit_name: c.unit_name,
+    source_kind: 'supply_order', source_id: c.order_id, source_label: c.source_label,
+  });
+  if (!res.ok) { showToast('Не добавилось', 'error'); return; }
+  UJ_STATE.card.parts = (res.data && res.data.parts) || [];
+  renderUnitCard();
+  loadUnitsJournal();
+  showToast('Добавлено в агрегат', 'success');
+}
+
+// Полный список позиций из счетов — для конденсатора, ТЗ на ТО и прочего.
+function ujCandidatesTable(d, can) {
+  const slots = (UJ_STATE.catalogs || {}).slots || [];
   const cands = d.candidates || [];
   if (!cands.length) {
-    html += '<div class="ujr-empty-line">Ничего не нашлось. Проверьте, что в «Паспорте» выбран ' +
-            'договор (объект) или задание и что счета по нему оплачены.</div>';
-  } else {
-    html += '<table class="ujr-sm"><thead><tr><th>Позиция</th><th>Кол-во</th><th>Из счёта</th>' +
-            '<th>Куда в агрегате</th>' + (can ? '<th></th>' : '') + '</tr></thead><tbody>';
-    cands.forEach((c, i) => {
-      const taken = (d.parts || []).some(p => p.name === c.name);
-      html += '<tr' + (taken ? ' class="is-taken"' : '') + '><td>' + escapeHtml(c.name) + '</td>' +
-        '<td>' + escapeHtml(((c.qty || '') + ' ' + (c.unit_name || '')).trim()) + '</td>' +
-        '<td>' + escapeHtml(c.source_label + (c.supplier ? ' · ' + c.supplier : '')) + '</td>' +
-        '<td><select id="uj-slot-' + i + '"' + (can ? '' : ' disabled') + '>' +
-        slots.map(s => '<option value="' + ujAttr(s.key) + '"' +
-          (s.key === c.slot_guess ? ' selected' : '') + '>' + escapeHtml(s.label) +
-          '</option>').join('') + '</select></td>' +
-        (can ? '<td><button class="btn btn-secondary btn-sm" onclick="ujAddPart(' + i + ')">' +
-               (taken ? 'Ещё раз' : 'В агрегат') + '</button></td>' : '') + '</tr>';
-    });
-    html += '</tbody></table>';
+    return '<div class="ujr-empty-line">Ничего не нашлось. Проверьте, что в «Паспорте» выбран ' +
+           'договор (объект) или задание и что счета по нему оплачены.</div>';
   }
-  html += '<div class="ujr-hint">Отмеченные позиции попадают в колонки журнала: «Компрессор», ' +
-          '«ТО», «ТЗ на ТО/Поверхность ТО», «Конденсатор», «Насос».</div>';
-  return html;
+  let html = '<table class="ujr-sm"><thead><tr><th>Позиция</th><th>Кол-во</th><th>Из счёта</th>' +
+             '<th>Куда в агрегате</th>' + (can ? '<th></th>' : '') + '</tr></thead><tbody>';
+  cands.forEach((c, i) => {
+    const taken = (d.parts || []).some(p => p.name === c.name);
+    html += '<tr' + (taken ? ' class="is-taken"' : '') + '><td>' + escapeHtml(c.name) + '</td>' +
+      '<td>' + escapeHtml(((c.qty || '') + ' ' + (c.unit_name || '')).trim()) + '</td>' +
+      '<td>' + escapeHtml(c.source_label + (c.supplier ? ' · ' + c.supplier : '')) + '</td>' +
+      '<td><select id="uj-slot-' + i + '"' + (can ? '' : ' disabled') + '>' +
+      slots.map(s => '<option value="' + ujAttr(s.key) + '"' +
+        (s.key === c.slot_guess ? ' selected' : '') + '>' + escapeHtml(s.label) +
+        '</option>').join('') + '</select></td>' +
+      (can ? '<td><button class="btn btn-secondary btn-sm" onclick="ujAddPart(' + i + ')">' +
+             (taken ? 'Ещё раз' : 'В агрегат') + '</button></td>' : '') + '</tr>';
+  });
+  return html + '</tbody></table>';
 }
 
 async function ujAddPart(idx) {
@@ -20961,16 +21216,7 @@ async function ujAddPart(idx) {
   const c = (d.candidates || [])[idx];
   if (!c) return;
   const sel = document.getElementById('uj-slot-' + idx);
-  const res = await apiPost('/api/units/' + d.unit.id + '/parts', {
-    slot: sel ? sel.value : c.slot_guess, name: c.name, qty: c.qty,
-    unit_name: c.unit_name, source_kind: 'supply_order', source_id: c.order_id,
-    source_label: c.source_label,
-  });
-  if (!res.ok) { showToast('Не добавилось', 'error'); return; }
-  UJ_STATE.card.parts = (res.data && res.data.parts) || [];
-  renderUnitCard();
-  loadUnitsJournal();
-  showToast('Добавлено в агрегат', 'success');
+  await ujAddCandTo(sel ? sel.value : c.slot_guess, idx);
 }
 
 async function ujDeletePart(id) {
@@ -20980,6 +21226,7 @@ async function ujDeletePart(id) {
   openUnitCard(d.unit.id);
   loadUnitsJournal();
 }
+
 
 // ---------------- вкладка «Пусконаладки»
 
