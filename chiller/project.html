@@ -4800,6 +4800,8 @@ function seatPart(it,nm){
   if(!/крышк/i.test(nm))return false;
   return r==='cond'||r==='fan'||!!(it.link&&it.link.face==='cap');
 }
+/* сводные группы мелочи из конвертера STEP: один материал на сотни деталей */
+const BULK_PART=/^(Крепёж и мелочь|Крепеж и мелочь)/i;
 function checkHits(){
   hitSet=new Set();hitWho=new Map();
   const frames=placed.filter(p=>roleOf(p.d)==='frame');
@@ -4831,7 +4833,13 @@ function checkHits(){
           if(!pipeBad.has(p.uid))pipeBad.set(p.uid,'сквозь · '+nm);
           return;
         }
-        fr._hit.add(i);hitSet.add(p.uid);
+        /* v2.46.080: «Крепёж и мелочь» — сводная группа сотен винтов со
+           всего корпуса, и материал у неё один. Подсветив её, мы красили
+           крепёж по всему изделию: сыпь красных точек там, где ничего не
+           упирается. Упор фиксируем и называем, но краской по группе не
+           мажем — красным светится сам узел, который не входит. */
+        if(!BULK_PART.test(nm))fr._hit.add(i);
+        hitSet.add(p.uid);
         if(!hitWho.has(p.uid))hitWho.set(p.uid,new Set());
         hitWho.get(p.uid).add(nm);
       });
