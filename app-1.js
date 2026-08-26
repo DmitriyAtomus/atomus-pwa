@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.085";
+const APP_VERSION = "v2.46.086";
 const APP_VERSION_DATE = "26.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2606,6 +2606,34 @@ function _devChatRender(msg) {
 // `user` со статусом `new`, поэтому само по себе оно ничего не запускает.
 // «Внедрить» ставит задачу, «На доработку» возвращает ТЗ в исходный чат,
 // «Не сейчас» пишет автору причину.
+// Чип решения на карточке ТЗ показывает ход задачи, а не только сам факт
+// нажатия. Раньше там навсегда застывало «задача в очереди»: сколько бы Клава
+// ни работала и чем бы ни кончила, карточка выглядела одинаково, и со стороны
+// было не отличить «стоит» от «внедряется». Задача лежит в этой же ленте и
+// помнит идею в context — по нему и подписываем чип.
+const _IDEA_TASK_CHIP = {
+  new:       ['ti-rocket', 'Внедряем — задача в очереди'],
+  uploading: ['ti-rocket', 'Внедряем — задача в очереди'],
+  running:   ['ti-loader-2', 'Внедряется прямо сейчас'],
+  talking:   ['ti-loader-2', 'Внедряется прямо сейчас'],
+  stopping:  ['ti-player-stop', 'Останавливаю…'],
+  done:      ['ti-circle-check', 'Внедрено'],
+  error:     ['ti-alert-triangle', 'Не получилось — смотрите ответ'],
+};
+
+function _devChatIdeaTaskChip(msg) {
+  const ctx = msg && msg.context;
+  if (!ctx || ctx.source !== 'idea' || !ctx.idea_id) return;
+  const chip = document.querySelector('[data-idea-decision="' + Number(ctx.idea_id) + '"]');
+  if (!chip) return;
+  const view = _IDEA_TASK_CHIP[msg.status];
+  if (!view) return;
+  chip.innerHTML = '<i class="ti ' + view[0] + '"></i>' + escapeHtml(view[1]);
+  chip.classList.toggle('is-work', msg.status === 'running' || msg.status === 'talking');
+  chip.classList.toggle('is-done', msg.status === 'done');
+  chip.classList.toggle('is-fail', msg.status === 'error');
+}
+
 function _devChatIdeaCard(msg) {
   const idea = msg.meta && msg.meta.idea;
   if (!idea || !idea.id) return null;
@@ -2629,8 +2657,8 @@ function _devChatIdeaCard(msg) {
     ideaSpecCardHtml(idea.card) +
     '<div class="di-act">' +
       (decision
-        ? '<span class="di-decision"><i class="ti ' + decision[0] + '"></i>' +
-          decision[1] + '</span>'
+        ? '<span class="di-decision" data-idea-decision="' + Number(idea.id) + '">' +
+          '<i class="ti ' + decision[0] + '"></i>' + decision[1] + '</span>'
         : '<button type="button" class="ok" onclick="ideaImplement(' + Number(idea.id) + ')">' +
         '<i class="ti ti-rocket"></i>Внедрить</button>' +
       '<button type="button" onclick="ideaRevision(' + Number(idea.id) + ')">' +
@@ -2982,6 +3010,7 @@ async function _devChatTickInner(feed) {
       _devChatGroupRow(row);
       added++;
     }
+    _devChatIdeaTaskChip(m);
     if (m.id > _devChatSince) _devChatSince = m.id;
   });
   if (added) _devChatSyncDays(feed);
@@ -3043,6 +3072,7 @@ async function _devChatRefreshStatuses() {
       span.textContent = st.text;
       span.className = 'dchat-chip is-' + m.status;
     }
+    _devChatIdeaTaskChip(m);
     if (_devChatOpen(m.status)) working = true;
     else _devChatPending.delete(m.id);
     // v2.45.955: засекаем момент «взял в работу» — для таймера в терминале.
