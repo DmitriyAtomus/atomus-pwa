@@ -2802,7 +2802,7 @@ async function addItem(d,at,rot,tilt,roll){
   obj.rotation.set(roll||0,tilt||0,rot||0);
   scene.add(obj);
   const keepUid=at&&Number.isFinite(at.uid)?at.uid:null;
-  const it={uid:keepUid==null?uidSeq++:keepUid,id:d.id,obj,d,pin:false,link:null,off:[],sch:null,fit:null,po:null,
+  const it={uid:keepUid==null?uidSeq++:keepUid,id:d.id,obj,d,pin:false,link:null,off:[],sch:null,fit:null,po:null,pv:0,
     zn:geo.userData.zones||[],zm:!!geo.userData.zoneMats};
   if(keepUid!=null)uidSeq=Math.max(uidSeq,keepUid+1);
   placed.push(it);
@@ -2817,12 +2817,13 @@ async function addItem(d,at,rot,tilt,roll){
     it.off=Array.isArray(at.state.off)?at.state.off.slice():[];
     it.fit=at.state.fit||null;                     // v2.46.021: пара авто-длины трубы
     it.po=at.state.po?JSON.parse(JSON.stringify(at.state.po)):null;
+    it.pv=+at.state.pv||0;
     if(at.state.hid)hidItem(it,true);
     applyOff(it);pinMark(it);
   }
   /* v2.46.033: у бака врезки — деталь проекта: разметку делаем его личной
      и рисуем муфты, которые можно таскать по стенке */
-  if(isTankAny(d)){tankZonesOwn(it);tankFits(it);}
+  if(isTankAny(d)){tankPortSchema(it,!!(at&&at.state));tankZonesOwn(it);tankFits(it);}
   select(it);refresh();save();
   /* v2.46.032: меши приезжают из базы вразнобой. Подгонка кадра раньше могла
      остановиться на полупустой сцене — и камера оставалась внутри корпуса,
@@ -3692,6 +3693,24 @@ const TFIT_COL={dis:C_DIS,suc:C_SUC,ppk:C_PPK,eq:C_EQ};
 const TFIT_STEP=5;          // штуцер двигается по стенке с шагом 5 мм
 const TFIT_EDGE=45;         // отступ от кромки: врезку надо где-то варить
 const TFIT_KEYS=['dis','suc','aux'];   // детали конструктора, которые и есть муфты
+
+/* v2.46.083: у заводского бака убран возврат через стенку — в новой базе
+   осталось две донные врезки вместо трёх. Старые проекты хранят поправки по
+   номерам зон: 0 — возврат, 1 — забор, 2 — слив. Сдвигаем забор и слив на
+   новые номера один раз и записываем версию схемы, иначе po[0].off от
+   удалённого возврата погасил бы уже забор насоса. */
+const TANK_PORT_SCHEMA=2;
+function tankPortSchema(it,fromProject){
+  if(!it||!it.d||it.d.id!=='bak-525x200x425'||(it.zn||[]).length!==2)return;
+  if(fromProject&&it.pv<TANK_PORT_SCHEMA){
+    const old=it.po||{},next={};
+    if(old[1])next[0]=JSON.parse(JSON.stringify(old[1]));
+    if(old[2])next[1]=JSON.parse(JSON.stringify(old[2]));
+    it.po=Object.keys(next).length?next:null;
+    it._pvShift=true;
+  }
+  it.pv=TANK_PORT_SCHEMA;
+}
 
 /* зоны бака делаем его собственными: разметка приходит из базы одна на все
    такие баки, а место врезки у каждого своё */
@@ -8083,6 +8102,7 @@ function projPayload(){
                                              d:p.link.d}:null,
                                 tk:isTank(p.d)?p.d.tk:undefined,   // бак: размеры и исполнение
                                 po:p.po&&Object.keys(p.po).length?JSON.parse(JSON.stringify(p.po)):undefined,
+                                pv:p.pv||undefined,                // v2.46.083: схема номеров врезок бака
                                 pl:isPipeSeg(p)?pipeLen(p):undefined,
                                 fit:p.fit?{to:p.fit.to,zi:p.fit.zi}:undefined,
                                 sch:p.sch||undefined,   // v2.46.017: позиция схемы
@@ -8174,6 +8194,7 @@ async function histApply(snapshot){
       if(it.pl&&isPipeSeg(p))setPipeLen(p,it.pl);      // длина отрезка тоже в снимке
       p.off=Array.isArray(it.off)?it.off.slice():[];
       p.po=it.po?JSON.parse(JSON.stringify(it.po)):null;
+      p.pv=+it.pv||p.pv||0;
       hidItem(p,!!it.hid);
       applyOff(p);pinMark(p);
     }
@@ -8220,7 +8241,7 @@ async function loadProjectData(data){
     if(!d)continue;
     // z, наклона и закрепления в старых проектах нет — там деталь просто стоит на полу
     const it=await addItem(d,{x:s.x,y:s.y,z:s.z,
-      state:{pin:s.pin,off:s.off,link:s.link,pl:s.pl,sch:s.sch,fit:s.fit,po:s.po,
+      state:{pin:s.pin,off:s.off,link:s.link,pl:s.pl,sch:s.sch,fit:s.fit,po:s.po,pv:s.pv,
              hid:s.hid}},s.r,s.t,s.k);
     if(it&&d._user&&s.s){it.obj.scale.setScalar(Math.max(.0001,+s.s));it.obj.updateMatrixWorld(true);}
     if(tankStand(it))toast('Бак стоял вверх дном — поставил его на дно');
@@ -8237,6 +8258,18 @@ async function loadProjectData(data){
     if(!p.fit)return;
     if(map[p.fit.to])p.fit={to:map[p.fit.to],zi:p.fit.zi};
     else if(!placed.some(x=>x.uid===p.fit.to))p.fit=null;});
+  /* Вместе с po сдвигаем ссылки обвязки на две оставшиеся зоны. Посадка на
+     старый возврат снимается, забор/слив получают номера 0/1. */
+  placed.forEach(p=>{
+    if(p.link&&p.link.mount==='rot'){
+      const host=placed.find(x=>x.uid===p.link.to&&x._pvShift);
+      if(host){if(p.link.zi===0)p.link=null;
+               else if(Number.isInteger(p.link.zi))p.link.zi--;}
+    }
+    if(p.fit){const host=placed.find(x=>x.uid===p.fit.to&&x._pvShift);
+      if(host){if(p.fit.zi===0)p.fit=null;
+               else if(Number.isInteger(p.fit.zi))p.fit.zi--;}}
+  });
   /* v2.46.075: врезки, которой деталь держалась, могло не остаться (её убрали
      в проекте или поправили в базе) — такую посадку снимаем, иначе фитинг
      висит в воздухе на месте пропавшего штуцера */
@@ -8248,9 +8281,11 @@ async function loadProjectData(data){
   });
   rotReseat();                      // связи починены — вентили садятся на свои штуцеры
   placed.forEach(p=>{if(p.link&&p.link.mount==='face')faceMate(p);});
+  const schemaMoved=placed.some(p=>p._pvShift);
   _loading=false;
   histReset();                      // v2.45.996: у каждого проекта своя история
   select(null);refresh();renderSchema();
+  if(schemaMoved)save();            // сразу закрепляем новые номера врезок в CRM
 }
 async function openProject(id){
   try{
