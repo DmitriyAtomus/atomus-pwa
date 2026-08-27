@@ -40,6 +40,13 @@ test('сотрудник прикладывает файлы, но только 
   const files = app.slice(app.indexOf('function devChatPickFiles'),
     app.indexOf('function _devChatNamed'));
   assert.doesNotMatch(files, /_devChatEmployeeMode\(\)/);
+  assert.match(ui, /Прикрепить файл/);
+  assert.match(html, /dchat-attach-label">Файл/);
+  assert.match(css, /dchat-employee-readonly \.dchat-attach-label \{ display: inline/);
+  const picker = app.slice(app.indexOf('function devChatAttachPick'),
+    app.indexOf('// ---- v2.45.961'));
+  assert.match(picker, /document\.createElement\('input'\)/);
+  assert.match(picker, /devChatPickFiles\(this\.files\)/);
   // предел и список типов повторяют employee_chat.py — отказ виден до загрузки
   const limit = app.slice(app.indexOf('function _devChatFileLimit'),
     app.indexOf('function _devChatSendProgress'));
