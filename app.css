@@ -26157,3 +26157,30 @@ body.dchat-ag.dchat-employee-readonly .dchat-empty .ico {
   body.dchat-ag .dchat-mode-badge i { display: none; }
   body.dchat-ag .dchat-file .sz { display: none; }
 }
+
+/* v2.46.099: сотрудник сразу видит загрузку, а не ищет её за безымянным «+». */
+.dchat-attach-label { display: none; font-size: 13px; font-weight: 650; }
+body.dchat-ag.dchat-employee-readonly .dchat-attach {
+  width: auto;
+  min-width: 76px;
+  padding: 0 13px;
+  gap: 7px;
+  color: #343434;
+  background: #f5f5f6;
+  border: 1px solid transparent;
+}
+body.dchat-ag.dchat-employee-readonly .dchat-attach-label { display: inline; }
+body.dchat-ag.dchat-employee-readonly .dchat-file-quick {
+  color: #1f4f38;
+  background: #edf7f0;
+  border-color: #d8eadc;
+}
+@media (max-width: 760px) {
+  body.dchat-ag.dchat-employee-readonly .dchat-attach {
+    width: 38px;
+    min-width: 38px;
+    padding: 0;
+    gap: 0;
+  }
+  body.dchat-ag.dchat-employee-readonly .dchat-attach-label { display: none; }
+}

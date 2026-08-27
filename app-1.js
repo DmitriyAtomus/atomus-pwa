@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.098";
+const APP_VERSION = "v2.46.099";
 const APP_VERSION_DATE = "27.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2167,7 +2167,8 @@ function _devChatApplyAgentUi() {
   if (drawerInput) drawerInput.placeholder = placeholder;
   const chips = document.getElementById('devchat-chips');
   if (chips) chips.innerHTML = employee
-    ? '<button onclick="devChatQuick(this)"><i class="ti ti-file-spreadsheet"></i>Сделай Excel…</button>' +
+    ? '<button class="dchat-file-quick" onclick="devChatAttachPick(\'file\')"><i class="ti ti-paperclip"></i>Прикрепить файл</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-file-spreadsheet"></i>Сделай Excel…</button>' +
       '<button onclick="devChatQuick(this)"><i class="ti ti-file-type-pdf"></i>Собери PDF…</button>' +
       '<button onclick="devChatQuick(this)"><i class="ti ti-schema"></i>Нарисуй схему…</button>' +
       '<button onclick="devChatQuick(this)"><i class="ti ti-cube-3d-sphere"></i>Сделай 3D-модель…</button>' +
@@ -3413,7 +3414,23 @@ function devChatAttachClose() {
 function devChatAttachPick(kind) {
   devChatAttachClose();
   const name = kind === 'camera' ? 'camera-input' : (kind === 'gallery' ? 'gallery-input' : 'file-input');
-  const el = _devChatEl(name);
+  let el = _devChatEl(name);
+  // Старый index.html мог остаться в PWA-кэше без input вложений. Не оставляем
+  // сотруднику мёртвую кнопку: создаём picker из свежего app-1.js.
+  if (!el) {
+    el = document.createElement('input');
+    el.type = 'file';
+    el.id = (_devChatHost === 'drawer' ? 'devchat-drawer-' : 'devchat-') + name;
+    el.style.display = 'none';
+    if (kind !== 'camera') el.multiple = true;
+    if (kind === 'camera' || kind === 'gallery') el.accept = 'image/*';
+    if (kind === 'camera') el.setAttribute('capture', 'environment');
+    el.onchange = function () {
+      if (kind === 'file') devChatPickFiles(this.files);
+      else devChatAddFiles(this.files);
+    };
+    document.body.appendChild(el);
+  }
   if (el) { el.value = ''; el.click(); }
 }
 
