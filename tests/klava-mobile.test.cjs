@@ -94,7 +94,7 @@ test('голос: запись в поле ввода, отправка оста
   assert.match(fn.slice(0, 1800), /getUserMedia\(\{ audio: true \}\)/);
   assert.match(fn.slice(0, 1800), /new MediaRecorder/);
   const fin = app.slice(app.indexOf('async function _dcVoiceFinish'));
-  assert.match(fin.slice(0, 1800), /\/api\/dev-chat\/voice/);
+  assert.match(fin.slice(0, 1800), /_devChatApi\('\/voice'\)/);
   assert.match(fin.slice(0, 1800), /input\.value = /);
   assert.doesNotMatch(fin.slice(0, 1800), /devChatSend\(/,
     'расшифровку человек должен успеть поправить до отправки');

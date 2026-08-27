@@ -1,6 +1,6 @@
 // Чат с Клавой: раздел, шторка поверх любого экрана и правила доступа.
-// Проверяем то, что легко потерять при правках: пункт и кнопка видны только
-// директору, лента опрашивается лишь когда есть где её показывать, а вложения
+// Проверяем то, что легко потерять при правках: пункт и кнопка видны сотрудникам,
+// лента опрашивается лишь когда есть где её показывать, а вложения
 // тянутся с токеном (иначе картинки молча не грузятся).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -22,11 +22,11 @@ test('раздел «Клава» и шторка есть в разметке',
   assert.match(html, /id="devchat-drawer-feed"/, 'нет ленты шторки');
 });
 
-test('пункт меню и кнопка показываются только директору', () => {
+test('пункт меню и кнопка показываются всем сотрудникам', () => {
   const start = app.indexOf("const navDev = document.getElementById('sb-devchat')");
   assert.ok(start > 0, 'не найден показ пункта меню');
   const block = app.slice(start - 200, start + 400);
-  assert.match(block, /roles\.includes\('director'\)/);
+  assert.match(block, /navDev\.style\.display = ''/);
   assert.match(block, /devchat-fab/);
 });
 
@@ -176,5 +176,5 @@ test('на телефоне поле ввода не уезжает под ни�
 });
 
 test('на экране чата круглая кнопка прячется', () => {
-  assert.match(app, /screenName === 'devchat' \|\| !isDir/);
+  assert.match(app, /screenName === 'devchat' \|\| screenName === 'codex'/);
 });
