@@ -2581,7 +2581,7 @@ function _devChatFileIcon(f) {
   if (/\.docx?$/.test(name)) return 'ti-file-type-docx';
   if (/\.pdf$/.test(name)) return 'ti-file-type-pdf';
   if (/\.pptx?$/.test(name)) return 'ti-presentation';
-  if (/\.stl$/.test(name)) return 'ti-cube-3d-sphere';
+  if (/\.(?:stl|obj|glb|gltf|step|stp)$/.test(name)) return 'ti-cube-3d-sphere';
   if (/\.png$|\.jpe?g$|\.webp$/.test(name)) return 'ti-photo';
   if (/\.json$/.test(name)) return 'ti-json';
   return 'ti-file-text';
