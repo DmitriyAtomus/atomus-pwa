@@ -23770,11 +23770,21 @@ tr.pdx-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 .dchat-img { display: none; max-width: 100%; border-radius: 10px; margin-top: 8px; cursor: zoom-in; }
 .dchat-img[src] { display: block; }
 .dchat-file {
-  display: inline-flex; align-items: center; gap: 6px; margin-top: 7px;
-  padding: 5px 10px; border-radius: 9px; font-size: 12px;
-  background: rgba(15,30,60,.05);
+  display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 8px;
+  padding: 9px 10px; border-radius: 11px; border: 1px solid rgba(15,30,60,.09);
+  color: inherit; font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+  background: rgba(15,30,60,.04);
 }
-.dchat-row.is-mine .dchat-file { background: rgba(255,255,255,.18); }
+.dchat-file > i { flex: none; font-size: 20px; color: var(--brand); }
+.dchat-file .nm { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.dchat-file .sz { flex: none; color: var(--text-muted); font-size: 10.5px; }
+.dchat-file .go { display: inline-flex; align-items: center; gap: 4px; flex: none; color: var(--brand); font-size: 11px; font-weight: 650; }
+.dchat-file:disabled { opacity: .55; cursor: wait; }
+.dchat-file.is-generated { background: #f2f8f4; border-color: #d5e6da; }
+.dchat-row.is-mine .dchat-file { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.22); }
+.dchat-row.is-mine .dchat-file > i,
+.dchat-row.is-mine .dchat-file .go { color: #fff; }
+.dchat-row.is-mine .dchat-file .sz { color: rgba(255,255,255,.75); }
 
 /* ---- живой макет: html-вложение открывается, а не лежит скрепкой ---- */
 .dchat-art {
@@ -26123,7 +26133,7 @@ body.dchat-ag.dchat-employee-readonly [data-screen="devchat"] .dchat-status {
 body.dchat-ag.dchat-employee-readonly [data-screen="devchat"] .dchat-status .dchat-st-arrow {
   display: none;
 }
-body.dchat-ag.dchat-employee-readonly .dchat-chips button:nth-child(2) i {
+body.dchat-ag.dchat-employee-readonly .dchat-chips button:nth-child(4) i {
   color: #1d4ed8;
   background: #e8efff;
 }
@@ -26134,4 +26144,5 @@ body.dchat-ag.dchat-employee-readonly .dchat-empty .ico {
 @media (max-width: 560px) {
   body.dchat-ag .dchat-mode-badge { padding: 2px 6px; font-size: 9.5px; }
   body.dchat-ag .dchat-mode-badge i { display: none; }
+  body.dchat-ag .dchat-file .sz { display: none; }
 }

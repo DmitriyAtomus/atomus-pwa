@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.093";
+const APP_VERSION = "v2.46.094";
 const APP_VERSION_DATE = "27.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2141,7 +2141,7 @@ function _devChatApplyAgentUi() {
   if (term) term.textContent = name + ' — работа вживую';
   const hint = document.querySelector('[data-screen="devchat"] .dchat-hint');
   if (hint) hint.textContent = employee
-    ? 'Enter — отправить · Shift+Enter — новая строка · Клава видит только разрешённые данные и ничего не изменяет'
+    ? 'Enter — отправить · Shift+Enter — новая строка · Клава видит только разрешённые данные и ничего не изменяет · может создать новый файл'
     : 'Enter — отправить, Shift+Enter — новая строка. Файлы можно перетащить прямо в окно. ' +
       name + ' работает на офисном компьютере и правит проекты сам.';
   const badge = document.getElementById('devchat-mode-badge');
@@ -2154,15 +2154,16 @@ function _devChatApplyAgentUi() {
   const input = document.getElementById('devchat-input');
   const drawerInput = document.getElementById('devchat-drawer-input');
   const placeholder = employee
-    ? 'Спросите про CRM или попросите найти в интернете…'
+    ? 'Спросите про CRM, интернет или попросите создать файл…'
     : 'Спросите или поставьте задачу…';
   if (input) input.placeholder = placeholder;
   if (drawerInput) drawerInput.placeholder = placeholder;
   const chips = document.getElementById('devchat-chips');
   if (chips) chips.innerHTML = employee
-    ? '<button onclick="devChatQuick(this)"><i class="ti ti-progress"></i>Что сейчас в работе?</button>' +
-      '<button onclick="devChatQuick(this)"><i class="ti ti-world-search"></i>Найди в интернете…</button>' +
-      '<button onclick="devChatQuick(this)"><i class="ti ti-database-search"></i>Проверь данные CRM…</button>'
+    ? '<button onclick="devChatQuick(this)"><i class="ti ti-file-spreadsheet"></i>Сделай Excel…</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-file-type-pdf"></i>Собери PDF…</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-schema"></i>Нарисуй схему…</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-world-search"></i>Найди в интернете…</button>'
     : '<button onclick="devChatQuick(this)"><i class="ti ti-progress"></i>Что сейчас в работе?</button>' +
       '<button onclick="devChatQuick(this)"><i class="ti ti-file-search"></i>Проверь логи за сегодня</button>' +
       '<button onclick="devChatQuick(this)"><i class="ti ti-brush"></i>Поправь дизайн раздела…</button>';
@@ -2565,6 +2566,62 @@ function _devChatArtifactEsc(e) {
   if (e.key === 'Escape') devChatCloseArtifact();
 }
 
+function _devChatFileIcon(f) {
+  const name = ((f && f.name) || '').toLowerCase();
+  if (/\.xlsx?$|\.csv$/.test(name)) return 'ti-file-spreadsheet';
+  if (/\.docx?$/.test(name)) return 'ti-file-type-docx';
+  if (/\.pdf$/.test(name)) return 'ti-file-type-pdf';
+  if (/\.pptx?$/.test(name)) return 'ti-presentation';
+  if (/\.png$|\.jpe?g$|\.webp$/.test(name)) return 'ti-photo';
+  if (/\.json$/.test(name)) return 'ti-json';
+  return 'ti-file-text';
+}
+
+function _devChatFileSize(size) {
+  const n = Number(size || 0);
+  if (!n) return '';
+  if (n < 1024) return n + ' Б';
+  if (n < 1024 * 1024) return Math.round(n / 1024) + ' КБ';
+  return (n / (1024 * 1024)).toFixed(1).replace('.', ',') + ' МБ';
+}
+
+async function devChatDownloadFile(f, button) {
+  if (!f || !f.url) return;
+  if (button) button.disabled = true;
+  try {
+    const r = await fetch(API_BASE + f.url, {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
+    });
+    if (!r.ok) throw new Error('http ' + r.status);
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = f.name || 'Документ';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Не удалось скачать файл', 'error');
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+function _devChatFileCard(f) {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'dchat-file' + (f.generated ? ' is-generated' : '');
+  card.innerHTML = '<i class="ti ' + _devChatFileIcon(f) + '"></i>' +
+    '<span class="nm"></span><span class="sz"></span>' +
+    '<span class="go"><i class="ti ti-download"></i>Скачать</span>';
+  card.querySelector('.nm').textContent = f.name || 'Файл';
+  card.querySelector('.sz').textContent = _devChatFileSize(f.size);
+  card.onclick = function () { devChatDownloadFile(f, card); };
+  return card;
+}
+
 function _devChatRender(msg) {
   const mine = msg.author === 'user';
   const wrap = document.createElement('div');
@@ -2617,14 +2674,11 @@ function _devChatRender(msg) {
       img.onclick = function () { if (this.src) openPhotoLightbox(this.src); };
       bubble.appendChild(img);
       _devChatLoadImage(img, f.url);
+      if (f.generated) bubble.appendChild(_devChatFileCard(f));
     } else if (_devChatIsArtifact(f)) {
       bubble.appendChild(_devChatArtifactCard(f));
     } else {
-      const note = document.createElement('div');
-      note.className = 'dchat-file';
-      note.innerHTML = '<i class="ti ti-paperclip"></i>';
-      note.appendChild(document.createTextNode(f.name || 'файл'));
-      bubble.appendChild(note);
+      bubble.appendChild(_devChatFileCard(f));
     }
   });
 
@@ -2973,13 +3027,13 @@ function _devChatEmptyHtml() {
   const name = _devChatAgentName();
   const employee = _devChatEmployeeMode();
   const quick = employee
-    ? ['Что сейчас в работе?', 'Найди в интернете характеристики…', 'Проверь остаток в CRM…']
+    ? ['Сделай Excel по данным CRM…', 'Подготовь документ Word…', 'Нарисуй блок-схему…']
     : ['Что сейчас в работе?', 'Поправь дизайн раздела', 'Собери отчёт по задачам'];
   return '<div class="dchat-empty">' +
     '<div class="ico"><i class="ti ti-sparkles"></i></div>' +
     '<h3>' + (employee ? 'Спросите ' : 'Задача для ') + escapeHtml(name) + '</h3>' +
     '<p>' + (employee
-      ? 'Клава может общаться, искать публичную информацию в интернете и отвечать по разрешённым данным CRM. Режим безопасный: только чтение, без команд и изменений.'
+      ? 'Клава может общаться, искать публичную информацию в интернете, читать разрешённые данные CRM и создавать новые Word, Excel, PDF, PowerPoint, текстовые файлы и PNG-схемы. Режим безопасный: только чтение, без команд и изменений.'
       : 'Опишите, что сделать. Агент работает на офисном сервере: сам правит проекты, запускает проверки и отвечает сюда же. Можно приложить фото или файл.') + '</p>' +
     '<div class="dchat-quick">' +
     quick.map(function (q) {
@@ -3310,7 +3364,7 @@ function devChatCamera() {
 // шторке. Шторка одна на оба композера — нужный input выбирает _devChatEl.
 function devChatAttachMenu() {
   if (typeof _devChatEmployeeMode === 'function' && _devChatEmployeeMode()) {
-    showToast('Сотрудническая Клава принимает текст и голос — без доступа к файлам', '');
+    showToast('Исходные файлы закрыты, но Клава может создать новый документ по вашему описанию', '');
     return;
   }
   let sheet = document.getElementById('devchat-attach-sheet');
@@ -3629,7 +3683,7 @@ function devChatTermClose() {
 
 function devChatPickFiles(files) {
   if (typeof _devChatEmployeeMode === 'function' && _devChatEmployeeMode()) {
-    showToast('В этом режиме файлы отключены: Клава ничего не может менять', '');
+    showToast('Загрузка исходных файлов отключена; попросите Клаву создать новый', '');
     return;
   }
   _devChatFiles = Array.prototype.slice.call(files || []).slice(0, 5);
@@ -3640,7 +3694,7 @@ function devChatPickFiles(files) {
 // скриншот не должен стирать выбранный до него файл.
 function devChatAddFiles(files) {
   if (typeof _devChatEmployeeMode === 'function' && _devChatEmployeeMode()) {
-    showToast('В этом режиме файлы отключены: задайте вопрос текстом или голосом', '');
+    showToast('Задайте текстом или голосом, какой новый файл нужно создать', '');
     return;
   }
   const list = Array.prototype.slice.call(files || []);
