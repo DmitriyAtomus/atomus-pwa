@@ -88,14 +88,14 @@ test('при подтверждении бак получает место previ
   assert.match(put, /const st=\{pin:old\.pin,off:old\.off,link:old\.link,fit:old\.fit,sch:old\.sch\}/);
 });
 
-test('кнопка бака ищет место внутри и создаёт tank-link', () => {
-  assert.match(page, /id="bTankLink"[^>]*[\s\S]{0,180}?Закрепить бак внутри/);
-  assert.match(page, /function tankInsidePlan\(it,fr\)/);
-  assert.match(page, /rots=\[rz0,rz0\+Math\.PI\/2\]/, 'если не входит вдоль, пробуем поперёк');
-  assert.match(page, /boxFree\(b,it\)&&frameFree\(b,it\)/, 'место свободно и от деталей, и от металла корпуса');
-  assert.match(page, /sel\.link=\{to:fr\.uid,mount:'tank',face:'pan'\}/);
-  assert.match(page, /sel\.link\.rel=tankRelOf\(sel,fr\)/);
-  assert.match(page, /pushHist\('закрепление бака внутри чиллера'\)/);
+test('кнопка бака ищет место, строит кронштейны и создаёт tank-link', () => {
+  assert.match(page, /id="bTankLink"[^>]*[\s\S]{0,240}?Закрепить бак/);
+  assert.match(page, /function tankShelfPlan\(it,fr\)/);
+  assert.match(page, /function tankShelfPut\(it\)/);
+  assert.match(page, /const plan=tankShelfPlan\(it,fr\)/);
+  assert.match(page, /it\.link=\{to:fr\.uid,mount:'tank',face:'pan',sh:plan\.sh\}/);
+  assert.match(page, /it\.link\.rel=tankRelOf\(it,fr\)/);
+  assert.match(page, /pushHist\('бак на рамные кронштейны к стойкам'\)/);
 });
 
 test('относительный transform ведёт бак за перемещением и поворотом корпуса', () => {
