@@ -9,7 +9,7 @@ const js = fs.readFileSync(path.join(root, 'app-1.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
-const skinCss = css.slice(css.indexOf('/* ============ v2.46.091: Клава — чистый интерфейс'));
+const skinCss = css.slice(css.indexOf('/* ============ v2.46.092: Клава — просторный focus-режим'));
 // Проверки правил ведём по «голому» CSS: слова вроде position: fixed живут и в
 // комментариях-объяснениях, а речь про то, что реально попадает в браузер.
 const skinRules = skinCss.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -27,9 +27,8 @@ test('вид один, поэтому выбора в localStorage больше 
 });
 
 test('палитра чата нейтральная, без старой сетки и тяжёлого градиента', () => {
-  assert.match(skinCss, /--dchat-ink:\s*#0d0d0d/);
-  assert.match(skinCss, /--dchat-user:\s*#f4f4f4/);
-  assert.match(skinCss, /body\.dchat-ag \.dchat-feed \{[\s\S]*?background:\s*#fff/);
+  assert.match(skinCss, /--dchat-panel:\s*#fafafa/);
+  assert.match(skinCss, /body\.dchat-ag \.dchat-feed \{[\s\S]*?background:\s*#fcfcfd/);
   assert.doesNotMatch(skinCss, /--ag-grid|linear-gradient\(var\(--ag-grid\)/);
 });
 
@@ -46,12 +45,24 @@ test('новый визуальный слой не назначает position 
 
 test('ответ Клавы плоский, пузырь остаётся только у пользователя', () => {
   assert.match(skinRules, /\.dchat-row:not\(\.is-mine\) \.dchat-bubble \{[^}]*background:\s*transparent;[^}]*border:\s*0;/s);
-  assert.match(skinRules, /\.dchat-row\.is-mine \.dchat-bubble \{[^}]*background:\s*var\(--dchat-user\);[^}]*border-radius:\s*20px;/s);
+  assert.match(skinRules, /\.dchat-row\.is-mine \.dchat-bubble \{[^}]*background:\s*#f0f0f0;[^}]*border-radius:\s*22px;/s);
 });
 
 test('композер собран округлой плавающей панелью', () => {
-  assert.match(skinRules, /\.dchat-box,[\s\S]*?border-radius:\s*24px;[\s\S]*?box-shadow:/);
+  assert.match(skinRules, /\.dchat-box,[\s\S]*?border-radius:\s*28px;[\s\S]*?box-shadow:/);
   assert.match(skinRules, /\.dchat-mic,[\s\S]*?\.dchat-send \{[^}]*border-radius:\s*50%;/s);
+});
+
+test('на широком экране чат получает focus-раскладку без второго меню CRM', () => {
+  assert.match(skinRules, /body\.dchat-screen \.app\.desktop-layout \{[^}]*max-width:\s*1920px;/s);
+  assert.match(skinRules, /body\.dchat-screen \.app\.desktop-layout \.body-layout \{[^}]*grid-template-columns:\s*78px minmax\(0, 1fr\)/s);
+  assert.match(skinRules, /\.sidebar\[data-visible="1"\] \{ display:\s*none;/);
+});
+
+test('историю можно свернуть кнопкой в шапке', () => {
+  assert.match(html, /dchat-list-btn[^>]*aria-expanded="true"/);
+  assert.match(js, /list\.classList\.toggle\('is-collapsed'\)/);
+  assert.match(skinRules, /\.dchat-list\.is-collapsed \{[^}]*width:\s*0;[^}]*pointer-events:\s*none;/s);
 });
 
 // Узкий экран — основной: рамка и скругление листа там только съедают ширину.
