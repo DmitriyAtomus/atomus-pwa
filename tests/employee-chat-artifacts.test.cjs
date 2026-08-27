@@ -9,13 +9,13 @@ const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
 const changelog = fs.readFileSync(path.join(root, 'app-3.js'), 'utf8');
 
 test('сотруднику явно предложены основные рабочие форматы', () => {
-  assert.match(app, /Word, Excel, PDF, PowerPoint, текстовые файлы, PNG-схемы и 3D-модели STL/);
+  assert.match(app, /Word, Excel, PDF, PowerPoint, изображения и 3D-модели STEP\/STL\/OBJ\/GLB/);
   assert.match(app, /Сделай Excel/);
   assert.match(app, /Собери PDF/);
   assert.match(app, /Нарисуй схему/);
   assert.match(app, /Сделай 3D-модель/);
   assert.match(app, /Кто я\?/);
-  assert.match(app, /\.stl\$.*ti-cube-3d-sphere/);
+  assert.match(app, /stl\|obj\|glb\|gltf\|step\|stp.*ti-cube-3d-sphere/);
 });
 
 test('созданный файл скачивается авторизованным запросом', () => {

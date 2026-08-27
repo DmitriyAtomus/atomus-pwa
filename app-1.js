@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.097";
+const APP_VERSION = "v2.46.098";
 const APP_VERSION_DATE = "27.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2141,8 +2141,8 @@ function _devChatApplyAgentUi() {
   if (term) term.textContent = name + ' — работа вживую';
   const hint = document.querySelector('[data-screen="devchat"] .dchat-hint');
   if (hint) hint.textContent = employee
-    ? 'Enter — отправить · Shift+Enter — новая строка · Клава видит только разрешённые данные и ничего не изменяет · '
-      + 'читает приложенные фото, PDF, Word, Excel и текст, может создать новый файл'
+    ? 'Enter — отправить · Shift+Enter — новая строка · Клава работает через локальный Codex · '
+      + 'читает разрешённые данные без права изменения, принимает вложения и выдаёт новые файлы'
     : 'Enter — отправить, Shift+Enter — новая строка. Файлы можно перетащить прямо в окно. ' +
       name + ' работает на офисном компьютере и правит проекты сам.';
   const badge = document.getElementById('devchat-mode-badge');
@@ -2581,7 +2581,7 @@ function _devChatFileIcon(f) {
   if (/\.docx?$/.test(name)) return 'ti-file-type-docx';
   if (/\.pdf$/.test(name)) return 'ti-file-type-pdf';
   if (/\.pptx?$/.test(name)) return 'ti-presentation';
-  if (/\.stl$/.test(name)) return 'ti-cube-3d-sphere';
+  if (/\.(?:stl|obj|glb|gltf|step|stp)$/.test(name)) return 'ti-cube-3d-sphere';
   if (/\.png$|\.jpe?g$|\.webp$/.test(name)) return 'ti-photo';
   if (/\.json$/.test(name)) return 'ti-json';
   return 'ti-file-text';
@@ -3043,7 +3043,7 @@ function _devChatEmptyHtml() {
     '<div class="ico"><i class="ti ti-sparkles"></i></div>' +
     '<h3>' + (employee ? 'Спросите ' : 'Задача для ') + escapeHtml(name) + '</h3>' +
     '<p>' + (employee
-      ? 'Клава знает, какой сотрудник вошёл в аккаунт, может общаться, искать публичную информацию в интернете, читать разрешённые данные CRM и создавать Word, Excel, PDF, PowerPoint, текстовые файлы, PNG-схемы и 3D-модели STL с просмотром. Режим безопасный: только чтение, без команд и изменений.'
+      ? 'Клава знает, какой сотрудник вошёл в аккаунт, может общаться, искать публичную информацию в интернете, читать разрешённые данные CRM, разбирать вложения и создавать Word, Excel, PDF, PowerPoint, изображения и 3D-модели STEP/STL/OBJ/GLB. Она работает локально через Codex, без изменения CRM и рабочих проектов.'
       : 'Опишите, что сделать. Агент работает на офисном сервере: сам правит проекты, запускает проверки и отвечает сюда же. Можно приложить фото или файл.') + '</p>' +
     '<div class="dchat-quick">' +
     quick.map(function (q) {
@@ -3943,16 +3943,16 @@ function devChatDropFile(i) {
 const DEVCHAT_MAX_FILE = 50 * 1024 * 1024;
 const DEVCHAT_MAX_TOTAL = 60 * 1024 * 1024;
 
-// У сотрудника пределы свои (employee_chat.py): Клава не выполняет команд, она
-// ЧИТАЕТ приложенное — фото смотрит глазами, PDF читает нативно, из Word/Excel/
-// текста берёт содержимое. Архив, CAD и видео разобрать нечем, поэтому такой
-// файл отсекаем прямо здесь, не гоняя его через сеть ради отказа.
+// У сотрудника пределы свои (employee_chat.py): локальный Codex читает документы,
+// изображения и инженерные CAD/3D-файлы в отдельной песочнице. Архивы и видео
+// отсекаем прямо здесь, не гоняя их через сеть ради отказа.
 const EMPCHAT_MAX_IMAGE = 8 * 1024 * 1024;
-const EMPCHAT_MAX_DOC = 20 * 1024 * 1024;
+const EMPCHAT_MAX_DOC = 25 * 1024 * 1024;
 const EMPCHAT_MAX_TOTAL = 40 * 1024 * 1024;
-const EMPCHAT_IMAGE_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'];
+const EMPCHAT_IMAGE_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 const EMPCHAT_DOC_EXT = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv',
-  'md', 'json', 'xml'];
+  'md', 'json', 'xml', 'svg', 'html', 'htm', 'pptx',
+  'stl', 'obj', 'glb', 'gltf', 'step', 'stp', 'dxf'];
 
 // Предел одного вложения — или 0, если такой файл Клава прочитать не сможет.
 function _devChatFileLimit(f) {
