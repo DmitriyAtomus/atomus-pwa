@@ -26123,6 +26123,9 @@ body.dchat-ag .dchat-mode-badge {
   font-size: 10.5px;
   font-weight: 650;
   white-space: nowrap;
+  max-width: min(310px, 42vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 body.dchat-ag.dchat-employee-readonly [data-screen="devchat"] .dchat-eye {
   display: none !important;
@@ -26134,6 +26137,14 @@ body.dchat-ag.dchat-employee-readonly [data-screen="devchat"] .dchat-status .dch
   display: none;
 }
 body.dchat-ag.dchat-employee-readonly .dchat-chips button:nth-child(4) i {
+  color: #6d28d9;
+  background: #f1eafe;
+}
+body.dchat-ag.dchat-employee-readonly .dchat-chips button:nth-child(5) i {
+  color: #23744e;
+  background: #e8f5ed;
+}
+body.dchat-ag.dchat-employee-readonly .dchat-chips button:nth-child(6) i {
   color: #1d4ed8;
   background: #e8efff;
 }

@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.095";
+const APP_VERSION = "v2.46.096";
 const APP_VERSION_DATE = "27.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2145,7 +2145,16 @@ function _devChatApplyAgentUi() {
     : 'Enter — отправить, Shift+Enter — новая строка. Файлы можно перетащить прямо в окно. ' +
       name + ' работает на офисном компьютере и правит проекты сам.';
   const badge = document.getElementById('devchat-mode-badge');
-  if (badge) badge.style.display = employee ? 'inline-flex' : 'none';
+  if (badge) {
+    const accountName = (state.user &&
+      (state.user.short_name || state.user.name || state.user.full_name)) || 'ваш аккаунт';
+    badge.style.display = employee ? 'inline-flex' : 'none';
+    badge.innerHTML = '<i class="ti ti-user-check"></i>' +
+      (employee ? 'Личный · ' + escapeHtml(accountName) : 'Только чтение');
+    badge.title = employee
+      ? 'Клава знает имя, должность и роль текущего авторизованного сотрудника'
+      : '';
+  }
   const projectBtn = document.getElementById('devchat-projects-btn');
   if (projectBtn) projectBtn.style.display = employee ? 'none' : '';
   document.querySelectorAll('.dchat-attach').forEach(function (btn) {
@@ -2154,7 +2163,7 @@ function _devChatApplyAgentUi() {
   const input = document.getElementById('devchat-input');
   const drawerInput = document.getElementById('devchat-drawer-input');
   const placeholder = employee
-    ? 'Спросите про CRM, интернет или попросите создать файл…'
+    ? 'Спросите про CRM, интернет, файл или 3D-модель…'
     : 'Спросите или поставьте задачу…';
   if (input) input.placeholder = placeholder;
   if (drawerInput) drawerInput.placeholder = placeholder;
@@ -2163,6 +2172,8 @@ function _devChatApplyAgentUi() {
     ? '<button onclick="devChatQuick(this)"><i class="ti ti-file-spreadsheet"></i>Сделай Excel…</button>' +
       '<button onclick="devChatQuick(this)"><i class="ti ti-file-type-pdf"></i>Собери PDF…</button>' +
       '<button onclick="devChatQuick(this)"><i class="ti ti-schema"></i>Нарисуй схему…</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-cube-3d-sphere"></i>Сделай 3D-модель…</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-user-check"></i>Кто я?</button>' +
       '<button onclick="devChatQuick(this)"><i class="ti ti-world-search"></i>Найди в интернете…</button>'
     : '<button onclick="devChatQuick(this)"><i class="ti ti-progress"></i>Что сейчас в работе?</button>' +
       '<button onclick="devChatQuick(this)"><i class="ti ti-file-search"></i>Проверь логи за сегодня</button>' +
@@ -2572,6 +2583,7 @@ function _devChatFileIcon(f) {
   if (/\.docx?$/.test(name)) return 'ti-file-type-docx';
   if (/\.pdf$/.test(name)) return 'ti-file-type-pdf';
   if (/\.pptx?$/.test(name)) return 'ti-presentation';
+  if (/\.stl$/.test(name)) return 'ti-cube-3d-sphere';
   if (/\.png$|\.jpe?g$|\.webp$/.test(name)) return 'ti-photo';
   if (/\.json$/.test(name)) return 'ti-json';
   return 'ti-file-text';
@@ -3027,13 +3039,13 @@ function _devChatEmptyHtml() {
   const name = _devChatAgentName();
   const employee = _devChatEmployeeMode();
   const quick = employee
-    ? ['Сделай Excel по данным CRM…', 'Подготовь документ Word…', 'Нарисуй блок-схему…']
+    ? ['Сделай Excel по данным CRM…', 'Сделай 3D-модель корпуса…', 'Кто я и какая у меня роль?']
     : ['Что сейчас в работе?', 'Поправь дизайн раздела', 'Собери отчёт по задачам'];
   return '<div class="dchat-empty">' +
     '<div class="ico"><i class="ti ti-sparkles"></i></div>' +
     '<h3>' + (employee ? 'Спросите ' : 'Задача для ') + escapeHtml(name) + '</h3>' +
     '<p>' + (employee
-      ? 'Клава может общаться, искать публичную информацию в интернете, читать разрешённые данные CRM и создавать новые Word, Excel, PDF, PowerPoint, текстовые файлы и PNG-схемы. Режим безопасный: только чтение, без команд и изменений.'
+      ? 'Клава знает, какой сотрудник вошёл в аккаунт, может общаться, искать публичную информацию в интернете, читать разрешённые данные CRM и создавать Word, Excel, PDF, PowerPoint, текстовые файлы, PNG-схемы и 3D-модели STL с просмотром. Режим безопасный: только чтение, без команд и изменений.'
       : 'Опишите, что сделать. Агент работает на офисном сервере: сам правит проекты, запускает проверки и отвечает сюда же. Можно приложить фото или файл.') + '</p>' +
     '<div class="dchat-quick">' +
     quick.map(function (q) {

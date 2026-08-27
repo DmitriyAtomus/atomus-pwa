@@ -9,10 +9,13 @@ const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
 const changelog = fs.readFileSync(path.join(root, 'app-3.js'), 'utf8');
 
 test('сотруднику явно предложены основные рабочие форматы', () => {
-  assert.match(app, /Word, Excel, PDF, PowerPoint, текстовые файлы и PNG-схемы/);
+  assert.match(app, /Word, Excel, PDF, PowerPoint, текстовые файлы, PNG-схемы и 3D-модели STL/);
   assert.match(app, /Сделай Excel/);
   assert.match(app, /Собери PDF/);
   assert.match(app, /Нарисуй схему/);
+  assert.match(app, /Сделай 3D-модель/);
+  assert.match(app, /Кто я\?/);
+  assert.match(app, /\.stl\$.*ti-cube-3d-sphere/);
 });
 
 test('созданный файл скачивается авторизованным запросом', () => {
@@ -33,6 +36,8 @@ test('ответ показывает карточку скачивания и �
 });
 
 test('версия рассказывает о безопасном создании файлов', () => {
-  assert.match(changelog, /v2\.46\.094/);
+  assert.match(changelog, /v2\.46\.095/);
   assert.match(changelog, /личном хранилище без доступа к правкам CRM/);
+  assert.match(changelog, /профиль нельзя подменить сообщением/);
+  assert.match(changelog, /3D-модель STL/);
 });
