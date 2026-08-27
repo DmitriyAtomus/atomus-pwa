@@ -82,6 +82,7 @@ function sendContext(opts) {
     'let _devChatFiles = this.__files;\n' +
     'function _devChatEl(name) { return name === "send" ? this.btn : (name === "input" ? this.input : null); }\n' +
     'function _devChatApi(p) { return "/api/dev-chat" + p; }\n' +
+    'function _devChatEmployeeMode() { return false; }\n' +
     'function _devChatDraftClear() {}\n' +
     'function devChatPickFiles(f) { _devChatFiles = f || []; }\n' +
     'function _devChatSendable() {}\n' +

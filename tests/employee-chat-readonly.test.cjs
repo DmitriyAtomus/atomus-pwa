@@ -28,13 +28,29 @@ test('сотрудническая Клава объясняет возможн�
   assert.match(app, /Клава видит только разрешённые данные и ничего не изменяет/);
 });
 
-test('вложения закрыты в сотрудническом режиме, голос идёт в безопасный API', () => {
+test('сотрудник прикладывает файлы, но только те, что Клава прочитает', () => {
+  // скрепка доступна всем: у сотрудника это способ показать фото, счёт, смету
+  const ui = app.slice(app.indexOf('function _devChatApplyAgentUi'),
+    app.indexOf('function _devChatUseAgent'));
+  assert.doesNotMatch(ui, /dchat-attach/);
   const attach = app.slice(app.indexOf('function devChatAttachMenu'),
     app.indexOf('function _devChatSheetEsc'));
-  assert.match(attach, /_devChatEmployeeMode\(\)/);
+  assert.doesNotMatch(attach, /_devChatEmployeeMode\(\)/);
   const files = app.slice(app.indexOf('function devChatPickFiles'),
     app.indexOf('function _devChatNamed'));
-  assert.equal((files.match(/_devChatEmployeeMode\(\)/g) || []).length, 2);
+  assert.doesNotMatch(files, /_devChatEmployeeMode\(\)/);
+  // предел и список типов повторяют employee_chat.py — отказ виден до загрузки
+  const limit = app.slice(app.indexOf('function _devChatFileLimit'),
+    app.indexOf('function _devChatSendProgress'));
+  assert.match(limit, /EMPCHAT_MAX_IMAGE/);
+  assert.match(limit, /EMPCHAT_DOC_EXT/);
+  const big = app.slice(app.indexOf('function _devChatTooBig'),
+    app.indexOf('async function _devChatUnreadable'));
+  assert.match(big, /EMPCHAT_MAX_TOTAL/);
+  assert.match(big, /прочитать не сможет/);
+});
+
+test('голос сотрудника идёт в безопасный API', () => {
   const voice = app.slice(app.indexOf('async function _dcVoiceFinish'),
     app.indexOf('// Кнопка микрофона'));
   assert.match(voice, /_devChatApi\('\/voice'\)/);

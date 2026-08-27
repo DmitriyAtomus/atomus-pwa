@@ -84,6 +84,7 @@ function sendContext(opts) {
     'let _devChatFiles = ' + JSON.stringify(o.files || []) + ';\n' +
     'function _devChatEl(name) { return name === "send" ? this.btn : (name === "input" ? this.input : null); }\n' +
     'function _devChatApi(p) { return "/api/dev-chat" + p; }\n' +
+    'function _devChatEmployeeMode() { return ' + (o.employee ? 'true' : 'false') + '; }\n' +
     'function _devChatDraftClear() {}\n' +
     'function devChatPickFiles(f) { _devChatFiles = f || []; }\n' +
     'function _devChatSendable() { this.row.classList.toggle("has-text", !!(this.input.value || "").trim() || _devChatFiles.length > 0); }\n' +
@@ -115,6 +116,43 @@ test('сумма вложений тоже ограничена', async () => {
   assert.equal(ctx.calls.length, 0);
   assert.match(ctx.toasts[0].msg, /75 МБ/);
   assert.match(ctx.toasts[0].msg, /60 МБ/);
+});
+
+// У сотрудника Клава только читает приложенное: свои пределы и свой список
+// типов (employee_chat.py). Отказ должен приходить до загрузки, а не после.
+test('сотруднику отбивается файл, который Клава не прочитает', async () => {
+  const ctx = sendContext({ employee: true, files: [{ name: 'узел.zip', size: 2 * MB }] });
+
+  await ctx.send();
+
+  assert.equal(ctx.calls.length, 0);
+  assert.match(ctx.toasts[0].msg, /узел\.zip/);
+  assert.match(ctx.toasts[0].msg, /прочитать не сможет/);
+});
+
+test('сотруднику фото ограничено 8 МБ, а вложения за раз — 40 МБ', async () => {
+  const heavy = sendContext({ employee: true, files: [{ name: 'цех.jpg', size: 12 * MB, type: 'image/jpeg' }] });
+  await heavy.send();
+  assert.equal(heavy.calls.length, 0);
+  assert.match(heavy.toasts[0].msg, /8\.0 МБ/);
+  assert.match(heavy.toasts[0].msg, /полегче/, 'архив сотруднику предлагать нечего');
+
+  const many = sendContext({
+    employee: true,
+    files: [1, 2, 3].map((i) => ({ name: `смета${i}.xlsx`, size: 18 * MB })),
+  });
+  await many.send();
+  assert.equal(many.calls.length, 0);
+  assert.match(many.toasts[0].msg, /40 МБ/);
+});
+
+test('сотруднический счёт-PDF уходит на свой адрес', async () => {
+  const ctx = sendContext({ employee: true, files: [{ name: 'счёт.pdf', size: 2 * MB }] });
+
+  await ctx.send();
+
+  assert.equal(ctx.calls.length, 1);
+  assert.equal(ctx.toasts.length, 0);
 });
 
 test('обрыв связи больше не молчит, а текст остаётся в поле', async () => {

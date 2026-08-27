@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.096";
+const APP_VERSION = "v2.46.097";
 const APP_VERSION_DATE = "27.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2141,7 +2141,8 @@ function _devChatApplyAgentUi() {
   if (term) term.textContent = name + ' — работа вживую';
   const hint = document.querySelector('[data-screen="devchat"] .dchat-hint');
   if (hint) hint.textContent = employee
-    ? 'Enter — отправить · Shift+Enter — новая строка · Клава видит только разрешённые данные и ничего не изменяет · может создать новый файл'
+    ? 'Enter — отправить · Shift+Enter — новая строка · Клава видит только разрешённые данные и ничего не изменяет · '
+      + 'читает приложенные фото, PDF, Word, Excel и текст, может создать новый файл'
     : 'Enter — отправить, Shift+Enter — новая строка. Файлы можно перетащить прямо в окно. ' +
       name + ' работает на офисном компьютере и правит проекты сам.';
   const badge = document.getElementById('devchat-mode-badge');
@@ -2157,9 +2158,6 @@ function _devChatApplyAgentUi() {
   }
   const projectBtn = document.getElementById('devchat-projects-btn');
   if (projectBtn) projectBtn.style.display = employee ? 'none' : '';
-  document.querySelectorAll('.dchat-attach').forEach(function (btn) {
-    btn.style.display = employee ? 'none' : '';
-  });
   const input = document.getElementById('devchat-input');
   const drawerInput = document.getElementById('devchat-drawer-input');
   const placeholder = employee
@@ -3375,10 +3373,6 @@ function devChatCamera() {
 // кнопка ростом с микрофон, а источники (камера / галерея / файл) живут в
 // шторке. Шторка одна на оба композера — нужный input выбирает _devChatEl.
 function devChatAttachMenu() {
-  if (typeof _devChatEmployeeMode === 'function' && _devChatEmployeeMode()) {
-    showToast('Исходные файлы закрыты, но Клава может создать новый документ по вашему описанию', '');
-    return;
-  }
   let sheet = document.getElementById('devchat-attach-sheet');
   if (!sheet) {
     sheet = document.createElement('div');
@@ -3694,10 +3688,6 @@ function devChatTermClose() {
 }
 
 function devChatPickFiles(files) {
-  if (typeof _devChatEmployeeMode === 'function' && _devChatEmployeeMode()) {
-    showToast('Загрузка исходных файлов отключена; попросите Клаву создать новый', '');
-    return;
-  }
   _devChatFiles = Array.prototype.slice.call(files || []).slice(0, 5);
   _devChatDrawFiles();
 }
@@ -3705,10 +3695,6 @@ function devChatPickFiles(files) {
 // Скрепка выбирает набор заново, а Ctrl+V докладывает к уже набранному:
 // скриншот не должен стирать выбранный до него файл.
 function devChatAddFiles(files) {
-  if (typeof _devChatEmployeeMode === 'function' && _devChatEmployeeMode()) {
-    showToast('Задайте текстом или голосом, какой новый файл нужно создать', '');
-    return;
-  }
   const list = Array.prototype.slice.call(files || []);
   if (!list.length) return;
   const free = 5 - _devChatFiles.length;
@@ -3957,6 +3943,27 @@ function devChatDropFile(i) {
 const DEVCHAT_MAX_FILE = 50 * 1024 * 1024;
 const DEVCHAT_MAX_TOTAL = 60 * 1024 * 1024;
 
+// У сотрудника пределы свои (employee_chat.py): Клава не выполняет команд, она
+// ЧИТАЕТ приложенное — фото смотрит глазами, PDF читает нативно, из Word/Excel/
+// текста берёт содержимое. Архив, CAD и видео разобрать нечем, поэтому такой
+// файл отсекаем прямо здесь, не гоняя его через сеть ради отказа.
+const EMPCHAT_MAX_IMAGE = 8 * 1024 * 1024;
+const EMPCHAT_MAX_DOC = 20 * 1024 * 1024;
+const EMPCHAT_MAX_TOTAL = 40 * 1024 * 1024;
+const EMPCHAT_IMAGE_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'];
+const EMPCHAT_DOC_EXT = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv',
+  'md', 'json', 'xml'];
+
+// Предел одного вложения — или 0, если такой файл Клава прочитать не сможет.
+function _devChatFileLimit(f) {
+  if (!_devChatEmployeeMode()) return DEVCHAT_MAX_FILE;
+  const ext = ((f && f.name || '').split('.').pop() || '').toLowerCase();
+  const type = (f && f.type || '').toLowerCase();
+  if (type.indexOf('image/') === 0 || EMPCHAT_IMAGE_EXT.indexOf(ext) >= 0) return EMPCHAT_MAX_IMAGE;
+  if (EMPCHAT_DOC_EXT.indexOf(ext) >= 0) return EMPCHAT_MAX_DOC;
+  return 0;
+}
+
 function _devChatMB(n) {
   const mb = n / (1024 * 1024);
   return (mb < 10 ? mb.toFixed(1) : Math.round(mb)) + ' МБ';
@@ -4045,16 +4052,26 @@ function _devChatPost(url, form, onProgress) {
 // Отказ по размеру называем ДО отправки: имя файла, его вес и предел.
 function _devChatTooBig() {
   let total = 0;
+  const maxTotal = _devChatEmployeeMode() ? EMPCHAT_MAX_TOTAL : DEVCHAT_MAX_TOTAL;
   for (let i = 0; i < _devChatFiles.length; i++) {
     const f = _devChatFiles[i];
     total += f.size || 0;
-    if (f.size > DEVCHAT_MAX_FILE) {
+    const limit = _devChatFileLimit(f);
+    if (!limit) {
+      return '«' + f.name + '» Клава прочитать не сможет. Подойдут фото, PDF, '
+        + 'Word, Excel и текстовые файлы.';
+    }
+    if (f.size > limit) {
+      // сотруднику архивы не предлагаем: их всё равно не примут — Клава читает
+      // только то, что умеет открыть сама
       return '«' + f.name + '» — ' + _devChatMB(f.size) + ', а больше '
-        + _devChatMB(DEVCHAT_MAX_FILE) + ' одним файлом не отправить. Заархивируй по частям или положи на Диск.';
+        + _devChatMB(limit) + ' одним файлом не отправить. '
+        + (_devChatEmployeeMode() ? 'Пришлите файл полегче или частями.'
+          : 'Заархивируй по частям или положи на Диск.');
     }
   }
-  if (total > DEVCHAT_MAX_TOTAL) {
-    return 'Вложений на ' + _devChatMB(total) + ', предел за раз — ' + _devChatMB(DEVCHAT_MAX_TOTAL) + '.';
+  if (total > maxTotal) {
+    return 'Вложений на ' + _devChatMB(total) + ', предел за раз — ' + _devChatMB(maxTotal) + '.';
   }
   return '';
 }
