@@ -25711,3 +25711,385 @@ body.dchat-ag.dchat-fullscreen [data-screen="devchat"] {
   body.dchat-ag .dchat-topbar.is-working .dchat-hd-ava::before,
   body.dchat-ag .dchat-topbar.is-working .dchat-eye { animation: none; }
 }
+
+/* ============ v2.46.092: Клава — просторный focus-режим и второй проход ============ */
+body.dchat-ag {
+  --dchat-panel: #fafafa;
+  --dchat-panel-strong: #f1f1f2;
+  --dchat-blue: #2563eb;
+}
+
+/* На широком мониторе у чата уже есть собственная история слева. Второе меню
+   раздела CRM только съедало место, поэтому оставляем рельсу разделов и отдаём
+   центральной колонке до 1920 px. В остальных экранах раскладка не меняется. */
+@media (min-width: 1180px) {
+  body.dchat-screen .app.desktop-layout {
+    width: 100%;
+    max-width: 1920px;
+  }
+  body.dchat-screen .app.desktop-layout .body-layout {
+    grid-template-columns: 78px minmax(0, 1fr);
+  }
+  body.dchat-screen .app.desktop-layout.rail-off .body-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body.dchat-screen .app.desktop-layout .sidebar[data-visible="1"] { display: none; }
+}
+
+/* Шапка стала заметнее, но остаётся лёгкой: имя, статус и действия читаются
+   даже при уменьшенном масштабе браузера. */
+body.dchat-ag [data-screen="devchat"] .page-header.dchat-topbar {
+  min-height: 68px;
+  padding: 11px 18px;
+  border-color: #e7e7e7;
+  box-shadow: 0 1px 0 rgba(13,13,13,.025);
+}
+body.dchat-ag [data-screen="devchat"] .page-header-title { gap: 10px; }
+body.dchat-ag [data-screen="devchat"] .dchat-hd-id h1 {
+  font-size: 18px;
+  font-weight: 680;
+  letter-spacing: -.25px;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-hd-ava {
+  width: 40px;
+  height: 40px;
+  font-size: 16px;
+  box-shadow: 0 0 0 4px #f2f2f2;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-status {
+  gap: 6px;
+  padding: 3px 8px;
+  color: #4d6852;
+  background: #f2f7f3;
+  border: 1px solid #e0ebe2;
+  border-radius: 999px;
+  font-size: 11.5px;
+  line-height: 1.2;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-status:hover,
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-status:active {
+  color: #314c36;
+  background: #eaf3eb;
+  border: 1px solid #d5e5d8;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-topbar.is-working .dchat-status {
+  color: #8a6208;
+  background: #fff8e9;
+  border-color: #f2dfb3;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .back-btn,
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-list-btn,
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-eye,
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-full-btn,
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-stopbtn {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  font-size: 18px;
+}
+
+/* Кнопка истории видна и на компьютере: один клик оставляет только диалог. */
+@media (min-width: 901px) {
+  body.dchat-ag [data-screen="devchat"] .dchat-list-btn { display: inline-flex; }
+  body.dchat-ag .dchat-list {
+    transition: width .22s ease, padding .22s ease, opacity .16s ease,
+      border-color .16s ease;
+  }
+  body.dchat-ag .dchat-list.is-collapsed {
+    width: 0;
+    padding-right: 0;
+    padding-left: 0;
+    overflow: hidden;
+    opacity: 0;
+    border-right-color: transparent;
+    pointer-events: none;
+  }
+}
+
+/* История: компактная ширина, ясная иерархия и активный чат как белая карточка. */
+body.dchat-ag .dchat-list {
+  width: 260px;
+  padding: 14px 12px 12px;
+  background: var(--dchat-panel);
+}
+body.dchat-ag .dcl-top { gap: 7px; margin-bottom: 11px; }
+body.dchat-ag .dcl-new {
+  min-height: 42px;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #dedede;
+  box-shadow: 0 1px 2px rgba(0,0,0,.035);
+}
+body.dchat-ag .dcl-new i {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--dchat-ink);
+  border-radius: 7px;
+  font-size: 14px;
+}
+body.dchat-ag .dcl-new:hover {
+  background: #fff;
+  border-color: #c9c9c9;
+  box-shadow: 0 3px 10px rgba(0,0,0,.06);
+}
+body.dchat-ag .dcl-icon {
+  width: 42px;
+  height: 42px;
+  background: #fff;
+  border: 1px solid #dedede;
+}
+body.dchat-ag .dcl-search input {
+  min-height: 38px;
+  background: #fff;
+  border: 1px solid #e3e3e3;
+}
+body.dchat-ag .dcl-search i { top: 11px; }
+body.dchat-ag .dcl-tab { padding: 6px 10px; }
+body.dchat-ag .dcl-tab.is-on {
+  color: #fff;
+  background: #222;
+}
+body.dchat-ag .dcl-items::before {
+  content: 'Недавние';
+  display: block;
+  padding: 7px 9px 6px;
+  color: #969696;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+body.dchat-ag .dcl-item {
+  padding: 10px 9px 10px 12px;
+  border: 1px solid transparent;
+}
+body.dchat-ag .dcl-item.is-on {
+  background: #fff;
+  border-color: #e1e1e1;
+  box-shadow: 0 3px 12px rgba(0,0,0,.055);
+}
+body.dchat-ag .dcl-item .t { font-size: 13.5px; font-weight: 620; }
+body.dchat-ag .dcl-item .p { margin-top: 3px; line-height: 1.35; }
+
+/* Разговор: больше рабочая колонка и спокойный контраст. */
+body.dchat-ag .dchat-main { background: #fcfcfd; }
+body.dchat-ag .dchat-feed {
+  padding: 30px clamp(22px, 5vw, 72px) 32px;
+  background: #fcfcfd;
+  scrollbar-color: #c8c8c8 transparent;
+  scrollbar-width: thin;
+}
+body.dchat-ag .dchat-feed > .dchat-row,
+body.dchat-ag .dchat-feed > .dchat-typing,
+body.dchat-ag .dchat-feed > .dchat-day,
+body.dchat-ag .dchat-feed > .dchat-empty,
+body.dchat-ag .dchat-feed > .dchat-older,
+body.dchat-ag .dchat-feed > .loading-block {
+  width: min(100%, 920px);
+}
+body.dchat-ag .dchat-row {
+  gap: 14px;
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+body.dchat-ag .dchat-row.is-cont { margin-top: -10px; }
+body.dchat-ag .dchat-ava {
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  box-shadow: 0 0 0 4px #f0f0f1;
+}
+body.dchat-ag .dchat-text {
+  font-size: 15.5px;
+  line-height: 1.66;
+  letter-spacing: -.04px;
+}
+body.dchat-ag .dchat-text a {
+  color: #1d4ed8;
+  text-decoration-color: rgba(29,78,216,.35);
+  text-underline-offset: 2px;
+}
+body.dchat-ag .dchat-row:not(.is-mine) .dchat-bubble {
+  max-width: calc(100% - 44px);
+  padding-top: 1px;
+  background: transparent;
+  border: 0;
+}
+body.dchat-ag .dchat-row.is-mine .dchat-bubble {
+  max-width: min(72%, 660px);
+  padding: 11px 16px;
+  background: #f0f0f0;
+  border: 1px solid #e9e9e9;
+  border-radius: 22px;
+}
+body.dchat-ag .dchat-day { gap: 12px; }
+body.dchat-ag .dchat-day::before,
+body.dchat-ag .dchat-day::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: #ededee;
+}
+body.dchat-ag .dchat-day span {
+  flex: none;
+  color: #9a9a9a;
+  font-size: 10.5px;
+}
+@media (hover: hover) and (pointer: fine) {
+  body.dchat-ag .dchat-row:not(.is-mine) .dchat-meta {
+    opacity: 0;
+    transform: translateY(-2px);
+    transition: opacity .14s ease, transform .14s ease;
+  }
+  body.dchat-ag .dchat-row:not(.is-mine):hover .dchat-meta {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Новая беседа выглядит как осмысленный старт, а не пустой прямоугольник. */
+body.dchat-ag .dchat-empty { padding: 76px 20px 54px; }
+body.dchat-ag .dchat-empty .ico {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 18px;
+  color: #fff;
+  background: var(--dchat-ink);
+  box-shadow: 0 0 0 7px #f0f0f1;
+}
+body.dchat-ag .dchat-empty h3 {
+  margin-bottom: 8px;
+  color: var(--dchat-ink);
+  font-size: 22px;
+  font-weight: 680;
+  letter-spacing: -.35px;
+}
+body.dchat-ag .dchat-empty p { max-width: 440px; font-size: 14px; }
+body.dchat-ag .dchat-quick { gap: 9px; margin-top: 22px; }
+body.dchat-ag .dchat-quick button {
+  padding: 9px 13px;
+  background: #fff;
+  border-color: #e2e2e2;
+  border-radius: 13px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.045);
+}
+
+/* Композер крупнее и визуально отделён от ленты — это главный элемент экрана. */
+body.dchat-ag .dchat-composer {
+  padding: 14px clamp(22px, 5vw, 72px) 17px;
+  background: linear-gradient(to bottom, rgba(252,252,253,0), #fcfcfd 22px);
+}
+body.dchat-ag .dchat-composer > * { width: min(100%, 920px); }
+body.dchat-ag .dchat-box,
+body.dchat-ag .app.mobile-layout .dchat-box {
+  padding: 8px 9px;
+  border-color: #d5d5d5;
+  border-radius: 28px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.09), 0 1px 2px rgba(0,0,0,.04);
+}
+body.dchat-ag .dchat-box:focus-within {
+  border-color: #b8b8b8;
+  box-shadow: 0 10px 32px rgba(0,0,0,.11), 0 0 0 3px rgba(13,13,13,.035);
+}
+body.dchat-ag .dchat-input {
+  min-height: 42px;
+  padding: 9px 5px;
+  font-size: 15.5px;
+}
+body.dchat-ag .dchat-attach,
+body.dchat-ag .dchat-mic,
+body.dchat-ag .dchat-send {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+}
+body.dchat-ag .dchat-chips { gap: 8px; padding-bottom: 11px; }
+body.dchat-ag .dchat-chips button {
+  gap: 7px;
+  padding: 7px 11px 7px 8px;
+  background: #f5f5f6;
+  border-color: transparent;
+  border-radius: 13px;
+}
+body.dchat-ag .dchat-chips button i {
+  width: 23px;
+  height: 23px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  background: #e8e8ea;
+  border-radius: 8px;
+  opacity: 1;
+}
+body.dchat-ag .dchat-hint { padding-top: 8px; font-size: 10.5px; }
+body.dchat-ag .dchat-jump {
+  right: max(20px, calc((100% - 920px) / 2 + 6px));
+  bottom: 142px;
+}
+
+@media (max-width: 1179px) and (min-width: 901px) {
+  body.dchat-ag .dchat-list { width: 240px; }
+  body.dchat-ag .dchat-feed { padding-right: 30px; padding-left: 30px; }
+  body.dchat-ag .dchat-composer { padding-right: 30px; padding-left: 30px; }
+}
+
+@media (max-width: 760px) {
+  body.dchat-ag [data-screen="devchat"] .page-header.dchat-topbar {
+    min-height: 60px;
+    padding: 8px 10px;
+  }
+  body.dchat-ag [data-screen="devchat"] .dchat-hd-ava {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+    box-shadow: none;
+  }
+  body.dchat-ag [data-screen="devchat"] .dchat-hd-id h1 { font-size: 16px; }
+  body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-status {
+    padding: 1px 0;
+    color: var(--dchat-muted);
+    background: transparent;
+    border: 0;
+  }
+  body.dchat-ag [data-screen="devchat"] .dchat-topbar .back-btn,
+  body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-list-btn,
+  body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-eye,
+  body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-stopbtn {
+    width: 38px;
+    height: 38px;
+  }
+  body.dchat-ag .dchat-feed {
+    padding: 16px 12px 22px;
+    border: 0;
+    border-radius: 0;
+  }
+  body.dchat-ag .dchat-row { gap: 9px; margin-top: 17px; margin-bottom: 17px; }
+  body.dchat-ag .dchat-row.is-cont { margin-top: -6px; }
+  body.dchat-ag .dchat-ava { width: 26px; height: 26px; box-shadow: none; }
+  body.dchat-ag .dchat-text { font-size: 14.5px; line-height: 1.6; }
+  body.dchat-ag .dchat-row.is-mine .dchat-bubble {
+    max-width: 88%;
+    padding: 9px 13px;
+    border-radius: 19px;
+  }
+  body.dchat-ag .dchat-composer { padding: 8px 10px 4px; }
+  body.dchat-ag .dchat-box,
+  body.dchat-ag .app.mobile-layout .dchat-box {
+    padding: 6px;
+    border-radius: 23px;
+    box-shadow: 0 3px 14px rgba(0,0,0,.08);
+  }
+  body.dchat-ag .dchat-input { min-height: 36px; font-size: 15px; }
+  body.dchat-ag .dchat-attach,
+  body.dchat-ag .dchat-mic,
+  body.dchat-ag .dchat-send { width: 38px; height: 38px; }
+  body.dchat-ag .dchat-empty { padding: 48px 14px 34px; }
+  body.dchat-ag .dchat-empty h3 { font-size: 19px; }
+  body.dchat-ag .dchat-jump { right: 14px; bottom: 108px; }
+}

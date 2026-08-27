@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.091";
+const APP_VERSION = "v2.46.092";
 const APP_VERSION_DATE = "27.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4373,11 +4373,20 @@ async function devChatArchiveProject(id) {
   _devChatProjRender(0);
 }
 
-// ---- панель списка на телефоне ----
+// ---- панель списка: на телефоне выезжает, на компьютере сворачивается ----
 function devChatToggleList() {
   const list = document.getElementById('devchat-list');
   if (!list) return;
-  list.classList.toggle('is-open');
+  const mobile = !!document.querySelector('.app.mobile-layout') ||
+    (window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
+  if (mobile) {
+    list.classList.toggle('is-open');
+    return;
+  }
+  const collapsed = list.classList.toggle('is-collapsed');
+  document.querySelectorAll('.dchat-list-btn').forEach(function (btn) {
+    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  });
 }
 
 function devChatCloseList() {
