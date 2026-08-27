@@ -25252,3 +25252,462 @@ body.dchat-ag.dchat-fullscreen [data-screen="devchat"] { background: var(--bg); 
   #unit-card-body { padding: 0 10px 12px; }
   .ujr-tabs { padding: 0 10px; margin: 0 -10px 12px; }
 }
+
+/* ============ v2.46.091: Клава — чистый интерфейс в духе ChatGPT ============ */
+/* Спокойная нейтральная поверхность вместо градиентов, сетки и пузырей у
+   каждого ответа. Все правила изолированы классом dchat-ag и не затрагивают
+   остальные чаты CRM. */
+body.dchat-ag {
+  --dchat-ink: #0d0d0d;
+  --dchat-muted: #6b6b6b;
+  --dchat-line: #e5e5e5;
+  --dchat-soft: #f7f7f8;
+  --dchat-user: #f4f4f4;
+}
+
+body.dchat-ag [data-screen="devchat"] { background: #fff; }
+
+/* Шапка — тонкая панель приложения, а не рекламный баннер. */
+body.dchat-ag [data-screen="devchat"] .page-header.dchat-topbar {
+  min-height: 62px;
+  margin: 0;
+  padding: 10px 16px;
+  color: var(--dchat-ink);
+  background: rgba(255, 255, 255, .96);
+  border: 1px solid var(--dchat-line);
+  border-bottom-color: #ededed;
+  border-radius: 18px 18px 0 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+body.dchat-ag [data-screen="devchat"] .page-header-title h1 {
+  color: var(--dchat-ink);
+  letter-spacing: -.2px;
+  font-weight: 650;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-hd-ava {
+  width: 36px;
+  height: 36px;
+  color: #fff;
+  background: var(--dchat-ink);
+  border-radius: 50%;
+  box-shadow: none;
+}
+body.dchat-ag .dchat-hd-ava i { border-color: #fff; }
+body.dchat-ag .dchat-hd-ava::before { inset: -2px; border-radius: 50%; padding: 2px; }
+
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .back-btn,
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-list-btn,
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-eye,
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-full-btn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: #4b4b4b;
+  background: transparent;
+  box-shadow: none;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .back-btn:hover,
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-list-btn:hover,
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-eye:hover,
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-full-btn:hover {
+  color: var(--dchat-ink);
+  background: var(--dchat-soft);
+  border-color: #ececec;
+  box-shadow: none;
+  transform: none;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-topbar.is-working .dchat-eye {
+  color: #9a6500;
+  background: #fff7e6;
+  border-color: #f1d8a4;
+  box-shadow: none;
+  animation: none;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-stopbtn {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 11px;
+  color: #fff;
+  background: #dc2626;
+  box-shadow: none;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-status {
+  width: fit-content;
+  max-width: 100%;
+  padding: 1px 0;
+  color: var(--dchat-muted);
+  background: none;
+  border: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-status:hover,
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-status:active {
+  color: #353535;
+  border: 0;
+  text-decoration: none;
+}
+body.dchat-ag .dchat-status .dot {
+  width: 7px;
+  height: 7px;
+  box-shadow: none;
+}
+body.dchat-ag .dchat-status .dchat-st-arrow { opacity: .48; }
+body.dchat-ag .dchat-topbar.is-working .dchat-status { color: #8a6208; }
+
+/* Две ровные поверхности: история слева, диалог справа. */
+body.dchat-ag [data-screen="devchat"] .dchat {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--dchat-line);
+  border-top: 0;
+  border-radius: 0 0 18px 18px;
+}
+body.dchat-ag .app.desktop-layout [data-screen="devchat"] .dchat {
+  padding: 0;
+}
+body.dchat-ag .dchat-list {
+  width: 278px;
+  padding: 12px 10px 10px;
+  background: var(--dchat-soft);
+  border-right: 1px solid var(--dchat-line);
+}
+body.dchat-ag .dcl-top { margin-bottom: 10px; }
+body.dchat-ag .dcl-new {
+  min-height: 38px;
+  justify-content: flex-start;
+  padding: 8px 11px;
+  color: var(--dchat-ink);
+  background: transparent;
+  border-color: transparent;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+body.dchat-ag .dcl-new:hover { background: #ececee; }
+body.dchat-ag .dcl-icon {
+  width: 38px;
+  height: 38px;
+  color: #5f5f5f;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 10px;
+}
+body.dchat-ag .dcl-icon:hover { color: var(--dchat-ink); background: #ececee; }
+body.dchat-ag .dcl-search { margin-bottom: 10px; }
+body.dchat-ag .dcl-search i { left: 11px; top: 10px; color: #8a8a8a; }
+body.dchat-ag .dcl-search input {
+  padding: 8px 10px 8px 33px;
+  color: var(--dchat-ink);
+  background: #ededee;
+  border-color: transparent;
+  border-radius: 10px;
+  outline: none;
+}
+body.dchat-ag .dcl-search input:focus {
+  background: #fff;
+  border-color: #cfcfcf;
+  box-shadow: 0 0 0 2px rgba(13, 13, 13, .06);
+}
+body.dchat-ag .dcl-tabs { gap: 5px; padding-bottom: 10px; }
+body.dchat-ag .dcl-tab {
+  padding: 5px 9px;
+  color: #6a6a6a;
+  background: transparent;
+  border-color: transparent;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+body.dchat-ag .dcl-tab:hover { background: #ececee; }
+body.dchat-ag .dcl-tab.is-on {
+  color: var(--dchat-ink);
+  background: #e6e6e8;
+  border-color: transparent;
+  font-weight: 650;
+}
+body.dchat-ag .dcl-items { margin: 0 -2px; padding: 0 2px; }
+body.dchat-ag .dcl-item {
+  margin-bottom: 2px;
+  padding: 9px 8px 9px 11px;
+  border-radius: 10px;
+}
+body.dchat-ag .dcl-item:hover { background: #ececee; }
+body.dchat-ag .dcl-item.is-on {
+  background: #e6e6e8;
+  box-shadow: none;
+}
+body.dchat-ag .dcl-item .t { color: #252525; font-weight: 560; }
+body.dchat-ag .dcl-item .p,
+body.dchat-ag .dcl-item .m { color: #737373; }
+body.dchat-ag .dcl-item .bar { width: 2px; opacity: .55; }
+body.dchat-ag .dcl-more:hover { color: var(--dchat-ink); background: #dedee0; }
+
+/* Лента: ответ Клавы лежит прямо на странице, пузырь остаётся только у автора. */
+body.dchat-ag .dchat-main { background: #fff; }
+body.dchat-ag .dchat-feed {
+  padding: 22px clamp(18px, 4vw, 54px) 26px;
+  background: #fff;
+  border: 0;
+  border-radius: 0;
+  scroll-padding-bottom: 24px;
+}
+body.dchat-ag .dchat-feed > .dchat-row,
+body.dchat-ag .dchat-feed > .dchat-typing,
+body.dchat-ag .dchat-feed > .dchat-day,
+body.dchat-ag .dchat-feed > .dchat-empty,
+body.dchat-ag .dchat-feed > .dchat-older,
+body.dchat-ag .dchat-feed > .loading-block {
+  width: min(100%, 840px);
+  margin-left: auto;
+  margin-right: auto;
+}
+body.dchat-ag .dchat-row {
+  gap: 12px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+body.dchat-ag .dchat-row.is-cont { margin-top: -8px; }
+body.dchat-ag .dchat-ava {
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  color: #fff;
+  background: var(--dchat-ink);
+  border-radius: 50%;
+  box-shadow: none;
+  font-size: 14px;
+}
+body.dchat-ag .dchat-row:not(.is-mine) .dchat-bubble {
+  max-width: calc(100% - 40px);
+  padding: 2px 4px 0 0;
+  color: var(--dchat-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+body.dchat-ag .dchat-row:not(.is-mine) .dchat-bubble:hover { box-shadow: none; }
+body.dchat-ag .dchat-row.is-mine { justify-content: flex-end; }
+body.dchat-ag .dchat-row.is-mine .dchat-bubble {
+  max-width: min(76%, 620px);
+  padding: 10px 15px;
+  color: var(--dchat-ink);
+  background: var(--dchat-user);
+  border: 0;
+  border-radius: 20px;
+  box-shadow: none;
+}
+body.dchat-ag .dchat-row.is-mine .dchat-text code {
+  color: inherit;
+  background: rgba(13, 13, 13, .07);
+}
+body.dchat-ag .dchat-text {
+  font-size: 14.5px;
+  line-height: 1.62;
+}
+body.dchat-ag .dchat-meta {
+  gap: 7px;
+  margin-top: 6px;
+  color: #8a8a8a;
+  font-size: 10.5px;
+  opacity: 1;
+}
+body.dchat-ag .dchat-row.is-mine .dchat-meta { color: #777; opacity: 1; }
+body.dchat-ag .dchat-chip {
+  padding: 1px 7px;
+  color: #686868;
+  background: rgba(13, 13, 13, .06);
+}
+body.dchat-ag .dchat-act { border-radius: 8px; }
+body.dchat-ag .dchat-act:hover { color: var(--dchat-ink); background: var(--dchat-soft); }
+body.dchat-ag .dchat-day { margin-top: 10px; margin-bottom: 12px; }
+body.dchat-ag .dchat-day span {
+  padding: 3px 9px;
+  color: #8a8a8a;
+  background: #fff;
+  border: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+body.dchat-ag .dchat-typing .bubble {
+  background: var(--dchat-soft);
+  border: 0;
+  border-radius: 16px;
+}
+body.dchat-ag .dchat-work {
+  background: #fffbf2;
+  border-color: #f0dfba;
+  border-radius: 16px;
+  box-shadow: none;
+}
+body.dchat-ag .dchat-jump {
+  right: max(18px, calc((100% - 840px) / 2 + 4px));
+  bottom: 126px;
+  color: #454545;
+  background: #fff;
+  border-color: var(--dchat-line);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .1);
+}
+
+/* Композер — центральная плавающая капсула с лёгкой тенью. */
+body.dchat-ag .dchat-composer {
+  padding: 12px clamp(18px, 4vw, 54px) 14px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0), #fff 18px);
+}
+body.dchat-ag .dchat-composer > * {
+  width: min(100%, 840px);
+  margin-left: auto;
+  margin-right: auto;
+}
+body.dchat-ag .dchat-chips {
+  gap: 7px;
+  padding: 0 2px 9px;
+}
+body.dchat-ag .dchat-chips button {
+  padding: 7px 11px;
+  color: #555;
+  background: #fff;
+  border-color: var(--dchat-line);
+  border-radius: 12px;
+  font-weight: 520;
+  box-shadow: none;
+}
+body.dchat-ag .dchat-chips button:hover {
+  color: var(--dchat-ink);
+  background: var(--dchat-soft);
+  border-color: #d7d7d7;
+  transform: none;
+}
+body.dchat-ag .dchat-box,
+body.dchat-ag .app.mobile-layout .dchat-box {
+  padding: 7px 8px;
+  background: #fff;
+  border: 1px solid #d8d8d8;
+  border-radius: 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .08);
+}
+body.dchat-ag .dchat-box:focus-within {
+  background: #fff;
+  border-color: #bcbcbc;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .1);
+}
+body.dchat-ag .dchat-input-row { gap: 7px; }
+body.dchat-ag .dchat-input {
+  min-height: 38px;
+  padding: 8px 4px;
+  color: var(--dchat-ink);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+body.dchat-ag .dchat-input::placeholder { color: #8a8a8a; }
+body.dchat-ag .dchat-attach {
+  width: 38px;
+  height: 38px;
+  color: #4f4f4f;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: none;
+}
+body.dchat-ag .dchat-attach:hover {
+  color: var(--dchat-ink);
+  background: var(--dchat-soft);
+  border: 0;
+}
+body.dchat-ag .dchat-mic,
+body.dchat-ag .dchat-send {
+  width: 38px;
+  height: 38px;
+  color: #fff;
+  background: var(--dchat-ink);
+  border: 0;
+  border-radius: 50%;
+  box-shadow: none;
+}
+body.dchat-ag .dchat-mic:hover,
+body.dchat-ag .dchat-send:hover:not(:disabled) {
+  background: #2d2d2d;
+  box-shadow: none;
+  filter: none;
+}
+body.dchat-ag .dchat-hint {
+  padding-top: 7px;
+  color: #8a8a8a;
+  font-size: 10.5px;
+}
+body.dchat-ag .dchat-files { padding-right: 8px; padding-left: 8px; }
+body.dchat-ag .dchat-att { background: var(--dchat-soft); border-color: var(--dchat-line); }
+
+/* Та же визуальная система в шторке Клавы из других разделов. */
+body.dchat-ag .dchat-drawer-head {
+  color: var(--dchat-ink);
+  background: #fff;
+  border-bottom: 1px solid var(--dchat-line);
+  box-shadow: none;
+}
+body.dchat-ag .dchat-drawer-head .ctx { color: var(--dchat-muted); }
+body.dchat-ag .dchat-drawer-head .icon-btn { color: #565656; }
+body.dchat-ag .dchat-drawer-head .icon-btn:hover { color: var(--dchat-ink); background: var(--dchat-soft); }
+body.dchat-ag #devchat-drawer .dchat-feed { background: #fff; }
+
+body.dchat-ag.dchat-fullscreen [data-screen="devchat"] {
+  padding: 12px;
+  background: var(--dchat-soft);
+}
+
+@media (max-width: 900px) {
+  body.dchat-ag [data-screen="devchat"] .dchat { border-radius: 0 0 16px 16px; }
+  body.dchat-ag .dchat-list {
+    width: min(88vw, 330px);
+    padding: 12px;
+    background: var(--dchat-soft);
+    border-right-color: var(--dchat-line);
+    box-shadow: 12px 0 40px rgba(0, 0, 0, .14);
+  }
+}
+
+@media (max-width: 760px) {
+  body.dchat-ag [data-screen="devchat"] .page-header.dchat-topbar {
+    min-height: 58px;
+    padding: 8px 10px;
+    border-width: 0 0 1px;
+    border-radius: 0;
+  }
+  body.dchat-ag [data-screen="devchat"] .dchat {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  body.dchat-ag .dchat-feed {
+    padding: 14px 12px 22px;
+    border: 0;
+    border-radius: 0;
+  }
+  body.dchat-ag .dchat-row { gap: 9px; margin-top: 16px; margin-bottom: 16px; }
+  body.dchat-ag .dchat-row.is-cont { margin-top: -6px; }
+  body.dchat-ag .dchat-ava { width: 26px; height: 26px; font-size: 13px; }
+  body.dchat-ag .dchat-row:not(.is-mine) .dchat-bubble { max-width: calc(100% - 35px); }
+  body.dchat-ag .dchat-row.is-mine .dchat-bubble { max-width: 88%; padding: 9px 13px; }
+  body.dchat-ag .dchat-text { font-size: 14px; line-height: 1.58; }
+  body.dchat-ag .dchat-composer { padding: 8px 10px 4px; }
+  body.dchat-ag .dchat-box,
+  body.dchat-ag .app.mobile-layout .dchat-box { padding: 6px; border-radius: 22px; }
+  body.dchat-ag .dchat-input { min-height: 36px; font-size: 15px; }
+  body.dchat-ag .dchat-attach,
+  body.dchat-ag .dchat-mic,
+  body.dchat-ag .dchat-send { width: 38px; height: 38px; }
+  body.dchat-ag .dchat-jump { right: 14px; bottom: 106px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.dchat-ag .dchat-row,
+  body.dchat-ag .dchat-topbar.is-working .dchat-hd-ava::before,
+  body.dchat-ag .dchat-topbar.is-working .dchat-eye { animation: none; }
+}

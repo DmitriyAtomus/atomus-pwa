@@ -1,4 +1,4 @@
-// Фирменный вид чата с Клавой: стилистика только наша, раскладка не едет.
+// Чистый вид чата с Клавой в духе ChatGPT: нейтральный, раскладка не едет.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -9,7 +9,7 @@ const js = fs.readFileSync(path.join(root, 'app-1.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
-const skinCss = css.slice(css.indexOf('/* ============ v2.46.033: фирменный вид чата с Клавой'));
+const skinCss = css.slice(css.indexOf('/* ============ v2.46.091: Клава — чистый интерфейс'));
 // Проверки правил ведём по «голому» CSS: слова вроде position: fixed живут и в
 // комментариях-объяснениях, а речь про то, что реально попадает в браузер.
 const skinRules = skinCss.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -26,23 +26,38 @@ test('вид один, поэтому выбора в localStorage больше 
   assert.match(fn.slice(0, fn.indexOf('}')), /classList\.add\('dchat-ag'\)/);
 });
 
-test('палитра фирменная: бренд-синий и фиолетовый Клавы', () => {
-  assert.match(skinCss, /--ag-klava:\s*#8B7BF0/);
-  assert.match(skinCss, /#2D5F8B/);
-  assert.doesNotMatch(skinCss, /#22ff9c/i);
+test('палитра чата нейтральная, без старой сетки и тяжёлого градиента', () => {
+  assert.match(skinCss, /--dchat-ink:\s*#0d0d0d/);
+  assert.match(skinCss, /--dchat-user:\s*#f4f4f4/);
+  assert.match(skinCss, /body\.dchat-ag \.dchat-feed \{[\s\S]*?background:\s*#fff/);
+  assert.doesNotMatch(skinCss, /--ag-grid|linear-gradient\(var\(--ag-grid\)/);
 });
 
 // На телефоне экран чата прибит к вьюпорту (position: fixed). Селектор с
 // `:is(..., #devchat-drawer)` весит как ID и перебивал бы это правило: лента
 // распрямлялась во всю переписку, а композер уезжал под таб-бар.
-test('фирменный слой не назначает position и не трогает размеры ленты', () => {
+test('новый визуальный слой не назначает position и не трогает высоту ленты', () => {
   assert.doesNotMatch(skinRules, /:is\([^)]*#devchat-drawer[^)]*\)\s*\{[^}]*position:/);
   assert.doesNotMatch(skinRules, /position:\s*(fixed|absolute|static)/);
-  assert.doesNotMatch(skinRules, /\b(height|min-height|max-height)\s*:/);
+  const feedRule = skinRules.match(/body\.dchat-ag \.dchat-feed \{([^}]*)\}/);
+  assert.ok(feedRule, 'правило ленты найдено');
+  assert.doesNotMatch(feedRule[1], /\b(height|min-height|max-height)\s*:/);
+});
+
+test('ответ Клавы плоский, пузырь остаётся только у пользователя', () => {
+  assert.match(skinRules, /\.dchat-row:not\(\.is-mine\) \.dchat-bubble \{[^}]*background:\s*transparent;[^}]*border:\s*0;/s);
+  assert.match(skinRules, /\.dchat-row\.is-mine \.dchat-bubble \{[^}]*background:\s*var\(--dchat-user\);[^}]*border-radius:\s*20px;/s);
+});
+
+test('композер собран округлой плавающей панелью', () => {
+  assert.match(skinRules, /\.dchat-box,[\s\S]*?border-radius:\s*24px;[\s\S]*?box-shadow:/);
+  assert.match(skinRules, /\.dchat-mic,[\s\S]*?\.dchat-send \{[^}]*border-radius:\s*50%;/s);
 });
 
 // Узкий экран — основной: рамка и скругление листа там только съедают ширину.
 test('на телефоне лента без рамки во всю ширину', () => {
   const mob = skinRules.slice(skinRules.indexOf('@media (max-width: 760px)'));
-  assert.match(mob.slice(0, mob.indexOf('\n}')), /border:\s*none;\s*border-radius:\s*0/);
+  const feedRule = mob.match(/body\.dchat-ag \.dchat-feed \{([^}]*)\}/);
+  assert.ok(feedRule, 'мобильное правило ленты найдено');
+  assert.match(feedRule[1], /border:\s*(?:0|none);[\s\S]*border-radius:\s*0/);
 });
