@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.092";
+const APP_VERSION = "v2.46.093";
 const APP_VERSION_DATE = "27.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1473,14 +1473,15 @@ function renderProfile() {
     navSec.style.display = (state.user.roles && state.user.roles.includes('director')) ? '' : 'none';
   }
 
-  // Чат с Клавой — тоже только директору (на бэкенде лента сужена до владельца)
+  // Клава видна всем сотрудникам. Директор попадает в личный канал агента
+  // разработки, остальные — в отдельный серверный режим только на чтение.
   const isDirector = !!(state.user.roles && state.user.roles.includes('director'));
   const navDev = document.getElementById('sb-devchat');
-  if (navDev) navDev.style.display = isDirector ? '' : 'none';
+  if (navDev) navDev.style.display = '';
   const navCodex = document.getElementById('sb-codex');
   if (navCodex) navCodex.style.display = isDirector ? '' : 'none';
   const devFab = document.getElementById('devchat-fab');
-  if (devFab) devFab.style.display = isDirector ? '' : 'none';
+  if (devFab) devFab.style.display = '';
 
   // «Идеи» — чат с Клавой для всех сотрудников. Выездным монтажникам пункт не
   // показываем: бэкенд им закрыт даже с паролем, кнопка только путала бы.
@@ -1985,8 +1986,7 @@ function runScreenLoader(screenName) {
   // ровно на поле ввода (особенно на телефоне)
   const devFab2 = document.getElementById('devchat-fab');
   if (devFab2) {
-    const isDir = !!(state.user && state.user.roles && state.user.roles.includes('director'));
-    devFab2.style.display = (screenName === 'devchat' || !isDir || screenName === 'codex') ? 'none' : '';
+    devFab2.style.display = (screenName === 'devchat' || screenName === 'codex') ? 'none' : '';
   }
 }
 
@@ -2112,12 +2112,19 @@ const DEVCHAT_THREAD_KEY = 'atomus_devchat_thread';
 const CODEXCHAT_THREAD_KEY = 'atomus_codexchat_thread';
 let _devChatAgent = 'claude';      // claude | codex; данные двух агентов не смешиваются
 
+function _devChatEmployeeMode() {
+  const roles = (state.user && state.user.roles) || [];
+  return _devChatAgent === 'claude' && roles.indexOf('director') < 0;
+}
+
 function _devChatAgentName() {
   return _devChatAgent === 'codex' ? 'Кодя' : 'Клава';
 }
 
 function _devChatApi(path) {
-  return (_devChatAgent === 'codex' ? '/api/codex-chat' : '/api/dev-chat') + (path || '');
+  const root = _devChatAgent === 'codex' ? '/api/codex-chat'
+    : (_devChatEmployeeMode() ? '/api/employee-chat' : '/api/dev-chat');
+  return root + (path || '');
 }
 
 function _devChatStorageKey() {
@@ -2126,13 +2133,39 @@ function _devChatStorageKey() {
 
 function _devChatApplyAgentUi() {
   const name = _devChatAgentName();
+  const employee = _devChatEmployeeMode();
+  document.body.classList.toggle('dchat-employee-readonly', employee);
   const ava = document.querySelector('[data-screen="devchat"] .dchat-hd-ava');
   if (ava) ava.innerHTML = (_devChatAgent === 'codex' ? 'Ко' : 'К') + '<i></i>';
   const term = document.getElementById('devchat-term-title');
   if (term) term.textContent = name + ' — работа вживую';
   const hint = document.querySelector('[data-screen="devchat"] .dchat-hint');
-  if (hint) hint.textContent = 'Enter — отправить, Shift+Enter — новая строка. Файлы можно перетащить прямо в окно. ' +
-    name + ' работает на офисном компьютере и правит проекты сам.';
+  if (hint) hint.textContent = employee
+    ? 'Enter — отправить · Shift+Enter — новая строка · Клава видит только разрешённые данные и ничего не изменяет'
+    : 'Enter — отправить, Shift+Enter — новая строка. Файлы можно перетащить прямо в окно. ' +
+      name + ' работает на офисном компьютере и правит проекты сам.';
+  const badge = document.getElementById('devchat-mode-badge');
+  if (badge) badge.style.display = employee ? 'inline-flex' : 'none';
+  const projectBtn = document.getElementById('devchat-projects-btn');
+  if (projectBtn) projectBtn.style.display = employee ? 'none' : '';
+  document.querySelectorAll('.dchat-attach').forEach(function (btn) {
+    btn.style.display = employee ? 'none' : '';
+  });
+  const input = document.getElementById('devchat-input');
+  const drawerInput = document.getElementById('devchat-drawer-input');
+  const placeholder = employee
+    ? 'Спросите про CRM или попросите найти в интернете…'
+    : 'Спросите или поставьте задачу…';
+  if (input) input.placeholder = placeholder;
+  if (drawerInput) drawerInput.placeholder = placeholder;
+  const chips = document.getElementById('devchat-chips');
+  if (chips) chips.innerHTML = employee
+    ? '<button onclick="devChatQuick(this)"><i class="ti ti-progress"></i>Что сейчас в работе?</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-world-search"></i>Найди в интернете…</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-database-search"></i>Проверь данные CRM…</button>'
+    : '<button onclick="devChatQuick(this)"><i class="ti ti-progress"></i>Что сейчас в работе?</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-file-search"></i>Проверь логи за сегодня</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-brush"></i>Поправь дизайн раздела…</button>';
 }
 
 function _devChatUseAgent(agent) {
@@ -2938,12 +2971,16 @@ async function devChatStop() {
 // Пустая лента: не «пока пусто», а подсказка, что вообще можно попросить.
 function _devChatEmptyHtml() {
   const name = _devChatAgentName();
-  const quick = ['Что сейчас в работе?', 'Поправь дизайн раздела', 'Собери отчёт по задачам'];
+  const employee = _devChatEmployeeMode();
+  const quick = employee
+    ? ['Что сейчас в работе?', 'Найди в интернете характеристики…', 'Проверь остаток в CRM…']
+    : ['Что сейчас в работе?', 'Поправь дизайн раздела', 'Собери отчёт по задачам'];
   return '<div class="dchat-empty">' +
     '<div class="ico"><i class="ti ti-sparkles"></i></div>' +
-    '<h3>Задача для ' + escapeHtml(name) + '</h3>' +
-    '<p>Опишите, что сделать. Агент работает на офисном сервере: сам правит проекты, ' +
-    'запускает проверки и отвечает сюда же. Можно приложить фото или файл.</p>' +
+    '<h3>' + (employee ? 'Спросите ' : 'Задача для ') + escapeHtml(name) + '</h3>' +
+    '<p>' + (employee
+      ? 'Клава может общаться, искать публичную информацию в интернете и отвечать по разрешённым данным CRM. Режим безопасный: только чтение, без команд и изменений.'
+      : 'Опишите, что сделать. Агент работает на офисном сервере: сам правит проекты, запускает проверки и отвечает сюда же. Можно приложить фото или файл.') + '</p>' +
     '<div class="dchat-quick">' +
     quick.map(function (q) {
       return '<button onclick="devChatQuick(this)">' + escapeHtml(q) + '</button>';
@@ -3049,7 +3086,7 @@ function _devChatSetStatus(text, mode) {
 async function _devChatRefreshStatuses() {
   const feed = _devChatEl('feed');
   if (!_devChatPending.size) {
-    _devChatSetStatus('Готов к работе', 'ready');
+    _devChatSetStatus(_devChatEmployeeMode() ? 'Готова ответить' : 'Готов к работе', 'ready');
     if (feed) _devChatTyping(feed, false);
     return;
   }
@@ -3097,7 +3134,7 @@ async function _devChatRefreshStatuses() {
   _devChatSetStatus(
     working ? (progLines ? progLines[progLines.length - 1]
                          : (running ? _devChatAgentName() + ' работает над задачей…' : 'Задача в очереди'))
-            : 'Готов к работе',
+            : (_devChatEmployeeMode() ? 'Готова ответить' : 'Готов к работе'),
     working ? 'working' : 'ready');
   if (feed) _devChatTyping(feed, working);
 }
@@ -3272,6 +3309,10 @@ function devChatCamera() {
 // кнопка ростом с микрофон, а источники (камера / галерея / файл) живут в
 // шторке. Шторка одна на оба композера — нужный input выбирает _devChatEl.
 function devChatAttachMenu() {
+  if (typeof _devChatEmployeeMode === 'function' && _devChatEmployeeMode()) {
+    showToast('Сотрудническая Клава принимает текст и голос — без доступа к файлам', '');
+    return;
+  }
   let sheet = document.getElementById('devchat-attach-sheet');
   if (!sheet) {
     sheet = document.createElement('div');
@@ -3453,7 +3494,7 @@ async function _dcVoiceFinish() {
   form.append('audio', new Blob(chunks, { type: type }), 'voice.' + ext);
   let text = '';
   try {
-    const voiceApi = _devChatAgent === 'codex' ? '/api/codex-chat/voice' : '/api/dev-chat/voice';
+    const voiceApi = _devChatApi('/voice');
     const r = await fetch(API_BASE + voiceApi, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') },
@@ -3571,6 +3612,7 @@ function _devChatTermRender() {
 
 let _devChatTermTimer = null;
 function devChatTermOpen() {
+  if (_devChatEmployeeMode()) return;
   const full = document.getElementById('devchat-term-full');
   if (!full) return;
   full.classList.add('show');
@@ -3586,6 +3628,10 @@ function devChatTermClose() {
 }
 
 function devChatPickFiles(files) {
+  if (typeof _devChatEmployeeMode === 'function' && _devChatEmployeeMode()) {
+    showToast('В этом режиме файлы отключены: Клава ничего не может менять', '');
+    return;
+  }
   _devChatFiles = Array.prototype.slice.call(files || []).slice(0, 5);
   _devChatDrawFiles();
 }
@@ -3593,6 +3639,10 @@ function devChatPickFiles(files) {
 // Скрепка выбирает набор заново, а Ctrl+V докладывает к уже набранному:
 // скриншот не должен стирать выбранный до него файл.
 function devChatAddFiles(files) {
+  if (typeof _devChatEmployeeMode === 'function' && _devChatEmployeeMode()) {
+    showToast('В этом режиме файлы отключены: задайте вопрос текстом или голосом', '');
+    return;
+  }
   const list = Array.prototype.slice.call(files || []);
   if (!list.length) return;
   const free = 5 - _devChatFiles.length;
@@ -3670,6 +3720,7 @@ let _devChatDropWatch = null;
 
 // Куда рисуем приёмник: открытая шторка важнее экрана — она лежит поверх него.
 function _devChatDropHost() {
+  if (typeof _devChatEmployeeMode === 'function' && _devChatEmployeeMode()) return null;
   const drawer = document.getElementById('devchat-drawer');
   if (drawer && drawer.style.display === 'flex') return drawer;
   if (state.currentScreen === 'devchat' || state.currentScreen === 'codex') {

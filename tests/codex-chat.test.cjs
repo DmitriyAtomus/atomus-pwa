@@ -18,7 +18,8 @@ test('Кодя добавлен отдельным пунктом и не зам
 
 test('один интерфейс выбирает разные API и разную сохранённую беседу', () => {
   assert.match(app, /'codex':\s+'devchat'/);
-  assert.match(app, /_devChatAgent === 'codex' \? '\/api\/codex-chat' : '\/api\/dev-chat'/);
+  assert.match(app, /_devChatAgent === 'codex' \? '\/api\/codex-chat'/);
+  assert.match(app, /_devChatEmployeeMode\(\) \? '\/api\/employee-chat' : '\/api\/dev-chat'/);
   assert.match(app, /const CODEXCHAT_THREAD_KEY = 'atomus_codexchat_thread'/);
   assert.match(app, /screenName === 'devchat'\) _devChatUseAgent\('claude'\)/);
   assert.match(app, /screenName === 'codex'[\s\S]{0,100}_devChatUseAgent\('codex'\)/);

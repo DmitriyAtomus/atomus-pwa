@@ -962,7 +962,12 @@
             </button>
             <div class="dchat-hd-ava">К<i></i></div>
             <div class="dchat-hd-id">
-              <h1 id="devchat-title">Клава</h1>
+              <div class="dchat-title-row">
+                <h1 id="devchat-title">Клава</h1>
+                <span class="dchat-mode-badge" id="devchat-mode-badge" style="display:none;">
+                  <i class="ti ti-eye"></i>Только чтение
+                </span>
+              </div>
               <!-- v2.45.955: тап по статусу открывает терминал «работа вживую» -->
               <!-- v2.45.984: шеврон и пунктир — чтобы было видно, что строка нажимается -->
               <div id="devchat-status" class="dchat-status" onclick="devChatTermOpen()"
@@ -994,7 +999,7 @@
           <aside class="dchat-list" id="devchat-list">
             <div class="dcl-top">
               <button class="dcl-new" onclick="devChatNewThread()"><i class="ti ti-plus"></i>Новый чат</button>
-              <button class="dcl-icon" onclick="devChatProjectsDialog()" title="Проекты"><i class="ti ti-folders"></i></button>
+              <button class="dcl-icon" id="devchat-projects-btn" onclick="devChatProjectsDialog()" title="Проекты"><i class="ti ti-folders"></i></button>
               <button class="dcl-icon dcl-close" onclick="devChatToggleList()" title="Закрыть"><i class="ti ti-x"></i></button>
             </div>
             <div class="dcl-search">
