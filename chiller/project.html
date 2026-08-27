@@ -1331,9 +1331,9 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <div class="t t2" id="mntFaceT" style="display:none">В лицевую панель:</div>
         <div class="o" data-m="face" data-f="front" id="mntFace" style="display:none">Врезать в панель
           <small>· циферблат наружу, штуцер внутрь</small></div>
-        <div class="t t2" id="mntShelfT" style="display:none">Поднять на полки:</div>
-        <div class="o" data-m="shelf" id="mntShelf" style="display:none">Полки к стойкам
-          <small>· два кронштейна лист 2 мм, болты М6</small></div>
+        <div class="t t2" id="mntShelfT" style="display:none">Поднять и закрепить:</div>
+        <div class="o" data-m="shelf" id="mntShelf" style="display:none">Рамные кронштейны
+          <small>· отм. 250/630, четыре штатных Ø7</small></div>
         <div class="o" data-m="off" id="mntOff" style="color:#f0a9a0">✕ Отсоединить</div>
       </div>
       <div id="pos">
@@ -1394,7 +1394,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <button id="bTankLink" style="display:none"
                 title="Поставить бак внутрь корпуса и связать с чиллером — поедет вместе с ним">⛓ Встроить бак</button>
         <button id="bTankShelf" style="display:none"
-                title="Поднять бак на два кронштейна из листа 2 мм, прикрученные болтами М6 к стойкам той стенки, к которой бак придвинут">▤ Бак на полки</button>
+                title="Поставить бак на два усиленных кронштейна и стянуть сверху: четыре болта М6 в штатные отверстия стоек на отметках 250 и 630">▤ Закрепить бак</button>
         <button id="bPos" title="Точные координаты и углы (G)">⌖ Координаты</button>
         <button id="bSwap" style="display:none" title="Поставить на этот патрубок другую деталь">⇄ Заменить</button>
         <button id="bRot" title="Повернуть вокруг вертикали (R)">⟳ 90°</button>
@@ -3693,24 +3693,35 @@ function tankLinkSel(){
   if(!sel||!isTankAny(sel.d))return;
   tankBuiltIn(sel)?tankDetach(sel):tankBuildIn(sel);
 }
-/* ═══ v2.46.088: бак на полках к стойкам ═══
+/* ═══ v2.46.100: бак на рамных кронштейнах к стойкам ═══
    Бак 36 л, поставленный на настил, съедает место насоса, поэтому его
-   поднимают: два гнутых кронштейна из листа 2 мм прикручены болтами М6 к двум
-   стойкам одной стенки, бак ложится на них торцами. Полки — деталь проекта,
-   как и сам бак: их геометрия считается по стойкам корпуса, живёт в связи
+   поднимают: два рамных кронштейна из листа 3 мм опирают бак снизу, диагонали
+   передают момент на верхний ряд, а П-образная стяжка с EPDM не даёт баку
+   опрокинуться и тереться о металл. На штатном корпусе четыре болта М6 попадают
+   в готовые Ø7 стоек: нижний ряд — отм. 250, верхний — 630. Сверлить корпус
+   и варить крепёж к баку не надо. Узел — деталь проекта, как и сам бак:
+   его геометрия считается по стойкам корпуса, живёт в связи
    (link.sh) в координатах корпуса и потому едет и крутится вместе с чиллером.
    Считаем всё в системе координат корпуса: тогда поворот машины полки не
    пересчитывает, а рисуются они одной группой по матрице корпуса. */
-const SH_T=2;          // лист полки
-const SH_LEG=55;       // вертикальная стенка кронштейна над полкой — под болты
+const SH_T=3;          // несущий кронштейн и ответная пластина
+const SH_LEG=380;      // расстояние между штатными рядами 250 и 630
 const SH_LAP=25;       // выпуск полки наружу за торец бака
 const SH_UNDER=80;     // заход полки ПОД торец бака — на нём бак и лежит
-const SH_REACH=320;    // дальше стойки полку не вылетаем: консоль из листа 2 мм
+const SH_REACH=320;    // дальше стойки рамный кронштейн не вылетаем
 const SH_STEP=10;      // шаг подбора отметки
 const SH_CLR=3;        // зазор между баком и стенкой кронштейна
 const SH_MIN=40;       // ниже этой высоты над настилом полки не имеют смысла
 const SH_TOP=20;       // технологический просвет над баком: не притираем к потолку
-const SH_BOLT='Болт М6×20 с гайкой и шайбой';
+const SH_STRAP=30;     // высота верхней П-образной стяжки
+const SH_GUS=30;       // ширина диагональной тяги каждого кронштейна
+const SH_PAD=3;        // EPDM между нержавеющим баком и окрашенной сталью
+const SH_STD_SUPPORT=250; // уровень опоры бака в системе проекта
+const SH_STD_LOW=283;  // СК модели: штатное Ø7 «250» (корпус поднят на 33 мм)
+const SH_STD_UP=663;   // СК модели: штатное Ø7 «630»
+const SH_BOLT='Болт М6×35, 2 шайбы, гайка самоконтрящаяся';
+const SH_BOLT_OLD='Болт М6×20 с гайкой и шайбой';
+const SH_BACK='Пластина ответная 40×400×3';
 /* коробки деталей корпуса в его собственных координатах (framePartBoxes даёт
    их в координатах сцены — те пересчитываются на каждый сдвиг машины) */
 function framePartLocalBoxes(fr){
@@ -3748,13 +3759,32 @@ function framePosts(fr){
     if(S.z<H*0.55)return;                       // не во всю высоту — не стойка
     if(S.x>240||S.y>240)return;                 // панель или сборная группа
     const nm=(PT[i]||{}).name||'';
-    if(/стойк/i.test(nm))named.push({nm:nm,b:b.clone()});
-    else if(S.x>=25&&S.y>=25)shaped.push({nm:nm||'стойка корпуса',b:b.clone()});
+    const des=(PT[i]||{}).des||'';
+    if(/стойк/i.test(nm))named.push({nm:nm,des:des,b:b.clone()});
+    else if(S.x>=25&&S.y>=25)shaped.push({nm:nm||'стойка корпуса',des:des,b:b.clone()});
   });
   return named.length>=2?named:shaped;
 }
 const SH_WALLS=[{a:'x',s:-1,t:'левой'},{a:'x',s:1,t:'правой'},
                 {a:'y',s:-1,t:'задней'},{a:'y',s:1,t:'передней'}];
+/* У штатного 600×900 ряды Ø7 проверены по раскрою и сборочному STEP.
+   Только две ЗАДНИЕ стойки 00.000.002 имеют одинаковую пригодную пару:
+   в СК детали 283/663, на чертеже — 250/630. Полка остаётся на уровне 250,
+   поэтому её отгиб на 33 мм ниже нижнего болта. У боковой стенки нижние Ø7
+   передней и задней стоек не совпадают — такой перекошенный узел не строим.
+   Для другого корпуса остаётся старый подбор по высоте. */
+function tankBracketRows(fr,P0,P1){
+  const tag=[fr&&fr.d&&fr.d.id,fr&&fr.d&&fr.d.name,P0.nm,P0.des,P1.nm,P1.des]
+    .filter(Boolean).join(' ');
+  const std=/chiller-600x900|AG-41\.000\.000|AG-41\.000\.00[12]|00\.000\.002/i.test(tag);
+  if(!std)return null;
+  const rear=[P0,P1].every(p=>{
+    const s=((p.des||'')+' '+(p.nm||'')).trim();
+    return /(?:^|\s)00\.000\.002(?:\s+Стойка)?$/i.test(s);
+  });
+  return rear?{support:SH_STD_SUPPORT,low:SH_STD_LOW,top:SH_STD_UP,
+               lowMark:250,topMark:630}:{unsupported:true};
+}
 /* Куда положить бак и как выкроить полки. Возвращает место бака в сцене,
    разметку полок в координатах корпуса и список того, что на этом месте
    мешает (пусто — место чистое). */
@@ -3762,7 +3792,12 @@ const SH_WALLS=[{a:'x',s:-1,t:'левой'},{a:'x',s:1,t:'правой'},
    Одна функция и на проверку места (кронштейн тоже занимает объём), и на
    готовую деталь — иначе проверяли бы одно, а варили другое. */
 function shelfCutOf(b){
-  const a=b.a,w=b.w,pl=[],lg=[],bo=[];
+  const a=b.a,w=b.w,pl=[],lg=[],bk=[],bo=[],dg=[],st=[],pd=[];
+  const rect=(w0,w1,a0,a1)=>{const r={};
+    r[w+'0']=Math.min(w0,w1);r[w+'1']=Math.max(w0,w1);
+    r[a+'0']=Math.min(a0,a1);r[a+'1']=Math.max(a0,a1);
+    return {x0:r.x0,x1:r.x1,y0:r.y0,y1:r.y1};};
+  const point=(wv,av,z)=>{const q={z:z};q[w]=wv;q[a]=av;return [q.x,q.y,q.z];};
   [b.P0,b.P1].forEach((P,n)=>{
     const low=n===0;                              // стойка со стороны меньших w
     const pf=low?P.b.max[w]:P.b.min[w];           // её грань к середине бака
@@ -3777,22 +3812,31 @@ function shelfCutOf(b){
        отодвинут от стенки в обход оборудования (b.off) */
     const reach=Math.min(SH_T+SH_CLR+b.fa+SH_LAP+(b.off||0),SH_REACH);
     const a0=b.face,a1=b.face+b.dir*reach;
-    const r={};r[w+'0']=A;r[w+'1']=Bb;r[a+'0']=Math.min(a0,a1);r[a+'1']=Math.max(a0,a1);
-    pl.push({x0:r.x0,x1:r.x1,y0:r.y0,y1:r.y1});
-    // вертикальная стенка — только там, где она правда лежит на стойке
+    pl.push(rect(A,Bb,a0,a1));
+    // Вертикальная полоса и ответная пластина зажимают полку стойки с двух сторон.
+    // Высоту дают ДВА штатных ряда, а не два выдуманных отверстия рядом с полкой.
     const L0=Math.max(A,P.b.min[w]),L1=Math.min(Bb,P.b.max[w]);
-    const g={};g[w+'0']=L0;g[w+'1']=L1;
-    g[a+'0']=Math.min(b.face,b.face+b.dir*SH_T);
-    g[a+'1']=Math.max(b.face,b.face+b.dir*SH_T);
-    lg.push({x0:g.x0,x1:g.x1,y0:g.y0,y1:g.y1});
-    // два болта М6 в стойку — по краям стенки, но внутри её пятна
-    const m=Math.max(12,(L1-L0)*0.2);
-    [L0+m,L1-m].forEach(t=>{
-      const q={};q[w]=t;q[a]=b.face;
-      bo.push([q.x,q.y,b.z+SH_LEG*0.55]);
-    });
+    lg.push(rect(L0,L1,b.face,b.face+b.dir*SH_T));
+    bk.push(rect(L0,L1,b.face-b.dir*(SH_T+1),b.face-b.dir));
+    const t=Math.max(L0+8,Math.min(L1-8,(P.b.min[w]+P.b.max[w])/2));
+    bo.push(point(t,b.face,b.zBolt==null?b.z:b.zBolt),point(t,b.face,b.zTop));
+    // Диагональ идёт СНАРУЖИ торца бака: работает на момент, но не режет бак.
+    const dw=low?end-SH_LAP*.55:end+SH_LAP*.55;
+    const front=b.ca+b.dir*(b.fa/2+SH_PAD+SH_T);
+    dg.push({p0:point(dw,front,b.z+SH_T),p1:point(dw,b.face+b.dir*SH_T,b.zTop),
+             sec:SH_GUS,t:SH_T});
+    // EPDM только в пятне опоры — штуцеры и дно бака остаются открыты.
+    const pw0=low?end:end-SH_UNDER,pw1=low?end+SH_UNDER:end;
+    pd.push(rect(pw0,pw1,b.ca-b.fa/2,b.ca+b.fa/2));
   });
-  return {pl:pl,lg:lg,bo:bo};
+  /* П-образная верхняя стяжка: поперечина прижимает бак через EPDM, два уха
+     уходят к стойкам. Снимается четырьмя болтами вместе со всем узлом. */
+  const front=b.ca+b.dir*(b.fa/2+SH_PAD+SH_T/2),lo=b.cw-b.fw/2-SH_LAP,
+        hi=b.cw+b.fw/2+SH_LAP,ear=22;
+  st.push(rect(lo,hi,front-SH_T/2,front+SH_T/2));
+  st.push(rect(lo-ear/2,lo+ear/2,b.face,front));
+  st.push(rect(hi-ear/2,hi+ear/2,b.face,front));
+  return {pl:pl,lg:lg,bk:bk,bo:bo,dg:dg,st:st,pd:pd};
 }
 function tankShelfPlan(it,fr){
   const geo=fr.obj.geometry,PT=geo.userData.parts||[],B=framePartLocalBoxes(fr);
@@ -3886,6 +3930,8 @@ function tankShelfPlan(it,fr){
         if(!P0||!P1||P0===P1)return;
         const gap0=Math.abs(lo-P0.b.max[w]),gap1=Math.abs(hi-P1.b.min[w]);
         if(gap0>SH_REACH*0.6||gap1>SH_REACH*0.6)return;
+        const holes=tankBracketRows(fr,P0,P1);
+        if(holes&&holes.unsupported)return;        // штатный корпус: только задняя пара 00.000.002
         for(let off=0;off<=offMax+1;off+=20){
           const ca=face+dir*(SH_T+SH_CLR+fa/2+off);
           const A0=Math.min(ca-fa/2,ca+fa/2),A1=Math.max(ca-fa/2,ca+fa/2);
@@ -3899,10 +3945,15 @@ function tankShelfPlan(it,fr){
             if(!over2(r,X0+8,X1-8,Y0+8,Y1-8))return;
             zStart=Math.max(zStart,r.z1+5);       // над насосом, а не сквозь него
           });
-          /* v2.46.089: отметку подбираем СВЕРХУ ВНИЗ — бак поднимают под самый
-             потолок полости, тогда весь низ корпуса остаётся под насос,
-             обвязку и электрику. Первое чистое место сверху и есть искомое. */
-          for(let z=zHi;z>=zStart;z-=SH_STEP){
+          /* Штатный корпус имеет единственную пригодную пару Ø7: 250/630.
+             Её не заменяем красивой, но несверлимой отметкой 280. Для другого
+             корпуса по-прежнему ищем чистое место сверху вниз. */
+          const Z=[];
+          if(holes){
+            if(holes.support>=zStart-2&&holes.support<=zHi+SH_STEP)Z.push(holes.support);
+          }else for(let z=zHi;z>=zStart;z-=SH_STEP)Z.push(z);
+          for(let zi=0;zi<Z.length;zi++){
+            const z=Z[zi],zTop=holes?holes.top:Math.min(z+SH_LEG,zCap-SH_TOP);
             const bz0=z+dZ0,bz1=bz0+fh+SH_TOP+6;  // сразу с просветом над баком
             const eq=[],met=[];
             for(let i=0;i<EQ.length;i++)
@@ -3912,8 +3963,10 @@ function tankShelfPlan(it,fr){
               if(r.z1-4<=bz0+1)continue;          // всё ниже дна бака — опора, не упор
               if(over3(r,X0,X1,Y0,Y1,bz0,bz1,4))met.push(r.nm);
             }
-            const cand={z:z,rzW:rzW,wall:W,a:a,w:w,dir:dir,face:face,cw:cw,ca:ca,
-                        off:off,fw:fw,fa:fa,fh:fh,dZ0:dZ0,P0:P0,P1:P1};
+            const cand={z:z,zTop:zTop,zBolt:holes?holes.low:z,holes:holes,
+                        rzW:rzW,wall:W,a:a,w:w,dir:dir,
+                        face:face,cw:cw,ca:ca,off:off,fw:fw,fa:fa,fh:fh,dZ0:dZ0,
+                        P0:P0,P1:P1};
             /* сами кронштейны тоже занимают место: полка выходит за торец бака
                и ложится на стойку — проверяем её по оборудованию так же, как бак
                (по металлу нельзя: она на этот металл и опирается) */
@@ -3922,7 +3975,17 @@ function tankShelfPlan(it,fr){
               cut.pl.forEach(r=>EQ.forEach(q=>{
                 if(over3(q,r.x0,r.x1,r.y0,r.y1,z-SH_T,z))eq.push(q.nm);}));
               cut.lg.forEach(r=>EQ.forEach(q=>{
-                if(over3(q,r.x0,r.x1,r.y0,r.y1,z,z+SH_LEG))eq.push(q.nm);}));
+                if(over3(q,r.x0,r.x1,r.y0,r.y1,z-20,zTop+20))eq.push(q.nm);}));
+              cut.st.forEach(r=>EQ.forEach(q=>{
+                if(over3(q,r.x0,r.x1,r.y0,r.y1,zTop-SH_STRAP/2,zTop+SH_STRAP/2))
+                  eq.push(q.nm);}));
+              cut.dg.forEach(d=>EQ.forEach(q=>{
+                const x0=Math.min(d.p0[0],d.p1[0])-d.sec/2,
+                      x1=Math.max(d.p0[0],d.p1[0])+d.sec/2,
+                      y0=Math.min(d.p0[1],d.p1[1])-d.sec/2,
+                      y1=Math.max(d.p0[1],d.p1[1])+d.sec/2;
+                if(over3(q,x0,x1,y0,y1,Math.min(d.p0[2],d.p1[2]),
+                         Math.max(d.p0[2],d.p1[2])))eq.push(q.nm);}));
             }
             const who=[...new Set(eq.concat(met))];
             cand.who=who;cand.eq=[...new Set(eq)];
@@ -3961,8 +4024,12 @@ function tankShelfPlan(it,fr){
   it.obj.position.copy(op);it.obj.rotation.copy(or);it.obj.updateMatrixWorld(true);
   if(!best)return {err:'бак не входит между стойками ни у одной стенки — уменьши бак или возьми корпус крупнее'};
   const cut=shelfCutOf(best);
-  const sh={z:best.z,ax:best.a,dir:best.dir,t:SH_T,leg:SH_LEG,
-            pl:cut.pl,lg:cut.lg,bo:cut.bo};
+  const sh={v:2,z:best.z,top:best.zTop,ax:best.a,dir:best.dir,t:SH_T,
+            leg:best.zTop-best.z,strap:SH_STRAP,gus:SH_GUS,pad:SH_PAD,
+            bolt0:best.zBolt,
+            mark0:best.holes?best.holes.lowMark:Math.round(best.z-zFloor),
+            mark1:best.holes?best.holes.topMark:Math.round(best.zTop-zFloor),
+            pl:cut.pl,lg:cut.lg,bk:cut.bk,bo:cut.bo,dg:cut.dg,st:cut.st,pd:cut.pd};
   const lp=new THREE.Vector3();lp[best.a]=best.ca;lp[best.w]=best.cw;lp.z=best.z;
   const wp=fr.obj.localToWorld(lp);
   return {sh:sh,rz:best.rzW,x:wp.x,y:wp.y,z:wp.z,who:best.who,eq:best.eq||[],
@@ -3971,9 +4038,10 @@ function tankShelfPlan(it,fr){
           off:best.off,under:under,over:over,underWho:[...new Set(underWho)],
           zLoc:best.z,posts:[best.P0.nm,best.P1.nm]};
 }
-/* ── полки в сцене: одна группа на бак, матрица берётся у корпуса ── */
+/* ── крепление в сцене: одна группа на бак, матрица берётся у корпуса ── */
 const shMat=new THREE.MeshStandardMaterial({color:0x8d959c,metalness:.6,roughness:.42,
   flatShading:true});
+const shPadMat=new THREE.MeshStandardMaterial({color:0x20282c,metalness:.05,roughness:.9});
 function shelfClear(it){
   if(!it||!it._shelf)return;
   scene.remove(it._shelf);
@@ -3995,8 +4063,31 @@ function shelfMark(it){
       m.position.set((r.x0+r.x1)/2,(r.y0+r.y1)/2,(z0+z1)/2);
       g.add(m);
     };
+    const bar=d=>{
+      const A=new THREE.Vector3(...d.p0),B=new THREE.Vector3(...d.p1),v=B.clone().sub(A),L=v.length();
+      if(L<1)return;
+      /* Плоская тяга лежит в плоскости стенки: 3 мм по нормали к ней,
+         30 мм поперёк диагонали. У боковой стенки эти оси меняются местами. */
+      const sec=d.sec||SH_GUS,t=d.t||SH_T;
+      const m=new THREE.Mesh(new THREE.BoxGeometry(sh.ax==='x'?t:sec,
+                                                   sh.ax==='x'?sec:t,L),shMat);
+      m.position.copy(A.add(B).multiplyScalar(.5));
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),v.normalize());
+      g.add(m);
+    };
+    const top=sh.top==null?sh.z+(sh.leg||SH_LEG):sh.top;
     (sh.pl||[]).forEach(r=>box(r,sh.z-(sh.t||SH_T),sh.z));
-    (sh.lg||[]).forEach(r=>box(r,sh.z,sh.z+(sh.leg||SH_LEG)));
+    (sh.lg||[]).forEach(r=>box(r,sh.v===2?sh.z-20:sh.z,sh.v===2?top+20:top));
+    (sh.bk||[]).forEach(r=>box(r,sh.z-20,top+20));
+    (sh.st||[]).forEach(r=>box(r,top-(sh.strap||SH_STRAP)/2,
+                               top+(sh.strap||SH_STRAP)/2));
+    (sh.dg||[]).forEach(bar);
+    (sh.pd||[]).forEach(r=>{
+      const w=Math.abs(r.x1-r.x0),d=Math.abs(r.y1-r.y0),h=sh.pad||SH_PAD;
+      if(w<1||d<1)return;
+      const m=new THREE.Mesh(new THREE.BoxGeometry(w,d,h),shPadMat);
+      m.position.set((r.x0+r.x1)/2,(r.y0+r.y1)/2,sh.z+h/2);g.add(m);
+    });
     (sh.bo||[]).forEach(p=>{
       const put=(rad,len,off)=>{
         const gm=new THREE.CylinderGeometry(rad,rad,len,12);
@@ -4008,8 +4099,8 @@ function shelfMark(it){
         o.translateZ(sh.dir>0?off:-off-len);
         g.add(o);
       };
-      put(3,26,-6);            // стержень сквозь стенку кронштейна и стойку
-      put(5,4,0);              // головка со стороны бака
+      put(3,35,-8);            // стержень: кронштейн + стойка + ответная пластина
+      put(5.5,4,0);            // головка и шайба со стороны бака
     });
     scene.add(g);it._shelf=g;
   }
@@ -4018,7 +4109,7 @@ function shelfMark(it){
   it._shelf.matrixWorldNeedsUpdate=true;
   it._shelf.updateMatrixWorld(true);
 }
-/* Поставить бак на полки: подбор места, полки в 3D и в ведомость. */
+/* Поставить бак на рамные кронштейны: место, крепление в 3D и ведомость. */
 function tankShelfPut(it){
   it=it||sel;
   if(!it||!isTankAny(it.d))return;
@@ -4026,7 +4117,7 @@ function tankShelfPut(it){
   if(!fr){toast('В сцене нет корпуса — сначала добавь чиллер');return;}
   const plan=tankShelfPlan(it,fr);
   if(plan.err){toast(plan.err);return;}
-  pushHist('бак на полки к стойкам');
+  pushHist('бак на рамные кронштейны к стойкам');
   const p0=it.obj.position.clone();
   it.obj.rotation.set(0,0,plan.rz);it.obj.updateMatrixWorld(true);
   placeAt(it,plan.x,plan.y,plan.z,plan.rz,0);
@@ -4043,11 +4134,12 @@ function tankShelfPut(it){
   const why=plan.far?('У '+plan.prefWall+' стенки '+
       (plan.prefWho.length?'мешают: '+few(plan.prefWho):'бак между стойками не встал')+
       ' — ушли к '+plan.wall+' стенке. '):'';
-  const head=why+'Бак на двух полках у '+plan.wall+' стенки · под баком '+
+  const head=why+'Бак на двух рамных кронштейнах у '+plan.wall+' стенки · '+
+    'штатные Ø7 на отм. '+plan.sh.mark0+'/'+plan.sh.mark1+', 4 болта М6 · под баком '+
     plan.under+' мм'+(plan.underWho.length?' (там '+few(plan.underWho)+')':' свободно')+
     ', над ним просвет '+plan.over+' мм'+
-    (plan.off?' · полка вынесена от стенки на '+plan.off+' мм в обход оборудования':'')+
-    ' · кронштейны лист 2 мм, по 2 болта М6 в стойку';
+    (plan.off?' · кронштейны вынесены от стенки на '+plan.off+' мм в обход оборудования':'')+
+    ' · лист 3 мм, диагонали, верхняя стяжка и EPDM';
   if(plan.who.length){
     toast(head+'. На этом месте стоят: '+few(plan.who)+' — подвинь их или бак');
     select(it);fitAuto(it);
@@ -4653,9 +4745,9 @@ function ctxItems(it){
         go:()=>{select(it);tankDetach(it);}}
       :{ic:'⛓',t:'Встроить бак в чиллер',s:'внутрь корпуса, автопоиск места',
         go:()=>{select(it);tankBuildIn(it);}});
-    /* v2.46.088: поднять бак на кронштейны, прикрученные к стойкам */
+    /* v2.46.100: рамные кронштейны в штатные Ø7 250/630 */
     if(placed.some(p=>roleOf(p.d)==='frame'))
-      L.push({ic:'▤',t:'На полки к стойкам',s:'кронштейны 2 мм + болты М6',
+      L.push({ic:'▤',t:'Закрепить к стойкам',s:'лист 3 мм · Ø7 на 250/630',
         go:()=>{select(it);tankShelfPut(it);}});
     if(it.po&&Object.keys(it.po).some(k=>it.po[k]&&it.po[k].p0))
       L.push({ic:'↺',t:'Врезки — на штатные места',s:'как в модели базы',
@@ -4846,8 +4938,8 @@ function selBtns(){
   const bm=sel&&sel.link&&BOLT[sel.link.mount],bi=bm?boltIssue(sel,bm):'';
   $('#bLink').textContent=rl?'⤫ Снять с патрубка'
     :bi?'⚠ Нужна разметка крепежа'
-    :lk?('⛓ '+(sel.link.sh?'на полках':(sel.link.face==='cap'?'на крышке':'на дне'))+' · '+
-         (sel.link.sh?'кронштейны к стойкам':lk.t))
+    :lk?('⛓ '+(sel.link.sh?'на кронштейнах':(sel.link.face==='cap'?'на крышке':'на дне'))+' · '+
+         (sel.link.sh?'штатные Ø7 · стяжка':lk.t))
        :'⛓ Соединить с корпусом';
   $('#bLink').classList.toggle('on',rl||!!lk);
   $('#bLink').title=rl?'Деталь сидит на патрубке аппарата — снять'
@@ -8424,14 +8516,22 @@ function refresh(){
       if(ck.ok){const fx=tkFixData(p.d.tk);hw.set('Крепление бака · '+fx.name,
         (hw.get('Крепление бака · '+fx.name)||0)+1);}
     }
-    /* v2.46.088: полки под баком — деталь проекта: их режут и гнут из листа,
-       поэтому в ведомость идут отдельной строкой вместе со своими болтами */
+    /* Крепление бака — изготовляемый узел проекта, а не безымянная графика. */
     const sh=p.link&&p.link.sh;
     if(sh&&(sh.pl||[]).length){
-      const r0=sh.pl[0],w=Math.round(Math.abs(r0.x1-r0.x0)),d=Math.round(Math.abs(r0.y1-r0.y0));
-      const nm='Полка бака гнутая '+Math.max(w,d)+'×'+Math.min(w,d)+', лист '+(sh.t||2)+' мм';
-      pc.set(nm,(pc.get(nm)||0)+sh.pl.length);
-      if((sh.bo||[]).length)hw.set(SH_BOLT,(hw.get(SH_BOLT)||0)+sh.bo.length);
+      if(sh.v===2){
+        const nm='Кронштейн рамный бака, лист '+(sh.t||SH_T)+' мм, с диагональю';
+        pc.set(nm,(pc.get(nm)||0)+(sh.pl||[]).length);
+        pc.set('Стяжка бака П-образная 30×2',(pc.get('Стяжка бака П-образная 30×2')||0)+1);
+        pc.set(SH_BACK,(pc.get(SH_BACK)||0)+2);
+        pc.set('Комплект прокладок EPDM 3 мм',(pc.get('Комплект прокладок EPDM 3 мм')||0)+1);
+      }else{
+        const r0=sh.pl[0],w=Math.round(Math.abs(r0.x1-r0.x0)),d=Math.round(Math.abs(r0.y1-r0.y0));
+        const nm='Полка бака гнутая '+Math.max(w,d)+'×'+Math.min(w,d)+', лист '+(sh.t||2)+' мм';
+        pc.set(nm,(pc.get(nm)||0)+sh.pl.length);
+      }
+      if((sh.bo||[]).length){const bn=sh.v===2?SH_BOLT:SH_BOLT_OLD;
+        hw.set(bn,(hw.get(bn)||0)+sh.bo.length);}
     }});
   if(pc.size)$('#spec').innerHTML+=[...pc.entries()].map(([t,n])=>
     `<div class="sr" style="color:var(--dim)"><span class="nm">${esc(t)}</span>`+
@@ -8469,7 +8569,7 @@ function refresh(){
   } else $('#fDims').textContent='';
   $('#empty').style.display=placed.length?'none':'flex';
   placed.forEach(boltMark);         // болты крепления — по выбранной посадке
-  placed.forEach(shelfMark);        // v2.46.088: полки под баком — по связи с корпусом
+  placed.forEach(shelfMark);        // крепление бака — по связи с корпусом
   portsPaint();portsRebuild();      // деталь ушла или приехала — подписи следом
   rotRebuild();                     // и метки свободных ротолоков
   checkCollisions();
