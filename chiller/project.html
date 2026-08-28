@@ -1333,7 +1333,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
           <small>· циферблат наружу, штуцер внутрь</small></div>
         <div class="t t2" id="mntShelfT" style="display:none">Поднять и закрепить:</div>
         <div class="o" data-m="shelf" id="mntShelf" style="display:none">Боковые рамные кронштейны
-          <small>· правая стенка изнутри, четыре штатных Ø7</small></div>
+          <small>· левая стенка изнутри, четыре штатных Ø7</small></div>
         <div class="o" data-m="off" id="mntOff" style="color:#f0a9a0">✕ Отсоединить</div>
       </div>
       <div id="pos">
@@ -1394,7 +1394,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <button id="bTankLink" style="display:none"
                 title="Поставить бак внутрь корпуса и связать с чиллером — поедет вместе с ним">⛓ Встроить бак</button>
         <button id="bTankShelf" style="display:none"
-                title="Поставить бак внутри у правой стенки: передняя стойка Ø7 235/615, задняя Ø7 250/630">▤ Закрепить бак</button>
+                title="Поставить бак внутри у левой стенки: передняя стойка Ø7 235/615, задняя Ø7 250/630">▤ Закрепить бак</button>
         <button id="bPos" title="Точные координаты и углы (G)">⌖ Координаты</button>
         <button id="bSwap" style="display:none" title="Поставить на этот патрубок другую деталь">⇄ Заменить</button>
         <button id="bRot" title="Повернуть вокруг вертикали (R)">⟳ 90°</button>
@@ -3698,12 +3698,12 @@ function tankLinkSel(){
   if(!sel||!isTankAny(sel.d))return;
   tankBuiltIn(sel)?tankDetach(sel):tankBuildIn(sel);
 }
-/* ═══ v2.46.103: бак внутри у правой стенки ═══
+/* ═══ v2.46.107: бак внутри у левой стенки ═══
    Бак 36 л, поставленный на настил, съедает место насоса, поэтому его
    поднимают: два рамных кронштейна из листа 3 мм опирают бак снизу, диагонали
    передают момент на верхний ряд, а П-образная стяжка с EPDM не даёт баку
    опрокинуться и тереться о металл. На штатном корпусе четыре болта М6 попадают
-   в готовые Ø7 стоек. У правой боковой стенки ряды разные: передняя стойка
+   в готовые Ø7 стоек. У левой боковой стенки ряды разные: передняя стойка
    00.000.001 — отм. 235/615, задняя 00.000.002 — 250/630. Две независимые
    вертикальные опоры держат общую полку на отм. 250 без перекоса. Сверлить
    корпус и варить крепёж к баку не надо. Узел — деталь проекта, как и сам бак:
@@ -3774,7 +3774,7 @@ function framePosts(fr){
 }
 const SH_WALLS=[{a:'x',s:-1,t:'левой'},{a:'x',s:1,t:'правой'},
                 {a:'y',s:-1,t:'задней'},{a:'y',s:1,t:'передней'}];
-const SH_STD_WALL=SH_WALLS[1];                  // стенка №2 на схеме Дмитрия
+const SH_STD_WALL=SH_WALLS[0];                  // противоположная стенка без щита
 /* У штатного 600×900 ряды Ø7 проверены по раскрою и сборочному STEP.
    Передняя стойка 00.000.001: в СК модели 268/648, на чертеже 235/615.
    Задняя 00.000.002: 283/663 в модели, 250/630 на чертеже. Поэтому каждая
@@ -3788,7 +3788,7 @@ function tankStdFrame(fr){
 function tankBracketRows(fr,P0,P1,W){
   if(!tankStdFrame(fr))return null;
   if(!W||W.a!==SH_STD_WALL.a||W.s!==SH_STD_WALL.s)return {unsupported:true};
-  /* P0/P1 уже отсортированы по поперечной координате стены: у правой стены
+  /* P0/P1 уже отсортированы по поперечной координате стены: у левой стены
      меньший Y — задняя стойка, больший Y — передняя. Это надёжнее имени из
      STEP: в живой AG-41 имена деталей приходят со сборочными суффиксами и
      иногда после перекодировки не распознаются, хотя геометрия верна. */
@@ -3901,7 +3901,7 @@ function tankShelfPlan(it,fr){
     return !(r.x1-p<=x0||r.x0+p>=x1||r.y1-p<=y0||r.y0+p>=y1||
              r.z1-p<=z0||r.z0+p>=z1);};
   const over2=(r,x0,x1,y0,y1)=>!(r.x1<=x0||r.x0>=x1||r.y1<=y0||r.y0>=y1);
-  /* Для штатного корпуса выбор Дмитрия фиксирован: стенка №2, правая, бак
+  /* Для штатного корпуса выбор Дмитрия фиксирован: левая боковая стенка, бак
      целиком внутри. У произвольной рамы сохраняем поиск подходящей стенки. */
   const walls=tankStdFrame(fr)?[SH_STD_WALL]:SH_WALLS;
   let pref=walls[0],pd=Infinity;
@@ -3952,7 +3952,7 @@ function tankShelfPlan(it,fr){
         const gap0=Math.abs(lo-P0.b.max[w]),gap1=Math.abs(hi-P1.b.min[w]);
         if(gap0>SH_REACH*0.6||gap1>SH_REACH*0.6)return;
         const holes=tankBracketRows(fr,P0,P1,W);
-        if(holes&&holes.unsupported)return;        // штатный корпус: только правая стенка 001+002
+        if(holes&&holes.unsupported)return;        // штатный корпус: только левая стенка 001+002
         for(let off=0;off<=offMax+1;off+=20){
           const ca=tankWallCenter(face,dir,fa,off);
           const A0=Math.min(ca-fa/2,ca+fa/2),A1=Math.max(ca-fa/2,ca+fa/2);
@@ -4052,7 +4052,7 @@ function tankShelfPlan(it,fr){
   const sh={v:3,z:best.z,top:best.zTop,ax:best.a,dir:best.dir,t:SH_T,
             leg:best.zTop-best.z,strap:SH_STRAP,gus:SH_GUS,pad:SH_PAD,
             bolt0:best.zBolt,
-            wall:'right-inside',rows:best.rows,
+            wall:'left-inside',rows:best.rows,
             marks:best.holes&&best.holes.marks,
             mark0:best.holes?235:Math.round(best.z-zFloor),
             mark1:best.holes?630:Math.round(best.zTop-zFloor),
