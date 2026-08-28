@@ -9,34 +9,49 @@ const end = html.indexOf('function tankShelfPlan', start);
 assert.ok(start > 0 && end > start, 'блок крепления бака найден');
 
 const api = new Function(
-  html.slice(start, end) + '\nreturn {tankBracketRows,shelfCutOf};'
+  html.slice(start, end) + '\nreturn {tankBracketRows,shelfCutOf,tankWallCenter};'
 )();
 
 const box = (x0, x1, y0, y1) => ({
   min: { x: x0, y: y0 },
   max: { x: x1, y: y1 },
 });
-const P0 = { nm: '00.000.002 Стойка', des: '', b: box(-447, -372, -300, -225) };
-const P1 = { nm: '00.000.002 Стойка', des: '', b: box(372, 447, -300, -225) };
+const rear = { nm: '00.000.002 Стойка', des: '', b: box(372, 447, -300, -225) };
+const front = { nm: 'AG-41.000.001 Стойка', des: '', b: box(372, 447, 225, 300) };
+const right = { a: 'x', s: 1, t: 'правой' };
 
-test('штатный корпус использует только одинаковые задние стойки', () => {
+test('штатный корпус крепит бак изнутри правой стенки к передней и задней стойкам', () => {
   const rows = api.tankBracketRows({
     d: { id: 'user:frame', name: 'AG-41.000.000СБ Корпус чиллера' },
-  }, P0, P1);
+  }, rear, front, right);
   assert.deepEqual(rows, {
-    support: 250, low: 283, top: 663, lowMark: 250, topMark: 630,
+    support: 250,
+    low: 268,
+    top: 663,
+    rows: [
+      { low: 283, top: 663, lowMark: 250, topMark: 630, label: 'задняя стойка' },
+      { low: 268, top: 648, lowMark: 235, topMark: 615, label: 'передняя стойка' },
+    ],
+    fixed: true,
+    marks: 'передняя стойка 235/615, задняя стойка 250/630',
   });
   assert.deepEqual(api.tankBracketRows({ d: { id: 'chiller-600x900' } },
-    { nm: 'AG-41.000.001 Стойка' }, P1), { unsupported: true });
+    rear, front, { a: 'y', s: -1 }), { unsupported: true }, 'другая стенка запрещена');
+  assert.deepEqual(api.tankBracketRows({ d: { id: 'chiller-600x900' } },
+    rear, rear, right), { unsupported: true }, 'две одинаковые стойки запрещены');
   assert.equal(api.tankBracketRows({ d: { id: 'custom-frame' } },
-    { nm: 'custom post' }, { nm: 'custom post' }), null);
+    { nm: 'custom post' }, { nm: 'custom post' }, right), null);
 });
 
 test('узел состоит из двух рамных кронштейнов, диагоналей и верхней стяжки', () => {
   const cut = api.shelfCutOf({
-    a: 'x', w: 'y', P0, P1, face: -372, dir: 1,
-    cw: -3, ca: -265, fw: 525, fa: 200, off: 0,
-    z: 250, zTop: 663, zBolt: 283,
+    a: 'x', w: 'y', P0: rear, P1: front, face: 372, dir: -1,
+    cw: 0, ca: 266, fw: 525, fa: 200, off: 0,
+    z: 250, zTop: 663, zBolt: 268,
+    rows: [
+      { low: 283, top: 663 },
+      { low: 268, top: 648 },
+    ],
   });
   assert.equal(cut.pl.length, 2, 'две нижние опоры');
   assert.equal(cut.lg.length, 2, 'две вертикальные полосы');
@@ -45,12 +60,23 @@ test('узел состоит из двух рамных кронштейнов,
   assert.equal(cut.st.length, 3, 'П-образная стяжка: поперечина и два уха');
   assert.equal(cut.pd.length, 2, 'EPDM под обеими опорами');
   assert.equal(cut.bo.length, 4, 'по два штатных болта на стойку');
-  assert.deepEqual([...new Set(cut.bo.map(p => p[2]))], [283, 663]);
+  assert.deepEqual(cut.bo.map(p => p[2]), [283, 663, 268, 648]);
+  assert.deepEqual(cut.dg.map(d => d.p1[2]), [663, 648],
+    'каждая диагональ приходит в верхнее отверстие своей стойки');
+});
+
+test('бак целиком находится внутри правой стенки', () => {
+  const face = 372;
+  const center = api.tankWallCenter(face, -1, 200, 0);
+  assert.equal(center, 266);
+  assert.ok(center + 100 < face, 'наружная грань бака не выходит за внутреннюю грань стоек');
 });
 
 test('команда и спецификация называют изготовляемый узел полностью', () => {
   assert.match(html, /▤ Закрепить бак/);
-  assert.match(html, /Рамные кронштейны[\s\S]{0,120}отм\. 250\/630/);
+  assert.match(html, /Боковые рамные кронштейны[\s\S]{0,120}правая стенка изнутри/);
+  assert.match(html, /передняя стойка Ø7 235\/615, задняя Ø7 250\/630/);
+  assert.match(html, /wall:'right-inside'/);
   assert.match(html, /Кронштейн рамный бака, лист/);
   assert.match(html, /Стяжка бака П-образная 30×2/);
   assert.match(html, /Пластина ответная 40×400×3/);
