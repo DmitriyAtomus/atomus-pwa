@@ -15,18 +15,25 @@ test('сотрудник использует отдельный API, а дир�
   assert.match(app, /_devChatAgent === 'codex' \? '\/api\/codex-chat'/);
 });
 
-test('режим только чтение виден в интерфейсе', () => {
-  assert.match(html, /id="devchat-mode-badge"[^>]*>[\s\S]{0,100}Только чтение/);
+test('интерфейс разделяет полный доступ к сайту и read-only CRM', () => {
+  assert.match(html, /id="devchat-mode-badge"[^>]*>[\s\S]{0,100}Сайт: полный доступ/);
   assert.match(app, /classList\.toggle\('dchat-employee-readonly', employee\)/);
   assert.match(css, /\.dchat-mode-badge \{/);
   assert.match(css, /dchat-employee-readonly[\s\S]{0,100}\.dchat-eye/);
 });
 
-test('сотрудническая Клава объясняет возможности без обещания правок', () => {
-  assert.match(app, /искать публичную информацию в интернете/);
-  assert.match(app, /без изменения CRM и рабочих проектов/);
-  assert.match(app, /читает разрешённые данные без права изменения/);
+test('сотрудническая Клава обещает правки только отдельного сайта', () => {
+  assert.match(app, /ведёт отдельный сайт/);
+  assert.match(app, /CRM для сотрудника остаётся только источником разрешённых данных без права записи/);
+  assert.match(app, /сайт создаёт, меняет и публикует полностью/);
   assert.match(app, /локальный Codex/);
+});
+
+test('быстрые действия ведут по полному циклу сайта', () => {
+  assert.match(app, /Создай страницу сайта/);
+  assert.match(app, /Переделай блок сайта/);
+  assert.match(app, /Проверь на телефоне/);
+  assert.match(app, /Опубликуй сайт/);
 });
 
 test('сотрудник прикладывает файлы, но только те, что Клава прочитает', () => {

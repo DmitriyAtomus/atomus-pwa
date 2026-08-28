@@ -43,8 +43,8 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.101";
-const APP_VERSION_DATE = "27.08.2026";
+const APP_VERSION = "v2.46.102";
+const APP_VERSION_DATE = "28.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -1474,7 +1474,7 @@ function renderProfile() {
   }
 
   // Клава видна всем сотрудникам. Директор попадает в личный канал агента
-  // разработки, остальные — в отдельный серверный режим только на чтение.
+  // разработки, остальные — в отдельный сайт-контур; CRM там только читается.
   const isDirector = !!(state.user.roles && state.user.roles.includes('director'));
   const navDev = document.getElementById('sb-devchat');
   if (navDev) navDev.style.display = '';
@@ -2142,7 +2142,7 @@ function _devChatApplyAgentUi() {
   const hint = document.querySelector('[data-screen="devchat"] .dchat-hint');
   if (hint) hint.textContent = employee
     ? 'Enter — отправить · Shift+Enter — новая строка · Клава работает через локальный Codex · '
-      + 'читает разрешённые данные без права изменения, принимает вложения и выдаёт новые файлы'
+      + 'CRM только читает · отдельный сайт создаёт, меняет и публикует полностью'
     : 'Enter — отправить, Shift+Enter — новая строка. Файлы можно перетащить прямо в окно. ' +
       name + ' работает на офисном компьютере и правит проекты сам.';
   const badge = document.getElementById('devchat-mode-badge');
@@ -2150,10 +2150,10 @@ function _devChatApplyAgentUi() {
     const accountName = (state.user &&
       (state.user.short_name || state.user.name || state.user.full_name)) || 'ваш аккаунт';
     badge.style.display = employee ? 'inline-flex' : 'none';
-    badge.innerHTML = '<i class="ti ti-user-check"></i>' +
-      (employee ? 'Личный · ' + escapeHtml(accountName) : 'Только чтение');
+    badge.innerHTML = '<i class="ti ti-world-code"></i>' +
+      (employee ? 'Сайт: полный доступ' : 'Только чтение');
     badge.title = employee
-      ? 'Клава знает имя, должность и роль текущего авторизованного сотрудника'
+      ? 'Личный чат ' + escapeHtml(accountName) + ': сайт — полный доступ, CRM — только чтение'
       : '';
   }
   const projectBtn = document.getElementById('devchat-projects-btn');
@@ -2161,19 +2161,19 @@ function _devChatApplyAgentUi() {
   const input = document.getElementById('devchat-input');
   const drawerInput = document.getElementById('devchat-drawer-input');
   const placeholder = employee
-    ? 'Спросите про CRM, интернет, файл или 3D-модель…'
+    ? 'Поставьте задачу по сайту или спросите про CRM…'
     : 'Спросите или поставьте задачу…';
   if (input) input.placeholder = placeholder;
   if (drawerInput) drawerInput.placeholder = placeholder;
   const chips = document.getElementById('devchat-chips');
   if (chips) chips.innerHTML = employee
     ? '<button class="dchat-file-quick" onclick="devChatAttachPick(\'file\')"><i class="ti ti-paperclip"></i>Прикрепить файл</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-file-code"></i>Создай страницу сайта…</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-brush"></i>Переделай блок сайта…</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-device-mobile-check"></i>Проверь на телефоне…</button>' +
+      '<button onclick="devChatQuick(this)"><i class="ti ti-cloud-upload"></i>Опубликуй сайт…</button>' +
       '<button onclick="devChatQuick(this)"><i class="ti ti-file-spreadsheet"></i>Сделай Excel…</button>' +
-      '<button onclick="devChatQuick(this)"><i class="ti ti-file-type-pdf"></i>Собери PDF…</button>' +
-      '<button onclick="devChatQuick(this)"><i class="ti ti-schema"></i>Нарисуй схему…</button>' +
-      '<button onclick="devChatQuick(this)"><i class="ti ti-cube-3d-sphere"></i>Сделай 3D-модель…</button>' +
-      '<button onclick="devChatQuick(this)"><i class="ti ti-user-check"></i>Кто я?</button>' +
-      '<button onclick="devChatQuick(this)"><i class="ti ti-world-search"></i>Найди в интернете…</button>'
+      '<button onclick="devChatQuick(this)"><i class="ti ti-cube-3d-sphere"></i>Сделай 3D-модель…</button>'
     : '<button onclick="devChatQuick(this)"><i class="ti ti-progress"></i>Что сейчас в работе?</button>' +
       '<button onclick="devChatQuick(this)"><i class="ti ti-file-search"></i>Проверь логи за сегодня</button>' +
       '<button onclick="devChatQuick(this)"><i class="ti ti-brush"></i>Поправь дизайн раздела…</button>';
@@ -3038,13 +3038,13 @@ function _devChatEmptyHtml() {
   const name = _devChatAgentName();
   const employee = _devChatEmployeeMode();
   const quick = employee
-    ? ['Сделай Excel по данным CRM…', 'Сделай 3D-модель корпуса…', 'Кто я и какая у меня роль?']
+    ? ['Создай первый экран сайта…', 'Переделай страницу под телефон…', 'Опубликуй готовую версию…']
     : ['Что сейчас в работе?', 'Поправь дизайн раздела', 'Собери отчёт по задачам'];
   return '<div class="dchat-empty">' +
     '<div class="ico"><i class="ti ti-sparkles"></i></div>' +
     '<h3>' + (employee ? 'Спросите ' : 'Задача для ') + escapeHtml(name) + '</h3>' +
     '<p>' + (employee
-      ? 'Клава знает, какой сотрудник вошёл в аккаунт, может общаться, искать публичную информацию в интернете, читать разрешённые данные CRM, разбирать вложения и создавать Word, Excel, PDF, PowerPoint, изображения и 3D-модели STEP/STL/OBJ/GLB. Она работает локально через Codex, без изменения CRM и рабочих проектов.'
+      ? 'Клава ведёт отдельный сайт: создаёт и переделывает страницы, проверяет мобильную версию и публикует готовые изменения. CRM для сотрудника остаётся только источником разрешённых данных без права записи. Также можно прикладывать файлы и получать Word, Excel, PDF, изображения и 3D-модели.'
       : 'Опишите, что сделать. Агент работает на офисном сервере: сам правит проекты, запускает проверки и отвечает сюда же. Можно приложить фото или файл.') + '</p>' +
     '<div class="dchat-quick">' +
     quick.map(function (q) {
