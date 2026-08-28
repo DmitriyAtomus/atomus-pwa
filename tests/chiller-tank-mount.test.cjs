@@ -16,14 +16,14 @@ const box = (x0, x1, y0, y1) => ({
   min: { x: x0, y: y0 },
   max: { x: x1, y: y1 },
 });
-const rear = { nm: '00.000.002 Стойка', des: '', b: box(372, 447, -300, -225) };
-const front = { nm: 'AG-41.000.001 Стойка', des: '', b: box(372, 447, 225, 300) };
-const right = { a: 'x', s: 1, t: 'правой' };
+const rear = { nm: '00.000.002 Стойка', des: '', b: box(-447, -372, -300, -225) };
+const front = { nm: 'AG-41.000.001 Стойка', des: '', b: box(-447, -372, 225, 300) };
+const left = { a: 'x', s: -1, t: 'левой' };
 
-test('штатный корпус крепит бак изнутри правой стенки к передней и задней стойкам', () => {
+test('штатный корпус крепит бак изнутри левой стенки к передней и задней стойкам', () => {
   const rows = api.tankBracketRows({
     d: { id: 'user:frame', name: 'AG-41.000.000СБ Корпус чиллера' },
-  }, rear, front, right);
+  }, rear, front, left);
   assert.deepEqual(rows, {
     support: 250,
     low: 268,
@@ -36,18 +36,19 @@ test('штатный корпус крепит бак изнутри право�
     marks: 'передняя стойка 235/615, задняя стойка 250/630',
   });
   assert.deepEqual(api.tankBracketRows({ d: { id: 'chiller-600x900' } },
-    rear, front, { a: 'y', s: -1 }), { unsupported: true }, 'другая стенка запрещена');
+    rear, front, { a: 'x', s: 1 }), { unsupported: true },
+    'прежняя правая стенка со щитом запрещена');
   assert.deepEqual(api.tankBracketRows({ d: { id: 'chiller-600x900' } },
-    { nm: 'стойка из STEP (17)' }, { nm: 'стойка из STEP (42)' }, right), rows,
+    { nm: 'стойка из STEP (17)' }, { nm: 'стойка из STEP (42)' }, left), rows,
     'ряды определяются по стороне и координате, даже если STEP испортил имена');
   assert.equal(api.tankBracketRows({ d: { id: 'custom-frame' } },
-    { nm: 'custom post' }, { nm: 'custom post' }, right), null);
+    { nm: 'custom post' }, { nm: 'custom post' }, left), null);
 });
 
 test('узел состоит из двух рамных кронштейнов, диагоналей и верхней стяжки', () => {
   const cut = api.shelfCutOf({
-    a: 'x', w: 'y', P0: rear, P1: front, face: 372, dir: -1,
-    cw: 0, ca: 266, fw: 525, fa: 200, off: 0,
+    a: 'x', w: 'y', P0: rear, P1: front, face: -372, dir: 1,
+    cw: 0, ca: -266, fw: 525, fa: 200, off: 0,
     z: 250, zTop: 663, zBolt: 268,
     rows: [
       { low: 283, top: 663 },
@@ -66,18 +67,18 @@ test('узел состоит из двух рамных кронштейнов,
     'каждая диагональ приходит в верхнее отверстие своей стойки');
 });
 
-test('бак целиком находится внутри правой стенки', () => {
-  const face = 372;
-  const center = api.tankWallCenter(face, -1, 200, 0);
-  assert.equal(center, 266);
-  assert.ok(center + 100 < face, 'наружная грань бака не выходит за внутреннюю грань стоек');
+test('бак целиком находится внутри левой стенки', () => {
+  const face = -372;
+  const center = api.tankWallCenter(face, 1, 200, 0);
+  assert.equal(center, -266);
+  assert.ok(center - 100 > face, 'наружная грань бака не выходит за внутреннюю грань стоек');
 });
 
 test('команда и спецификация называют изготовляемый узел полностью', () => {
   assert.match(html, /▤ Закрепить бак/);
-  assert.match(html, /Боковые рамные кронштейны[\s\S]{0,120}правая стенка изнутри/);
+  assert.match(html, /Боковые рамные кронштейны[\s\S]{0,120}левая стенка изнутри/);
   assert.match(html, /передняя стойка Ø7 235\/615, задняя Ø7 250\/630/);
-  assert.match(html, /wall:'right-inside'/);
+  assert.match(html, /wall:'left-inside'/);
   assert.match(html, /Кронштейн рамный бака, лист/);
   assert.match(html, /Стяжка бака П-образная 30×2/);
   assert.match(html, /Пластина ответная 40×400×3/);
