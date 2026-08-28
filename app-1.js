@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.104";
+const APP_VERSION = "v2.46.105";
 const APP_VERSION_DATE = "28.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1473,15 +1473,16 @@ function renderProfile() {
     navSec.style.display = (state.user.roles && state.user.roles.includes('director')) ? '' : 'none';
   }
 
-  // Клава видна всем сотрудникам. Директор попадает в личный канал агента
-  // разработки, остальные — в отдельный сайт-контур; CRM там только читается.
+  // Общий сайт виден всем. Личная Клава разработки остаётся только директору.
   const isDirector = !!(state.user.roles && state.user.roles.includes('director'));
+  const navSite = document.getElementById('sb-sitechat');
+  if (navSite) navSite.style.display = '';
   const navDev = document.getElementById('sb-devchat');
-  if (navDev) navDev.style.display = '';
+  if (navDev) navDev.style.display = isDirector ? '' : 'none';
   const navCodex = document.getElementById('sb-codex');
   if (navCodex) navCodex.style.display = isDirector ? '' : 'none';
   const devFab = document.getElementById('devchat-fab');
-  if (devFab) devFab.style.display = '';
+  if (devFab) devFab.style.display = isDirector ? '' : 'none';
 
   // «Идеи» — чат с Клавой для всех сотрудников. Выездным монтажникам пункт не
   // показываем: бэкенд им закрыт даже с паролем, кнопка только путала бы.
@@ -1820,6 +1821,8 @@ function selectSidebarItem(screenName) {
     'warehouse-movements':   'warehouse-dashboard',
     // Codex использует тот же экран чата, но отдельную очередь и историю.
     'codex':                  'devchat',
+    // Общий сайт использует тот же экран, но одну историю для всей компании.
+    'sitechat':               'devchat',
   };
   const targetScreen = SCREEN_ALIASES[screenName] || screenName;
 
@@ -1978,15 +1981,21 @@ function runScreenLoader(screenName) {
   else if (screenName === 'codex') {
     _devChatUseAgent('codex');
     loadDevChat('screen');
+  } else if (screenName === 'sitechat') {
+    _devChatUseAgent('site');
+    loadDevChat('screen');
   } else { devChatExitFull(); if (!drawerOpen) stopDevChat(); }
   // v2.45.971: внутри чата прячем круглый «+» таб-бара — он выпирал над панелью
   // и отбирал у ленты полсантиметра, а по смыслу дублировал «+» композера
-  document.body.classList.toggle('dchat-screen', screenName === 'devchat' || screenName === 'codex');
+  document.body.classList.toggle('dchat-screen',
+    screenName === 'devchat' || screenName === 'codex' || screenName === 'sitechat');
   // v2.45.956: на самом экране чата плавающая кнопка не нужна — она ложится
   // ровно на поле ввода (особенно на телефоне)
   const devFab2 = document.getElementById('devchat-fab');
   if (devFab2) {
-    devFab2.style.display = (screenName === 'devchat' || screenName === 'codex') ? 'none' : '';
+    const isDirector = !!(state.user && state.user.roles && state.user.roles.includes('director'));
+    devFab2.style.display = (screenName === 'devchat' || screenName === 'codex' ||
+      screenName === 'sitechat' || !isDirector) ? 'none' : '';
   }
 }
 
@@ -2110,25 +2119,27 @@ let _devChatSearchTimer = null;
 let _devChatSearchResults = null;  // не null — в панели показан результат поиска
 const DEVCHAT_THREAD_KEY = 'atomus_devchat_thread';
 const CODEXCHAT_THREAD_KEY = 'atomus_codexchat_thread';
-let _devChatAgent = 'claude';      // claude | codex; данные двух агентов не смешиваются
+const SITECHAT_THREAD_KEY = 'atomus_sitechat_thread';
+let _devChatAgent = 'claude';      // claude | codex | site; очереди не смешиваются
 
 function _devChatEmployeeMode() {
-  const roles = (state.user && state.user.roles) || [];
-  return _devChatAgent === 'claude' && roles.indexOf('director') < 0;
+  return _devChatAgent === 'site';
 }
 
 function _devChatAgentName() {
-  return _devChatAgent === 'codex' ? 'Кодя' : 'Клава';
+  if (_devChatAgent === 'codex') return 'Кодя';
+  return _devChatAgent === 'site' ? 'Клава сайта' : 'Клава';
 }
 
 function _devChatApi(path) {
   const root = _devChatAgent === 'codex' ? '/api/codex-chat'
-    : (_devChatEmployeeMode() ? '/api/employee-chat' : '/api/dev-chat');
+    : (_devChatEmployeeMode() ? '/api/site-chat' : '/api/dev-chat');
   return root + (path || '');
 }
 
 function _devChatStorageKey() {
-  return _devChatAgent === 'codex' ? CODEXCHAT_THREAD_KEY : DEVCHAT_THREAD_KEY;
+  if (_devChatAgent === 'codex') return CODEXCHAT_THREAD_KEY;
+  return _devChatAgent === 'site' ? SITECHAT_THREAD_KEY : DEVCHAT_THREAD_KEY;
 }
 
 function _devChatApplyAgentUi() {
@@ -2136,24 +2147,22 @@ function _devChatApplyAgentUi() {
   const employee = _devChatEmployeeMode();
   document.body.classList.toggle('dchat-employee-readonly', employee);
   const ava = document.querySelector('[data-screen="devchat"] .dchat-hd-ava');
-  if (ava) ava.innerHTML = (_devChatAgent === 'codex' ? 'Ко' : 'К') + '<i></i>';
+  if (ava) ava.innerHTML = (_devChatAgent === 'codex' ? 'Ко' : (_devChatAgent === 'site' ? 'С' : 'К')) + '<i></i>';
   const term = document.getElementById('devchat-term-title');
   if (term) term.textContent = name + ' — работа вживую';
   const hint = document.querySelector('[data-screen="devchat"] .dchat-hint');
   if (hint) hint.textContent = employee
     ? 'Enter — отправить · Shift+Enter — новая строка · Клава работает через локальный Codex · '
-      + 'CRM только читает · отдельный сайт создаёт, меняет и публикует полностью'
+      + 'общая переписка · сайт создаёт, меняет и публикует полностью · CRM только читает'
     : 'Enter — отправить, Shift+Enter — новая строка. Файлы можно перетащить прямо в окно. ' +
       name + ' работает на офисном компьютере и правит проекты сам.';
   const badge = document.getElementById('devchat-mode-badge');
   if (badge) {
-    const accountName = (state.user &&
-      (state.user.short_name || state.user.name || state.user.full_name)) || 'ваш аккаунт';
     badge.style.display = employee ? 'inline-flex' : 'none';
     badge.innerHTML = '<i class="ti ti-world-code"></i>' +
-      (employee ? 'Сайт: полный доступ' : 'Только чтение');
+      (employee ? 'Общий чат сайта' : 'Только чтение');
     badge.title = employee
-      ? 'Личный чат ' + escapeHtml(accountName) + ': сайт — полный доступ, CRM — только чтение'
+      ? 'Одна переписка для директора и всех сотрудников; сайт — полный доступ, CRM — только чтение'
       : '';
   }
   const projectBtn = document.getElementById('devchat-projects-btn');
@@ -2161,7 +2170,7 @@ function _devChatApplyAgentUi() {
   const input = document.getElementById('devchat-input');
   const drawerInput = document.getElementById('devchat-drawer-input');
   const placeholder = employee
-    ? 'Поставьте задачу по сайту или спросите про CRM…'
+    ? 'Напишите в общий чат сайта…'
     : 'Спросите или поставьте задачу…';
   if (input) input.placeholder = placeholder;
   if (drawerInput) drawerInput.placeholder = placeholder;
@@ -2180,8 +2189,9 @@ function _devChatApplyAgentUi() {
 }
 
 function _devChatUseAgent(agent) {
-  const next = agent === 'codex' ? 'codex' : 'claude';
+  const next = agent === 'codex' ? 'codex' : (agent === 'site' ? 'site' : 'claude');
   if (_devChatAgent !== next) {
+    _devChatDraftStash(_devChatThreadId);
     stopDevChat();
     _devChatThreadId = 0;
     _devChatThreads = [];
@@ -2216,32 +2226,39 @@ function _devChatDraftsStore() {
   try { localStorage.setItem(DEVCHAT_DRAFT_KEY, JSON.stringify(_devChatDrafts)); } catch (e) {}
 }
 
+function _devChatDraftId(id) {
+  return _devChatAgent + ':' + Number(id || _devChatThreadId || 0);
+}
+
 // Снять то, что сейчас в поле, в черновик чата id (перед уходом из него).
 function _devChatDraftStash(id) {
   if (!id) return;
+  const key = _devChatDraftId(id);
   const input = _devChatEl('input');
   const text = (input && input.value || '').trim();
-  if (text) _devChatDrafts[id] = text; else delete _devChatDrafts[id];
-  if (_devChatFiles.length) _devChatDraftFiles[id] = _devChatFiles.slice();
-  else delete _devChatDraftFiles[id];
+  if (text) _devChatDrafts[key] = text; else delete _devChatDrafts[key];
+  if (_devChatFiles.length) _devChatDraftFiles[key] = _devChatFiles.slice();
+  else delete _devChatDraftFiles[key];
   _devChatDraftsStore();
 }
 
 // Подставить черновик чата в поле — или оставить поле пустым, если его нет.
 function _devChatDraftApply() {
   _devChatDraftsLoad();
+  const key = _devChatDraftId(_devChatThreadId);
   const input = _devChatEl('input');
   if (input) {
-    input.value = _devChatDrafts[_devChatThreadId] || '';
+    input.value = _devChatDrafts[key] || '';
     devChatGrow(input);
   }
-  _devChatFiles = (_devChatDraftFiles[_devChatThreadId] || []).slice();
+  _devChatFiles = (_devChatDraftFiles[key] || []).slice();
   _devChatDrawFiles();
 }
 
 function _devChatDraftClear(id) {
-  delete _devChatDrafts[id || _devChatThreadId];
-  delete _devChatDraftFiles[id || _devChatThreadId];
+  const key = _devChatDraftId(id || _devChatThreadId);
+  delete _devChatDrafts[key];
+  delete _devChatDraftFiles[key];
   _devChatDraftsStore();
 }
 
@@ -2653,7 +2670,12 @@ function _devChatRender(msg) {
   const st = mine && msg.status ? _devChatStatus(msg.status) : null;
   const bubble = document.createElement('div');
   bubble.className = 'dchat-bubble';
+  const authorName = mine && _devChatEmployeeMode()
+    ? String(msg.author_name || (msg.meta && msg.meta.author_name) || 'Сотрудник')
+    : '';
   bubble.innerHTML =
+    (authorName ? '<div class="dchat-author"><i class="ti ti-user"></i>' +
+      escapeHtml(authorName) + '</div>' : '') +
     '<div class="dchat-text">' + _devChatFormat(msg.text) + '</div>' +
     '<div class="dchat-meta">' +
     '<span>' + _devChatTime(msg.ts) + '</span>' +
@@ -3044,7 +3066,7 @@ function _devChatEmptyHtml() {
     '<div class="ico"><i class="ti ti-sparkles"></i></div>' +
     '<h3>' + (employee ? 'Спросите ' : 'Задача для ') + escapeHtml(name) + '</h3>' +
     '<p>' + (employee
-      ? 'Клава ведёт отдельный сайт: создаёт и переделывает страницы, проверяет мобильную версию и публикует готовые изменения. CRM для сотрудника остаётся только источником разрешённых данных без права записи. Также можно прикладывать файлы и получать Word, Excel, PDF, изображения и 3D-модели.'
+      ? 'Это общая переписка по сайту: директор и сотрудники видят всю историю, имена авторов и результат каждой правки. Клава создаёт и переделывает страницы, проверяет мобильную версию и публикует готовые изменения. CRM остаётся только источником разрешённых данных без права записи.'
       : 'Опишите, что сделать. Агент работает на офисном сервере: сам правит проекты, запускает проверки и отвечает сюда же. Можно приложить фото или файл.') + '</p>' +
     '<div class="dchat-quick">' +
     quick.map(function (q) {
@@ -3231,8 +3253,9 @@ function devChatGrow(el) {
   // тогда переход в другую ленту (и обратно) ничего не теряет и не подсовывает
   if (_devChatThreadId) {
     const draft = (el.value || '').trim();
-    if (draft) _devChatDrafts[_devChatThreadId] = draft;
-    else delete _devChatDrafts[_devChatThreadId];
+    const key = _devChatDraftId(_devChatThreadId);
+    if (draft) _devChatDrafts[key] = draft;
+    else delete _devChatDrafts[key];
     _devChatDraftsStore();
   }
 }
@@ -3767,7 +3790,8 @@ function _devChatBindPaste() {
   document.addEventListener('paste', function (e) {
     const drawer = document.getElementById('devchat-drawer');
     const drawerOpen = drawer && drawer.style.display === 'flex';
-    if (!drawerOpen && state.currentScreen !== 'devchat' && state.currentScreen !== 'codex') return;
+    if (!drawerOpen && state.currentScreen !== 'devchat' && state.currentScreen !== 'codex' &&
+        state.currentScreen !== 'sitechat') return;
     const t = e.target;
     const tag = (t && t.tagName || '').toLowerCase();
     const id = t && t.id || '';
@@ -3792,7 +3816,8 @@ function _devChatDropHost() {
   if (typeof _devChatEmployeeMode === 'function' && _devChatEmployeeMode()) return null;
   const drawer = document.getElementById('devchat-drawer');
   if (drawer && drawer.style.display === 'flex') return drawer;
-  if (state.currentScreen === 'devchat' || state.currentScreen === 'codex') {
+  if (state.currentScreen === 'devchat' || state.currentScreen === 'codex' ||
+      state.currentScreen === 'sitechat') {
     const screen = document.querySelector('.screen[data-screen="devchat"]');
     return screen && (screen.querySelector('.dchat-main') || screen);
   }
@@ -4251,7 +4276,8 @@ function _devChatRenderThreads() {
   if (_devChatSearchResults) {
     box.innerHTML = _devChatSearchResults.length
       ? _devChatSearchResults.map(function (r) {
-          const who = r.author === _devChatAgent ? _devChatAgentName() : 'Вы';
+          const who = r.author === 'claude' ? _devChatAgentName()
+            : (r.author_name || (_devChatEmployeeMode() ? 'Сотрудник' : 'Вы'));
           return '<button class="dcl-item dcl-found" onclick="devChatOpenThread(' + r.thread_id + ')">' +
             '<div class="t">' + escapeHtml(r.thread_title || 'Чат') + '</div>' +
             '<div class="p">' + escapeHtml(who) + ': ' + escapeHtml(r.snippet || '') + '</div>' +
@@ -4305,8 +4331,7 @@ function devChatOpenThread(id) {
   _devChatThreadId = id;
   if (!same) _devChatDraftApply();
   try {
-    if (_devChatAgent === 'codex') localStorage.setItem(CODEXCHAT_THREAD_KEY, String(id));
-    else localStorage.setItem(DEVCHAT_THREAD_KEY, String(id));
+    localStorage.setItem(_devChatStorageKey(), String(id));
   } catch (e) {}
   // Лента чужого чата — другая переписка целиком: обнуляем курсор и рисуем с нуля
   _devChatSince = 0;
@@ -4599,7 +4624,8 @@ function devChatIsFull() {
 // снаружи экрана (шапка, сайдбары, плавающая кнопка шторки).
 function _devChatApplyFull() {
   const on = devChatIsFull() &&
-    (state.currentScreen === 'devchat' || state.currentScreen === 'codex');
+    (state.currentScreen === 'devchat' || state.currentScreen === 'codex' ||
+      state.currentScreen === 'sitechat');
   document.body.classList.toggle('dchat-fullscreen', on);
   const btn = document.getElementById('devchat-full-btn');
   if (btn) {
@@ -4640,8 +4666,10 @@ function devChatToggleDrawer() {
     drawer.style.display = 'none';
     if (backdrop) backdrop.classList.remove('show');
     // на своём экране лента должна продолжать жить
-    if (state.currentScreen === 'devchat' || state.currentScreen === 'codex') {
-      _devChatUseAgent(state.currentScreen === 'codex' ? 'codex' : 'claude');
+    if (state.currentScreen === 'devchat' || state.currentScreen === 'codex' ||
+        state.currentScreen === 'sitechat') {
+      _devChatUseAgent(state.currentScreen === 'codex' ? 'codex' :
+        (state.currentScreen === 'sitechat' ? 'site' : 'claude'));
       loadDevChat('screen');
     } else stopDevChat();
   }
@@ -4926,6 +4954,7 @@ const AUTO_REFRESH_SKIP = [
   'sale-offer-form', 'sales-offer-form', 'sale-product-form', 'defect-form',
   'model-form', 'vacation-form', 'new-assembly', 'sales-contractor-form',
   'wh-ship-qr', 'security', 'atom-electrica', 'atom-chiller',
+  'devchat', 'codex', 'sitechat',
   'defects-detail', 'defects-chats', 'developments', 'inventory', 'paint-calc', 'mfg',
   'units-journal',   // правка прямо в ячейке — перерисовка стёрла бы недописанное
   'mail-messenger',
