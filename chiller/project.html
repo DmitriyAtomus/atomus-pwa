@@ -3785,19 +3785,17 @@ function tankStdFrame(fr){
   const tag=[fr&&fr.d&&fr.d.id,fr&&fr.d&&fr.d.name].filter(Boolean).join(' ');
   return /chiller-600x900|AG-41\.000\.000/i.test(tag);
 }
-function tankPostRows(P){
-  const tag=((P&&P.des||'')+' '+(P&&P.nm||'')).trim();
-  if(/000\.001(?:\D|$)/i.test(tag))
-    return {low:268,top:648,lowMark:235,topMark:615,label:'передняя стойка'};
-  if(/000\.002(?:\D|$)/i.test(tag))
-    return {low:283,top:663,lowMark:250,topMark:630,label:'задняя стойка'};
-  return null;
-}
 function tankBracketRows(fr,P0,P1,W){
   if(!tankStdFrame(fr))return null;
   if(!W||W.a!==SH_STD_WALL.a||W.s!==SH_STD_WALL.s)return {unsupported:true};
-  const rows=[tankPostRows(P0),tankPostRows(P1)];
-  if(!rows[0]||!rows[1]||rows[0].label===rows[1].label)return {unsupported:true};
+  /* P0/P1 уже отсортированы по поперечной координате стены: у правой стены
+     меньший Y — задняя стойка, больший Y — передняя. Это надёжнее имени из
+     STEP: в живой AG-41 имена деталей приходят со сборочными суффиксами и
+     иногда после перекодировки не распознаются, хотя геометрия верна. */
+  const rows=[
+    {low:283,top:663,lowMark:250,topMark:630,label:'задняя стойка'},
+    {low:268,top:648,lowMark:235,topMark:615,label:'передняя стойка'},
+  ];
   return {support:SH_STD_SUPPORT,low:Math.min(rows[0].low,rows[1].low),
           top:Math.max(rows[0].top,rows[1].top),rows:rows,fixed:true,
           marks:'передняя стойка 235/615, задняя стойка 250/630'};

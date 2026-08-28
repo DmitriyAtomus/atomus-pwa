@@ -38,7 +38,8 @@ test('штатный корпус крепит бак изнутри право�
   assert.deepEqual(api.tankBracketRows({ d: { id: 'chiller-600x900' } },
     rear, front, { a: 'y', s: -1 }), { unsupported: true }, 'другая стенка запрещена');
   assert.deepEqual(api.tankBracketRows({ d: { id: 'chiller-600x900' } },
-    rear, rear, right), { unsupported: true }, 'две одинаковые стойки запрещены');
+    { nm: 'стойка из STEP (17)' }, { nm: 'стойка из STEP (42)' }, right), rows,
+    'ряды определяются по стороне и координате, даже если STEP испортил имена');
   assert.equal(api.tankBracketRows({ d: { id: 'custom-frame' } },
     { nm: 'custom post' }, { nm: 'custom post' }, right), null);
 });
