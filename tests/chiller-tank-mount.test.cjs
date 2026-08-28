@@ -9,7 +9,7 @@ const end = html.indexOf('function tankShelfPlan', start);
 assert.ok(start > 0 && end > start, 'блок крепления бака найден');
 
 const api = new Function(
-  html.slice(start, end) + '\nreturn {tankBracketRows,shelfCutOf,tankWallCenter};'
+  html.slice(start, end) + '\nreturn {tankBracketRows,shelfCutOf,tankWallFace,tankWallCenter};'
 )();
 
 const box = (x0, x1, y0, y1) => ({
@@ -17,7 +17,8 @@ const box = (x0, x1, y0, y1) => ({
   max: { x: x1, y: y1 },
 });
 const rear = { nm: '00.000.002 Стойка', des: '', b: box(-447, -372, -300, -225) };
-const front = { nm: 'AG-41.000.001 Стойка', des: '', b: box(-447, -372, 225, 300) };
+const front = { nm: 'AG-41.000.001 Стойка', des: '', b: box(-447, -272, 219, 294) };
+const sidePanel = box(-447, -427, -244, 238);
 const left = { a: 'x', s: -1, t: 'левой' };
 
 test('штатный корпус крепит бак изнутри левой стенки к передней и задней стойкам', () => {
@@ -47,8 +48,8 @@ test('штатный корпус крепит бак изнутри левой 
 
 test('узел состоит из двух рамных кронштейнов, диагоналей и верхней стяжки', () => {
   const cut = api.shelfCutOf({
-    a: 'x', w: 'y', P0: rear, P1: front, face: -372, dir: 1,
-    cw: 0, ca: -266, fw: 525, fa: 200, off: 0,
+    a: 'x', w: 'y', P0: rear, P1: front, face: -427, dir: 1,
+    cw: 0, ca: -321, fw: 525, fa: 200, off: 0,
     z: 250, zTop: 663, zBolt: 268,
     rows: [
       { low: 283, top: 663 },
@@ -67,18 +68,30 @@ test('узел состоит из двух рамных кронштейнов,
     'каждая диагональ приходит в верхнее отверстие своей стойки');
 });
 
-test('бак целиком находится внутри левой стенки', () => {
-  const face = -372;
+test('бак прижат к внутренней плоскости левой панели, а не к краю широкой стойки', () => {
+  const parts = [
+    { name: rear.nm },
+    { name: front.nm },
+    { name: '00.000.007 Панель боковая' },
+  ];
+  const boxes = [rear.b, front.b, sidePanel];
+  const postFace = Math.max(rear.b.max.x, front.b.max.x);
+  assert.equal(postFace, -272, 'широкая передняя стойка действительно выступает в полость');
+  const face = api.tankWallFace(parts, boxes, left, -450, postFace);
+  assert.equal(face, -427, 'берём внутреннюю грань боковой панели');
   const center = api.tankWallCenter(face, 1, 200, 0);
-  assert.equal(center, -266);
-  assert.ok(center - 100 > face, 'наружная грань бака не выходит за внутреннюю грань стоек');
+  assert.equal(center, -321);
+  assert.equal(center - 100 - face, 6, 'между панелью и баком только кронштейн 3 мм + EPDM 3 мм');
+  assert.ok(center - 100 >= -420 - 6, 'бак остаётся внутри допуска полости корпуса');
+  assert.equal(api.tankWallFace([], [], left, -450, postFace), postFace,
+    'у произвольного корпуса без панели остаётся безопасная привязка к стойкам');
 });
 
 test('команда и спецификация называют изготовляемый узел полностью', () => {
   assert.match(html, /▤ Закрепить бак/);
-  assert.match(html, /Боковые рамные кронштейны[\s\S]{0,120}левая стенка изнутри/);
+  assert.match(html, /Боковые рамные кронштейны[\s\S]{0,120}бак прижат к левой панели/);
   assert.match(html, /передняя стойка Ø7 235\/615, задняя Ø7 250\/630/);
-  assert.match(html, /wall:'left-inside'/);
+  assert.match(html, /wall:'left-flush'/);
   assert.match(html, /Кронштейн рамный бака, лист/);
   assert.match(html, /Стяжка бака П-образная 30×2/);
   assert.match(html, /Пластина ответная 40×400×3/);
