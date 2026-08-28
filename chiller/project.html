@@ -3297,7 +3297,7 @@ function faceHolesShow(fr){
 }
 function faceMate(it){
   const fr=placed.find(p=>p.uid===it.link.to);
-  if(!fr){it.link=null;return false;}
+  if(!fr){if(!_loading)it.link=null;return false;}
   if(Array.isArray(it.link.lp)){
     const g=it.obj.geometry;if(!g.boundingBox)g.computeBoundingBox();
     const b=g.boundingBox,anchor=new THREE.Vector3(b.max.x-4,
@@ -3401,7 +3401,12 @@ function reseatLink(it){
   if(!it.link)return;
   if(it.link.mount==='face'){faceMate(it);return;}
   const fr=placed.find(x=>x.uid===it.link.to);
-  if(!fr){it.link=null;return;}
+  /* v2.46.101: проект грузится по одной детали, и бак почти всегда приезжает
+     раньше корпуса. Раньше refresh() внутри addItem не находил корпус и рвал
+     связь — вместе с ней пропадало и крепление на стойках: после F5 бак
+     оставался просто деталью на дне. Пока идёт загрузка, связь не трогаем:
+     uid-ы чинит loadProjectData, а посадку — её же итоговый refresh(). */
+  if(!fr){if(!_loading)it.link=null;return;}
   if(it.link.mount==='tank'){tankReseat(it,fr);return;}
   const st=seatOf(fr,it.link.face),b=new THREE.Box3().setFromObject(it.obj);
   /* вентилятор сидит в проёме крышки: держим начало его СК на листе,
@@ -8767,6 +8772,7 @@ async function loadProjectData(data){
                                                        face:p.link.face||'pan',zi:p.link.zi,
                                                        pzi:p.link.pzi,roll:p.link.roll,
                                                        rel:p.link.rel,hole:p.link.hole,
+                                                       sh:p.link.sh,   /* крепление бака на стойках */
                                                        lp:p.link.lp,d:p.link.d};
                      else if(p.link&&!placed.some(x=>x.uid===p.link.to))p.link=null;});
   /* v2.46.021: пара авто-длины тоже ссылается на uid — перевешиваем и её */
