@@ -57,3 +57,22 @@ test('команда и спецификация называют изготов
   assert.match(html, /Комплект прокладок EPDM 3 мм/);
   assert.match(html, /Болт М6×35, 2 шайбы, гайка самоконтрящаяся/);
 });
+
+/* Проект грузится по одной детали, и бак приезжает раньше корпуса. refresh()
+   внутри addItem не находил корпус, рвал связь бака — и вместе со связью
+   пропадало крепление на стойках: после F5 бак снова лежал на дне. */
+test('крепление бака переживает перезагрузку проекта', () => {
+  const reseat = html.slice(html.indexOf('function reseatLink(it){'),
+                            html.indexOf('function linkSel('));
+  assert.match(reseat, /if\(!fr\)\{if\(!_loading\)it\.link=null;return;\}/,
+    'пока проект грузится, связь бака не рвём');
+  const face = html.slice(html.indexOf('function faceMate(it){'),
+                          html.indexOf('function faceMate(it){') + 260);
+  assert.match(face, /if\(!fr\)\{if\(!_loading\)it\.link=null;return false;\}/,
+    'та же ловушка у приборов на лицевой панели');
+
+  const load = html.slice(html.indexOf('async function loadProjectData(data){'),
+                          html.indexOf('async function openProject(id){'));
+  assert.match(load, /sh:p\.link\.sh/,
+    'при переносе uid-ов крепление бака (link.sh) не теряется');
+});
