@@ -27,6 +27,21 @@ test('один интерфейс выбирает разные API и разн�
   assert.match(app, /_devChatPost\(API_BASE \+ _devChatApi\('\/send'\)/);
 });
 
+test('чат можно не только спрятать в архив, но и удалить', () => {
+  const menu = app.slice(app.indexOf('function devChatThreadMenu'),
+    app.indexOf('async function _devChatPatchThread'));
+  assert.match(menu, /devChatArchiveThread/);
+  assert.match(menu, /devChatDeleteThread/);
+  const del = app.slice(app.indexOf('async function devChatDeleteThread'),
+    app.indexOf('// ---- поиск по всем чатам ----'));
+  // удаление идёт DELETE-запросом по адресу текущего агента и подтверждается
+  assert.match(del, /confirm\(/);
+  assert.match(del, /навсегда/);
+  assert.match(del, /apiDelete\(_devChatApi\('\/threads\/' \+ id\)\)/);
+  // отказ сервера (нет прав, идёт задача) показываем его словами
+  assert.match(del, /showToast\(\(e && e\.message\)/);
+});
+
 test('плавающая шторка и чат чиллера остаются у Клавы', () => {
   const drawer = app.slice(app.indexOf('function devChatToggleDrawer()'),
     app.indexOf('// ---- чат по чиллерам'));
