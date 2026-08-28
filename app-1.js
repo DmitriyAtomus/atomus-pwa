@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.105";
+const APP_VERSION = "v2.46.106";
 const APP_VERSION_DATE = "28.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4386,7 +4386,11 @@ function devChatThreadMenu(id, btn) {
         '<i class="ti ti-folder-off"></i>Убрать из проекта</button>' : '') : '') +
     '<div class="sep"></div>' +
     '<button class="danger" onclick="devChatArchiveThread(' + id + ')">' +
-      '<i class="ti ti-archive"></i>В архив</button>';
+      '<i class="ti ti-archive"></i>В архив</button>' +
+    // архив только прячет чат, а пустые и случайные чаты копятся в списке —
+    // их нужно убирать совсем
+    '<button class="danger" onclick="devChatDeleteThread(' + id + ')">' +
+      '<i class="ti ti-trash"></i>Удалить</button>';
   document.body.appendChild(menu);
   const r = btn.getBoundingClientRect();
   menu.style.top = Math.min(r.bottom + 4, window.innerHeight - menu.offsetHeight - 8) + 'px';
@@ -4432,6 +4436,34 @@ async function devChatArchiveThread(id) {
   if (!confirm('Убрать чат в архив? Переписка сохранится.')) return;
   if (!await _devChatPatchThread(id, { archived: true })) return;
   if (id === _devChatThreadId && _devChatThreads.length) devChatOpenThread(_devChatThreads[0].id);
+}
+
+// Удаление — навсегда и для всех: чат сайта общий, поэтому и предупреждение
+// жёстче архива, и сервер пустит сюда только директора.
+async function devChatDeleteThread(id) {
+  const t = _devChatThread(id);
+  const name = (t && t.title || '').trim() || 'Без названия';
+  const count = t && t.msg_count ? Number(t.msg_count) : 0;
+  if (!confirm('Удалить чат «' + name + '»' +
+      (count ? ' вместе с перепиской (' + count + ' ' +
+        plural(count, 'сообщение', 'сообщения', 'сообщений') + ')' : '') +
+      '? Это навсегда и для всех.')) return;
+  let res;
+  try {
+    res = await apiDelete(_devChatApi('/threads/' + id));
+  } catch (e) {
+    // сервер объясняет отказ своими словами: чужой чат, нет прав, идёт задача
+    showToast((e && e.message) || 'Не удалось удалить чат', 'error');
+    return;
+  }
+  showToast('Чат удалён', 'success');
+  if (id === _devChatThreadId) {
+    const next = res && res.default_thread_id;
+    _devChatThreadId = 0;
+    if (next) devChatOpenThread(next);
+  }
+  await devChatLoadThreads(false);
+  _devChatRenderTitle();
 }
 
 // ---- поиск по всем чатам ----
