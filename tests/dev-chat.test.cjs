@@ -22,12 +22,14 @@ test('раздел «Клава» и шторка есть в разметке',
   assert.match(html, /id="devchat-drawer-feed"/, 'нет ленты шторки');
 });
 
-test('пункт меню и кнопка показываются всем сотрудникам', () => {
+test('личная Клава показывается директору, общий сайт — всем', () => {
   const start = app.indexOf("const navDev = document.getElementById('sb-devchat')");
   assert.ok(start > 0, 'не найден показ пункта меню');
-  const block = app.slice(start - 200, start + 400);
-  assert.match(block, /navDev\.style\.display = ''/);
+  const block = app.slice(start - 300, start + 500);
+  assert.match(block, /navSite\.style\.display = ''/);
+  assert.match(block, /navDev\.style\.display = isDirector \? '' : 'none'/);
   assert.match(block, /devchat-fab/);
+  assert.match(html, /id="sb-sitechat"/);
 });
 
 test('экран подключён к навигации и не гасит открытую шторку', () => {

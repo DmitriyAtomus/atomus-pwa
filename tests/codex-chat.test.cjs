@@ -12,14 +12,14 @@ test('Кодя добавлен отдельным пунктом и не зам
   assert.match(html, /id="sb-codex"[^>]*data-nav="codex"[^>]*onclick="selectSidebarItem\('codex'\)"/);
   assert.match(html, /id="sb-codex"[\s\S]{0,180}<span>Кодя<\/span>/);
   assert.match(app, /const navCodex = document\.getElementById\('sb-codex'\)/);
-  assert.match(app, /_devChatAgent === 'codex' \? 'Кодя' : 'Клава'/);
-  assert.match(app, /_devChatAgent === 'codex' \? 'Ко' : 'К'/);
+  assert.match(app, /if \(_devChatAgent === 'codex'\) return 'Кодя'/);
+  assert.match(app, /_devChatAgent === 'codex' \? 'Ко'/);
 });
 
 test('один интерфейс выбирает разные API и разную сохранённую беседу', () => {
   assert.match(app, /'codex':\s+'devchat'/);
   assert.match(app, /_devChatAgent === 'codex' \? '\/api\/codex-chat'/);
-  assert.match(app, /_devChatEmployeeMode\(\) \? '\/api\/employee-chat' : '\/api\/dev-chat'/);
+  assert.match(app, /_devChatEmployeeMode\(\) \? '\/api\/site-chat' : '\/api\/dev-chat'/);
   assert.match(app, /const CODEXCHAT_THREAD_KEY = 'atomus_codexchat_thread'/);
   assert.match(app, /screenName === 'devchat'\) _devChatUseAgent\('claude'\)/);
   assert.match(app, /screenName === 'codex'[\s\S]{0,100}_devChatUseAgent\('codex'\)/);

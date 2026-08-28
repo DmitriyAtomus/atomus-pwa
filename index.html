@@ -269,7 +269,12 @@
           <i class="ti ti-bulb"></i><span>Идеи</span>
           <span class="nav-badge" id="ideas-badge" style="display:none;"></span>
         </button>
-        <!-- Чат с Клавой: задачи уходят агенту на сервер .30. Личный, показ в app-1.js. -->
+        <!-- Общая работа над сайтом: одна история для директора и сотрудников. -->
+        <button class="nav-item" id="sb-sitechat" data-nav="sitechat" onclick="selectSidebarItem('sitechat')" style="display:none;">
+          <i class="ti ti-world-code"></i><span>Сайт</span>
+          <span class="nav-badge" id="sitechat-badge" style="display:none;"></span>
+        </button>
+        <!-- Чат с Клавой разработки: личный канал директора. -->
         <button class="nav-item" id="sb-devchat" data-nav="devchat" onclick="selectSidebarItem('devchat')" style="display:none;">
           <i class="ti ti-message-code"></i><span>Клава</span>
           <span class="nav-badge" id="devchat-badge" style="display:none;"></span>
@@ -965,7 +970,7 @@
               <div class="dchat-title-row">
                 <h1 id="devchat-title">Клава</h1>
                 <span class="dchat-mode-badge" id="devchat-mode-badge" style="display:none;">
-                  <i class="ti ti-world-code"></i>Сайт: полный доступ
+                  <i class="ti ti-world-code"></i>Общий чат сайта
                 </span>
               </div>
               <!-- v2.45.955: тап по статусу открывает терминал «работа вживую» -->

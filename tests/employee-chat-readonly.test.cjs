@@ -8,23 +8,31 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'app-1.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
 
-test('сотрудник использует отдельный API, а директор сохраняет канал разработки', () => {
+test('общий сайт использует отдельный API, а директор сохраняет личный канал разработки', () => {
   assert.match(app, /function _devChatEmployeeMode\(\)/);
-  assert.match(app, /roles\.indexOf\('director'\) < 0/);
-  assert.match(app, /_devChatEmployeeMode\(\) \? '\/api\/employee-chat' : '\/api\/dev-chat'/);
+  assert.match(app, /return _devChatAgent === 'site'/);
+  assert.match(app, /_devChatEmployeeMode\(\) \? '\/api\/site-chat' : '\/api\/dev-chat'/);
   assert.match(app, /_devChatAgent === 'codex' \? '\/api\/codex-chat'/);
+  assert.match(html, /id="sb-sitechat"[^>]*data-nav="sitechat"/);
+  assert.match(html, /id="sb-sitechat"[\s\S]{0,180}<span>Сайт<\/span>/);
+  assert.match(app, /const SITECHAT_THREAD_KEY = 'atomus_sitechat_thread'/);
+  assert.match(app, /return _devChatAgent \+ ':' \+ Number/);
 });
 
-test('интерфейс разделяет полный доступ к сайту и read-only CRM', () => {
-  assert.match(html, /id="devchat-mode-badge"[^>]*>[\s\S]{0,100}Сайт: полный доступ/);
+test('интерфейс показывает общую переписку и read-only CRM', () => {
+  assert.match(html, /id="devchat-mode-badge"[^>]*>[\s\S]{0,100}Общий чат сайта/);
   assert.match(app, /classList\.toggle\('dchat-employee-readonly', employee\)/);
+  assert.match(app, /общая переписка/);
+  assert.match(app, /имена авторов/);
+  assert.match(app, /dchat-author/);
+  assert.match(css, /\.dchat-author \{/);
   assert.match(css, /\.dchat-mode-badge \{/);
   assert.match(css, /dchat-employee-readonly[\s\S]{0,100}\.dchat-eye/);
 });
 
-test('сотрудническая Клава обещает правки только отдельного сайта', () => {
-  assert.match(app, /ведёт отдельный сайт/);
-  assert.match(app, /CRM для сотрудника остаётся только источником разрешённых данных без права записи/);
+test('Клава сайта обещает правки только общего сайта', () => {
+  assert.match(app, /Это общая переписка по сайту/);
+  assert.match(app, /CRM остаётся только источником разрешённых данных без права записи/);
   assert.match(app, /сайт создаёт, меняет и публикует полностью/);
   assert.match(app, /локальный Codex/);
 });

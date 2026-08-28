@@ -45,7 +45,7 @@ test('смена чата обнуляет курсор ленты', () => {
                          app.indexOf('async function devChatNewThread'));
   assert.match(open, /_devChatSince = 0/, 'иначе в новом чате не будет истории');
   assert.match(open, /_devChatPending = new Set\(\)/);
-  assert.match(open, /localStorage\.setItem\(DEVCHAT_THREAD_KEY/);
+  assert.match(open, /localStorage\.setItem\(_devChatStorageKey\(\)/);
 });
 
 test('список чатов обновляется сам и гасится вместе с разделом', () => {
