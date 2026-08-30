@@ -26194,3 +26194,45 @@ body.dchat-ag.dchat-employee-readonly .dchat-file-quick {
   }
   body.dchat-ag.dchat-employee-readonly .dchat-attach-label { display: none; }
 }
+
+/* ============ v2.46.109: голосовой диалог с Клавой ============ */
+.dchat-voice-toggle {
+  min-width: 34px; height: 34px; padding: 0 10px; border: 0; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none;
+  color: #fff; background: rgba(255,255,255,.14); cursor: pointer;
+  font-size: 13px; font-weight: 650; transition: background .15s ease, color .15s ease;
+}
+.dchat-voice-toggle i { font-size: 17px; }
+.dchat-voice-toggle:hover { background: rgba(255,255,255,.26); }
+.dchat-voice-toggle.is-on {
+  color: #164e30; background: #dcfce7; box-shadow: inset 0 0 0 1px #86efac;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-voice-toggle {
+  height: 42px; min-width: 42px; padding: 0 12px; border: 1px solid transparent;
+  border-radius: 13px; color: #4b4b4b; background: transparent; box-shadow: none;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-voice-toggle:hover {
+  color: var(--dchat-ink); background: var(--dchat-soft); border-color: #ececec;
+}
+body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-voice-toggle.is-on {
+  color: #166534; background: #ecfdf3; border-color: #bbebca;
+}
+.dchat-drawer-head .dchat-voice-toggle {
+  width: 32px; min-width: 32px; height: 32px; padding: 0; margin-left: auto;
+}
+.dchat-drawer-head .dchat-voice-toggle + .icon-btn { margin-left: 0 !important; }
+.dchat-act.is-speaking { opacity: 1; color: #166534; background: #dcfce7; }
+.dchat-act.is-speaking i { animation: dchatPulse 1s ease-in-out infinite; }
+body.dchat-voice-mode .dchat-mic {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 4px 14px rgba(22,163,74,.3);
+}
+body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-in-out infinite; }
+
+@media (max-width: 760px) {
+  .dchat-hd-right { gap: 6px; }
+  .dchat-voice-toggle span { display: none; }
+  body.dchat-ag [data-screen="devchat"] .dchat-topbar .dchat-voice-toggle {
+    width: 38px; min-width: 38px; height: 38px; padding: 0;
+  }
+}

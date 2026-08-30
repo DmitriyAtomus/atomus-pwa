@@ -43,8 +43,8 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.108";
-const APP_VERSION_DATE = "28.08.2026";
+const APP_VERSION = "v2.46.109";
+const APP_VERSION_DATE = "30.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -2403,6 +2403,23 @@ function _devChatStatus(status) {
   return st;
 }
 
+function _devChatVoiceLaunchText(text) {
+  return /^\s*(?:(?:вс[её]|хорошо|ладно|согласовано)\s*[,—-]?\s*)?(?:(?:давай|можешь)\s+)?(?:запускай|запусти|выполняй|выполни|приступай|приступи|начинай|начни|делай)(?:\s+(?:это|задачу|работу|правки|к\s+работе))?[\s.!?]*$/i.test(String(text || ''));
+}
+
+function _devChatMessageStatus(msg) {
+  const context = msg && msg.context || {};
+  const voiceTalk = context.voice_discussion ||
+    (context.voice_dialogue && !_devChatVoiceLaunchText(msg && msg.text));
+  if (voiceTalk && msg.status === 'new') {
+    return { text: 'Клава слушает…', cls: 'text-muted' };
+  }
+  if (voiceTalk && msg.status === 'talking') {
+    return { text: 'Клава отвечает…', cls: 'text-warning' };
+  }
+  return _devChatStatus(msg && msg.status);
+}
+
 // Задача ещё в работе, пока не done/error: за такими сообщениями нужно следить
 // (uploading — файлы ещё летят в хранилище, агент их пока не видит).
 // stopping — «Стоп» нажат, но агент ещё не подтвердил: следить надо до конца.
@@ -2667,7 +2684,7 @@ function _devChatRender(msg) {
     wrap.appendChild(ava);
   }
 
-  const st = mine && msg.status ? _devChatStatus(msg.status) : null;
+  const st = mine && msg.status ? _devChatMessageStatus(msg) : null;
   const bubble = document.createElement('div');
   bubble.className = 'dchat-bubble';
   const authorName = mine && _devChatEmployeeMode()
@@ -2682,7 +2699,9 @@ function _devChatRender(msg) {
     (msg.meta && msg.meta.wall_sec ? '<span>· ' + Math.round(msg.meta.wall_sec) + 'с</span>' : '') +
     (st ? '<span class="dchat-chip is-' + msg.status + '" data-status>' + escapeHtml(st.text) + '</span>' : '') +
     // v2.45.957: ответ Клавы часто нужно перенести в задачу/письмо — копируем одним тапом
-    (mine ? '' : '<button class="dchat-act" type="button" onclick="devChatCopyMsg(this)" ' +
+    (mine ? '' : '<button class="dchat-act dchat-speak" type="button" onclick="devChatSpeakMsg(this)" ' +
+      'title="Озвучить ответ"><i class="ti ti-volume"></i></button>' +
+    '<button class="dchat-act" type="button" onclick="devChatCopyMsg(this)" ' +
       'title="Скопировать ответ"><i class="ti ti-copy"></i></button>') +
     '</div>';
 
@@ -3132,6 +3151,7 @@ async function _devChatTickInner(feed) {
       if (first) row.classList.add('no-anim');
       feed.appendChild(row);
       _devChatGroupRow(row);
+      if (!first) _devChatVoiceMaybeSpeak(m, row);
       added++;
     }
     _devChatIdeaTaskChip(m);
@@ -3191,7 +3211,7 @@ async function _devChatRefreshStatuses() {
   ((data && data.messages) || []).forEach(function (m) {
     if (!_devChatPending.has(m.id)) return;
     const span = document.querySelector('[data-msg-id="' + m.id + '"] [data-status]');
-    const st = _devChatStatus(m.status);
+    const st = _devChatMessageStatus(m);
     if (span && st) {
       span.textContent = st.text;
       span.className = 'dchat-chip is-' + m.status;
@@ -3457,7 +3477,154 @@ function devChatAttachPick(kind) {
   if (el) { el.value = ''; el.click(); }
 }
 
-// ---- v2.45.961: задача голосом ----
+// ---- v2.46.109: голосовой диалог с Клавой ----
+// В обычном режиме микрофон по-прежнему только вставляет распознанный текст.
+// В голосовом — отправляет реплику сразу, Клава отвечает голосом, а правки
+// начнутся только после отдельной команды «давай запускай» (это проверяет API).
+const DCVOICE_MODE_KEY = 'atomus_devchat_voice_dialogue';
+let _dcVoiceMode = false;
+try { _dcVoiceMode = localStorage.getItem(DCVOICE_MODE_KEY) === '1'; } catch (e) {}
+let _dcSpeechAudio = null;
+let _dcSpeechUrl = '';
+let _dcSpeechButton = null;
+let _dcSpeechSeq = 0;
+
+function _devChatVoiceModeApply() {
+  document.body.classList.toggle('dchat-voice-mode', _dcVoiceMode);
+  document.querySelectorAll('[data-dchat-voice-toggle]').forEach(function (btn) {
+    btn.classList.toggle('is-on', _dcVoiceMode);
+    btn.setAttribute('aria-pressed', _dcVoiceMode ? 'true' : 'false');
+    btn.title = _dcVoiceMode ? 'Выключить голосовой диалог' : 'Голосовой диалог с Клавой';
+  });
+  ['devchat-mic', 'devchat-drawer-mic'].forEach(function (id) {
+    const mic = document.getElementById(id);
+    if (mic) mic.title = _dcVoiceMode
+      ? 'Нажмите, скажите реплику и нажмите ещё раз'
+      : 'Удерживайте — говорите — отпустите';
+  });
+}
+
+function devChatVoiceModeToggle() {
+  _dcVoiceMode = !_dcVoiceMode;
+  try { localStorage.setItem(DCVOICE_MODE_KEY, _dcVoiceMode ? '1' : '0'); } catch (e) {}
+  _devChatVoiceModeApply();
+  if (!_dcVoiceMode) _devChatSpeechStop();
+  else {
+    // Разблокируем звук этим пользовательским нажатием — важно для iPhone/PWA.
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      try {
+        window._dcVoiceAudioContext = window._dcVoiceAudioContext || new AudioCtx();
+        window._dcVoiceAudioContext.resume();
+      } catch (e) {}
+    }
+  }
+  showToast(_dcVoiceMode
+    ? 'Голос включён: обсуждаем, а после «давай запускай» — выполняю'
+    : 'Голосовой режим выключен', 'success');
+}
+
+function _devChatSpeechDone() {
+  if (_dcSpeechAudio) {
+    _dcSpeechAudio.onended = null;
+    _dcSpeechAudio.onerror = null;
+    _dcSpeechAudio = null;
+  }
+  if (_dcSpeechUrl) { try { URL.revokeObjectURL(_dcSpeechUrl); } catch (e) {} }
+  _dcSpeechUrl = '';
+  if (_dcSpeechButton) _dcSpeechButton.classList.remove('is-speaking');
+  _dcSpeechButton = null;
+  document.body.classList.remove('dchat-speaking');
+}
+
+function _devChatSpeechStop() {
+  _dcSpeechSeq++;
+  if (_dcSpeechAudio) {
+    try { _dcSpeechAudio.pause(); _dcSpeechAudio.currentTime = 0; } catch (e) {}
+  }
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  _devChatSpeechDone();
+}
+
+function _devChatBrowserSpeak(text, btn) {
+  if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return false;
+  const seq = _dcSpeechSeq;
+  const utter = new SpeechSynthesisUtterance(String(text || ''));
+  utter.lang = 'ru-RU';
+  utter.rate = 1;
+  utter.pitch = 1.05;
+  const voices = window.speechSynthesis.getVoices() || [];
+  utter.voice = voices.find(function (v) { return /^ru/i.test(v.lang || ''); }) || null;
+  const done = function () { if (seq === _dcSpeechSeq) _devChatSpeechDone(); };
+  utter.onend = done;
+  utter.onerror = done;
+  _dcSpeechButton = btn || null;
+  if (_dcSpeechButton) _dcSpeechButton.classList.add('is-speaking');
+  document.body.classList.add('dchat-speaking');
+  window.speechSynthesis.speak(utter);
+  return true;
+}
+
+async function _devChatSpeak(text, btn, quiet) {
+  text = String(text || '').trim();
+  if (!text) return;
+  if (_dcSpeechButton === btn && document.body.classList.contains('dchat-speaking')) {
+    _devChatSpeechStop();
+    return;
+  }
+  _devChatSpeechStop();
+  const seq = ++_dcSpeechSeq;
+  _dcSpeechButton = btn || null;
+  if (_dcSpeechButton) _dcSpeechButton.classList.add('is-speaking');
+  document.body.classList.add('dchat-speaking');
+  try {
+    const r = await fetch(API_BASE + _devChatApi('/speech'), {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: text }),
+    });
+    if (!r.ok) {
+      const data = await r.json().catch(function () { return {}; });
+      throw new Error(data.message || 'Не смогла включить голос');
+    }
+    const blob = await r.blob();
+    if (seq !== _dcSpeechSeq) return;
+    _dcSpeechUrl = URL.createObjectURL(blob);
+    _dcSpeechAudio = new Audio(_dcSpeechUrl);
+    _dcSpeechAudio.onended = function () {
+      if (seq === _dcSpeechSeq) _devChatSpeechDone();
+    };
+    _dcSpeechAudio.onerror = function () {
+      if (seq !== _dcSpeechSeq) return;
+      _devChatSpeechDone();
+      if (!_devChatBrowserSpeak(text, btn) && !quiet) showToast('Не удалось включить звук', 'error');
+    };
+    await _dcSpeechAudio.play();
+  } catch (err) {
+    if (seq !== _dcSpeechSeq) return;
+    _devChatSpeechDone();
+    if (!_devChatBrowserSpeak(text, btn) && !quiet) {
+      showToast(String(err && err.message || 'Не смогла включить голос'), 'error');
+    }
+  }
+}
+
+function devChatSpeakMsg(btn) {
+  const text = btn && btn.closest('.dchat-bubble') &&
+    btn.closest('.dchat-bubble').querySelector('.dchat-text');
+  if (text) _devChatSpeak(text.innerText || text.textContent || '', btn, false);
+}
+
+function _devChatVoiceMaybeSpeak(msg, row) {
+  if (!_dcVoiceMode || !msg || msg.author === 'user' || !msg.text) return;
+  const btn = row && row.querySelector('.dchat-speak');
+  _devChatSpeak(msg.text, btn, true);
+}
+
+// ---- v2.45.961: запись и распознавание речи ----
 // В цеху набирать текст неудобно, а распознавание речи в браузере на Android
 // то есть, то нет. Поэтому пишем звук сами (MediaRecorder) и отправляем на
 // расшифровку в CRM — тем же Whisper, что разбирает голосовые в MAX. Текст
@@ -3469,6 +3636,8 @@ let _dcVoiceCancel = false;    // смахнули вниз или отпуст�
 let _dcVoiceLocked = false;    // короткий тап = «пишу, пока не нажмёшь ещё раз»
 let _dcVoiceStartedAt = 0;
 let _dcVoiceDownY = 0;
+let _dcVoicePointerHeld = false;
+let _dcVoiceStarting = false;
 
 const DCVOICE_MIN_MS = 400;    // случайный тык по кнопке — не запись
 
@@ -3488,12 +3657,23 @@ function _dcVoiceUi(on, title, hint) {
   box.classList.toggle('is-locked', !!_dcVoiceLocked);
   const t = document.getElementById('devchat-voice-title');
   const h = document.getElementById('devchat-voice-hint');
+  const x = document.getElementById('devchat-voice-txt');
   if (t && title) t.textContent = title;
   if (h && hint) h.textContent = hint;
+  if (x) x.textContent = _dcVoiceMode
+    ? 'Говорите с Клавой — реплика отправится сама'
+    : 'Говорите — расшифрую и вставлю в поле';
 }
 
 async function devChatVoiceStart(e) {
   if (e && e.preventDefault) e.preventDefault();
+  _dcVoicePointerHeld = true;
+  _devChatSpeechStop();                 // Дмитрий заговорил — Клава замолкает
+  if (_dcVoiceStarting) {
+    _dcVoicePointerHeld = false;
+    _dcVoiceCancel = true;
+    return;
+  }
   if (_dcVoiceRec) {                       // повторный тап в режиме «замок» — конец записи
     if (_dcVoiceLocked) devChatVoiceEnd();
     return;
@@ -3505,12 +3685,16 @@ async function devChatVoiceStart(e) {
   _dcVoiceCancel = false;
   _dcVoiceLocked = false;
   _dcVoiceDownY = (e && (e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY))) || 0;
+  _dcVoiceStarting = true;
   try {
     _dcVoiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (err) {
     showToast('Нет доступа к микрофону', 'error');
     return;
+  } finally {
+    _dcVoiceStarting = false;
   }
+  if (_dcVoiceCancel) { _dcVoiceRelease(); _dcVoiceUi(false); return; }
   const mime = _dcVoiceMime();
   try {
     _dcVoiceRec = new MediaRecorder(_dcVoiceStream, mime ? { mimeType: mime } : undefined);
@@ -3524,7 +3708,12 @@ async function devChatVoiceStart(e) {
   _dcVoiceRec.onstop = _dcVoiceFinish;
   _dcVoiceRec.start();
   _dcVoiceStartedAt = Date.now();
-  _dcVoiceUi(true, 'Слушаю…', 'Отпустите — текст попадёт в поле. Смахните вниз — отмена.');
+  // На первом запуске запрос доступа к микрофону может пережить pointerup.
+  // Тогда считаем жест коротким тапом и продолжаем запись до второго нажатия.
+  if (!_dcVoicePointerHeld) _dcVoiceLocked = true;
+  _dcVoiceUi(true, 'Слушаю…', _dcVoiceMode
+    ? 'Скажите реплику и нажмите микрофон ещё раз. Смахните вниз — отмена.'
+    : 'Отпустите — текст попадёт в поле. Смахните вниз — отмена.');
 }
 
 // Палец пополз вниз — как в мессенджерах, это отмена.
@@ -3547,6 +3736,7 @@ function devChatVoiceMove(e) {
 // (руки заняты — говори сколько нужно), длинное — заканчивает запись.
 function devChatVoiceUp(e) {
   if (e && e.preventDefault) e.preventDefault();
+  _dcVoicePointerHeld = false;
   if (!_dcVoiceRec || _dcVoiceLocked) return;
   if (Date.now() - _dcVoiceStartedAt < DCVOICE_MIN_MS && !_dcVoiceCancel) {
     _dcVoiceLocked = true;
@@ -3562,8 +3752,9 @@ function devChatVoiceEnd() {
 }
 
 function devChatVoiceCancel() {
-  if (!_dcVoiceRec) { _dcVoiceUi(false); return; }
+  _dcVoicePointerHeld = false;
   _dcVoiceCancel = true;
+  if (!_dcVoiceRec) { _dcVoiceUi(false); return; }
   devChatVoiceEnd();
 }
 
@@ -3614,7 +3805,11 @@ async function _dcVoiceFinish() {
   if (!input) return;
   input.value = (input.value ? input.value.replace(/\s*$/, ' ') : '') + text;
   devChatGrow(input);
-  input.focus();
+  if (_dcVoiceMode) {
+    await devChatSend({ screen: state.currentScreen || 'devchat', voice_dialogue: true });
+  } else {
+    input.focus();
+  }
 }
 
 // Кнопка микрофона есть и на экране, и в шторке — вешаем обработчики на обе.
@@ -4631,6 +4826,7 @@ function loadDevChat(host) {
   _devChatBindPaste();
   _devChatBindDrop();
   _devChatBindVoice();
+  _devChatVoiceModeApply();
   // Сначала список чатов: тик без выбранного чата тянул бы чужую переписку.
   // v2.45.976: черновик подставляем ПОСЛЕ того, как известен чат — иначе поле
   // пришлось бы наполнять наугад, а пустое затёрло бы недописанное.

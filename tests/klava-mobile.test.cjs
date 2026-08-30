@@ -86,7 +86,7 @@ test('«Повторить» возвращает задачу в поле, а �
     'повтор не должен уходить на сервер сам — формулировку почти всегда правят');
 });
 
-test('голос: запись в поле ввода, отправка остаётся ручной', () => {
+test('голос: обычная диктовка остаётся в поле, голосовой режим отправляет сам', () => {
   assert.match(html, /id="devchat-mic"/);
   assert.match(html, /id="devchat-voice"/);
   assert.match(html, /id="devchat-voice-mic"/);
@@ -94,10 +94,12 @@ test('голос: запись в поле ввода, отправка оста
   assert.match(fn.slice(0, 1800), /getUserMedia\(\{ audio: true \}\)/);
   assert.match(fn.slice(0, 1800), /new MediaRecorder/);
   const fin = app.slice(app.indexOf('async function _dcVoiceFinish'));
-  assert.match(fin.slice(0, 1800), /_devChatApi\('\/voice'\)/);
-  assert.match(fin.slice(0, 1800), /input\.value = /);
-  assert.doesNotMatch(fin.slice(0, 1800), /devChatSend\(/,
-    'расшифровку человек должен успеть поправить до отправки');
+  assert.match(fin.slice(0, 2600), /_devChatApi\('\/voice'\)/);
+  assert.match(fin.slice(0, 2600), /input\.value = /);
+  assert.match(fin.slice(0, 2600), /if \(_dcVoiceMode\)[\s\S]*devChatSend\(\{ screen:[\s\S]*voice_dialogue: true/,
+    'в голосовом диалоге расшифрованная реплика должна уйти сама');
+  assert.match(fin.slice(0, 2600), /else \{[\s\S]*input\.focus\(\)/,
+    'обычная диктовка должна остаться в поле для правки');
   // микрофонный поток обязательно отпускаем — иначе на телефоне горит индикатор
   assert.match(app, /function _dcVoiceRelease[\s\S]{0,300}getTracks\(\)\.forEach/);
 });

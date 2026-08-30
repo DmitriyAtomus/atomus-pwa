@@ -982,6 +982,11 @@
             </div>
           </div>
           <div class="dchat-hd-right">
+            <button class="dchat-voice-toggle" data-dchat-voice-toggle
+                    onclick="devChatVoiceModeToggle()" aria-pressed="false"
+                    title="Голосовой диалог с Клавой">
+              <i class="ti ti-headphones"></i><span>Голос</span>
+            </button>
             <button class="dchat-eye" onclick="devChatTermOpen()" title="Смотреть работу вживую">
               <i class="ti ti-eye"></i>
             </button>
@@ -9085,6 +9090,11 @@ function _ccReset() {
     <i class="ti ti-message-code" style="font-size:19px;"></i>
     <b>Клава</b>
     <span id="devchat-drawer-context" class="ctx"></span>
+    <button class="icon-btn dchat-voice-toggle" data-dchat-voice-toggle
+            onclick="devChatVoiceModeToggle()" aria-pressed="false"
+            title="Голосовой диалог с Клавой">
+      <i class="ti ti-headphones"></i>
+    </button>
     <button class="icon-btn" style="margin-left:auto;" onclick="devChatToggleDrawer()" title="Закрыть">
       <i class="ti ti-x"></i>
     </button>
