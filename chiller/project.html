@@ -2925,9 +2925,9 @@ function panTop(fr){
   }
   return {z:bb.max.z,box:bb,part:PT[idx]};
 }
-/* Верх крышки корпуса (деталь 00.000.003 «Крышка»). В нашей версии
-   конденсатор не ставится внутрь, а надевается сверху — на крышку, по её
-   монтажному проёму. Крышки в модели нет — берём верх корпуса. */
+/* Верх крышки корпуса (деталь 00.000.003 «Крышка»). Конденсатор висит под
+   листом, а его круглая обечайка входит снизу в монтажный проём. Крышки в
+   модели нет — берём верх корпуса. */
 function capTop(fr,wantHole){
   const geo=fr.obj.geometry,PT=geo.userData.parts;
   const idx=PT?PT.findIndex(x=>/крышк/i.test(x.name)||/00\.000\.003/.test(x.des)):-1;
@@ -3063,6 +3063,19 @@ function holesHide(){
    крышки: держат его четыре болта М6 (v2.46.073, уголки сняты).
    Вентилятор сидит в крышке и тянет воздух через конденсатор снизу вверх. */
 const CAP_T=1;               // крышка — лист 1 мм, снизу к нему прижат аппарат
+/* У моделей Belief BS-ACV плоская панель находится на 10 мм ниже наружной
+   кромки круглой обечайки (gen_belief.py: rim_h 14 мм, лист выступает на 4 мм).
+   К листу крыши прижимаем именно панель: обечайка проходит через Ø490 и после
+   листа 1 мм остаётся снаружи на 9 мм. У прочих конденсаторов уступ не
+   выдумываем — их посадка остаётся по верхнему габариту. */
+const COND_NECK_PROJ=10;
+function condNeckProjection(it){
+  const d=it&&it.d||{},tag=[d.id,d.name,d.title].filter(Boolean).join(' ');
+  return /Belief|BS-ACV/i.test(tag)?COND_NECK_PROJ:0;
+}
+function condSeatDz(it,st,b){
+  return Math.round(st.z-CAP_T+condNeckProjection(it)-b.max.z);
+}
 /* Круглый проём в верхней плоскости детали: сетка лучей сверху вниз, глубже
    листа не смотрим. Из пустых клеток собираем связные пятна, выкидываем те,
    что выходят на кромку сетки (это край листа, а не проём), и берём самое
@@ -3154,7 +3167,7 @@ function seatCond(it,fr,g){
   const hw=ax?it.obj.localToWorld(ax.clone()):c;
   const tx=g?g.cx:zone.getCenter(new THREE.Vector3()).x,
         ty=g?g.cy:zone.getCenter(new THREE.Vector3()).y;
-  const dz=Math.round(st.z-CAP_T-b.max.z);
+  const neck=condNeckProjection(it),dz=condSeatDz(it,st,b);
   /* строго соосно проёму: вентилятор из крышки уходит в диффузор аппарата,
      и сдвигать аппарат вбок нельзя. Не влезает в корпус — про это скажет
      проверка упора, это вопрос подбора аппарата, а не места. */
@@ -3165,6 +3178,8 @@ function seatCond(it,fr,g){
   pinMark(it);
   const msg=['Конденсатор под крышкой, панелью вверх, отм. низа '+
     Math.round(b.min.z+dz)+' мм, 4 болта М6'];
+  if(neck)msg.push('обечайка заведена в проём, выступ над крышей '+
+    Math.max(0,neck-CAP_T)+' мм');
   if(!lay)msg.push('проём вентилятора у аппарата не нашёлся — проверь крен');
   if(!g)msg.push('в крышке нет проёма обдува — поставлен по центру полости');
   else msg.push('соосно проёму Ø'+Math.round(g.dia));
@@ -3416,12 +3431,12 @@ function reseatLink(it){
   /* v2.46.015: конденсатор висит под крышкой — равняем его по верху,
      а не по низу; v2.46.073: без уголков он прижат прямо к листу крышки */
   if(it.link.under){
-    moveItem(it,0,0,Math.round(st.z-CAP_T-b.max.z));return;}
+    moveItem(it,0,0,condSeatDz(it,st,b));return;}
   moveItem(it,0,0,Math.round(st.z-b.min.z));
 }
 /* Посадить выделенную деталь на корпус и запомнить крепление.
-   face='pan' — внутрь, на дно; face='cap' — сверху, на крышку (так у нас
-   надевается конденсатор: низом на крышку, по центру монтажного проёма). */
+   face='pan' — внутрь, на дно; face='cap' — к крышке. Конденсатор обрабатывает
+   seatCond отдельно: панелью снизу, обечайкой внутрь монтажного проёма. */
 function linkSel(mount,face){
   if(!sel)return;
   if(mount==='off'){
@@ -8832,13 +8847,22 @@ async function loadProjectData(data){
     if(!sh||sh.v>=5)return;
     if(tankShelfPut(p,{quiet:true}))tankMountMoved=true;
   });
+  /* v2.46.113: раньше по низу крыши выравнивался верх обечайки Belief, из-за
+     чего она не заходила в Ø490. Пересаживаем уже сохранённые конденсаторы по
+     плоскости панели; их обечайка поднимается через лист на штатные 9 мм. */
+  let condSeatMoved=false;
+  placed.forEach(p=>{
+    if(roleOf(p.d)!=='cond'||!p.link||!p.link.under||!condNeckProjection(p))return;
+    const z=p.obj.position.z;reseatLink(p);
+    if(Math.abs(p.obj.position.z-z)>.01)condSeatMoved=true;
+  });
   rotReseat();                      // связи починены — вентили садятся на свои штуцеры
   placed.forEach(p=>{if(p.link&&p.link.mount==='face')faceMate(p);});
   const schemaMoved=placed.some(p=>p._pvShift);
   _loading=false;
   histReset();                      // v2.45.996: у каждого проекта своя история
   select(null);refresh();renderSchema();
-  if(schemaMoved||tankMountMoved)save(); // закрепляем миграции в CRM
+  if(schemaMoved||tankMountMoved||condSeatMoved)save(); // закрепляем миграции в CRM
 }
 async function openProject(id){
   try{

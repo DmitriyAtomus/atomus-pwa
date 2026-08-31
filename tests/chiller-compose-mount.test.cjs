@@ -35,7 +35,7 @@ test('крен сохраняется в проект и возвращаетс�
   assert.match(page, /k:p\.obj\.rotation\.x/);                 // в payload
   assert.match(page, /async function addItem\(d,at,rot,tilt,roll\)/);
   assert.match(page, /obj\.rotation\.set\(roll\|\|0,tilt\|\|0,rot\|\|0\)/);
-  assert.match(page, /addItem\(d,\{x:s\.x,y:s\.y,z:s\.z,state:[^)]*\},s\.r,s\.t,s\.k\)/);
+  assert.match(page, /addItem\(d,\{x:s\.x,y:s\.y,z:s\.z,\s*state:[^)]*\},s\.r,s\.t,s\.k\)/);
 });
 
 test('в меню крепления две плоскости: дно и крышка', () => {
@@ -90,4 +90,24 @@ test('центр монтажного проёма находится по ме�
 
 test('глухая крышка — проёма нет, деталь садится там, где стояла', () => {
   assert.equal(runCapHole({ x: 0, y: 0, r: -1 }), null);
+});
+
+test('обечайка Belief входит в проём, а плоская панель прижата к низу крыши', () => {
+  const code = section('const CAP_T=1;', '/* Круглый проём в верхней плоскости детали:');
+  const ctx = { result: null };
+  vm.createContext(ctx);
+  vm.runInContext(code + `
+    const it={d:{name:'Belief BS-ACV-G8-145-A13'}};
+    const st={z:899},b={max:{z:200}};
+    const dz=condSeatDz(it,st,b);
+    result={neck:condNeckProjection(it),dz:dz,top:b.max.z+dz};`, ctx);
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.result)), { neck: 10, dz: 708, top: 908 });
+  assert.equal(ctx.result.top - 899, 9, 'обечайка выступает над листом крыши на 9 мм');
+});
+
+test('сохранённый конденсатор автоматически пересаживается обечайкой в проём', () => {
+  const load = section('async function loadProjectData(data){', 'async function openProject(id){');
+  assert.match(load, /roleOf\(p\.d\)!=='cond'\|\|!p\.link\|\|!p\.link\.under/);
+  assert.match(load, /const z=p\.obj\.position\.z;reseatLink\(p\)/);
+  assert.match(load, /schemaMoved\|\|tankMountMoved\|\|condSeatMoved/);
 });
