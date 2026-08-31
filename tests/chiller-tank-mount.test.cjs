@@ -8,20 +8,23 @@ const start = html.indexOf('const SH_T=0;');
 const end = html.indexOf('function tankShelfPlan', start);
 assert.ok(start > 0 && end > start, 'блок прямого крепления бака найден');
 
-const api = new Function(
-  html.slice(start, end) + '\nreturn {tankBracketRows,shelfCutOf,tankWallFace,tankWallCenter};'
-)();
+const THREE = { Vector3: class { constructor() { this.x = this.y = this.z = 0; } } };
+const api = new Function('THREE',
+  html.slice(start, end) +
+  '\nreturn {tankBracketRows,tankEndHolePair,tankEndHoleFit,shelfCutOf,tankWallFace,tankWallCenter};'
+)(THREE);
 
 const box = (x0, x1, y0, y1) => ({
   min: { x: x0, y: y0 },
   max: { x: x1, y: y1 },
+  getCenter(v) { v.x = (x0 + x1) / 2; v.y = (y0 + y1) / 2; return v; },
 });
 const rear = { nm: '00.000.002 Стойка', des: '', b: box(-447, -372, -300, -225) };
 const front = { nm: 'AG-41.000.001 Стойка', des: '', b: box(-447, -272, 219, 294) };
 const sidePanel = box(-447, -427, -244, 238);
 const left = { a: 'x', s: -1, t: 'левой' };
 
-test('штатный корпус использует два Ø7 самого бака, а не отверстия стоек', () => {
+test('штатный корпус использует торцевые Ø7 бака напротив двух стоек', () => {
   const holes = api.tankBracketRows({
     d: { id: 'user:frame', name: 'AG-41.000.000СБ Корпус чиллера' },
   }, rear, front, left);
@@ -32,7 +35,8 @@ test('штатный корпус использует два Ø7 самого �
     rows: null,
     fixed: true,
     direct: true,
-    marks: 'два Ø7 бака: ±142.5 мм, отм. 663',
+    posts: true,
+    marks: 'торцевые Ø7 бака: ±258.8 мм, отм. 663',
   });
   assert.deepEqual(api.tankBracketRows({ d: { id: 'chiller-600x900' } },
     rear, front, { a: 'x', s: 1 }), { unsupported: true },
@@ -41,14 +45,25 @@ test('штатный корпус использует два Ø7 самого �
     rear, front, left), null);
 });
 
-test('крепление содержит только два прямых болта по координатам STEP бака', () => {
-  const cut = api.shelfCutOf({
-    a: 'x', w: 'y', face: -427, dir: 1, cw: 0, z: 250,
-  });
-  assert.deepEqual(cut.bo, [
-    [-427, -142.5, 663],
-    [-427, 142.5, 663],
+test('разворот +90° совмещает торцевые отверстия STEP с задней и передней стойками', () => {
+  const pair = api.tankEndHolePair(Math.PI / 2, -306.25, -3, 250);
+  assert.deepEqual(pair.map(h => h.p), [
+    [-392.95, -261.8, 663],
+    [-392.95, 255.8, 663],
   ]);
+  assert.equal(api.tankEndHoleFit(pair, rear, front), true,
+    'оба отверстия лежат в металле своих стоек');
+
+  const mirrored = api.tankEndHolePair(Math.PI * 3 / 2, -306.25, -3, 250);
+  assert.equal(api.tankEndHoleFit(mirrored, rear, front), false,
+    'зеркальный разворот уносит ряд отверстий мимо стоек');
+
+  const cut = api.shelfCutOf({ endHoles: pair });
+  assert.deepEqual(cut.bo, [
+    [-392.95, -261.8, 663],
+    [-392.95, 255.8, 663],
+  ]);
+  assert.deepEqual(cut.bd, [[0, -1], [0, 1]], 'болты идут наружу в обе стойки');
   for (const key of ['pl', 'lg', 'bk', 'dg', 'st', 'pd'])
     assert.deepEqual(cut[key], [], key + ' отсутствует');
 });
@@ -67,22 +82,25 @@ test('бак прижат к внутренней плоскости левой 
   assert.equal(center - 105 - (-427), 0.5, 'видимого воздушного зазора нет');
 });
 
-test('интерфейс и BOM описывают прямое крепление без изготовляемого узла', () => {
-  assert.match(html, /Прямо через отверстия бака/);
-  assert.match(html, /два штатных Ø7 на боковом фланце/);
-  assert.match(html, /wall:'left-direct'/);
-  assert.match(html, /kind:'tank-holes'/);
+test('интерфейс и BOM описывают крепление к стойкам без изготовляемого узла', () => {
+  assert.match(html, /Развернуть отверстиями к стойкам/);
+  assert.match(html, /два торцевых Ø7/);
+  assert.match(html, /wall:'left-posts'/);
+  assert.match(html, /kind:'tank-post-holes'/);
+  assert.match(html, /boltAx:best\.w/);
   assert.match(html, /Болт М6×35, шайба широкая, гайка самоконтрящаяся/);
   assert.match(html, /sh\.v>=4&&\(sh\.bo\|\|\[\]\)\.length/);
+  assert.match(html, /\[0,Math\.PI\/2,Math\.PI,Math\.PI\*3\/2\]/,
+    'проверяются оба зеркальных разворота бака');
   assert.doesNotMatch(html, /Кронштейн рамный бака, лист/);
   assert.doesNotMatch(html, /Стяжка бака П-образная/);
   assert.doesNotMatch(html, /Пластина ответная 40×400×3/);
 });
 
-test('старое крепление мигрирует на прямые болты и сохраняется', () => {
+test('прежняя посадка в панель мигрирует на стойки и сохраняется', () => {
   const load = html.slice(html.indexOf('async function loadProjectData(data){'),
                           html.indexOf('async function openProject(id){'));
-  assert.match(load, /if\(!sh\|\|sh\.v>=4\)return;/);
+  assert.match(load, /if\(!sh\|\|sh\.v>=5\)return;/);
   assert.match(load, /tankShelfPut\(p,\{quiet:true\}\)/);
   assert.match(load, /schemaMoved\|\|tankMountMoved/);
 
