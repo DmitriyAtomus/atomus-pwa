@@ -3738,6 +3738,7 @@ const SH_STRAP=0;
 const SH_GUS=0;
 const SH_PAD=0;
 const SH_OEM_BASE_DROP=200; // низ пластины AG-04.002.002 от опорной кромки бака
+const SH_STD_SUPPORT=250;   // штатная отметка бака и его верхнего крепежа
 const SH_POST_X=229;   // два ряда крепления к передней/задней стойкам [мод]
 const SH_POST_Y=96.3;  // отверстия на длинной стенке со стороны корпуса [мод]
 const SH_POST_Z0=12.5; // нижний ряд от опорной кромки бака [мод]
@@ -3804,12 +3805,13 @@ function tankStdFrame(fr){
 function tankBracketRows(fr,P0,P1,W,zFloor){
   if(!tankStdFrame(fr))return null;
   if(!W||W.a!==SH_STD_WALL.a||W.s!==SH_STD_WALL.s)return {unsupported:true};
-  /* В AG-41 дно занимает Z=33…36, поэтому прежняя фиксированная отметка 250
-     оставляла под опорной пластиной 14 мм воздуха. Заводской узел опускаем
-     целиком: низ пластины касается верхней плоскости конкретного дна. */
-  const support=zFloor+SH_OEM_BASE_DROP;
+  /* Бак и верхние М6 остаются на штатной отметке 250. До верхней плоскости
+     конкретного дна доводим только прямой низ стойки, пластину и четыре М8. */
+  const support=SH_STD_SUPPORT;
+  const baseDrop=Math.max(0,support-SH_OEM_BASE_DROP-zFloor);
   return {support:support,low:support+SH_POST_Z0,
           top:support+SH_POST_Z1,rows:null,fixed:true,direct:true,
+          baseDrop:baseDrop,
           posts:true,brackets:true,marks:'4 × Ø'+SH_HOLE_D+' в стойки · '+
           '2 кронштейна снизу'};
 }
@@ -3855,6 +3857,7 @@ function tankPostHoleFit(holes,P0,P1,tol){
    через торцы бака в кронштейны и четыре вертикальных М8 в нижнюю раму. */
 function shelfCutOf(b){
   const a=b.a,w=b.w,br=[],bm=[],bmd=[],b8=[],b8d=[];
+  const baseDrop=(b.holes&&b.holes.baseDrop)||b.baseDrop||0;
   const rect=(w0,w1,a0,a1,z0,z1)=>{const r={z0:z0,z1:z1};
     r[w+'0']=Math.min(w0,w1);r[w+'1']=Math.max(w0,w1);
     r[a+'0']=Math.min(a0,a1);r[a+'1']=Math.max(a0,a1);
@@ -3867,9 +3870,9 @@ function shelfCutOf(b){
        исходный AG-04 расположен у правой стенки, для левой стенки его целиком
        разворачиваем на 180° вокруг Z — форму деталей отдельно не зеркалим. */
     br.push(rect(end-sg*10,end+sg*15,b.ca+b.dir*16,b.ca+b.dir*116,
-                 b.z-200,b.z-198));
+                 b.z-200-baseDrop,b.z-198-baseDrop));
     br.push(rect(end,end+sg*15,b.ca+b.dir*43.5,b.ca+b.dir*88.5,
-                 b.z-198,b.z+25));
+                 b.z-198-baseDrop,b.z+25));
     /* Два М6 в продолговатые отверстия стойки кронштейна. */
     [56.5,75.5].forEach(off=>{
       bm.push(point(end,b.ca+b.dir*off,b.z+SH_POST_Z0));
@@ -3877,7 +3880,7 @@ function shelfCutOf(b){
     });
     /* Два Ø9 в опорной пластине — М8×20 в нижнюю раму. */
     [33.5,98.5].forEach(off=>{
-      b8.push(point(end,b.ca+b.dir*off,b.z-198));b8d.push([0,0,-1]);
+      b8.push(point(end,b.ca+b.dir*off,b.z-198-baseDrop));b8d.push([0,0,-1]);
     });
   });
   return {pl:[],lg:[],bk:[],bo:(b.postHoles||[]).map(h=>h.p.slice()),
@@ -4091,12 +4094,13 @@ function tankShelfPlan(it,fr){
   it.obj.position.copy(op);it.obj.rotation.copy(or);it.obj.updateMatrixWorld(true);
   if(!best)return {err:'бак не входит между стойками ни у одной стенки — уменьши бак или возьми корпус крупнее'};
   const cut=shelfCutOf(best);
-  const sh={v:8,kind:'tank-oem-brackets-step',z:best.z,top:best.zTop,
+  const sh={v:9,kind:'tank-oem-brackets-step',z:best.z,top:best.zTop,
             ax:best.a,dir:best.dir,face:best.face,t:SH_T,
             ca:best.ca,cw:best.cw,wa:best.w,
             boltAx:best.a,holeD:SH_HOLE_D,holeX:SH_POST_X,
             holeY:SH_POST_Y,holeZ0:SH_POST_Z0,holeZ1:SH_POST_Z1,
             bolt0:best.zBolt,
+            baseDrop:best.holes&&best.holes.baseDrop||0,
             wall:'left-posts-brackets',rows:null,
             marks:best.holes&&best.holes.marks,
             mark0:best.holes?SH_POST_Z0:Math.round(best.z-zFloor),
@@ -4116,9 +4120,11 @@ function tankShelfPlan(it,fr){
 const shMat=new THREE.MeshStandardMaterial({color:0x8d959c,metalness:.6,roughness:.42,
   flatShading:true});
 const shPadMat=new THREE.MeshStandardMaterial({color:0x20282c,metalness:.05,roughness:.9});
-let SH_OEM_GEO=null;
-function tankOemBracketGeo(){
-  if(SH_OEM_GEO)return SH_OEM_GEO;
+const SH_OEM_GEO=new Map();
+function tankOemBracketGeo(baseDrop){
+  baseDrop=Math.max(0,+baseDrop||0);
+  const key=baseDrop.toFixed(3);
+  if(SH_OEM_GEO.has(key))return SH_OEM_GEO.get(key);
   const MS=globalThis.TANK_OEM_BRACKET_MESH;
   if(!MS||!MS.pos||!MS.idx)return null;
   const p16=new Uint16Array(b64(MS.pos).buffer),ix=new Uint16Array(b64(MS.idx).buffer);
@@ -4126,7 +4132,12 @@ function tankOemBracketGeo(){
   for(let i=0;i<p16.length;i+=3){
     pos[i]=MS.lo[0]+p16[i]*MS.scale[0];
     pos[i+1]=MS.lo[1]+p16[i+1]*MS.scale[1];
-    pos[i+2]=MS.lo[2]+p16[i+2]*MS.scale[2];
+    const z=MS.lo[2]+p16[i+2]*MS.scale[2];
+    /* У точной стойки между нижней кромкой Z=-198 и отверстиями Z=+12.5
+       идёт прямая стенка без промежуточных особенностей. Её нижние вершины,
+       опорные пластины и весь крепёж М8 лежат ниже Z=-150: опускаем только их,
+       удлиняя прямой участок до листа и не сдвигая бак и верхние М6. */
+    pos[i+2]=z<-150?z-baseDrop:z;
   }
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(pos,3));
@@ -4134,8 +4145,8 @@ function tankOemBracketGeo(){
   (MS.groups||[]).forEach((r,i)=>g.addGroup(r[0],r[1],i));
   g.computeVertexNormals();g.computeBoundingBox();
   g.userData.source=MS.source;g.userData.assembly=MS.assembly;
-  g.userData.shared=true;
-  SH_OEM_GEO=g;return g;
+  g.userData.shared=true;g.userData.baseDrop=baseDrop;
+  SH_OEM_GEO.set(key,g);return g;
 }
 function shelfClear(it){
   if(!it||!it._shelf)return;
@@ -4186,7 +4197,7 @@ function shelfMark(it){
     /* v7: исходные поверхности и штатный крепёж прямо из STEP. Меш хранится
        относительно центра опорной плоскости бака: +X направлен внутрь корпуса. */
     if(sh.v>=7){
-      const geo=tankOemBracketGeo();
+      const geo=tankOemBracketGeo(sh.baseDrop);
       if(geo){
         const m=new THREE.Mesh(geo,[shMat,boltMat]);
         m.position.set(sh.ax==='x'?sh.ca:sh.cw,sh.ax==='x'?sh.cw:sh.ca,sh.z);
@@ -8935,13 +8946,12 @@ async function loadProjectData(data){
     const hz=host&&(host.zn||[])[p.link.zi];
     if(host&&isTankAny(host.d)&&(!hz||hz.off||!hz.p0))p.link=null;
   });
-  /* v2.46.116: v1…v5 не имели заводского узла, v6 рисовал его габаритными
-     брусками, а v7 оставлял 14 мм воздуха над дном AG-41. Перестраиваем все
-     старые варианты на точный меш из STEP с посадкой пластины на лист. */
+  /* v2.46.117: v8 опускал вместе с опорой весь бак. В v9 бак и верхние М6
+     остаются на штатной отметке, а до листа удлиняется только низ кронштейна. */
   let tankMountMoved=false;
   placed.forEach(p=>{
     const sh=p.link&&p.link.mount==='tank'&&p.link.sh;
-    if(!sh||sh.v>=8)return;
+    if(!sh||sh.v>=9)return;
     if(tankShelfPut(p,{quiet:true}))tankMountMoved=true;
   });
   /* v2.46.113: раньше по низу крыши выравнивался верх обечайки Belief, из-за

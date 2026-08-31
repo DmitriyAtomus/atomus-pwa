@@ -31,12 +31,13 @@ test('штатный корпус использует четыре Ø7 бака
     d: { id: 'user:frame', name: 'AG-41.000.000СБ Корпус чиллера' },
   }, rear, front, left, 36);
   assert.deepEqual(holes, {
-    support: 236,
-    low: 248.5,
-    top: 646,
+    support: 250,
+    low: 262.5,
+    top: 660,
     rows: null,
     fixed: true,
     direct: true,
+    baseDrop: 14,
     posts: true,
     brackets: true,
     marks: '4 × Ø7 в стойки · 2 кронштейна снизу',
@@ -49,23 +50,23 @@ test('штатный корпус использует четыре Ø7 бака
 });
 
 test('разворот +90° совмещает по два отверстия с каждой стойкой', () => {
-  const holes = api.tankPostHoleSet(Math.PI / 2, -306.25, -3, 236);
+  const holes = api.tankPostHoleSet(Math.PI / 2, -306.25, -3, 250);
   assert.deepEqual(holes.map(h => h.p), [
-    [-402.55, -232, 248.5],
-    [-402.55, -232, 646],
-    [-402.55, 226, 248.5],
-    [-402.55, 226, 646],
+    [-402.55, -232, 262.5],
+    [-402.55, -232, 660],
+    [-402.55, 226, 262.5],
+    [-402.55, 226, 660],
   ]);
   assert.deepEqual(holes.map(h => h.d), new Array(4).fill([-1, 0]));
   assert.equal(api.tankPostHoleFit(holes, rear, front), true,
     'по два отверстия лежат в металле каждой стойки');
 
-  const mirrored = api.tankPostHoleSet(Math.PI * 3 / 2, -306.25, -3, 236);
+  const mirrored = api.tankPostHoleSet(Math.PI * 3 / 2, -306.25, -3, 250);
   assert.equal(api.tankPostHoleFit(mirrored, rear, front), false,
     'зеркальный разворот уносит ряд отверстий мимо стоек');
 
   const cut = api.shelfCutOf({ a: 'x', w: 'y', dir: 1, ca: -321.5,
-    cw: -3, fw: 525, z: 236, postHoles: holes });
+    cw: -3, fw: 525, z: 250, postHoles: holes, holes: { baseDrop: 14 } });
   assert.deepEqual(cut.bo, holes.map(h => h.p));
   assert.deepEqual(cut.bd, new Array(4).fill([-1, 0]));
   assert.equal(cut.br.length, 4, 'две пластины и две стойки кронштейнов');
@@ -73,11 +74,11 @@ test('разворот +90° совмещает по два отверстия �
     x0: -305.5, x1: -205.5, y0: -280.5, y1: -255.5, z0: 36, z1: 38,
   });
   assert.deepEqual(cut.br[1], {
-    x0: -278, x1: -233, y0: -280.5, y1: -265.5, z0: 38, z1: 261,
+    x0: -278, x1: -233, y0: -280.5, y1: -265.5, z0: 38, z1: 275,
   });
   assert.equal(cut.bm.length, 4, 'по два М6 на каждом кронштейне');
   assert.deepEqual(cut.bm.slice(0, 2), [
-    [-265, -265.5, 248.5], [-246, -265.5, 248.5],
+    [-265, -265.5, 262.5], [-246, -265.5, 262.5],
   ], 'М6 сохраняют заводское положение с внутренней стороны бака');
   assert.deepEqual(cut.bmd.slice(0, 2), [[0, -1, 0], [0, -1, 0]]);
   assert.equal(cut.b8.length, 4, 'по два М8 в раму на каждом кронштейне');
@@ -113,10 +114,12 @@ test('интерфейс и BOM описывают заводской узел �
   assert.match(html, /Комплект М6×14 DIN 7045 \+ гайка и шайбы · бак → кронштейны/);
   assert.match(html, /Комплект М8×20 ГОСТ 11738-84 \+ гайка и шайбы · кронштейны → рама/);
   assert.match(html, /pc\.set\(SH_BRACKET/);
-  assert.match(html, /const sh=\{v:8/);
-  assert.match(html, /const support=zFloor\+SH_OEM_BASE_DROP/,
-    'низ точной пластины садится на верхнюю плоскость листа');
-  assert.match(html, /tankOemBracketGeo\(\)/);
+  assert.match(html, /const sh=\{v:9/);
+  assert.match(html, /const baseDrop=Math\.max\(0,support-SH_OEM_BASE_DROP-zFloor\)/,
+    'до листа опускается низ кронштейна, а не бак');
+  assert.match(html, /tankOemBracketGeo\(sh\.baseDrop\)/);
+  assert.match(html, /pos\[i\+2\]=z<-150\?z-baseDrop:z/,
+    'нижняя прямая часть удлиняется без сдвига верхних отверстий');
   assert.match(html, /exactStepAssembly='AG-04\.002\.000СБ'/);
   assert.match(html, /\[0,Math\.PI\/2,Math\.PI,Math\.PI\*3\/2\]/,
     'проверяются оба зеркальных разворота бака');
@@ -161,7 +164,7 @@ test('меш кронштейнов и крепежа взят из исходн
 test('прежняя посадка мигрирует на точную STEP-геометрию и сохраняется', () => {
   const load = html.slice(html.indexOf('async function loadProjectData(data){'),
                           html.indexOf('async function openProject(id){'));
-  assert.match(load, /if\(!sh\|\|sh\.v>=8\)return;/);
+  assert.match(load, /if\(!sh\|\|sh\.v>=9\)return;/);
   assert.match(load, /tankShelfPut\(p,\{quiet:true\}\)/);
   assert.match(load, /schemaMoved\|\|tankMountMoved/);
 
