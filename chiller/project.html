@@ -1616,6 +1616,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
 </div></div>
 
 <script src="three.min.js"></script>
+<script src="tank-oem-brackets.js"></script>
 <script>
 /* ═══ данные: тот же контракт, что у базы (index.html) ═══ */
 const BASE=(window.ATOMUS3D_BASE||'./pack/').replace(/\/?$/,'/');
@@ -3713,16 +3714,17 @@ function tankLinkSel(){
   if(!sel||!isTankAny(sel.d))return;
   tankBuiltIn(sel)?tankDetach(sel):tankBuildIn(sel);
 }
-/* ═══ v2.46.114: заводское крепление бака AG-04 — стойки + два кронштейна ═══
+/* ═══ v2.46.115: точный узел крепления бака из STEP AG-04 ═══
    Проверено по сборочному чертежу AG-04.000.000СБ (п.6) и исходному STEP:
    «Бак закрепить к стойкам и к кронштейнам винтами М6, кронштейны крепить
    к раме винтами». В сборке это четыре М6 бака к двум вертикальным стойкам,
    четыре М6 бака к двум кронштейнам AG-04.002.000СБ и четыре М8 кронштейнов
    к нижней раме. Два торцевых винта крышек больше не считаются креплением.
 
-   Размеры кронштейна из КД: стойка 45×15×223, опорная пластина 100×25×2;
-   стойка перекрывает нижнюю кромку бака на 25 мм. Узел строится зеркально у
-   двух торцов бака и хранится в link.sh вместе с корпусом. */
+   Геометрия больше не строится прямоугольниками. Четыре листовых тела и 44
+   тела штатного крепежа извлечены непосредственно из присланного STEP и
+   упакованы в tank-oem-brackets.js. В link.sh хранятся заводская посадка и
+   коробки для контроля пересечений; рендер использует исходные треугольники. */
 const SH_T=2;          // толщина опорной пластины AG-04.002.002
 const SH_LEG=0;
 const SH_LAP=0;
@@ -3741,11 +3743,11 @@ const SH_POST_Y=96.3;  // отверстия на длинной стенке с
 const SH_POST_Z0=12.5; // нижний ряд от опорной кромки бака [мод]
 const SH_POST_Z1=410;  // верхний ряд от опорной кромки бака [мод]
 const SH_HOLE_D=7;     // штатное отверстие под М6 [мод]
-const SH_BR_H=223,SH_BR_W=45,SH_BR_D=15; // стойка кронштейна
-const SH_BR_PL_W=100,SH_BR_PL_D=25;       // опорная пластина
-const SH_POST_BOLT='Винт М6×14 DIN 7045 · бак → стойки';
-const SH_BR_BOLT='Винт М6×14 DIN 7045 · бак → кронштейны';
-const SH_BASE_BOLT='Винт М8×20 ГОСТ 11738-84 · кронштейны → рама';
+const SH_BR_H=223,SH_BR_W=45,SH_BR_D=15; // габариты точного STEP для коллизий
+const SH_BR_PL_W=100,SH_BR_PL_D=25;
+const SH_POST_BOLT='Комплект М6×14 DIN 7045 + гайка М6 · бак → стойки';
+const SH_BR_BOLT='Комплект М6×14 DIN 7045 + гайка и шайбы · бак → кронштейны';
+const SH_BASE_BOLT='Комплект М8×20 ГОСТ 11738-84 + гайка и шайбы · кронштейны → рама';
 const SH_BRACKET='Кронштейн бака, тип AG-04.002.000СБ';
 /* коробки деталей корпуса в его собственных координатах (framePartBoxes даёт
    их в координатах сцены — те пересчитываются на каждый сдвиг машины) */
@@ -3857,19 +3859,21 @@ function shelfCutOf(b){
   const lo=b.cw-b.fw/2,hi=b.cw+b.fw/2;
   [lo,hi].forEach((end,n)=>{
     const sg=n?1:-1;
-    /* Пластина 100×25×2 и стойка 45×15×223 из AG-04.002.000СБ. */
-    br.push(rect(end-sg*10,end+sg*15,b.ca-b.dir*16,b.ca-b.dir*116,
+    /* Точные габариты тел из STEP. Узел стоит с внутренней стороны бака:
+       исходный AG-04 расположен у правой стенки, для левой стенки его целиком
+       разворачиваем на 180° вокруг Z — форму деталей отдельно не зеркалим. */
+    br.push(rect(end-sg*10,end+sg*15,b.ca+b.dir*16,b.ca+b.dir*116,
                  b.z-200,b.z-198));
-    br.push(rect(end,end+sg*15,b.ca-b.dir*43.5,b.ca-b.dir*88.5,
+    br.push(rect(end,end+sg*15,b.ca+b.dir*43.5,b.ca+b.dir*88.5,
                  b.z-198,b.z+25));
     /* Два М6 в продолговатые отверстия стойки кронштейна. */
     [56.5,75.5].forEach(off=>{
-      bm.push(point(end,b.ca-b.dir*off,b.z+SH_POST_Z0));
+      bm.push(point(end,b.ca+b.dir*off,b.z+SH_POST_Z0));
       const d={x:0,y:0};d[w]=sg;bmd.push([d.x,d.y,0]);
     });
     /* Два Ø9 в опорной пластине — М8×20 в нижнюю раму. */
     [33.5,98.5].forEach(off=>{
-      b8.push(point(end,b.ca-b.dir*off,b.z-198));b8d.push([0,0,-1]);
+      b8.push(point(end,b.ca+b.dir*off,b.z-198));b8d.push([0,0,-1]);
     });
   });
   return {pl:[],lg:[],bk:[],bo:(b.postHoles||[]).map(h=>h.p.slice()),
@@ -4083,8 +4087,9 @@ function tankShelfPlan(it,fr){
   it.obj.position.copy(op);it.obj.rotation.copy(or);it.obj.updateMatrixWorld(true);
   if(!best)return {err:'бак не входит между стойками ни у одной стенки — уменьши бак или возьми корпус крупнее'};
   const cut=shelfCutOf(best);
-  const sh={v:6,kind:'tank-oem-brackets',z:best.z,top:best.zTop,
+  const sh={v:7,kind:'tank-oem-brackets-step',z:best.z,top:best.zTop,
             ax:best.a,dir:best.dir,face:best.face,t:SH_T,
+            ca:best.ca,cw:best.cw,wa:best.w,
             boltAx:best.a,holeD:SH_HOLE_D,holeX:SH_POST_X,
             holeY:SH_POST_Y,holeZ0:SH_POST_Z0,holeZ1:SH_POST_Z1,
             bolt0:best.zBolt,
@@ -4107,10 +4112,31 @@ function tankShelfPlan(it,fr){
 const shMat=new THREE.MeshStandardMaterial({color:0x8d959c,metalness:.6,roughness:.42,
   flatShading:true});
 const shPadMat=new THREE.MeshStandardMaterial({color:0x20282c,metalness:.05,roughness:.9});
+let SH_OEM_GEO=null;
+function tankOemBracketGeo(){
+  if(SH_OEM_GEO)return SH_OEM_GEO;
+  const MS=globalThis.TANK_OEM_BRACKET_MESH;
+  if(!MS||!MS.pos||!MS.idx)return null;
+  const p16=new Uint16Array(b64(MS.pos).buffer),ix=new Uint16Array(b64(MS.idx).buffer);
+  const pos=new Float32Array(p16.length);
+  for(let i=0;i<p16.length;i+=3){
+    pos[i]=MS.lo[0]+p16[i]*MS.scale[0];
+    pos[i+1]=MS.lo[1]+p16[i+1]*MS.scale[1];
+    pos[i+2]=MS.lo[2]+p16[i+2]*MS.scale[2];
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setIndex(new THREE.BufferAttribute(ix,1));
+  (MS.groups||[]).forEach((r,i)=>g.addGroup(r[0],r[1],i));
+  g.computeVertexNormals();g.computeBoundingBox();
+  g.userData.source=MS.source;g.userData.assembly=MS.assembly;
+  g.userData.shared=true;
+  SH_OEM_GEO=g;return g;
+}
 function shelfClear(it){
   if(!it||!it._shelf)return;
   scene.remove(it._shelf);
-  it._shelf.traverse(o=>{if(o.geometry)o.geometry.dispose();});
+  it._shelf.traverse(o=>{if(o.geometry&&!o.geometry.userData.shared)o.geometry.dispose();});
   it._shelf=null;it._shKey='';
 }
 function shelfMark(it){
@@ -4153,8 +4179,20 @@ function shelfMark(it){
       const m=new THREE.Mesh(new THREE.BoxGeometry(w,d,h),shPadMat);
       m.position.set((r.x0+r.x1)/2,(r.y0+r.y1)/2,sh.z+h/2);g.add(m);
     });
-    /* v6: реальные опорные детали AG-04.002.000СБ и три группы крепежа. */
-    if(sh.v>=6){
+    /* v7: исходные поверхности и штатный крепёж прямо из STEP. Меш хранится
+       относительно центра опорной плоскости бака: +X направлен внутрь корпуса. */
+    if(sh.v>=7){
+      const geo=tankOemBracketGeo();
+      if(geo){
+        const m=new THREE.Mesh(geo,[shMat,boltMat]);
+        m.position.set(sh.ax==='x'?sh.ca:sh.cw,sh.ax==='x'?sh.cw:sh.ca,sh.z);
+        m.rotation.z=sh.ax==='x'?(sh.dir>0?0:Math.PI):(sh.dir>0?Math.PI/2:-Math.PI/2);
+        m.userData.exactStepAssembly='AG-04.002.000СБ';g.add(m);
+      }
+    }
+    /* v6 остаётся только как безопасный показ старого сохранённого проекта до
+       автоматической миграции: это прежние габаритные коробки и цилиндры. */
+    if(sh.v===6){
       (sh.br||[]).forEach(r=>box(r,r.z0,r.z1));
       const fast=(p,d,rad,len,hr,hh)=>{
         const A=new THREE.Vector3(...p),D=new THREE.Vector3(...d).normalize();
@@ -8893,12 +8931,12 @@ async function loadProjectData(data){
     const hz=host&&(host.zn||[])[p.link.zi];
     if(host&&isTankAny(host.d)&&(!hz||hz.off||!hz.p0))p.link=null;
   });
-  /* v2.46.114: сохранённые узлы v1…v5 не содержали заводских нижних
-     кронштейнов и использовали винты крышек. Перестраиваем узел по КД AG-04. */
+  /* v2.46.115: v1…v5 не имели заводского узла, v6 рисовал его габаритными
+     брусками. Перестраиваем все старые варианты на точный меш из STEP. */
   let tankMountMoved=false;
   placed.forEach(p=>{
     const sh=p.link&&p.link.mount==='tank'&&p.link.sh;
-    if(!sh||sh.v>=6)return;
+    if(!sh||sh.v>=7)return;
     if(tankShelfPut(p,{quiet:true}))tankMountMoved=true;
   });
   /* v2.46.113: раньше по низу крыши выравнивался верх обечайки Belief, из-за

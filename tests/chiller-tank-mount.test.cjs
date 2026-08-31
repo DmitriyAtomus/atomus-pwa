@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'chiller', 'project.html'), 'utf8');
+const meshJs = fs.readFileSync(path.join(__dirname, '..', 'chiller', 'tank-oem-brackets.js'), 'utf8');
+const mesh = JSON.parse(meshJs.slice(meshJs.indexOf('=') + 1, meshJs.lastIndexOf(';')));
 const start = html.indexOf('const SH_T=2;');
 const end = html.indexOf('function tankShelfPlan', start);
 assert.ok(start > 0 && end > start, 'блок заводского крепления бака найден');
@@ -68,19 +70,19 @@ test('разворот +90° совмещает по два отверстия �
   assert.deepEqual(cut.bd, new Array(4).fill([-1, 0]));
   assert.equal(cut.br.length, 4, 'две пластины и две стойки кронштейнов');
   assert.deepEqual(cut.br[0], {
-    x0: -437.5, x1: -337.5, y0: -280.5, y1: -255.5, z0: 50, z1: 52,
+    x0: -305.5, x1: -205.5, y0: -280.5, y1: -255.5, z0: 50, z1: 52,
   });
   assert.deepEqual(cut.br[1], {
-    x0: -410, x1: -365, y0: -280.5, y1: -265.5, z0: 52, z1: 275,
+    x0: -278, x1: -233, y0: -280.5, y1: -265.5, z0: 52, z1: 275,
   });
   assert.equal(cut.bm.length, 4, 'по два М6 на каждом кронштейне');
   assert.deepEqual(cut.bm.slice(0, 2), [
-    [-378, -265.5, 262.5], [-397, -265.5, 262.5],
-  ], 'М6 попадают в стойку кронштейна со стороны стенки корпуса');
+    [-265, -265.5, 262.5], [-246, -265.5, 262.5],
+  ], 'М6 сохраняют заводское положение с внутренней стороны бака');
   assert.deepEqual(cut.bmd.slice(0, 2), [[0, -1, 0], [0, -1, 0]]);
   assert.equal(cut.b8.length, 4, 'по два М8 в раму на каждом кронштейне');
   assert.deepEqual(cut.b8.slice(0, 2), [
-    [-355, -265.5, 52], [-420, -265.5, 52],
+    [-288, -265.5, 52], [-223, -265.5, 52],
   ], 'М8 проходят через отверстия опорной пластины в нижнюю раму');
   for (const key of ['pl', 'lg', 'bk', 'dg', 'st', 'pd'])
     assert.deepEqual(cut[key], [], key + ' отсутствует');
@@ -104,24 +106,60 @@ test('интерфейс и BOM описывают заводской узел �
   assert.match(html, /Закрепить как в AG-04/);
   assert.match(html, /4 × М6 к стойкам/);
   assert.match(html, /wall:'left-posts-brackets'/);
-  assert.match(html, /kind:'tank-oem-brackets'/);
+  assert.match(html, /kind:'tank-oem-brackets-step'/);
   assert.match(html, /boltAx:best\.a/);
   assert.match(html, /Кронштейн бака, тип AG-04\.002\.000СБ/);
-  assert.match(html, /Винт М6×14 DIN 7045 · бак → стойки/);
-  assert.match(html, /Винт М6×14 DIN 7045 · бак → кронштейны/);
-  assert.match(html, /Винт М8×20 ГОСТ 11738-84 · кронштейны → рама/);
+  assert.match(html, /Комплект М6×14 DIN 7045 \+ гайка М6 · бак → стойки/);
+  assert.match(html, /Комплект М6×14 DIN 7045 \+ гайка и шайбы · бак → кронштейны/);
+  assert.match(html, /Комплект М8×20 ГОСТ 11738-84 \+ гайка и шайбы · кронштейны → рама/);
   assert.match(html, /pc\.set\(SH_BRACKET/);
-  assert.match(html, /sh\.v>=6/);
+  assert.match(html, /const sh=\{v:7/);
+  assert.match(html, /tankOemBracketGeo\(\)/);
+  assert.match(html, /exactStepAssembly='AG-04\.002\.000СБ'/);
   assert.match(html, /\[0,Math\.PI\/2,Math\.PI,Math\.PI\*3\/2\]/,
     'проверяются оба зеркальных разворота бака');
   assert.doesNotMatch(html, /М6×35/);
   assert.doesNotMatch(html, /торцевые Ø7/);
 });
 
-test('прежняя посадка мигрирует на заводские кронштейны и сохраняется', () => {
+test('меш кронштейнов и крепежа взят из исходного STEP, а не нарисован брусками', () => {
+  assert.match(html, /<script src="tank-oem-brackets\.js"><\/script>/);
+  assert.equal(mesh.assembly, 'AG-04.002.000СБ Кронштейн');
+  assert.equal(mesh.source_sha256,
+    '6eff48df98e966c23c675859a4677453b7d9cd2cd6aa3c4d6afb5f546d903da1');
+  assert.deepEqual(mesh.bodies, [4, 44], '4 листовых тела и 44 тела штатного крепежа');
+  assert.equal(mesh.n_tri, 27952);
+  assert.equal(mesh.groups[0][1], 3200 * 3, 'первая группа — точные тела кронштейнов');
+  assert.equal(mesh.groups[1][1], 24752 * 3, 'вторая группа — штатный крепёж');
+  assert.deepEqual(mesh.lo, [-105.549, -277.5, -213.6]);
+
+  const posBuf = Buffer.from(mesh.pos, 'base64');
+  const pos16 = new Uint16Array(posBuf.buffer, posBuf.byteOffset, posBuf.byteLength / 2);
+  const ixBuf = Buffer.from(mesh.idx, 'base64');
+  const index = new Uint16Array(ixBuf.buffer, ixBuf.byteOffset, ixBuf.byteLength / 2);
+  const point = i => [0, 1, 2].map(a => mesh.lo[a] + pos16[i * 3 + a] * mesh.scale[a]);
+  const bounds = group => {
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    const [start, count] = mesh.groups[group];
+    for (let i = start; i < start + count; i++) point(index[i]).forEach((v, a) => {
+      lo[a] = Math.min(lo[a], v); hi[a] = Math.max(hi[a], v);
+    });
+    return [lo.map(v => +v.toFixed(3)), hi.map(v => +v.toFixed(3))];
+  };
+  const closeBounds = (actual, expected, message) => {
+    actual.flat().forEach((v, i) => assert.ok(Math.abs(v - expected.flat()[i]) < 0.015,
+      `${message}: координата ${i}, ${v} ≠ ${expected.flat()[i]}`));
+  };
+  closeBounds(bounds(0), [[16, -277.5, -200], [116, 277.5, 25]],
+    'точные листовые тела стоят с внутренней стороны и перекрывают бак на 25 мм');
+  closeBounds(bounds(1), [[-105.549, -269.988, -213.6], [106.5, 269.988, 416]],
+    'крепёж включает четыре М6 к стойкам, четыре М6 к кронштейнам и четыре М8');
+});
+
+test('прежняя посадка мигрирует на точную STEP-геометрию и сохраняется', () => {
   const load = html.slice(html.indexOf('async function loadProjectData(data){'),
                           html.indexOf('async function openProject(id){'));
-  assert.match(load, /if\(!sh\|\|sh\.v>=6\)return;/);
+  assert.match(load, /if\(!sh\|\|sh\.v>=7\)return;/);
   assert.match(load, /tankShelfPut\(p,\{quiet:true\}\)/);
   assert.match(load, /schemaMoved\|\|tankMountMoved/);
 
