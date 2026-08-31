@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.110";
+const APP_VERSION = "v2.46.111";
 const APP_VERSION_DATE = "31.08.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3485,6 +3485,7 @@ const DCVOICE_MODE_KEY = 'atomus_devchat_voice_dialogue';
 let _dcVoiceMode = false;
 try { _dcVoiceMode = localStorage.getItem(DCVOICE_MODE_KEY) === '1'; } catch (e) {}
 let _dcSpeechAudio = null;
+let _dcSpeechSource = null;
 let _dcSpeechUrl = '';
 let _dcSpeechButton = null;
 let _dcSpeechSeq = 0;
@@ -3511,13 +3512,7 @@ function devChatVoiceModeToggle() {
   if (!_dcVoiceMode) _devChatSpeechStop();
   else {
     // Разблокируем звук этим пользовательским нажатием — важно для iPhone/PWA.
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtx) {
-      try {
-        window._dcVoiceAudioContext = window._dcVoiceAudioContext || new AudioCtx();
-        window._dcVoiceAudioContext.resume();
-      } catch (e) {}
-    }
+    _devChatPrimeAudioContext();
   }
   showToast(_dcVoiceMode
     ? 'Голос включён: обсуждаем, а после «давай запускай» — выполняю'
@@ -3525,6 +3520,11 @@ function devChatVoiceModeToggle() {
 }
 
 function _devChatSpeechDone() {
+  if (_dcSpeechSource) {
+    _dcSpeechSource.onended = null;
+    try { _dcSpeechSource.disconnect(); } catch (e) {}
+    _dcSpeechSource = null;
+  }
   if (_dcSpeechAudio) {
     _dcSpeechAudio.onended = null;
     _dcSpeechAudio.onerror = null;
@@ -3539,40 +3539,141 @@ function _devChatSpeechDone() {
 
 function _devChatSpeechStop() {
   _dcSpeechSeq++;
+  if (_dcSpeechSource) {
+    _dcSpeechSource.onended = null;
+    try { _dcSpeechSource.stop(0); } catch (e) {}
+  }
   if (_dcSpeechAudio) {
     try { _dcSpeechAudio.pause(); _dcSpeechAudio.currentTime = 0; } catch (e) {}
   }
-  if (window.speechSynthesis) window.speechSynthesis.cancel();
   _devChatSpeechDone();
 }
 
-function _devChatBrowserSpeak(text, btn) {
-  if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return false;
-  const seq = _dcSpeechSeq;
-  const utter = new SpeechSynthesisUtterance(String(text || ''));
-  utter.lang = 'ru-RU';
-  utter.rate = 1;
-  utter.pitch = 1.05;
-  const voices = window.speechSynthesis.getVoices() || [];
-  utter.voice = voices.find(function (v) { return /^ru/i.test(v.lang || ''); }) || null;
-  const done = function () { if (seq === _dcSpeechSeq) _devChatSpeechDone(); };
-  utter.onend = done;
-  utter.onerror = done;
-  _dcSpeechButton = btn || null;
-  if (_dcSpeechButton) _dcSpeechButton.classList.add('is-speaking');
-  document.body.classList.add('dchat-speaking');
-  window.speechSynthesis.speak(utter);
-  return true;
+function _devChatAudioContext() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return null;
+  if (window._dcVoiceAudioContext && window._dcVoiceAudioContext.state !== 'closed') {
+    return window._dcVoiceAudioContext;
+  }
+  window._dcVoiceAudioContext = null;
+  try {
+    window._dcVoiceAudioContext = new AudioCtx();
+    return window._dcVoiceAudioContext;
+  } catch (err) {
+    throw new Error('Не удалось запустить аудиосистему браузера');
+  }
 }
 
-async function _devChatSpeak(text, btn, quiet) {
+function _devChatPrimeAudioContext() {
+  try {
+    const context = _devChatAudioContext();
+    if (context && context.state !== 'running') {
+      // Вызов идёт прямо из тапа пользователя. Promise дождёмся уже перед start().
+      const resumed = context.resume();
+      if (resumed && typeof resumed.catch === 'function') resumed.catch(function () {});
+    }
+    if (context && context.createBuffer && context.createBufferSource) {
+      // iOS надёжнее разблокирует Web Audio, когда в доверенном жесте не только
+      // resume(), но и реально стартует бесшумный буфер длительностью 1 сэмпл.
+      const silent = context.createBuffer(1, 1, context.sampleRate || 44100);
+      const unlock = context.createBufferSource();
+      unlock.buffer = silent;
+      unlock.connect(context.destination);
+      unlock.onended = function () { try { unlock.disconnect(); } catch (e) {} };
+      unlock.start(0);
+    }
+  } catch (e) {}
+}
+
+function _devChatDecodeAudio(context, encoded) {
+  // Старый Safari принимает callbacks, новый возвращает Promise. Поддерживаем
+  // оба варианта и не даём им завершить одну операцию дважды.
+  return new Promise(function (resolve, reject) {
+    let settled = false;
+    const done = function (value) {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const fail = function (err) {
+      if (settled) return;
+      settled = true;
+      const error = new Error('Не удалось декодировать голосовой файл');
+      if (err && err.name) error.name = err.name;
+      reject(error);
+    };
+    try {
+      const result = context.decodeAudioData(encoded, done, fail);
+      if (result && typeof result.then === 'function') result.then(done, fail);
+    } catch (err) {
+      fail(err);
+    }
+  });
+}
+
+async function _devChatPlayServerAudio(blob, seq) {
+  const context = _devChatAudioContext();
+  if (context) {
+    if (context.state !== 'running') await context.resume();
+    if (context.state !== 'running') {
+      throw new Error('Нажмите динамик ещё раз, чтобы разрешить воспроизведение');
+    }
+    const encoded = await blob.arrayBuffer();
+    const decoded = await _devChatDecodeAudio(context, encoded);
+    if (seq !== _dcSpeechSeq) return;
+    const source = context.createBufferSource();
+    source.buffer = decoded;
+    source.connect(context.destination);
+    source.onended = function () {
+      if (seq === _dcSpeechSeq) _devChatSpeechDone();
+    };
+    _dcSpeechSource = source;
+    source.start(0);
+    return;
+  }
+
+  // Старые браузеры без Web Audio всё равно проигрывают тот же серверный MP3.
+  // Это не системный TTS и не меняет голос Клавы.
+  _dcSpeechUrl = URL.createObjectURL(blob);
+  _dcSpeechAudio = new Audio(_dcSpeechUrl);
+  _dcSpeechAudio.onended = function () {
+    if (seq === _dcSpeechSeq) _devChatSpeechDone();
+  };
+  _dcSpeechAudio.onerror = function () {
+    if (seq !== _dcSpeechSeq) return;
+    _devChatSpeechFail(new Error('Не удалось воспроизвести голосовой файл'), seq);
+  };
+  await _dcSpeechAudio.play();
+}
+
+function _devChatSpeechError(err) {
+  if (err && err.name === 'NotAllowedError') {
+    return 'Браузер заблокировал звук — нажмите динамик ещё раз';
+  }
+  const message = String(err && err.message || '').trim();
+  return message || 'Не удалось воспроизвести серверный голос';
+}
+
+function _devChatSpeechFail(err, seq) {
+  // Decode error can both fire audio.onerror and reject play(). Invalidate this
+  // attempt before showing the toast so the same failure is reported once.
+  if (seq !== _dcSpeechSeq) return;
+  _dcSpeechSeq++;
+  _devChatSpeechDone();
+  showToast(_devChatSpeechError(err), 'error');
+}
+
+async function _devChatSpeak(text, btn) {
   text = String(text || '').trim();
   if (!text) return;
-  if (_dcSpeechButton === btn && document.body.classList.contains('dchat-speaking')) {
+  if (btn && _dcSpeechButton === btn && document.body.classList.contains('dchat-speaking')) {
     _devChatSpeechStop();
     return;
   }
   _devChatSpeechStop();
+  // Ручной тап по динамику тоже является пользовательским жестом: разблокируем
+  // Web Audio до первого await, чтобы после загрузки MP3 браузер разрешил start().
+  _devChatPrimeAudioContext();
   const seq = ++_dcSpeechSeq;
   _dcSpeechButton = btn || null;
   if (_dcSpeechButton) _dcSpeechButton.classList.add('is-speaking');
@@ -3590,38 +3691,30 @@ async function _devChatSpeak(text, btn, quiet) {
       const data = await r.json().catch(function () { return {}; });
       throw new Error(data.message || 'Не смогла включить голос');
     }
+    const contentType = String(r.headers.get('Content-Type') || '').toLowerCase();
+    if (!contentType.startsWith('audio/')) {
+      throw new Error('Сервер вернул неверный формат звука');
+    }
     const blob = await r.blob();
+    if (!blob.size) throw new Error('Сервер вернул пустой звуковой файл');
     if (seq !== _dcSpeechSeq) return;
-    _dcSpeechUrl = URL.createObjectURL(blob);
-    _dcSpeechAudio = new Audio(_dcSpeechUrl);
-    _dcSpeechAudio.onended = function () {
-      if (seq === _dcSpeechSeq) _devChatSpeechDone();
-    };
-    _dcSpeechAudio.onerror = function () {
-      if (seq !== _dcSpeechSeq) return;
-      _devChatSpeechDone();
-      if (!_devChatBrowserSpeak(text, btn) && !quiet) showToast('Не удалось включить звук', 'error');
-    };
-    await _dcSpeechAudio.play();
+    await _devChatPlayServerAudio(blob, seq);
   } catch (err) {
     if (seq !== _dcSpeechSeq) return;
-    _devChatSpeechDone();
-    if (!_devChatBrowserSpeak(text, btn) && !quiet) {
-      showToast(String(err && err.message || 'Не смогла включить голос'), 'error');
-    }
+    _devChatSpeechFail(err, seq);
   }
 }
 
 function devChatSpeakMsg(btn) {
   const text = btn && btn.closest('.dchat-bubble') &&
     btn.closest('.dchat-bubble').querySelector('.dchat-text');
-  if (text) _devChatSpeak(text.innerText || text.textContent || '', btn, false);
+  if (text) _devChatSpeak(text.innerText || text.textContent || '', btn);
 }
 
 function _devChatVoiceMaybeSpeak(msg, row) {
   if (!_dcVoiceMode || !msg || msg.author === 'user' || !msg.text) return;
   const btn = row && row.querySelector('.dchat-speak');
-  _devChatSpeak(msg.text, btn, true);
+  _devChatSpeak(msg.text, btn);
 }
 
 // ---- v2.45.961: запись и распознавание речи ----
@@ -3669,6 +3762,9 @@ async function devChatVoiceStart(e) {
   if (e && e.preventDefault) e.preventDefault();
   _dcVoicePointerHeld = true;
   _devChatSpeechStop();                 // Дмитрий заговорил — Клава замолкает
+  // Режим мог сохраниться после перезапуска PWA. Используем новый тап по
+  // микрофону, чтобы снова разблокировать будущий автоматический ответ.
+  if (_dcVoiceMode) _devChatPrimeAudioContext();
   if (_dcVoiceStarting) {
     _dcVoicePointerHeld = false;
     _dcVoiceCancel = true;
@@ -3736,6 +3832,7 @@ function devChatVoiceMove(e) {
 // (руки заняты — говори сколько нужно), длинное — заканчивает запись.
 function devChatVoiceUp(e) {
   if (e && e.preventDefault) e.preventDefault();
+  if (_dcVoiceMode) _devChatPrimeAudioContext();
   _dcVoicePointerHeld = false;
   if (!_dcVoiceRec || _dcVoiceLocked) return;
   if (Date.now() - _dcVoiceStartedAt < DCVOICE_MIN_MS && !_dcVoiceCancel) {
@@ -4334,6 +4431,9 @@ async function _devChatUnreadable() {
 
 async function devChatSend(context) {
   if (_devChatBusy) return;
+  // Enter/кнопка «отправить» — ещё один пользовательский жест, которым можно
+  // разблокировать Web Audio при сохранённом после перезапуска голосовом режиме.
+  if (typeof _dcVoiceMode !== 'undefined' && _dcVoiceMode) _devChatPrimeAudioContext();
   const input = _devChatEl('input');
   const text = (input && input.value || '').trim();
   if (!text && !_devChatFiles.length) return;
@@ -5001,6 +5101,7 @@ function stopDevChat() {
   if (_devChatListTimer) { clearInterval(_devChatListTimer); _devChatListTimer = null; }
   _devChatWorkTick(false);      // секундная стрелка карточки работы
   _devChatStickStop();          // липучка низа ленты
+  _devChatSpeechStop();         // ушли с экрана — голос и индикатор тоже гасим
   if (_dcVoiceRec) devChatVoiceCancel();   // ушли с экрана — микрофон отпускаем
 }
 
@@ -5280,6 +5381,10 @@ function stopAutoRefresh() {
 
 // Вернулись на вкладку/в окно — проверяем сразу, не дожидаясь тика.
 document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    _devChatSpeechStop();
+    return;
+  }
   if (document.visibilityState === 'visible') checkForChanges();
 });
 window.addEventListener('focus', () => { checkForChanges(); });
