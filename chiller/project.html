@@ -3737,7 +3737,7 @@ const SH_TOP=20;       // технологический просвет над �
 const SH_STRAP=0;
 const SH_GUS=0;
 const SH_PAD=0;
-const SH_STD_SUPPORT=250; // уровень опоры бака в системе проекта
+const SH_OEM_BASE_DROP=200; // низ пластины AG-04.002.002 от опорной кромки бака
 const SH_POST_X=229;   // два ряда крепления к передней/задней стойкам [мод]
 const SH_POST_Y=96.3;  // отверстия на длинной стенке со стороны корпуса [мод]
 const SH_POST_Z0=12.5; // нижний ряд от опорной кромки бака [мод]
@@ -3801,11 +3801,15 @@ function tankStdFrame(fr){
   const tag=[fr&&fr.d&&fr.d.id,fr&&fr.d&&fr.d.name].filter(Boolean).join(' ');
   return /chiller-600x900|AG-41\.000\.000/i.test(tag);
 }
-function tankBracketRows(fr,P0,P1,W){
+function tankBracketRows(fr,P0,P1,W,zFloor){
   if(!tankStdFrame(fr))return null;
   if(!W||W.a!==SH_STD_WALL.a||W.s!==SH_STD_WALL.s)return {unsupported:true};
-  return {support:SH_STD_SUPPORT,low:SH_STD_SUPPORT+SH_POST_Z0,
-          top:SH_STD_SUPPORT+SH_POST_Z1,rows:null,fixed:true,direct:true,
+  /* В AG-41 дно занимает Z=33…36, поэтому прежняя фиксированная отметка 250
+     оставляла под опорной пластиной 14 мм воздуха. Заводской узел опускаем
+     целиком: низ пластины касается верхней плоскости конкретного дна. */
+  const support=zFloor+SH_OEM_BASE_DROP;
+  return {support:support,low:support+SH_POST_Z0,
+          top:support+SH_POST_Z1,rows:null,fixed:true,direct:true,
           posts:true,brackets:true,marks:'4 × Ø'+SH_HOLE_D+' в стойки · '+
           '2 кронштейна снизу'};
 }
@@ -3979,7 +3983,7 @@ function tankShelfPlan(it,fr){
         if(!P0||!P1||P0===P1)return;
         const gap0=Math.abs(lo-P0.b.max[w]),gap1=Math.abs(hi-P1.b.min[w]);
         if(gap0>200||gap1>200)return;
-        const holes=tankBracketRows(fr,P0,P1,W);
+        const holes=tankBracketRows(fr,P0,P1,W,zFloor);
         if(holes&&holes.unsupported)return;        // штатный корпус: только левая стенка 001+002
         for(let off=0;off<=offMax+1;off+=20){
           const ca=tankWallCenter(face,dir,fa,off);
@@ -3999,7 +4003,7 @@ function tankShelfPlan(it,fr){
             if(!over2(r,X0+8,X1-8,Y0+8,Y1-8))return;
             zStart=Math.max(zStart,r.z1+5);       // над насосом, а не сквозь него
           });
-          /* Для штатного корпуса используем заводскую отметку опоры 250 мм.
+          /* Для штатного корпуса используем заводскую посадку от плоскости дна.
              Для другого корпуса ищем чистое место сверху вниз. */
           const Z=[];
           if(holes){
@@ -4087,7 +4091,7 @@ function tankShelfPlan(it,fr){
   it.obj.position.copy(op);it.obj.rotation.copy(or);it.obj.updateMatrixWorld(true);
   if(!best)return {err:'бак не входит между стойками ни у одной стенки — уменьши бак или возьми корпус крупнее'};
   const cut=shelfCutOf(best);
-  const sh={v:7,kind:'tank-oem-brackets-step',z:best.z,top:best.zTop,
+  const sh={v:8,kind:'tank-oem-brackets-step',z:best.z,top:best.zTop,
             ax:best.a,dir:best.dir,face:best.face,t:SH_T,
             ca:best.ca,cw:best.cw,wa:best.w,
             boltAx:best.a,holeD:SH_HOLE_D,holeX:SH_POST_X,
@@ -8931,12 +8935,13 @@ async function loadProjectData(data){
     const hz=host&&(host.zn||[])[p.link.zi];
     if(host&&isTankAny(host.d)&&(!hz||hz.off||!hz.p0))p.link=null;
   });
-  /* v2.46.115: v1…v5 не имели заводского узла, v6 рисовал его габаритными
-     брусками. Перестраиваем все старые варианты на точный меш из STEP. */
+  /* v2.46.116: v1…v5 не имели заводского узла, v6 рисовал его габаритными
+     брусками, а v7 оставлял 14 мм воздуха над дном AG-41. Перестраиваем все
+     старые варианты на точный меш из STEP с посадкой пластины на лист. */
   let tankMountMoved=false;
   placed.forEach(p=>{
     const sh=p.link&&p.link.mount==='tank'&&p.link.sh;
-    if(!sh||sh.v>=7)return;
+    if(!sh||sh.v>=8)return;
     if(tankShelfPut(p,{quiet:true}))tankMountMoved=true;
   });
   /* v2.46.113: раньше по низу крыши выравнивался верх обечайки Belief, из-за
