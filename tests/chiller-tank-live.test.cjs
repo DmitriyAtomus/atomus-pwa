@@ -97,7 +97,8 @@ test('кнопка бака создаёт заводской узел со ст
   assert.match(page, /it\.link\.rel=tankRelOf\(it,fr\)/);
   assert.match(page, /pushHist\('бак закреплён к стойкам и двум кронштейнам'\)/);
   assert.match(page, /tankPostHoleFit\(post0,P0,P1,2\)/);
-  assert.match(page, /kind:'tank-oem-brackets'/);
+  assert.match(page, /kind:'tank-oem-brackets-step'/);
+  assert.match(page, /tankOemBracketGeo\(\)/);
 });
 
 test('относительный transform ведёт бак за перемещением и поворотом корпуса', () => {
