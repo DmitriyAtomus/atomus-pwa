@@ -5425,6 +5425,10 @@ function renderDashboard(d) {
   const container = document.getElementById('dashboard-content');
   let html = '';
 
+  // Занятость смены: колонка в цеху спрашивает про неё голосом, поэтому
+  // отмечаться удобнее прямо здесь, а не уходить на главную.
+  html += '<div id="prod-busy-block"></div>';
+
   // v2.45.271: блок «На оплате» для бухгалтера/директора — заполняется отдельно
   html += '<div id="pay-due-block"></div>';
 
@@ -5581,6 +5585,80 @@ function renderDashboard(d) {
   }
   // v2.45.271: «На оплате» — бухгалтеру и директору
   try { _fillPayDueBlock(); } catch (_) {}
+  try { loadProdBusyBlock(); } catch (_) {}
+}
+
+
+// ===== Занятость смены на странице производства =====
+// Если занятость не проставлена, цеховая колонка каждые полчаса спрашивает об
+// этом голосом. Здесь и отмечаются, и глушат голос кнопкой «Сброс голоса» —
+// он вернётся через полчаса, если занятость так и осталась пустой.
+async function loadProdBusyBlock() {
+  const wrap = document.getElementById('prod-busy-block');
+  if (!wrap) return;
+  let data = null;
+  try {
+    data = await apiGet('/api/work-status');
+  } catch (e) {
+    wrap.innerHTML = '';       // бэк старый — блока просто нет
+    return;
+  }
+  const cur = (data && data.current) || [];
+  let html = '<div class="card" style="padding:10px;margin-bottom:10px;">';
+  html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">';
+  html += '<i class="ti ti-user-check"></i>';
+  html += '<span style="font-weight:700;font-size:13px;">Кто чем занят</span>';
+  if (!cur.length) {
+    html += '<span style="font-size:11.5px;color:var(--text-faint);margin-left:auto;">никто не отметился</span>';
+  }
+  html += '</div>';
+
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
+  html += '<input id="prod-ws-input" class="form-input" style="flex:1;min-width:180px;" maxlength="500" ' +
+          'placeholder="Чем занят сейчас…" ' +
+          'onkeydown="if(event.key===\'Enter\'){event.preventDefault();postProdWorkStatus();}">';
+  html += '<button class="btn btn-primary" onclick="postProdWorkStatus()"><i class="ti ti-check"></i> Записать</button>';
+  html += '<button class="btn btn-secondary" onclick="muteBusyVoice()" title="Колонка замолчит на 30 минут">' +
+          '<i class="ti ti-volume-off"></i> Сброс голоса</button>';
+  html += '</div>';
+
+  if (cur.length) {
+    html += '<div style="display:flex;flex-direction:column;margin-top:8px;">';
+    cur.forEach((s, i) => {
+      const sep = i < cur.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
+      html += '<div style="padding:7px 2px;' + sep + '">';
+      html += '<div style="display:flex;align-items:baseline;gap:6px;">';
+      html += '<span style="font-weight:700;font-size:13px;">' + escapeHtml(s.author_name || 'сотрудник') + '</span>';
+      html += '<span style="font-size:11px;color:var(--text-faint);margin-left:auto;">' +
+              escapeHtml(String(s.created_at || '').slice(11, 16)) + '</span>';
+      html += '</div>';
+      html += '<div style="font-size:13px;color:var(--text-dark);margin-top:1px;">' + escapeHtml(s.text) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+async function postProdWorkStatus() {
+  const inp = document.getElementById('prod-ws-input');
+  if (!inp) return;
+  const text = (inp.value || '').trim();
+  if (!text) return;
+  try {
+    const r = await apiPost('/api/work-status', { text: text });
+    if (r && r.ok) { inp.value = ''; showToast('Записано', 'success'); loadProdBusyBlock(); }
+    else showToast((r && r.data && r.data.message) || 'Не удалось записать', 'error');
+  } catch (e) { showToast('Ошибка сети', 'error'); }
+}
+
+async function muteBusyVoice() {
+  try {
+    const r = await apiPost('/api/work-status/mute', {});
+    if (r && r.ok) showToast('Колонка молчит 30 минут', 'success');
+    else showToast('Не удалось выключить голос', 'error');
+  } catch (e) { showToast('Ошибка сети', 'error'); }
 }
 
 // v2.45.272: пункт «На оплате» в левой колонке — открывает Заказы с фильтром «К оплате»
