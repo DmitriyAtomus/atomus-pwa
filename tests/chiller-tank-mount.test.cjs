@@ -4,9 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'chiller', 'project.html'), 'utf8');
-const start = html.indexOf('const SH_T=3;');
+const start = html.indexOf('const SH_T=0;');
 const end = html.indexOf('function tankShelfPlan', start);
-assert.ok(start > 0 && end > start, 'блок крепления бака найден');
+assert.ok(start > 0 && end > start, 'блок прямого крепления бака найден');
 
 const api = new Function(
   html.slice(start, end) + '\nreturn {tankBracketRows,shelfCutOf,tankWallFace,tankWallCenter};'
@@ -21,54 +21,39 @@ const front = { nm: 'AG-41.000.001 Стойка', des: '', b: box(-447, -272, 21
 const sidePanel = box(-447, -427, -244, 238);
 const left = { a: 'x', s: -1, t: 'левой' };
 
-test('штатный корпус крепит бак изнутри левой стенки к передней и задней стойкам', () => {
-  const rows = api.tankBracketRows({
+test('штатный корпус использует два Ø7 самого бака, а не отверстия стоек', () => {
+  const holes = api.tankBracketRows({
     d: { id: 'user:frame', name: 'AG-41.000.000СБ Корпус чиллера' },
   }, rear, front, left);
-  assert.deepEqual(rows, {
+  assert.deepEqual(holes, {
     support: 250,
-    low: 268,
+    low: 663,
     top: 663,
-    rows: [
-      { low: 283, top: 663, lowMark: 250, topMark: 630, label: 'задняя стойка' },
-      { low: 268, top: 648, lowMark: 235, topMark: 615, label: 'передняя стойка' },
-    ],
+    rows: null,
     fixed: true,
-    marks: 'передняя стойка 235/615, задняя стойка 250/630',
+    direct: true,
+    marks: 'два Ø7 бака: ±142.5 мм, отм. 663',
   });
   assert.deepEqual(api.tankBracketRows({ d: { id: 'chiller-600x900' } },
     rear, front, { a: 'x', s: 1 }), { unsupported: true },
-    'прежняя правая стенка со щитом запрещена');
-  assert.deepEqual(api.tankBracketRows({ d: { id: 'chiller-600x900' } },
-    { nm: 'стойка из STEP (17)' }, { nm: 'стойка из STEP (42)' }, left), rows,
-    'ряды определяются по стороне и координате, даже если STEP испортил имена');
+    'стенка со щитом по-прежнему запрещена');
   assert.equal(api.tankBracketRows({ d: { id: 'custom-frame' } },
-    { nm: 'custom post' }, { nm: 'custom post' }, left), null);
+    rear, front, left), null);
 });
 
-test('узел состоит из двух рамных кронштейнов, диагоналей и верхней стяжки', () => {
+test('крепление содержит только два прямых болта по координатам STEP бака', () => {
   const cut = api.shelfCutOf({
-    a: 'x', w: 'y', P0: rear, P1: front, face: -427, dir: 1,
-    cw: 0, ca: -321, fw: 525, fa: 200, off: 0,
-    z: 250, zTop: 663, zBolt: 268,
-    rows: [
-      { low: 283, top: 663 },
-      { low: 268, top: 648 },
-    ],
+    a: 'x', w: 'y', face: -427, dir: 1, cw: 0, z: 250,
   });
-  assert.equal(cut.pl.length, 2, 'две нижние опоры');
-  assert.equal(cut.lg.length, 2, 'две вертикальные полосы');
-  assert.equal(cut.bk.length, 2, 'две ответные пластины');
-  assert.equal(cut.dg.length, 2, 'две диагонали');
-  assert.equal(cut.st.length, 3, 'П-образная стяжка: поперечина и два уха');
-  assert.equal(cut.pd.length, 2, 'EPDM под обеими опорами');
-  assert.equal(cut.bo.length, 4, 'по два штатных болта на стойку');
-  assert.deepEqual(cut.bo.map(p => p[2]), [283, 663, 268, 648]);
-  assert.deepEqual(cut.dg.map(d => d.p1[2]), [663, 648],
-    'каждая диагональ приходит в верхнее отверстие своей стойки');
+  assert.deepEqual(cut.bo, [
+    [-427, -142.5, 663],
+    [-427, 142.5, 663],
+  ]);
+  for (const key of ['pl', 'lg', 'bk', 'dg', 'st', 'pd'])
+    assert.deepEqual(cut[key], [], key + ' отсутствует');
 });
 
-test('бак прижат к внутренней плоскости левой панели, а не к краю широкой стойки', () => {
+test('бак прижат к внутренней плоскости левой панели', () => {
   const parts = [
     { name: rear.nm },
     { name: front.nm },
@@ -76,44 +61,43 @@ test('бак прижат к внутренней плоскости левой 
   ];
   const boxes = [rear.b, front.b, sidePanel];
   const postFace = Math.max(rear.b.max.x, front.b.max.x);
-  assert.equal(postFace, -272, 'широкая передняя стойка действительно выступает в полость');
-  const face = api.tankWallFace(parts, boxes, left, -450, postFace);
-  assert.equal(face, -427, 'берём внутреннюю грань боковой панели');
-  const center = api.tankWallCenter(face, 1, 200, 0);
-  assert.equal(center, -321);
-  assert.equal(center - 100 - face, 6, 'между панелью и баком только кронштейн 3 мм + EPDM 3 мм');
-  assert.ok(center - 100 >= -420 - 6, 'бак остаётся внутри допуска полости корпуса');
-  assert.equal(api.tankWallFace([], [], left, -450, postFace), postFace,
-    'у произвольного корпуса без панели остаётся безопасная привязка к стойкам');
+  assert.equal(api.tankWallFace(parts, boxes, left, -450, postFace), -427);
+  const center = api.tankWallCenter(-427, 1, 210, 0);
+  assert.equal(center, -321.5);
+  assert.equal(center - 105 - (-427), 0.5, 'видимого воздушного зазора нет');
 });
 
-test('команда и спецификация называют изготовляемый узел полностью', () => {
-  assert.match(html, /▤ Закрепить бак/);
-  assert.match(html, /Боковые рамные кронштейны[\s\S]{0,120}бак прижат к левой панели/);
-  assert.match(html, /передняя стойка Ø7 235\/615, задняя Ø7 250\/630/);
-  assert.match(html, /wall:'left-flush'/);
-  assert.match(html, /Кронштейн рамный бака, лист/);
-  assert.match(html, /Стяжка бака П-образная 30×2/);
-  assert.match(html, /Пластина ответная 40×400×3/);
-  assert.match(html, /Комплект прокладок EPDM 3 мм/);
-  assert.match(html, /Болт М6×35, 2 шайбы, гайка самоконтрящаяся/);
+test('интерфейс и BOM описывают прямое крепление без изготовляемого узла', () => {
+  assert.match(html, /Прямо через отверстия бака/);
+  assert.match(html, /два штатных Ø7 на боковом фланце/);
+  assert.match(html, /wall:'left-direct'/);
+  assert.match(html, /kind:'tank-holes'/);
+  assert.match(html, /Болт М6×35, шайба широкая, гайка самоконтрящаяся/);
+  assert.match(html, /sh\.v>=4&&\(sh\.bo\|\|\[\]\)\.length/);
+  assert.doesNotMatch(html, /Кронштейн рамный бака, лист/);
+  assert.doesNotMatch(html, /Стяжка бака П-образная/);
+  assert.doesNotMatch(html, /Пластина ответная 40×400×3/);
 });
 
-/* Проект грузится по одной детали, и бак приезжает раньше корпуса. refresh()
-   внутри addItem не находил корпус, рвал связь бака — и вместе со связью
-   пропадало крепление на стойках: после F5 бак снова лежал на дне. */
+test('старое крепление мигрирует на прямые болты и сохраняется', () => {
+  const load = html.slice(html.indexOf('async function loadProjectData(data){'),
+                          html.indexOf('async function openProject(id){'));
+  assert.match(load, /if\(!sh\|\|sh\.v>=4\)return;/);
+  assert.match(load, /tankShelfPut\(p,\{quiet:true\}\)/);
+  assert.match(load, /schemaMoved\|\|tankMountMoved/);
+
+  const history = html.slice(html.indexOf('async function histApply(snapshot)'),
+                             html.indexOf('async function histGo(back)'));
+  assert.match(history, /sh:it\.link\.sh\?JSON\.parse\(JSON\.stringify\(it\.link\.sh\)\):undefined/,
+    'undo/redo не теряет прямые болты');
+});
+
+/* Проект грузится по одной детали, и бак может приехать раньше корпуса. */
 test('крепление бака переживает перезагрузку проекта', () => {
   const reseat = html.slice(html.indexOf('function reseatLink(it){'),
                             html.indexOf('function linkSel('));
-  assert.match(reseat, /if\(!fr\)\{if\(!_loading\)it\.link=null;return;\}/,
-    'пока проект грузится, связь бака не рвём');
-  const face = html.slice(html.indexOf('function faceMate(it){'),
-                          html.indexOf('function faceMate(it){') + 260);
-  assert.match(face, /if\(!fr\)\{if\(!_loading\)it\.link=null;return false;\}/,
-    'та же ловушка у приборов на лицевой панели');
-
+  assert.match(reseat, /if\(!fr\)\{if\(!_loading\)it\.link=null;return;\}/);
   const load = html.slice(html.indexOf('async function loadProjectData(data){'),
                           html.indexOf('async function openProject(id){'));
-  assert.match(load, /sh:p\.link\.sh/,
-    'при переносе uid-ов крепление бака (link.sh) не теряется');
+  assert.match(load, /sh:p\.link\.sh/);
 });

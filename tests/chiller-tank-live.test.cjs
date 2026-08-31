@@ -88,14 +88,14 @@ test('при подтверждении бак получает место previ
   assert.match(put, /const st=\{pin:old\.pin,off:old\.off,link:old\.link,fit:old\.fit,sch:old\.sch\}/);
 });
 
-test('кнопка бака ищет место, строит кронштейны и создаёт tank-link', () => {
+test('кнопка бака ищет место, ставит прямые болты и создаёт tank-link', () => {
   assert.match(page, /id="bTankLink"[^>]*[\s\S]{0,240}?Закрепить бак/);
   assert.match(page, /function tankShelfPlan\(it,fr\)/);
-  assert.match(page, /function tankShelfPut\(it\)/);
+  assert.match(page, /function tankShelfPut\(it,opt\)/);
   assert.match(page, /const plan=tankShelfPlan\(it,fr\)/);
   assert.match(page, /it\.link=\{to:fr\.uid,mount:'tank',face:'pan',sh:plan\.sh\}/);
   assert.match(page, /it\.link\.rel=tankRelOf\(it,fr\)/);
-  assert.match(page, /pushHist\('бак на рамные кронштейны к стойкам'\)/);
+  assert.match(page, /pushHist\('прямое крепление бака через штатные отверстия'\)/);
 });
 
 test('относительный transform ведёт бак за перемещением и поворотом корпуса', () => {
