@@ -29,11 +29,11 @@ const left = { a: 'x', s: -1, t: 'левой' };
 test('штатный корпус использует четыре Ø7 бака и два нижних кронштейна', () => {
   const holes = api.tankBracketRows({
     d: { id: 'user:frame', name: 'AG-41.000.000СБ Корпус чиллера' },
-  }, rear, front, left);
+  }, rear, front, left, 36);
   assert.deepEqual(holes, {
-    support: 250,
-    low: 262.5,
-    top: 660,
+    support: 236,
+    low: 248.5,
+    top: 646,
     rows: null,
     fixed: true,
     direct: true,
@@ -42,47 +42,47 @@ test('штатный корпус использует четыре Ø7 бака
     marks: '4 × Ø7 в стойки · 2 кронштейна снизу',
   });
   assert.deepEqual(api.tankBracketRows({ d: { id: 'chiller-600x900' } },
-    rear, front, { a: 'x', s: 1 }), { unsupported: true },
+    rear, front, { a: 'x', s: 1 }, 36), { unsupported: true },
     'стенка со щитом по-прежнему запрещена');
   assert.equal(api.tankBracketRows({ d: { id: 'custom-frame' } },
-    rear, front, left), null);
+    rear, front, left, 36), null);
 });
 
 test('разворот +90° совмещает по два отверстия с каждой стойкой', () => {
-  const holes = api.tankPostHoleSet(Math.PI / 2, -306.25, -3, 250);
+  const holes = api.tankPostHoleSet(Math.PI / 2, -306.25, -3, 236);
   assert.deepEqual(holes.map(h => h.p), [
-    [-402.55, -232, 262.5],
-    [-402.55, -232, 660],
-    [-402.55, 226, 262.5],
-    [-402.55, 226, 660],
+    [-402.55, -232, 248.5],
+    [-402.55, -232, 646],
+    [-402.55, 226, 248.5],
+    [-402.55, 226, 646],
   ]);
   assert.deepEqual(holes.map(h => h.d), new Array(4).fill([-1, 0]));
   assert.equal(api.tankPostHoleFit(holes, rear, front), true,
     'по два отверстия лежат в металле каждой стойки');
 
-  const mirrored = api.tankPostHoleSet(Math.PI * 3 / 2, -306.25, -3, 250);
+  const mirrored = api.tankPostHoleSet(Math.PI * 3 / 2, -306.25, -3, 236);
   assert.equal(api.tankPostHoleFit(mirrored, rear, front), false,
     'зеркальный разворот уносит ряд отверстий мимо стоек');
 
   const cut = api.shelfCutOf({ a: 'x', w: 'y', dir: 1, ca: -321.5,
-    cw: -3, fw: 525, z: 250, postHoles: holes });
+    cw: -3, fw: 525, z: 236, postHoles: holes });
   assert.deepEqual(cut.bo, holes.map(h => h.p));
   assert.deepEqual(cut.bd, new Array(4).fill([-1, 0]));
   assert.equal(cut.br.length, 4, 'две пластины и две стойки кронштейнов');
   assert.deepEqual(cut.br[0], {
-    x0: -305.5, x1: -205.5, y0: -280.5, y1: -255.5, z0: 50, z1: 52,
+    x0: -305.5, x1: -205.5, y0: -280.5, y1: -255.5, z0: 36, z1: 38,
   });
   assert.deepEqual(cut.br[1], {
-    x0: -278, x1: -233, y0: -280.5, y1: -265.5, z0: 52, z1: 275,
+    x0: -278, x1: -233, y0: -280.5, y1: -265.5, z0: 38, z1: 261,
   });
   assert.equal(cut.bm.length, 4, 'по два М6 на каждом кронштейне');
   assert.deepEqual(cut.bm.slice(0, 2), [
-    [-265, -265.5, 262.5], [-246, -265.5, 262.5],
+    [-265, -265.5, 248.5], [-246, -265.5, 248.5],
   ], 'М6 сохраняют заводское положение с внутренней стороны бака');
   assert.deepEqual(cut.bmd.slice(0, 2), [[0, -1, 0], [0, -1, 0]]);
   assert.equal(cut.b8.length, 4, 'по два М8 в раму на каждом кронштейне');
   assert.deepEqual(cut.b8.slice(0, 2), [
-    [-288, -265.5, 52], [-223, -265.5, 52],
+    [-288, -265.5, 38], [-223, -265.5, 38],
   ], 'М8 проходят через отверстия опорной пластины в нижнюю раму');
   for (const key of ['pl', 'lg', 'bk', 'dg', 'st', 'pd'])
     assert.deepEqual(cut[key], [], key + ' отсутствует');
@@ -113,7 +113,9 @@ test('интерфейс и BOM описывают заводской узел �
   assert.match(html, /Комплект М6×14 DIN 7045 \+ гайка и шайбы · бак → кронштейны/);
   assert.match(html, /Комплект М8×20 ГОСТ 11738-84 \+ гайка и шайбы · кронштейны → рама/);
   assert.match(html, /pc\.set\(SH_BRACKET/);
-  assert.match(html, /const sh=\{v:7/);
+  assert.match(html, /const sh=\{v:8/);
+  assert.match(html, /const support=zFloor\+SH_OEM_BASE_DROP/,
+    'низ точной пластины садится на верхнюю плоскость листа');
   assert.match(html, /tankOemBracketGeo\(\)/);
   assert.match(html, /exactStepAssembly='AG-04\.002\.000СБ'/);
   assert.match(html, /\[0,Math\.PI\/2,Math\.PI,Math\.PI\*3\/2\]/,
@@ -159,7 +161,7 @@ test('меш кронштейнов и крепежа взят из исходн
 test('прежняя посадка мигрирует на точную STEP-геометрию и сохраняется', () => {
   const load = html.slice(html.indexOf('async function loadProjectData(data){'),
                           html.indexOf('async function openProject(id){'));
-  assert.match(load, /if\(!sh\|\|sh\.v>=7\)return;/);
+  assert.match(load, /if\(!sh\|\|sh\.v>=8\)return;/);
   assert.match(load, /tankShelfPut\(p,\{quiet:true\}\)/);
   assert.match(load, /schemaMoved\|\|tankMountMoved/);
 
