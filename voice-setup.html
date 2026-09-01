@@ -24,6 +24,12 @@
     .actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:18px; }
     button { min-height:52px; border:0; border-radius:15px; padding:12px 16px; font:700 16px/1.2 inherit; cursor:pointer; }
     button:disabled { opacity:.55; cursor:wait; }
+    .login { display:none; margin:0 0 18px; padding:16px; border-radius:18px; background:#fff6df; border:1px solid #ead59b; }
+    .login.visible { display:block; }
+    .login p { margin:0 0 10px; color:#684f17; line-height:1.4; }
+    .login-row { display:grid; grid-template-columns:1fr auto; gap:10px; }
+    .login input { min-width:0; border:1px solid #c8b87d; border-radius:13px; background:#fff; padding:12px; font:inherit; color:inherit; }
+    #login-button { min-height:48px; background:#8a681a; color:#fff; }
     #create { background:#173b5e; color:#fff; box-shadow:0 10px 25px #173b5e38; }
     #test { background:#dcecf2; color:#174861; }
     #status { margin-top:16px; padding:13px 14px; border-radius:14px; background:#eef3f6; line-height:1.4; }
@@ -33,7 +39,7 @@
     audio.ready { display:block; }
     .privacy { margin:18px 2px 0; color:#657989; font-size:13px; line-height:1.45; }
     a { color:#176786; }
-    @media (max-width:520px) { .card{padding:18px}.actions{grid-template-columns:1fr} }
+    @media (max-width:520px) { .card{padding:18px}.actions,.login-row{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
@@ -42,6 +48,15 @@
   <section class="card">
     <h1>Персональный голос Дмитрия</h1>
     <p class="lead">Загрузите две записи один раз. После создания Клава будет озвучивать ответы вашим голосом вместо <code>marin</code>.</p>
+
+    <div class="login" id="login-panel">
+      <p><strong>Нужно снова войти в CRM.</strong><br>Сессия в этом браузере отсутствует или истекла.</p>
+      <div class="login-row">
+        <input id="password" type="password" placeholder="Пароль CRM" autocomplete="current-password">
+        <button id="login-button" type="button">Войти</button>
+      </div>
+      <small>Пароль используется только для входа и не сохраняется на этой странице.</small>
+    </div>
 
     <div class="step">
       <div class="step-head"><span class="num">1</span>Запись согласия</div>
@@ -74,6 +89,9 @@
   'use strict';
   const TOKEN_KEY = 'atomus_token';
   const DIRECT_API = 'https://worker-production-9b70.up.railway.app';
+  const loginPanel = document.getElementById('login-panel');
+  const password = document.getElementById('password');
+  const loginButton = document.getElementById('login-button');
   const consent = document.getElementById('consent');
   const sample = document.getElementById('sample');
   const phrase = document.getElementById('phrase');
@@ -86,6 +104,16 @@
   function show(message, kind) {
     status.textContent = message;
     status.className = kind || '';
+  }
+  function requireLogin(message) {
+    localStorage.removeItem(TOKEN_KEY);
+    loginPanel.classList.add('visible');
+    show(message || 'Сессия истекла. Войдите в CRM и продолжите.', 'err');
+    setTimeout(() => password.focus(), 50);
+  }
+  function hideLogin() {
+    loginPanel.classList.remove('visible');
+    password.value = '';
   }
   async function api(path, init = {}, direct = false) {
     init.headers = Object.assign({}, init.headers, { Authorization: 'Bearer ' + token() });
@@ -110,14 +138,60 @@
     const data = await response.json().catch(() => ({}));
     return data.message || (fallback + ' Код сервера: ' + response.status + '.');
   }
+  async function checkAuthorized(response, message) {
+    if (response.status !== 401) return response;
+    requireLogin(message);
+    throw new Error(message || 'Сессия истекла. Войдите в CRM и продолжите.');
+  }
+  async function refreshStatus() {
+    if (!token()) {
+      requireLogin('Войдите в CRM, чтобы создать персональный голос.');
+      return;
+    }
+    const response = await api('/api/dev-chat/custom-voice');
+    await checkAuthorized(response);
+    if (!response.ok) throw new Error(await responseError(response, 'Сервер ещё не обновлён.'));
+    const data = await response.json();
+    hideLogin();
+    show(data.configured ? 'Персональный голос уже подключён — можно проверять.' : 'Готово к загрузке двух записей.', data.configured ? 'ok' : '');
+  }
+  async function login() {
+    const value = password.value.trim();
+    if (!value) { show('Введите пароль CRM.', 'err'); password.focus(); return; }
+    if (value.length < 6) { show('Пароль должен быть не короче 6 символов.', 'err'); password.focus(); return; }
+    loginButton.disabled = true;
+    show('Проверяю пароль…');
+    try {
+      const response = await fetch('/api/auth/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: value })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.token) {
+        throw new Error(data.message || data.error || 'Неверный пароль.');
+      }
+      localStorage.setItem(TOKEN_KEY, data.token);
+      hideLogin();
+      show('Вход выполнен. Проверяю подключение…', 'ok');
+      await refreshStatus();
+    } catch (error) {
+      password.value = '';
+      show(error.message || String(error), 'err');
+      password.focus();
+    } finally {
+      loginButton.disabled = false;
+    }
+  }
   async function speak() {
-    if (!token()) throw new Error('Сначала войдите в CRM, затем снова откройте эту страницу.');
+    if (!token()) { requireLogin(); throw new Error('Войдите в CRM и продолжите.'); }
     const text = phrase.value.trim();
     if (!text) throw new Error('Введите тестовую фразу.');
     show('Создаю тестовую озвучку…');
     const response = await api('/api/dev-chat/speech', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text })
     });
+    await checkAuthorized(response);
     if (!response.ok) throw new Error(await responseError(response, 'Не удалось создать озвучку.'));
     const blob = await response.blob();
     if (player.src) URL.revokeObjectURL(player.src);
@@ -128,7 +202,7 @@
   }
   create.addEventListener('click', async () => {
     try {
-      if (!token()) throw new Error('Сначала войдите в CRM, затем снова откройте эту страницу.');
+      if (!token()) { requireLogin(); throw new Error('Войдите в CRM и продолжите.'); }
       if (!consent.files[0] || !sample.files[0]) throw new Error('Выберите обе аудиозаписи.');
       const duration = await audioDuration(sample.files[0]);
       if (duration > 30.2) throw new Error('Образец длится ' + Math.ceil(duration) + ' секунд. Нужен файл не длиннее 30 секунд.');
@@ -142,6 +216,7 @@
       const ticketResponse = await api(
         '/api/dev-chat/custom-voice-ticket', { method: 'POST' }
       );
+      await checkAuthorized(ticketResponse, 'Сессия истекла. Войдите в CRM и снова нажмите «Создать мой голос».');
       if (!ticketResponse.ok) {
         throw new Error(await responseError(ticketResponse, 'Не удалось разрешить загрузку.'));
       }
@@ -164,14 +239,13 @@
     try { await speak(); } catch (error) { show(error.message || String(error), 'err'); }
     finally { test.disabled = false; }
   });
+  loginButton.addEventListener('click', login);
+  password.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); login(); }
+  });
   (async () => {
-    if (!token()) { show('Вы не вошли в CRM. Откройте главную страницу, войдите и вернитесь сюда.', 'err'); return; }
-    try {
-      const response = await api('/api/dev-chat/custom-voice');
-      if (!response.ok) throw new Error(await responseError(response, 'Сервер ещё не обновлён.'));
-      const data = await response.json();
-      show(data.configured ? 'Персональный голос уже подключён — можно проверять.' : 'Готово к загрузке двух записей.', data.configured ? 'ok' : '');
-    } catch (error) { show(error.message || String(error), 'err'); }
+    try { await refreshStatus(); }
+    catch (error) { show(error.message || String(error), 'err'); }
   })();
 })();
 </script>

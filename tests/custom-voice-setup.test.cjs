@@ -35,3 +35,11 @@ test('долгая загрузка получает одноразовый пр
 test('страница сообщает, что голос сгенерирован ИИ', () => {
   assert.match(html, /голос является сгенерированным ИИ/);
 });
+
+test('при истёкшей сессии можно войти по паролю, не покидая страницу', () => {
+  assert.match(html, /id="login-panel"/);
+  assert.match(html, /id="password" type="password"/);
+  assert.match(html, /fetch\('\/api\/auth\/password'/);
+  assert.match(html, /localStorage\.setItem\(TOKEN_KEY, data\.token\)/);
+  assert.match(html, /response\.status !== 401/);
+});
