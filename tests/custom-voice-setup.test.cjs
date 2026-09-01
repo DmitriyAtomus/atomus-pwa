@@ -23,6 +23,12 @@ test('после создания можно сразу прослушать с�
   assert.match(html, /player\.play\(\)/);
 });
 
+test('долгое создание голоса идёт напрямую в Railway без тайм-аута Vercel', () => {
+  assert.match(html, /const DIRECT_API = 'https:\/\/worker-production-9b70\.up\.railway\.app'/);
+  assert.match(html, /\/api\/dev-chat\/custom-voice'[\s\S]{0,100}true/);
+  assert.match(html, /\[403, 502, 504\]/);
+});
+
 test('страница сообщает, что голос сгенерирован ИИ', () => {
   assert.match(html, /голос является сгенерированным ИИ/);
 });
