@@ -1,0 +1,28 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+
+const html = fs.readFileSync(path.join(__dirname, '..', 'voice-setup.html'), 'utf8');
+
+test('страница отправляет согласие и образец в защищённый API', () => {
+  assert.match(html, /form\.append\('consent'/);
+  assert.match(html, /form\.append\('sample'/);
+  assert.match(html, /\/api\/dev-chat\/custom-voice/);
+  assert.match(html, /Authorization: 'Bearer '/);
+});
+
+test('образец ограничен тридцатью секундами', () => {
+  assert.match(html, /duration > 30\.2/);
+  assert.match(html, /не длиннее 30 секунд/);
+});
+
+test('после создания можно сразу прослушать согласованную фразу', () => {
+  assert.match(html, /Привет, Андрей\. Заведи данные в производство, пожалуйста\./);
+  assert.match(html, /\/api\/dev-chat\/speech/);
+  assert.match(html, /player\.play\(\)/);
+});
+
+test('страница сообщает, что голос сгенерирован ИИ', () => {
+  assert.match(html, /голос является сгенерированным ИИ/);
+});
