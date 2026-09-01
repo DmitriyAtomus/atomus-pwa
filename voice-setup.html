@@ -136,6 +136,14 @@
   }
   async function responseError(response, fallback) {
     const data = await response.json().catch(() => ({}));
+    const raw = JSON.stringify(data);
+    if (/does not have access to this endpoint/i.test(raw)) {
+      create.dataset.unavailable = 'true';
+      create.disabled = true;
+      create.textContent = 'Доступ OpenAI пока не открыт';
+      test.textContent = 'Проверить обычный голос';
+      return 'OpenAI пока не открыл вашей организации функцию Custom Voice. Персональный голос создать нельзя; кнопка ниже проверит обычный естественный голос marin.';
+    }
     return data.message || (fallback + ' Код сервера: ' + response.status + '.');
   }
   async function checkAuthorized(response, message) {
@@ -231,7 +239,8 @@
     } catch (error) {
       show(error.message || String(error), 'err');
     } finally {
-      create.disabled = test.disabled = false;
+      create.disabled = create.dataset.unavailable === 'true';
+      test.disabled = false;
     }
   });
   test.addEventListener('click', async () => {

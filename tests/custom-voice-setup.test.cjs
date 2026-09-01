@@ -43,3 +43,11 @@ test('при истёкшей сессии можно войти по парол
   assert.match(html, /localStorage\.setItem\(TOKEN_KEY, data\.token\)/);
   assert.match(html, /response\.status !== 401/);
 });
+
+test('отсутствие доступа OpenAI показывается понятным сообщением', () => {
+  assert.match(html, /does not have access to this endpoint/);
+  assert.doesNotMatch(html, /response\.status === 404 && \/does not have access/);
+  assert.match(html, /OpenAI пока не открыл вашей организации функцию Custom Voice/);
+  assert.match(html, /Проверить обычный голос/);
+  assert.match(html, /create\.dataset\.unavailable/);
+});
