@@ -24,10 +24,11 @@ test('выбранный блок передаётся Клаве с точны�
 
 test('мост выбора не получает origin и токен CRM', () => {
   assert.match(app, /function _devChatArtifactBridge\(token\)/);
-  assert.match(app, /parent\.postMessage/);
+  assert.match(app, /top\.postMessage/);
   assert.match(app, /sandbox="allow-scripts allow-popups allow-forms allow-modals"/);
   assert.doesNotMatch(app, /sandbox="[^"]*allow-same-origin/);
   assert.match(app, /function _devChatArtifactSafeSelection/);
+  assert.match(app, /data-atomus-visual-bridge/);
 });
 
 test('предпросмотр переключается между компьютером, планшетом и телефоном', () => {
@@ -40,7 +41,7 @@ test('предпросмотр переключается между компь�
 });
 
 test('версия содержит визуальные правки сайта', () => {
-  assert.equal(version.version, 'v2.46.118');
-  assert.match(version.label, /Визуальные правки сайта/);
-  assert.match(app, /const APP_VERSION = "v2\.46\.118"/);
+  assert.equal(version.version, 'v2.46.119');
+  assert.match(version.label, /Визуальные правки.*сайта/);
+  assert.match(app, /const APP_VERSION = "v2\.46\.119"/);
 });

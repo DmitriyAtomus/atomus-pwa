@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.118";
+const APP_VERSION = "v2.46.119";
 const APP_VERSION_DATE = "01.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2581,6 +2581,7 @@ function _devChatArtifactBridge(token) {
     const TYPE = 'atomus-site-visual-editor';
     let enabled = false;
     let selected = null;
+    let pageHint = '';
     const docs = [];
 
     function trim(value, max) {
@@ -2631,7 +2632,8 @@ function _devChatArtifactBridge(token) {
 
     function currentPage() {
       const active = document.querySelector('[data-page].active');
-      return trim(active && active.getAttribute('data-page'), 120)
+      return trim(active && (active.textContent || active.getAttribute('data-page')), 120)
+        || pageHint
         || trim(document.title, 120) || 'Текущая страница';
     }
 
@@ -2661,7 +2663,35 @@ function _devChatArtifactBridge(token) {
     }
 
     function post(kind, data) {
-      parent.postMessage({ type: TYPE, token: bridgeToken, kind: kind, data: data || {} }, '*');
+      // top нужен для автономных предпросмотров, где сама страница сайта живёт
+      // ещё в одном srcdoc-iframe внутри оболочки с переключателем страниц.
+      top.postMessage({ type: TYPE, token: bridgeToken, kind: kind, data: data || {} }, '*');
+    }
+
+    function bridgeMarkup() {
+      return '<script data-atomus-visual-bridge>(' + visualBridge.toString() + ')(' +
+        JSON.stringify(bridgeToken) + ');<' + '/script>';
+    }
+
+    function injectFrame(frame) {
+      if (!frame) return false;
+      const source = frame.getAttribute('srcdoc');
+      if (!source) return false;
+      if (source.indexOf('data-atomus-visual-bridge') >= 0) return true;
+      const lower = source.toLowerCase();
+      const at = lower.lastIndexOf('</body>');
+      const bridge = bridgeMarkup();
+      frame.setAttribute('srcdoc', at >= 0
+        ? source.slice(0, at) + bridge + source.slice(at)
+        : source + bridge);
+      return true;
+    }
+
+    function relay(msg) {
+      Array.from(document.querySelectorAll('iframe')).forEach(function (frame) {
+        injectFrame(frame);
+        try { frame.contentWindow.postMessage(msg, '*'); } catch (e) { /* нет окна */ }
+      });
     }
 
     function clearSelection() {
@@ -2690,6 +2720,28 @@ function _devChatArtifactBridge(token) {
       (doc.head || doc.documentElement).appendChild(style);
     }
 
+    function prepareFrame(frame) {
+      if (!frame) return;
+      if (!frame.__atomusVisualFrame) {
+        frame.__atomusVisualFrame = true;
+        frame.addEventListener('load', function () {
+          if (enabled) {
+            try {
+              frame.contentWindow.postMessage({
+                type: TYPE + '-control', token: bridgeToken, action: 'pick',
+                enabled: true, page: currentPage(),
+              }, '*');
+            } catch (e) { /* нет окна */ }
+          }
+        });
+      }
+      // В sandbox без allow-same-origin содержимое вложенного srcdoc нельзя
+      // читать снаружи. Поэтому тот же ограниченный мост заранее кладётся в
+      // строку srcdoc и общается только через postMessage.
+      if (injectFrame(frame)) return;
+      try { attach(frame.contentDocument); } catch (e) { /* чужой origin */ }
+    }
+
     function attach(doc) {
       if (!doc || doc.__atomusVisualEditor) return;
       doc.__atomusVisualEditor = true;
@@ -2715,13 +2767,7 @@ function _devChatArtifactBridge(token) {
         if (event.stopImmediatePropagation) event.stopImmediatePropagation();
         choose(el, doc);
       }, true);
-      Array.from(doc.querySelectorAll('iframe')).forEach(function (frame) {
-        function attachFrame() {
-          try { attach(frame.contentDocument); } catch (e) { /* чужой origin */ }
-        }
-        frame.addEventListener('load', attachFrame);
-        attachFrame();
-      });
+      Array.from(doc.querySelectorAll('iframe')).forEach(prepareFrame);
       if (doc.body) doc.body.classList.toggle('atomus-ve-picking', enabled);
     }
 
@@ -2736,8 +2782,18 @@ function _devChatArtifactBridge(token) {
     window.addEventListener('message', function (event) {
       const msg = event.data || {};
       if (msg.type !== TYPE + '-control' || msg.token !== bridgeToken) return;
-      if (msg.action === 'pick') setEnabled(msg.enabled);
-      if (msg.action === 'clear') clearSelection();
+      if (msg.page) pageHint = trim(msg.page, 120);
+      if (msg.action === 'pick') {
+        setEnabled(msg.enabled);
+        relay({
+          type: TYPE + '-control', token: bridgeToken, action: 'pick',
+          enabled: !!msg.enabled, page: currentPage(),
+        });
+      }
+      if (msg.action === 'clear') {
+        clearSelection();
+        relay({ type: TYPE + '-control', token: bridgeToken, action: 'clear' });
+      }
     });
     attach(document);
     // Внутренние srcdoc-страницы могут появиться после запуска оболочки.
@@ -2745,7 +2801,7 @@ function _devChatArtifactBridge(token) {
     const timer = setInterval(function () {
       attach(document);
       Array.from(document.querySelectorAll('iframe')).forEach(function (frame) {
-        try { attach(frame.contentDocument); } catch (e) { /* чужой origin */ }
+        prepareFrame(frame);
       });
       scans += 1;
       if (scans > 40) clearInterval(timer);
@@ -2825,8 +2881,10 @@ function _devChatArtifactSafeSelection(value) {
 function _devChatArtifactMessage(event) {
   const state = _devChatArtifactState;
   const msg = event.data || {};
-  if (!state || event.source !== state.frame.contentWindow ||
-      msg.type !== _DCHAT_VISUAL_MESSAGE || msg.token !== state.token) return;
+  // Вложенный srcdoc имеет собственный WindowProxy, поэтому event.source не
+  // равен внешнему frame. Доступ защищает случайный токен текущего модального
+  // окна; входные строки дополнительно ограничивает SafeSelection ниже.
+  if (!state || msg.type !== _DCHAT_VISUAL_MESSAGE || msg.token !== state.token) return;
   if (msg.kind === 'selected') {
     const data = _devChatArtifactSafeSelection(msg.data);
     state.selection = data;
