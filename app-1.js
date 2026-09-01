@@ -43,8 +43,8 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.117";
-const APP_VERSION_DATE = "31.08.2026";
+const APP_VERSION = "v2.46.118";
+const APP_VERSION_DATE = "01.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -2560,6 +2560,333 @@ function _devChatArtifactCard(f) {
   return card;
 }
 
+// Визуальная правка сайта: макет остаётся в sandbox без allow-same-origin.
+// Внутрь srcdoc добавляется только маленький мост выбора элемента. Он не знает
+// токен CRM и не может вызвать API: наружу отдаёт лишь страницу, CSS-селектор и
+// короткий видимый текст, а задачу пользователь явно отправляет кнопкой.
+let _devChatArtifactState = null;
+const _DCHAT_VISUAL_MESSAGE = 'atomus-site-visual-editor';
+
+function _devChatArtifactToken() {
+  if (window.crypto && window.crypto.getRandomValues) {
+    const values = new Uint32Array(4);
+    window.crypto.getRandomValues(values);
+    return Array.from(values).map(function (n) { return n.toString(36); }).join('-');
+  }
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+}
+
+function _devChatArtifactBridge(token) {
+  function visualBridge(bridgeToken) {
+    const TYPE = 'atomus-site-visual-editor';
+    let enabled = false;
+    let selected = null;
+    const docs = [];
+
+    function trim(value, max) {
+      const clean = String(value || '').replace(/\s+/g, ' ').trim();
+      return clean.length > max ? clean.slice(0, max - 1) + '…' : clean;
+    }
+
+    function escapePart(doc, value) {
+      try {
+        if (doc.defaultView.CSS && doc.defaultView.CSS.escape) {
+          return doc.defaultView.CSS.escape(String(value));
+        }
+      } catch (e) { /* старый браузер */ }
+      return String(value).replace(/[^a-zA-Z0-9_-]/g, function (ch) {
+        return '\\' + ch.charCodeAt(0).toString(16) + ' ';
+      });
+    }
+
+    function selectorFor(el, doc) {
+      if (!el || el.nodeType !== 1) return '';
+      if (el.id) return '#' + escapePart(doc, el.id);
+      const parts = [];
+      let node = el;
+      while (node && node.nodeType === 1 && node !== doc.body && parts.length < 5) {
+        let part = node.tagName.toLowerCase();
+        const useful = Array.from(node.classList || []).filter(function (name) {
+          return name && !/^atomus-ve-/.test(name) && name.length < 48;
+        }).slice(0, 2);
+        if (useful.length) part += '.' + useful.map(function (name) {
+          return escapePart(doc, name);
+        }).join('.');
+        const parentNode = node.parentElement;
+        if (parentNode) {
+          const peers = Array.from(parentNode.children).filter(function (peer) {
+            return peer.tagName === node.tagName;
+          });
+          if (peers.length > 1) part += ':nth-of-type(' + (peers.indexOf(node) + 1) + ')';
+        }
+        parts.unshift(part);
+        node = parentNode;
+        if (node && node.id) {
+          parts.unshift('#' + escapePart(doc, node.id));
+          break;
+        }
+      }
+      return parts.join(' > ');
+    }
+
+    function currentPage() {
+      const active = document.querySelector('[data-page].active');
+      return trim(active && active.getAttribute('data-page'), 120)
+        || trim(document.title, 120) || 'Текущая страница';
+    }
+
+    function meaningfulTarget(target) {
+      if (!target || target.nodeType !== 1) return null;
+      if (/^(path|use|svg|span|strong|em|small|i)$/i.test(target.tagName)) {
+        return target.closest('a,button,h1,h2,h3,h4,p,figure,article,section,nav,header,footer')
+          || target.parentElement || target;
+      }
+      return target;
+    }
+
+    function describe(el, doc) {
+      const block = el.closest('section,article,header,footer,nav,main,[id]') || el;
+      const heading = block.querySelector && block.querySelector('h1,h2,h3,h4');
+      const image = el.matches('img') ? el : (el.querySelector && el.querySelector('img'));
+      const link = el.closest('a[href]');
+      return {
+        page: currentPage(),
+        selector: selectorFor(el, doc),
+        tag: (el.tagName || '').toLowerCase(),
+        text: trim(el.innerText || el.textContent || (image && image.alt), 260),
+        section: trim(heading && (heading.innerText || heading.textContent), 180),
+        alt: trim(image && image.getAttribute('alt'), 180),
+        href: trim(link && link.getAttribute('href'), 180),
+      };
+    }
+
+    function post(kind, data) {
+      parent.postMessage({ type: TYPE, token: bridgeToken, kind: kind, data: data || {} }, '*');
+    }
+
+    function clearSelection() {
+      if (selected && selected.classList) selected.classList.remove('atomus-ve-selected');
+      selected = null;
+      post('cleared');
+    }
+
+    function choose(el, doc) {
+      if (selected && selected.classList) selected.classList.remove('atomus-ve-selected');
+      selected = meaningfulTarget(el);
+      if (!selected) return;
+      selected.classList.add('atomus-ve-selected');
+      post('selected', describe(selected, doc));
+    }
+
+    function addStyle(doc) {
+      if (doc.getElementById('atomus-visual-editor-style')) return;
+      const style = doc.createElement('style');
+      style.id = 'atomus-visual-editor-style';
+      style.textContent =
+        '.atomus-ve-picking *{cursor:crosshair!important}' +
+        '.atomus-ve-hover{outline:2px dashed #ff8a1f!important;outline-offset:3px!important}' +
+        '.atomus-ve-selected{outline:3px solid #ff7a00!important;outline-offset:4px!important;' +
+          'box-shadow:0 0 0 5px rgba(255,122,0,.18)!important}';
+      (doc.head || doc.documentElement).appendChild(style);
+    }
+
+    function attach(doc) {
+      if (!doc || doc.__atomusVisualEditor) return;
+      doc.__atomusVisualEditor = true;
+      docs.push(doc);
+      addStyle(doc);
+      doc.addEventListener('mouseover', function (event) {
+        if (!enabled) return;
+        const el = meaningfulTarget(event.target);
+        if (el && el.classList) el.classList.add('atomus-ve-hover');
+      }, true);
+      doc.addEventListener('mouseout', function (event) {
+        const el = meaningfulTarget(event.target);
+        if (el && el.classList) el.classList.remove('atomus-ve-hover');
+      }, true);
+      doc.addEventListener('click', function (event) {
+        if (!enabled) return;
+        const el = meaningfulTarget(event.target);
+        // У многостраничного автономного предпросмотра верхние кнопки должны
+        // продолжать переключать страницы даже в режиме выбора.
+        if (doc === document && el && el.closest('.preview-bar,[data-atomus-editor-ignore]')) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+        choose(el, doc);
+      }, true);
+      Array.from(doc.querySelectorAll('iframe')).forEach(function (frame) {
+        function attachFrame() {
+          try { attach(frame.contentDocument); } catch (e) { /* чужой origin */ }
+        }
+        frame.addEventListener('load', attachFrame);
+        attachFrame();
+      });
+      if (doc.body) doc.body.classList.toggle('atomus-ve-picking', enabled);
+    }
+
+    function setEnabled(value) {
+      enabled = !!value;
+      docs.forEach(function (doc) {
+        if (doc.body) doc.body.classList.toggle('atomus-ve-picking', enabled);
+      });
+      post('mode', { enabled: enabled });
+    }
+
+    window.addEventListener('message', function (event) {
+      const msg = event.data || {};
+      if (msg.type !== TYPE + '-control' || msg.token !== bridgeToken) return;
+      if (msg.action === 'pick') setEnabled(msg.enabled);
+      if (msg.action === 'clear') clearSelection();
+    });
+    attach(document);
+    // Внутренние srcdoc-страницы могут появиться после запуска оболочки.
+    let scans = 0;
+    const timer = setInterval(function () {
+      attach(document);
+      Array.from(document.querySelectorAll('iframe')).forEach(function (frame) {
+        try { attach(frame.contentDocument); } catch (e) { /* чужой origin */ }
+      });
+      scans += 1;
+      if (scans > 40) clearInterval(timer);
+    }, 500);
+    post('ready');
+  }
+  return '<script>(' + visualBridge.toString() + ')(' + JSON.stringify(token) + ');<' + '/script>';
+}
+
+function _devChatArtifactInject(html, token) {
+  const bridge = _devChatArtifactBridge(token);
+  const source = String(html || '');
+  const lower = source.toLowerCase();
+  const at = lower.lastIndexOf('</body>');
+  return at >= 0 ? source.slice(0, at) + bridge + source.slice(at) : source + bridge;
+}
+
+function _devChatArtifactControl(action, extra) {
+  const state = _devChatArtifactState;
+  if (!state || !state.frame || !state.frame.contentWindow) return;
+  state.frame.contentWindow.postMessage(Object.assign({
+    type: _DCHAT_VISUAL_MESSAGE + '-control', token: state.token, action: action,
+  }, extra || {}), '*');
+}
+
+function _devChatArtifactPick(force) {
+  const state = _devChatArtifactState;
+  if (!state) return;
+  state.picking = typeof force === 'boolean' ? force : !state.picking;
+  state.box.classList.toggle('is-picking', state.picking);
+  const button = state.box.querySelector('[data-art-pick]');
+  if (button) {
+    button.classList.toggle('active', state.picking);
+    button.setAttribute('aria-pressed', state.picking ? 'true' : 'false');
+    button.innerHTML = state.picking
+      ? '<i class="ti ti-pointer-check"></i>Выберите блок на сайте'
+      : '<i class="ti ti-focus-2"></i>Указать блок';
+  }
+  _devChatArtifactControl('pick', { enabled: state.picking });
+}
+
+function _devChatArtifactViewport(size) {
+  const state = _devChatArtifactState;
+  if (!state) return;
+  const allowed = ['desktop', 'tablet', 'mobile'];
+  state.viewport = allowed.indexOf(size) >= 0 ? size : 'desktop';
+  state.box.setAttribute('data-viewport', state.viewport);
+  state.box.querySelectorAll('[data-art-viewport]').forEach(function (button) {
+    const active = button.getAttribute('data-art-viewport') === state.viewport;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+function _devChatArtifactClear() {
+  const state = _devChatArtifactState;
+  if (!state) return;
+  state.selection = null;
+  state.box.classList.remove('has-selection');
+  const label = state.box.querySelector('[data-art-selection]');
+  if (label) label.textContent = 'Вся страница';
+  const detail = state.box.querySelector('[data-art-selection-detail]');
+  if (detail) detail.textContent = 'Можно описать общую правку или сначала указать конкретный блок.';
+  _devChatArtifactControl('clear');
+}
+
+function _devChatArtifactSafeSelection(value) {
+  const input = value && typeof value === 'object' ? value : {};
+  const limits = { page: 120, selector: 360, tag: 32, text: 260, section: 180, alt: 180, href: 180 };
+  const safe = {};
+  Object.keys(limits).forEach(function (key) {
+    safe[key] = String(input[key] || '').replace(/\s+/g, ' ').trim().slice(0, limits[key]);
+  });
+  return safe;
+}
+
+function _devChatArtifactMessage(event) {
+  const state = _devChatArtifactState;
+  const msg = event.data || {};
+  if (!state || event.source !== state.frame.contentWindow ||
+      msg.type !== _DCHAT_VISUAL_MESSAGE || msg.token !== state.token) return;
+  if (msg.kind === 'selected') {
+    const data = _devChatArtifactSafeSelection(msg.data);
+    state.selection = data;
+    state.box.classList.add('has-selection');
+    const label = state.box.querySelector('[data-art-selection]');
+    const detail = state.box.querySelector('[data-art-selection-detail]');
+    if (label) label.textContent = data.section || data.text || data.selector || 'Выбранный блок';
+    if (detail) detail.textContent = (data.page || 'Страница') +
+      (data.selector ? ' · ' + data.selector : '');
+    const note = state.box.querySelector('[data-art-note]');
+    if (note) note.focus();
+    _devChatArtifactPick(false);
+  } else if (msg.kind === 'cleared') {
+    state.selection = null;
+  } else if (msg.kind === 'ready' && state.picking) {
+    _devChatArtifactControl('pick', { enabled: true });
+  }
+}
+
+async function _devChatArtifactSend() {
+  const state = _devChatArtifactState;
+  if (!state || !_devChatEmployeeMode()) return;
+  const note = state.box.querySelector('[data-art-note]');
+  const request = (note && note.value || '').trim();
+  if (!request) {
+    if (typeof showToast === 'function') showToast('Напишите, что нужно изменить', 'error');
+    if (note) note.focus();
+    return;
+  }
+  const selection = state.selection;
+  const lines = ['ВИЗУАЛЬНАЯ ПРАВКА САЙТА', 'Предпросмотр: ' + state.name];
+  if (selection) {
+    lines.push('Страница: ' + (selection.page || 'текущая'));
+    if (selection.selector) lines.push('Элемент: ' + selection.selector);
+    if (selection.section) lines.push('Раздел: ' + selection.section);
+    if (selection.text) lines.push('Текущий текст: «' + selection.text + '»');
+    if (selection.alt) lines.push('Изображение: ' + selection.alt);
+    if (selection.href) lines.push('Ссылка: ' + selection.href);
+  } else {
+    lines.push('Область: вся текущая страница');
+  }
+  lines.push('', 'Что изменить:', request, '',
+    'Внеси правку в рабочие исходники сайта, проверь компьютер и телефон и пришли новый HTML-предпросмотр.');
+  const input = _devChatEl('input');
+  if (!input) return;
+  input.value = lines.join('\n');
+  devChatGrow(input);
+  const button = state.box.querySelector('[data-art-send]');
+  if (button) button.disabled = true;
+  await devChatSend({
+    screen: 'site_visual_editor', artifact: state.name,
+    page: selection && selection.page || '', selector: selection && selection.selector || '',
+  });
+  if (!(input.value || '').trim()) {
+    if (note) note.value = '';
+    if (typeof showToast === 'function') showToast('Правка отправлена Клаве', 'success');
+  }
+  if (button) button.disabled = false;
+}
+
 // Живой просмотр макета: на телефоне — во весь экран, на широком — панелью
 // справа, чтобы лента с обсуждением осталась на другой половине.
 async function devChatOpenArtifact(url, name) {
@@ -2579,35 +2906,84 @@ async function devChatOpenArtifact(url, name) {
   const box = document.createElement('div');
   box.className = 'dchat-artview';
   box.id = 'dchat-artview';
+  const visual = _devChatEmployeeMode();
   box.innerHTML =
     '<div class="dchat-artview-back"></div>' +
     '<div class="dchat-artview-panel">' +
       '<div class="dchat-artview-head">' +
         '<i class="ti ti-layout-2"></i><span class="nm"></span>' +
+        (visual ? '<div class="dchat-artview-devices" aria-label="Размер предпросмотра">' +
+          '<button type="button" data-art-viewport="desktop" title="Компьютер" aria-label="Компьютер"><i class="ti ti-device-desktop"></i></button>' +
+          '<button type="button" data-art-viewport="tablet" title="Планшет" aria-label="Планшет"><i class="ti ti-device-tablet"></i></button>' +
+          '<button type="button" data-art-viewport="mobile" title="Телефон" aria-label="Телефон"><i class="ti ti-device-mobile"></i></button>' +
+        '</div>' +
+        '<button type="button" class="dchat-artview-pick" data-art-pick aria-pressed="false">' +
+          '<i class="ti ti-focus-2"></i>Указать блок</button>' : '') +
         '<button type="button" class="dchat-artview-x" aria-label="Закрыть">' +
           '<i class="ti ti-x"></i></button>' +
       '</div>' +
-      '<iframe class="dchat-artview-frame" ' +
-        'sandbox="allow-scripts allow-popups allow-forms allow-modals"></iframe>' +
+      '<div class="dchat-artview-canvas"><iframe class="dchat-artview-frame" ' +
+        'sandbox="allow-scripts allow-popups allow-forms allow-modals"></iframe></div>' +
+      (visual ? '<div class="dchat-artedit">' +
+        '<div class="dchat-artedit-target"><span>Правка для</span>' +
+          '<strong data-art-selection>Вся страница</strong>' +
+          '<small data-art-selection-detail>Можно описать общую правку или сначала указать конкретный блок.</small>' +
+          '<button type="button" data-art-clear title="Снять выбор"><i class="ti ti-x"></i></button></div>' +
+        '<div class="dchat-artedit-compose">' +
+          '<textarea rows="2" data-art-note placeholder="Например: сделай заголовок меньше и добавь воздуха сверху"></textarea>' +
+          '<button type="button" data-art-send><i class="ti ti-send"></i><span>Отправить Клаве</span></button>' +
+        '</div></div>' : '') +
     '</div>';
   box.querySelector('.nm').textContent = name;
   box.querySelector('.dchat-artview-x').onclick = devChatCloseArtifact;
   box.querySelector('.dchat-artview-back').onclick = devChatCloseArtifact;
   document.body.appendChild(box);
+  const frame = box.querySelector('.dchat-artview-frame');
+  if (visual) {
+    const token = _devChatArtifactToken();
+    _devChatArtifactState = {
+      box: box, frame: frame, token: token, name: name,
+      selection: null, picking: false, viewport: 'desktop',
+    };
+    window.addEventListener('message', _devChatArtifactMessage);
+    box.querySelector('[data-art-pick]').onclick = function () { _devChatArtifactPick(); };
+    box.querySelector('[data-art-clear]').onclick = _devChatArtifactClear;
+    box.querySelector('[data-art-send]').onclick = _devChatArtifactSend;
+    box.querySelector('[data-art-note]').addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        _devChatArtifactSend();
+      }
+    });
+    box.querySelectorAll('[data-art-viewport]').forEach(function (button) {
+      button.onclick = function () { _devChatArtifactViewport(button.getAttribute('data-art-viewport')); };
+    });
+    _devChatArtifactViewport('desktop');
+    frame.addEventListener('load', function () {
+      if (_devChatArtifactState && _devChatArtifactState.frame === frame && _devChatArtifactState.picking) {
+        _devChatArtifactControl('pick', { enabled: true });
+      }
+    });
+    html = _devChatArtifactInject(html, token);
+  }
   // srcdoc свойством, а не атрибутом: макет бывает длинным, и кавычки внутри
   // не должны рвать разметку
-  box.querySelector('.dchat-artview-frame').srcdoc = html;
+  frame.srcdoc = html;
   document.addEventListener('keydown', _devChatArtifactEsc);
 }
 
 function devChatCloseArtifact() {
   const box = document.getElementById('dchat-artview');
   if (box) box.remove();
+  window.removeEventListener('message', _devChatArtifactMessage);
+  _devChatArtifactState = null;
   document.removeEventListener('keydown', _devChatArtifactEsc);
 }
 
 function _devChatArtifactEsc(e) {
-  if (e.key === 'Escape') devChatCloseArtifact();
+  if (e.key !== 'Escape') return;
+  if (_devChatArtifactState && _devChatArtifactState.picking) _devChatArtifactPick(false);
+  else devChatCloseArtifact();
 }
 
 function _devChatFileIcon(f) {
