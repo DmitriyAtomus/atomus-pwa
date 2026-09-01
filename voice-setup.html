@@ -87,11 +87,11 @@
     status.textContent = message;
     status.className = kind || '';
   }
-  async function api(path, init = {}) {
+  async function api(path, init = {}, direct = false) {
     init.headers = Object.assign({}, init.headers, { Authorization: 'Bearer ' + token() });
-    let response = await fetch(path, init);
+    let response = await fetch((direct ? DIRECT_API : '') + path, init);
     const type = String(response.headers.get('content-type') || '').toLowerCase();
-    if (response.status === 403 && type.includes('text/html')) {
+    if (!direct && [403, 502, 504].includes(response.status) && type.includes('text/html')) {
       response = await fetch(DIRECT_API + path, init);
     }
     return response;
@@ -108,7 +108,7 @@
   }
   async function responseError(response, fallback) {
     const data = await response.json().catch(() => ({}));
-    return data.message || fallback;
+    return data.message || (fallback + ' Код сервера: ' + response.status + '.');
   }
   async function speak() {
     if (!token()) throw new Error('Сначала войдите в CRM, затем снова откройте эту страницу.');
@@ -137,7 +137,11 @@
       const form = new FormData();
       form.append('consent', consent.files[0], consent.files[0].name);
       form.append('sample', sample.files[0], sample.files[0].name);
-      const response = await api('/api/dev-chat/custom-voice', { method: 'POST', body: form });
+      // Создание двух объектов Custom Voice иногда идёт дольше лимита Vercel.
+      // Шлём этот единственный долгий запрос напрямую в Railway; CORS разрешён.
+      const response = await api(
+        '/api/dev-chat/custom-voice', { method: 'POST', body: form }, true
+      );
       if (!response.ok) throw new Error(await responseError(response, 'Не удалось создать голос.'));
       show('Персональный голос создан. Готовлю тестовую фразу…', 'ok');
       await speak();
