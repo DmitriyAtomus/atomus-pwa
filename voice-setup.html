@@ -137,11 +137,19 @@
       const form = new FormData();
       form.append('consent', consent.files[0], consent.files[0].name);
       form.append('sample', sample.files[0], sample.files[0].name);
-      // Создание двух объектов Custom Voice иногда идёт дольше лимита Vercel.
-      // Шлём этот единственный долгий запрос напрямую в Railway; CORS разрешён.
-      const response = await api(
-        '/api/dev-chat/custom-voice', { method: 'POST', body: form }, true
+      // Сначала получаем через авторизованный origin короткий одноразовый пропуск.
+      // Постоянный Bearer-токен на другой origin не отправляем.
+      const ticketResponse = await api(
+        '/api/dev-chat/custom-voice-ticket', { method: 'POST' }
       );
+      if (!ticketResponse.ok) {
+        throw new Error(await responseError(ticketResponse, 'Не удалось разрешить загрузку.'));
+      }
+      const ticketData = await ticketResponse.json();
+      if (!ticketData.ticket) throw new Error('Сервер не выдал пропуск для загрузки.');
+      const uploadUrl = DIRECT_API + '/api/dev-chat/custom-voice-upload?ticket=' +
+        encodeURIComponent(ticketData.ticket);
+      const response = await fetch(uploadUrl, { method: 'POST', body: form });
       if (!response.ok) throw new Error(await responseError(response, 'Не удалось создать голос.'));
       show('Персональный голос создан. Готовлю тестовую фразу…', 'ok');
       await speak();

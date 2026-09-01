@@ -23,9 +23,12 @@ test('после создания можно сразу прослушать с�
   assert.match(html, /player\.play\(\)/);
 });
 
-test('долгое создание голоса идёт напрямую в Railway без тайм-аута Vercel', () => {
+test('долгая загрузка получает одноразовый пропуск и идёт напрямую в Railway', () => {
   assert.match(html, /const DIRECT_API = 'https:\/\/worker-production-9b70\.up\.railway\.app'/);
-  assert.match(html, /\/api\/dev-chat\/custom-voice'[\s\S]{0,100}true/);
+  assert.match(html, /\/api\/dev-chat\/custom-voice-ticket/);
+  assert.match(html, /\/api\/dev-chat\/custom-voice-upload\?ticket=/);
+  assert.match(html, /encodeURIComponent\(ticketData\.ticket\)/);
+  assert.doesNotMatch(html, /custom-voice-upload[\s\S]{0,200}Authorization/);
   assert.match(html, /\[403, 502, 504\]/);
 });
 
