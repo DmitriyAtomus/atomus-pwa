@@ -4762,6 +4762,7 @@ let BOLTS=true;
 try{BOLTS=localStorage.getItem('chiller.bolts')!=='0';}catch(e){}
 function boltsApply(){
   placed.forEach(p=>{
+    applyOff(p);                       // заводская мелочь гаснет вместе с крепежом
     if(p._bolts)p._bolts.visible=BOLTS;
     if(p._shelf)p._shelf.traverse(o=>{
       if(o.userData&&o.userData.bolt)o.visible=BOLTS;
@@ -5087,6 +5088,15 @@ function applyOff(it){
     const g=gs.find(x=>x.k===k);
     if(g)g.idx.forEach(i=>{if(ms[i])ms[i].visible=false;});
   });
+  /* v2.46.132: тумблер «Крепёж» гасит и заводскую мелочь из STEP — те самые
+     болты и уголки по периметру листа, которые приходят одной группой из
+     чужого CAD. Конструктор их не рисует, поэтому прячем прямо материалом. */
+  if(!BOLTS){
+    const PT=it.obj.geometry.userData.parts;
+    if(PT)PT.forEach((pt,i)=>{
+      if(pt&&TFIT_JUNK.test(pt.name||'')&&ms[i])ms[i].visible=false;
+    });
+  }
   if(it._fits)tankHideBaked(it);       // v2.46.033: муфты бака рисуем сами
 }
 function buildParts(){
