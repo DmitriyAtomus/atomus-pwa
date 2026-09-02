@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.121";
+const APP_VERSION = "v2.46.122";
 const APP_VERSION_DATE = "02.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1253,7 +1253,28 @@ function showApp() {
 }
 
 // v2.8.2: восстановление последнего открытого экрана при F5/перезагрузке
+/* v2.46.122: прямая ссылка на запись голоса — .../?voice=1 открывает чат с
+   Клавой и сразу показывает мастер. Кнопку в шапке чата на телефоне легко
+   пропустить, а ссылку можно переслать себе в мессенджер и нажать. */
+function _voiceDeepLink() {
+  let want = false;
+  try { want = new URLSearchParams(location.search).get('voice') === '1'; } catch (e) {}
+  if (!want) return false;
+  try {
+    const u = new URL(location.href);
+    u.searchParams.delete('voice');
+    history.replaceState(null, '', u.pathname + u.search + u.hash);
+  } catch (e) {}
+  selectSection('home');
+  selectSidebarItem('devchat');
+  setTimeout(function () {
+    if (typeof devVoiceSetup === 'function') devVoiceSetup();
+  }, 500);
+  return true;
+}
+
 function _restoreLastView() {
+  if (_voiceDeepLink()) return;
   // ТВ-режим (трансляция CRM на телевизор): открыть заданный раздел и
   // не восстанавливать сохранённый вид. Раздел = ключ SECTION_CONFIG
   // (напр. tasks — планёрка, production, warehouse, mail…).
