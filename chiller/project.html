@@ -1279,6 +1279,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <div class="vb" id="bGrid">Сетка 100 мм</div>
         <div class="vb" id="bParts" style="display:none">Детали</div>
         <div class="vb" id="bShown" style="display:none" title="Вернуть скрытые узлы (Shift+H)">👁 Скрытые</div>
+        <div class="vb" id="bBolts" title="Показывать крепёж, который считает конструктор: болты узлов и кронштейнов. Лист дна у нас на точечной сварке — болты там не нужны">⛒ Крепёж</div>
         <div class="vb" id="bHide" title="Наведи на крышу, боковину или дверку — клик её скроет. Клавиша H гасит то, что под курсором, Shift+H возвращает все">👁 Скрыть панель</div>
         <div class="vb" id="bPorts" title="Подписи патрубков: выкл · у выделенной · у всех">Патрубки</div>
         <div class="vb" id="bRl" title="Показывать свободные патрубки: метка «+» — жми и выбирай, что на него поставить">Присоединения</div>
@@ -4265,7 +4266,7 @@ function shelfMark(it){
           const gm=new THREE.CylinderGeometry(r,r,L,12);gm.rotateX(Math.PI/2);
           const m=new THREE.Mesh(gm,boltMat);
           m.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),D);
-          m.position.copy(at);g.add(m);
+          m.position.copy(at);m.userData.bolt=1;m.visible=BOLTS;g.add(m);
         };
         add(rad,len,A.clone().addScaledVector(D,len/2));
         add(hr,hh,A.clone().addScaledVector(D,-hh/2));
@@ -4282,6 +4283,7 @@ function shelfMark(it){
         const gm=new THREE.CylinderGeometry(rad,rad,len,12);
         gm.rotateX(Math.PI/2);gm.translate(0,0,len/2);
         const o=new THREE.Mesh(gm,boltMat);
+        o.userData.bolt=1;o.visible=BOLTS;
         if(bax==='x')o.rotation.y=Math.PI/2;
         else o.rotation.x=-Math.PI/2;
         o.position.set(p[0],p[1],p[2]);
@@ -4751,6 +4753,30 @@ const BOLT={bolt8: {d:8, hd:13,hh:5.5,wd:17,ln:25,t:'М8', hw:'Болт М8×25 
             bolt16:{d:16,hd:24,hh:10, wd:30,ln:45,t:'М16',hw:'Болт М16×45 с гайкой и шайбами'},
             bolt20:{d:20,hd:30,hh:12.5,wd:37,ln:55,t:'М20',hw:'Болт М20×55 с гайкой и шайбами'}};
 const BOLT_THR=Object.fromEntries(Object.values(BOLT).map(b=>[b.t,b]));
+/* ═══ v2.46.131: крепёж можно убрать с вида ═══
+   Конструктор рисует болты по каждому расчётному креплению, но у нас часть
+   узлов и сам лист дна идут точечной сваркой — тогда болты по периметру
+   только мешают смотреть. Тумблер прячет весь рисуемый крепёж; спецификация
+   не меняется, там крепёж считается по факту крепления. */
+let BOLTS=true;
+try{BOLTS=localStorage.getItem('chiller.bolts')!=='0';}catch(e){}
+function boltsApply(){
+  placed.forEach(p=>{
+    if(p._bolts)p._bolts.visible=BOLTS;
+    if(p._shelf)p._shelf.traverse(o=>{
+      if(o.userData&&o.userData.bolt)o.visible=BOLTS;
+    });
+  });
+  const b=$('#bBolts');
+  if(b){b.classList.toggle('on',BOLTS);
+    b.textContent=BOLTS?'⛒ Крепёж':'⛒ Крепёж скрыт';}
+}
+function boltsToggle(){
+  BOLTS=!BOLTS;
+  try{localStorage.setItem('chiller.bolts',BOLTS?'1':'0');}catch(e){}
+  boltsApply();
+  toast(BOLTS?'Крепёж показан':'Крепёж скрыт — в спецификации он остаётся');
+}
 const boltMat=new THREE.MeshStandardMaterial({color:0x3a4046,metalness:.85,roughness:.3,
   flatShading:true});
 /* ═══ v2.46.021 (#894): болт садится в настоящее отверстие ═══
@@ -4845,7 +4871,7 @@ function boltHoles(it,m,H){
     put(bm.wd/2,lowerWasher,-supportT-lowerWasher); // нижняя шайба у основания
     put(bm.hd/2,bm.hh,nut0);                   // гайка сразу под основанием
   });
-  grp.renderOrder=1;grp.matrixAutoUpdate=false;
+  grp.renderOrder=1;grp.matrixAutoUpdate=false;grp.visible=BOLTS;
   scene.add(grp);it._bolts=grp;boltSync(it);
 }
 function boltClear(it){
@@ -5115,6 +5141,7 @@ const HINT_KEY='atomus_chiller_hint';
   };
 })();
 $('#bShown').onclick=hidAllShow;
+$('#bBolts').onclick=boltsToggle;
 $('#bHide').onclick=()=>hideMode();
 $('#bParts').onclick=()=>{
   const on=!$('#partsBox').classList.contains('on');
@@ -8766,6 +8793,7 @@ function refresh(){
   } else $('#fDims').textContent='';
   $('#empty').style.display=placed.length?'none':'flex';
   placed.forEach(boltMark);         // болты крепления — по выбранной посадке
+  boltsApply();                     // ...и прячем их, если крепёж выключен
   placed.forEach(shelfMark);        // крепление бака — по связи с корпусом
   portsPaint();portsRebuild();      // деталь ушла или приехала — подписи следом
   rotRebuild();                     // и метки свободных ротолоков
