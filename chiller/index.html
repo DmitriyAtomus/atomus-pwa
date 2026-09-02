@@ -236,6 +236,16 @@ footer b{color:var(--dim)}
 .ctube .cpipe{color:#8FD3F4;font-family:Consolas,monospace}
 .cok{color:var(--ok)}
 .cbad{color:var(--gold)}
+/* дорожка назад в расчёт и требование по величине — в строке разделов */
+.cback{display:inline-flex;align-items:center;gap:5px;margin-right:12px;padding:3px 11px;
+  border:1px solid var(--cyan);border-radius:13px;color:#8FD3F4;cursor:pointer;
+  font-size:11.5px;background:rgba(27,159,216,.12);vertical-align:middle}
+.cback:hover{background:rgba(27,159,216,.24)}
+.cneed{display:inline-flex;align-items:center;gap:7px;margin-left:12px;padding:3px 11px;
+  border:1px solid rgba(201,162,39,.45);border-radius:13px;color:#E8CE7A;font-size:11.5px;
+  background:rgba(201,162,39,.10);vertical-align:middle}
+.cneed i{font-style:normal;cursor:pointer;opacity:.7;font-size:13px}
+.cneed i:hover{opacity:1}
 /* ---------- карточка позиции ---------- */
 #det{position:fixed;inset:0;background:rgba(3,9,18,.72);backdrop-filter:blur(4px);
   display:none;z-index:40}
@@ -692,7 +702,21 @@ let DATA = [], GEOMS = {}, SECTIONS = [], VERSION = '';
 let f = {sec:null, sub:null, brand:null, st:null, q:""};
 const $ = s => document.querySelector(s);
 
+/* v2.46.128: пришли из расчёта — держим и требование по величине
+   («подача ≥ 5,3 м³/ч»), чтобы список сразу показывал только то, что подходит */
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function needOk(d){
+  if(!f.need) return true;
+  const re = new RegExp('([0-9]+[.,]?[0-9]*)\\s*' + f.need.unit, 'i');
+  const hay = [(d.tags||[]).join(' '), d.kind || '', d.name || '',
+               ((d.specs||[]).map(r=>r.join(' ')).join(' '))].join(' ');
+  const m = hay.match(re);
+  if(!m) return false;                       // величины не указано — не угадываем
+  return parseFloat(m[1].replace(',', '.')) >= f.need.value * 0.999;
+}
 function match(d){
+  if(!needOk(d)) return false;
   if(f.sec && d.section!==f.sec) return false;
   if(f.sub && d.sub!==f.sub) return false;
   if(f.brand && d.brand!==f.brand) return false;
@@ -865,7 +889,14 @@ function drawCards(){
 
   const secNm = f.sec ? SECTIONS.find(s=>s[0]===f.sec) : null;
   const subNm = secNm && f.sub ? (secNm[2]||[]).find(s=>s[0]===f.sub) : null;
-  $('#crumb').textContent = ['Все разделы', secNm&&secNm[1], subNm&&subNm[1]].filter(Boolean).join('  ·  ');
+  const crumb = ['Все разделы', secNm&&secNm[1], subNm&&subNm[1]].filter(Boolean).join('  ·  ');
+  /* дорожка обратно в расчёт: пришёл считать — не должен искать путь назад */
+  $('#crumb').innerHTML = (calcBack
+      ? '<span class="cback" onclick="calcReturn()">‹ к расчёту</span>' : '') +
+    esc(crumb) +
+    (f.need ? '<span class="cneed">' + esc(f.need.label) + ' ≥ ' +
+      esc(cFix(f.need.value, 2)) + ' ' + esc(f.need.unit) +
+      '<i onclick="needClear()" title="Показать все">✕</i></span>' : '');
   $('#title').firstChild.textContent = (subNm?subNm[1]:(secNm?secNm[1]:'База 3D-моделей'))+' ';
   $('#sub').textContent = 'позиций: '+list.length+' · с моделями: '+list.filter(d=>d.ready).length;
 }
@@ -2444,7 +2475,19 @@ function calcPipePaint() {
 }
 
 /* ── 4. Производительность насоса (лист 3) ────────────────────────────── */
+/* типы насосов берём из самой базы: подразделы раздела «Насосы» */
+function pumpKinds() {
+  const sec = (SECTIONS || []).find(x => x[0] === 'pumps');
+  return (sec && sec[2] || []).filter(sb => cnt('pumps', sb[0]));
+}
 function calcPumpForm() {
+  const kinds = pumpKinds();
+  const kindRow = kinds.length ? `
+    <div class="crow"><label>Тип насоса</label>
+      <select id="uKind">
+        <option value="">Любой — все ${cnt('pumps')} в базе</option>
+        ${kinds.map(k => `<option value="${esc(k[0])}">${esc(k[1])} · ${cnt('pumps', k[0])}</option>`).join('')}
+      </select></div>` : '';
   return `<div class="cgrid"><div class="cfields">
     <div class="crow"><label>Холодопроизводительность</label>
       <div class="cinp"><input type="number" id="uQ" value="17" step="0.5" min="0">
@@ -2453,6 +2496,7 @@ function calcPumpForm() {
     <div class="crow"><label>Перепад температур Δt</label>
       <div class="cinp"><input type="number" id="uDt" value="3" step="0.5" min="0.5">
         <span class="cunit">К</span></div></div>
+    ${kindRow}
   </div><div class="cout" id="uOut"></div></div>`;
 }
 function calcPumpPaint() {
@@ -2475,9 +2519,17 @@ function calcPumpPaint() {
        на 1000, как для воды, и получается <b>${cFix(gFile, 2)} м³/ч</b> (расхождение
        ${cFix(diff, 1)} %). Для гликолей это заметно: их плотность ${h[1]} кг/м³.
        Здесь считается с плотностью выбранного хладоносителя.</div>` : ''}
-     <div class="cpick"><button onclick="calcShowSection('pumps')">→ Насосы в базе</button></div>`;
+     <div class="cpick">
+       <button onclick="calcPickPump(${g.toFixed(2)})">→ Насосы от ${cFix(g, 2)} м³/ч</button>
+       <button onclick="calcShowSection('pumps')">→ Все насосы</button>
+     </div>`;
 }
 
+/* насос: уходим в нужный подраздел и сразу отсекаем то, что не тянет подачу */
+function calcPickPump(g) {
+  const sel = document.getElementById('uKind');
+  calcShowSection('pumps', sel ? sel.value : '', { label: 'подача', value: g, unit: 'м³/ч' });
+}
 function calcRun() {
   if (calcTab === 'q') calcQPaint();
   else if (calcTab === 'comp') calcCompPaint();
@@ -2487,12 +2539,44 @@ function calcRun() {
 /* переходы между вкладками с переносом результата */
 function calcToComp(q) { calcTab = 'comp'; calcPaint(); $('#kQ').value = q; calcRun(); }
 function calcToPump(q) { calcTab = 'pump'; calcPaint(); $('#uQ').value = q; calcRun(); }
-/* показать раздел базы: расчёт закончился — дальше выбираем железо */
-function calcShowSection(sec) {
+/* ═══ v2.46.128: расчёт → каталог → обратно ═══
+   Из результата уходим в раздел базы, но с дорожкой назад: запоминаем, на
+   какой вкладке считали и что там было введено. Плюс требование по величине
+   («подача не меньше расчётной») — оно фильтрует список. */
+let calcBack = null;
+function calcShowSection(sec, sub, need) {
+  calcBack = { tab: calcTab, vals: calcSnapshot() };
   calcClose();
-  f.sec = sec; f.sub = null; f.brand = null; f.st = 'ready';
+  f.sec = sec; f.sub = sub || null; f.brand = null; f.st = 'ready';
+  f.need = need || null;
   draw();
   document.querySelector('main').scrollTop = 0;
+}
+function calcReturn() {
+  const b = calcBack;
+  calcBack = null; f.need = null;
+  if (b) calcTab = b.tab;
+  calcOpen();
+  if (b) calcRestore(b.vals);
+  draw();
+}
+function needClear() { f.need = null; draw(); }
+/* снимок значений полей текущей вкладки — вернёмся ровно к тому, что считали */
+function calcSnapshot() {
+  const o = {};
+  document.querySelectorAll('#cBody input,#cBody select').forEach(el => { o[el.id] = el.value; });
+  return o;
+}
+function calcRestore(vals) {
+  if (!vals) return;
+  /* селекты хладагента заполняют зависимые списки, поэтому проходим дважды */
+  for (let pass = 0; pass < 2; pass++) {
+    Object.keys(vals).forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.value !== vals[id]) el.value = vals[id];
+    });
+    calcRun();
+  }
 }
 
 async function dlStep(d){
