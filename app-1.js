@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.122";
+const APP_VERSION = "v2.46.123";
 const APP_VERSION_DATE = "02.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -8602,7 +8602,9 @@ async function pkbColDrop(ev, newStatus) {
       }
       showToast(msg, 'success');
     } else {
-      showToast('Статус обновлён', 'success');
+      showToast(newStatus === 'cancelled'
+        ? 'Работа снята с производства — история и часы сохранены'
+        : 'Статус обновлён', 'success');
     }
     cache.productionKanban = null;
     cache.assemblies = null;
@@ -11019,9 +11021,15 @@ function renderPkbDetailActions(w) {
                     { to: 'cancelled',   label: 'Отменить',       icon: 'ti-x' }],
       review:      [{ to: 'packing',     label: 'На упаковку',    icon: 'ti-package', cls: 'primary' },
                     { to: 'done',        label: 'Принять (Готово)', icon: 'ti-circle-check' },
-                    { to: 'in_progress', label: 'Вернуть в работу', icon: 'ti-arrow-back-up' }],
+                    { to: 'in_progress', label: 'Вернуть в работу', icon: 'ti-arrow-back-up' },
+                    // v2.46.123: изделие сняли с выпуска — работу закрываем с
+                    // причиной, а часы сборщика остаются в журнале участия
+                    { to: 'cancelled',   label: 'Снять с производства', icon: 'ti-archive' }],
       packing:     [{ to: 'done',        label: 'Упаковано (Готово)', icon: 'ti-circle-check', cls: 'primary' },
-                    { to: 'review',      label: 'Вернуть на проверку', icon: 'ti-arrow-back-up' }],
+                    { to: 'review',      label: 'Вернуть на проверку', icon: 'ti-arrow-back-up' },
+                    { to: 'cancelled',   label: 'Снять с производства', icon: 'ti-archive' }],
+      /* из «Готово» снять нельзя: изделие уже принято и могло уйти на склад —
+         сначала «Откатить (ОТК)», оттуда снятие доступно */
       done:        [{ to: 'packing',     label: 'На упаковку',    icon: 'ti-package' },
                     { to: 'review',      label: 'Откатить (ОТК)', icon: 'ti-arrow-back-up' }],
       cancelled:   [{ to: 'queue',       label: 'Реактивировать', icon: 'ti-refresh' }],
@@ -11054,7 +11062,23 @@ async function changeProductionWorkStatus(workId, newStatus) {
   if (newStatus === 'done') {
     if (!confirm('Завершить работу и перевести в «Готово»?\n\nЕсли это сборка — появится приход на склад.')) return;
   }
+  /* v2.46.123: снятие с производства — с причиной. Причина уходит в мини-чат
+     карточки: работа исчезает из активных, но в истории остаётся и что
+     собирали, и сколько часов, и почему остановились. */
+  let reason = '';
+  if (newStatus === 'cancelled') {
+    reason = (prompt('Почему снимаем с производства?\n' +
+      'Причина останется в карточке — часы сборщиков и журнал участия сохранятся.',
+      'Изделие снято с выпуска') || '').trim();
+    if (!reason) return;
+  }
   try {
+    if (reason) {
+      try {
+        await apiPost('/api/production/works/' + workId + '/comments',
+          { text: 'Снято с производства: ' + reason });
+      } catch (e) { /* причина не записалась — статус всё равно меняем */ }
+    }
     const r = await apiPatch('/api/production/works/' + workId + '/status', { status: newStatus });
     // v2.43.5 (Этап 34): при переходе в 'done' бэк может автоматически создать assembly
     if (r && r.created_assembly) {
