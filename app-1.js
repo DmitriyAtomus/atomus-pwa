@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.120";
+const APP_VERSION = "v2.46.121";
 const APP_VERSION_DATE = "02.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4095,6 +4095,138 @@ function _devChatSpeechFail(err, seq) {
   _dcSpeechSeq++;
   _devChatSpeechDone();
   showToast(_devChatSpeechError(err), 'error');
+}
+
+/* ═══ v2.46.121: «Мой голос» — Клава читает ответы голосом Дмитрия ═══
+   Бэкенд персонального голоса готов давно (POST /api/dev-chat/custom-voice),
+   но записать образец из CRM было нечем. Мастер пишет две дорожки прямо в
+   браузере: короткое согласие (его требует OpenAI) и образец речи. Файлы
+   уходят одноразовым пропуском напрямую в Railway — через прокси Vercel
+   запись длиннее полуминуты не проходит; на нашем сервере они не хранятся. */
+const MYVOICE_CONSENT =
+  'Я, Подкорытов Дмитрий Сергеевич, разрешаю создать синтетическую копию ' +
+  'моего голоса и использовать её в моих собственных проектах.';
+const MYVOICE_HINT =
+  'Говорите свободно 40–60 секунд обычным рабочим тоном: чем занимается ' +
+  'компания, какой чиллер сейчас собираете, что нужно заказать. Чем ровнее ' +
+  'и естественнее речь — тем ближе будет голос.';
+const _myVoice = { step: 1, media: null, chunks: [], clips: {}, timer: null, sec: 0, busy: false };
+
+function devVoiceSetup() {
+  if (document.getElementById('myvoice-modal')) return;
+  const box = document.createElement('div');
+  box.className = 'modal-overlay visible';       // без visible оверлей скрыт
+  box.id = 'myvoice-modal';
+  box.innerHTML =
+    '<div class="modal" style="max-width:560px" onclick="event.stopPropagation()">' +
+      '<div class="modal-header"><h3>Мой голос для Клавы</h3>' +
+        '<button class="modal-close" onclick="devVoiceClose()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body" id="myvoice-body"></div>' +
+    '</div>';
+  box.onclick = devVoiceClose;
+  document.body.appendChild(box);
+  _myVoice.step = 1; _myVoice.clips = {}; _myVoice.sec = 0; _myVoice.busy = false;
+  _myVoicePaint();
+  _myVoiceStatus();
+}
+function devVoiceClose() {
+  _myVoiceStopRec(true);
+  const b = document.getElementById('myvoice-modal');
+  if (b) b.remove();
+}
+async function _myVoiceStatus() {
+  try {
+    const st = await apiGet(_devChatApi('/custom-voice'));
+    if (st && st.configured) _myVoicePaint('Голос уже записан — можно перезаписать заново.');
+  } catch (e) {}
+}
+function _myVoicePaint(msg) {
+  const body = document.getElementById('myvoice-body');
+  if (!body) return;
+  const done1 = !!_myVoice.clips.consent, done2 = !!_myVoice.clips.sample;
+  const rec = !!_myVoice.media, step = _myVoice.step;
+  body.innerHTML =
+    '<div class="mv-lead">Клава будет отвечать в чате вашим голосом. Нужны две ' +
+      'записи — они уходят напрямую в OpenAI и на нашем сервере не сохраняются.</div>' +
+    '<div class="mv-step' + (step === 1 ? ' is-on' : '') + (done1 ? ' is-done' : '') + '">' +
+      '<b>1. Согласие</b><div class="mv-say">' + escapeHtml(MYVOICE_CONSENT) + '</div>' +
+      '<div class="mv-note">Прочитайте эту фразу вслух — этого требует OpenAI.</div></div>' +
+    '<div class="mv-step' + (step === 2 ? ' is-on' : '') + (done2 ? ' is-done' : '') + '">' +
+      '<b>2. Образец голоса</b><div class="mv-note">' + escapeHtml(MYVOICE_HINT) + '</div></div>' +
+    (msg ? '<div class="mv-msg">' + escapeHtml(msg) + '</div>' : '') +
+    '<div class="mv-act">' +
+      (_myVoice.busy ? '<div class="mv-note">Создаю голос — это занимает до минуты…</div>' :
+        (rec
+          ? '<button class="mv-btn is-stop" onclick="devVoiceStop()">' +
+              '<i class="ti ti-player-stop"></i> Стоп · ' + _myVoice.sec + ' с</button>'
+          : '<button class="mv-btn" onclick="devVoiceRec()">' +
+              '<i class="ti ti-microphone"></i> Записать ' +
+              (step === 1 ? 'согласие' : 'образец') + '</button>') +
+        (done1 && done2 && !rec
+          ? '<button class="mv-btn is-ok" onclick="devVoiceSend()">' +
+              '<i class="ti ti-check"></i> Создать голос</button>' : '')) +
+    '</div>';
+}
+async function devVoiceRec() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mr = new MediaRecorder(stream);
+    _myVoice.media = mr; _myVoice.chunks = []; _myVoice.sec = 0;
+    mr.ondataavailable = function (e) { if (e.data && e.data.size) _myVoice.chunks.push(e.data); };
+    mr.onstop = function () {
+      stream.getTracks().forEach(function (t) { t.stop(); });
+      const blob = new Blob(_myVoice.chunks, { type: mr.mimeType || 'audio/webm' });
+      _myVoice.media = null;
+      clearInterval(_myVoice.timer);
+      if (blob.size > 2000) {
+        _myVoice.clips[_myVoice.step === 1 ? 'consent' : 'sample'] = blob;
+        if (_myVoice.step === 1) _myVoice.step = 2;
+        _myVoicePaint('Записано: ' + Math.round(blob.size / 1024) + ' КБ');
+      } else {
+        _myVoicePaint('Слишком коротко — попробуйте ещё раз');
+      }
+    };
+    mr.start();
+    _myVoice.timer = setInterval(function () { _myVoice.sec++; _myVoicePaint(); }, 1000);
+    _myVoicePaint();
+  } catch (e) {
+    _myVoicePaint('Микрофон недоступен: ' + (e.message || e));
+  }
+}
+function devVoiceStop() { _myVoiceStopRec(false); }
+function _myVoiceStopRec(silent) {
+  clearInterval(_myVoice.timer);
+  if (_myVoice.media) {
+    try { _myVoice.media.stop(); } catch (e) {}
+    if (silent) _myVoice.media = null;
+  }
+}
+async function devVoiceSend() {
+  const c = _myVoice.clips.consent, sm = _myVoice.clips.sample;
+  if (!c || !sm || _myVoice.busy) return;
+  _myVoice.busy = true; _myVoicePaint();
+  const token = localStorage.getItem(TOKEN_KEY) || '';
+  try {
+    const tr = await fetch(API_BASE + _devChatApi('/custom-voice-ticket'), {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const tj = await tr.json().catch(function () { return {}; });
+    if (!tr.ok || !tj.ticket) throw new Error(tj.message || 'пропуск не выдан');
+    const fd = new FormData();
+    fd.append('consent', c, 'consent.webm');
+    fd.append('sample', sm, 'sample.webm');
+    /* мимо прокси: у Vercel лимит тела 4,5 МБ, образец речи в него не влезает */
+    const base = (typeof API_DIRECT_FALLBACK === 'string' && API_DIRECT_FALLBACK) || API_BASE;
+    const r = await fetch(base + _devChatApi('/custom-voice-upload') +
+      '?ticket=' + encodeURIComponent(tj.ticket), { method: 'POST', body: fd });
+    const j = await r.json().catch(function () { return {}; });
+    if (!r.ok) throw new Error(j.message || j.error || ('HTTP ' + r.status));
+    devVoiceClose();
+    showToast('Готово — Клава теперь говорит вашим голосом', 'success');
+  } catch (e) {
+    _myVoice.busy = false;
+    _myVoicePaint('Не получилось: ' + (e.message || e));
+  }
 }
 
 async function _devChatSpeak(text, btn) {

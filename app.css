@@ -25371,7 +25371,7 @@ body.dchat-ag.dchat-fullscreen [data-screen="devchat"] { background: var(--bg); 
   .ujr-tabs { padding: 0 10px; margin: 0 -10px 12px; }
 }
 
-/* ============ v2.46.091: Клава — чистый интерфейс в духе ChatGPT ============ */
+/* ==== v2.46.091: Клава — чистый интерфейс в духе ChatGPT ============ */
 /* Спокойная нейтральная поверхность вместо градиентов, сетки и пузырей у
    каждого ответа. Все правила изолированы классом dchat-ag и не затрагивают
    остальные чаты CRM. */
@@ -26334,3 +26334,24 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
     width: 38px; min-width: 38px; height: 38px; padding: 0;
   }
 }
+
+/* ═══ v2.46.121: мастер «Мой голос» ═══ */
+.mv-lead { font-size: 13.5px; color: var(--text-secondary, #64748B);
+  line-height: 1.5; margin-bottom: 14px; }
+.mv-step { border: 1px solid var(--border, #E5E9F0); border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 10px; background: #fff; }
+.mv-step.is-on { border-color: var(--brand, #2563EB); box-shadow: 0 0 0 3px rgba(37,99,235,.10); }
+.mv-step.is-done { border-color: var(--success, #16A34A); }
+.mv-step.is-done b:after { content: ' ✓'; color: var(--success, #16A34A); }
+.mv-step b { display: block; font-size: 14px; margin-bottom: 6px; }
+.mv-say { font-size: 14px; line-height: 1.5; background: #F6F8FC;
+  border-radius: 9px; padding: 10px 12px; margin-bottom: 6px; }
+.mv-note { font-size: 12.5px; color: var(--text-secondary, #64748B); line-height: 1.45; }
+.mv-msg { font-size: 13px; color: var(--text-secondary, #64748B); margin: 4px 0 10px; }
+.mv-act { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.mv-btn { display: inline-flex; align-items: center; gap: 7px; border: 0;
+  border-radius: 10px; padding: 10px 16px; font: inherit; font-size: 14px;
+  cursor: pointer; color: #fff; background: var(--brand, #2563EB); }
+.mv-btn.is-stop { background: var(--danger, #DC2626); }
+.mv-btn.is-ok { background: var(--success, #16A34A); }
+.mv-btn:hover { filter: brightness(1.06); }
