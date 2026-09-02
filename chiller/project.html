@@ -3896,6 +3896,30 @@ function shelfCutOf(b){
 function tankWallCenter(face,dir,fa,off){
   return face+dir*(SH_CLR+fa/2+(off||0));
 }
+/* ═══ v2.46.130: где у корпуса пол ═══
+   Дно искали строго по имени детали («дно», «поддон», «настил»), а в чужом
+   STEP лист может называться как угодно — «Основание», «Плита», «Панель
+   нижняя». Тогда за пол принимался габаритный низ корпуса, то есть подошва
+   рамы: кронштейн бака садился на неё и висел ниже настоящего дна.
+   Ищем так: сначала по имени, затем — самый широкий горизонтальный лист в
+   нижней четверти корпуса. Это и есть пол, на который всё опирается. */
+function frameFloorZ(fr,B,PT,all){
+  const byName=PT.findIndex(x=>/дно|поддон|настил|основани|плит[аы]|нижн(ий|яя|ее)/i
+    .test((x&&x.name)||''));
+  if(byName>=0&&B[byName]&&!B[byName].isEmpty())return B[byName].max.z;
+  const size=all.getSize(new THREE.Vector3());
+  const area=Math.max(1,size.x*size.y);
+  let best=null;
+  B.forEach(b=>{
+    if(!b||b.isEmpty())return;
+    const s=b.getSize(new THREE.Vector3());
+    if(s.z>size.z*0.25)return;                      // не лист, а стойка или стенка
+    if(s.x*s.y<area*0.35)return;                    // мелочь, не настил
+    if(b.min.z>all.min.z+size.z*0.25)return;        // это уже полка, а не пол
+    if(!best||b.max.z>best)best=b.max.z;
+  });
+  return best==null?all.min.z:best;
+}
 function tankShelfPlan(it,fr){
   const geo=fr.obj.geometry,PT=geo.userData.parts||[],B=framePartLocalBoxes(fr);
   if(!B)return {err:'у корпуса нет разбора по деталям — стенку для бака не найти'};
@@ -3904,7 +3928,7 @@ function tankShelfPlan(it,fr){
   const all=new THREE.Box3();B.forEach(b=>{if(!b.isEmpty())all.union(b);});
   const iFloor=PT.findIndex(x=>/дно|поддон|настил/i.test((x&&x.name)||''));
   const iCap=PT.findIndex(x=>/крышк/i.test((x&&x.name)||''));
-  const zFloor=iFloor>=0?B[iFloor].max.z:all.min.z;
+  const zFloor=frameFloorZ(fr,B,PT,all);
   const zCap=iCap>=0?B[iCap].min.z:all.max.z;
   const cs=all.getSize(new THREE.Vector3());
   const cavV=cs.x*cs.y*(zCap-zFloor);
@@ -4165,9 +4189,9 @@ function shBaseDrop(it,sh){
   if(!fr||!fr.obj||!fr.obj.geometry)return saved;
   const PT=fr.obj.geometry.userData.parts||[],B=framePartLocalBoxes(fr);
   if(!B||!PT.length)return saved;
-  const iFloor=PT.findIndex(x=>/дно|поддон|настил/i.test((x&&x.name)||''));
-  if(iFloor<0||!B[iFloor]||B[iFloor].isEmpty())return saved;
-  const zFloor=B[iFloor].max.z;
+  const all=new THREE.Box3();B.forEach(b=>{if(!b.isEmpty())all.union(b);});
+  if(all.isEmpty())return saved;
+  const zFloor=frameFloorZ(fr,B,PT,all);
   const drop=(sh.z==null?SH_STD_SUPPORT:sh.z)-SH_OEM_BASE_DROP-zFloor;
   return Math.max(-(SH_OEM_BASE_DROP-30),drop);
 }
