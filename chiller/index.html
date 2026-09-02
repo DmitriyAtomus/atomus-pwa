@@ -171,6 +171,43 @@ footer b{color:var(--dim)}
 .pres td{padding:5px 8px 5px 0;color:#C6D4E3;text-align:left}
 .pres td:last-child,.pres th:last-child{text-align:right;padding-right:0}
 .pres td.a{color:#fff}
+/* ---------- расчёт чиллера (v2.46.124) ---------- */
+#calc{position:fixed;inset:0;background:rgba(3,9,18,.72);backdrop-filter:blur(4px);
+  display:none;z-index:46}
+#calc.open{display:block}
+.cwin{position:absolute;top:4vh;left:50%;transform:translateX(-50%);width:min(880px,95vw);
+  max-height:92vh;background:var(--panel);border:1px solid var(--line2);border-radius:13px;
+  display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.ctabs{display:flex;gap:2px;padding:10px 14px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ctab{padding:8px 14px;border-radius:9px 9px 0 0;font-size:12.5px;color:var(--dim);
+  cursor:pointer;border:1px solid transparent;border-bottom:none;white-space:nowrap}
+.ctab:hover{color:var(--text)}
+.ctab.on{color:#8FD3F4;background:rgba(27,159,216,.10);border-color:var(--line)}
+.cbody{overflow-y:auto;padding:16px 18px 20px}
+.crow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.crow>label{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim2);
+  min-width:210px}
+.crow input,.crow select{background:rgba(255,255,255,.05);color:#E6EEF7;border:1px solid var(--line2);
+  border-radius:7px;padding:7px 10px;font:inherit;font-size:13px;outline:none}
+.crow input{width:120px}
+.crow select{min-width:260px;max-width:100%}
+.crow input:focus,.crow select:focus{border-color:var(--cyan)}
+.crow .hint{font-size:11.5px;color:var(--dim2)}
+.cout{margin-top:14px;border-top:1px solid var(--line);padding-top:14px}
+.cbig{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.cbig b{font-size:30px;color:#8FD3F4;font-family:Consolas,monospace;line-height:1}
+.cbig span{font-size:13px;color:var(--dim)}
+.csteps{font-size:12px;color:var(--dim);line-height:1.75}
+.csteps i{font-style:normal;font-family:Consolas,monospace;color:#C6D4E3}
+.cwarn{margin-top:10px;font-size:12px;line-height:1.5;color:var(--gold);
+  background:rgba(201,162,39,.08);border:1px solid rgba(201,162,39,.3);
+  border-radius:9px;padding:9px 12px}
+.cpick{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+.cpick button{background:rgba(27,159,216,.14);border:1px solid var(--cyan);color:#8FD3F4;
+  border-radius:9px;padding:8px 14px;font:inherit;font-size:12.5px;cursor:pointer}
+.cpick button:hover{background:rgba(27,159,216,.24)}
+.ctube{margin-top:12px;font-size:12.5px;color:#C6D4E3}
+.ctube b{color:#fff;font-size:14px}
 /* ---------- карточка позиции ---------- */
 #det{position:fixed;inset:0;background:rgba(3,9,18,.72);backdrop-filter:blur(4px);
   display:none;z-index:40}
@@ -444,6 +481,8 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
             title="Чат по чиллерам">💬 <span id="chatTxt">Чат</span></button>
     <!-- v2.46.051: кнопка «Подбор» из витрины убрана — подбор фильтра живёт
          в конструкторе (Проект), где фильтр и ставят; pickOpen() остаётся. -->
+    <button class="fsbtn" onclick="calcOpen()"
+            title="Расчёт: холодильная мощность, компрессор, диаметры труб, насос">&#8721; <span>Расчёт</span></button>
     <button id="upBtn" class="fsbtn"
             title="Загрузить STEP-модель корпуса — она появится в разделе «Корпуса и рамы» и в конструкторе">⇧ <span>Корпус</span></button>
     <input type="file" id="upFile" accept=".step,.stp" style="display:none">
@@ -491,6 +530,19 @@ table.sel tr:hover td{background:rgba(27,159,216,.07)}
      Работает по полю pick позиции (кВт по каждому хладагенту, линия, тип
      присоединения) — оно приходит в индексе, поэтому подбор идёт мгновенно
      и офлайн, без обращения к серверу. -->
+<div id="calc"><div class="cwin">
+  <div class="ph1"><b>Расчёт чиллера</b>
+    <span style="font-size:11.5px;color:var(--dim)">по методике Атомус</span>
+    <button onclick="calcClose()">×</button></div>
+  <div class="ctabs" id="cTabs">
+    <div class="ctab on" data-t="q">Холодильная мощность</div>
+    <div class="ctab" data-t="comp">Компрессор</div>
+    <div class="ctab" data-t="pipe">Диаметры труб</div>
+    <div class="ctab" data-t="pump">Насос</div>
+  </div>
+  <div class="cbody" id="cBody"></div>
+</div></div>
+
 <div id="pick">
   <div class="pwin">
     <div class="ph1"><b>Подбор фильтра-осушителя</b>
@@ -1319,14 +1371,18 @@ async function boot(){
     '<div style="padding:30px;color:#7C93AE">База не отвечает ('+r.status+'). '+
     'Если это CRM — проверьте, что пакет базы залит в хранилище.</div>'; return; }
   const ix = await r.json();
-  DATA = ix.items; GEOMS = ix.geoms; SECTIONS = ix.sections; VERSION = ix.built;
+  /* пустые значения по умолчанию: неполный индекс (или ответ прокси вместо
+     базы) не должен ронять всю витрину на первой же строке */
+  DATA = ix.items || []; GEOMS = ix.geoms || {}; SECTIONS = ix.sections || [];
+  VERSION = ix.built || '';
   VER = (ix.version || ix.built || '').replace(/[^0-9a-zA-Z]/g,'');
   Object.values(GEOMS).forEach(g=>{ if(g && g.f && g.v) RV[g.f]=g.v; });
   const nUser = await mergeUserModels();
   draw();
   const c=document.querySelector('.hcount');
-  if(c) c.innerHTML = '<b>'+(ix.count.ready+nUser)+'</b> моделей выпущено<br>'+
-                      (ix.count.items+nUser)+' позиций в базе<br>'+
+  const cnt = ix.count || {ready:DATA.filter(d=>d.ready).length, items:DATA.length};
+  if(c) c.innerHTML = '<b>'+((cnt.ready||0)+nUser)+'</b> моделей выпущено<br>'+
+                      ((cnt.items||0)+nUser)+' позиций в базе<br>'+
                       '<span style="font-size:10px;opacity:.6">база от '+ix.built+'</span>';
   chatArm();     /* чат по чиллерам — если он этому пользователю доступен */
 }
@@ -2071,6 +2127,317 @@ async function baseZoneSex(id,zi,sex){
     openDet(d.id);
   }catch(err){alert('Не сохранилось: '+(err.message||err));}
 }
+/* ═══════════════════════════════════════════════════════════════════════
+   v2.46.124: РАСЧЁТ ЧИЛЛЕРА — четыре калькулятора по методике Атомус
+
+   Формулы и таблицы взяты один в один из рабочего файла Дмитрия
+   («Расчет и подбор.xlsx», листы «Q кВт», «ПРОИЗ-ТЬ КОМПРЕССОРА_диаметр тр»,
+   «Производительность насоса»). Каждый результат показывается вместе с
+   промежуточными величинами — расчёт можно проверить руками.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* хладоносители: плотность кг/м³ и теплоёмкость Дж/(кг·К) — листы 1 и 3 */
+const HC = [
+  ['Вода',                                   1000,   4190],
+  ['Солевой раствор 10%',                    1070,   4180],
+  ['Пропиленгликоль, 30% конц. при −13 °С',  1023,   3884],
+  ['Пропиленгликоль, 35% конц. при −17 °С',  1028,   3819],
+  ['Пропиленгликоль, 40% конц. при −21 °С',  1032,   3732],
+  ['Пропиленгликоль, 45% конц. при −26 °С',  1034.5, 3652.5],
+  ['Пропиленгликоль, 50% конц. при −33 °С',  1039.9, 3548.7],
+  ['Пропиленгликоль, 55% конц. при −42 °С',  1041.6, 3456.2],
+  ['Этиленгликоль, 30% конц. при −15 °С',    1040.7, 3684.4],
+  ['Этиленгликоль, 35% конц. при −19 °С',    1044.8, 3616.3],
+  ['Этиленгликоль, 40% конц. при −24 °С',    1056.3, 3499.1],
+  ['Этиленгликоль, 45% конц. при −29 °С',    1057.3, 3443.3],
+  ['Этиленгликоль, 50% конц. при −35 °С',    1063.3, 3351.8],
+  ['Этиленгликоль, 55% конц. при −43 °С',    1072,   3236.9],
+];
+
+/* свойства хладагентов по температуре насыщения — лист 2, строки 23…85:
+   [t, h'ж кДж/кг, ρ"пара кг/м³, h"пара кДж/кг, ρ'ж кг/м³]; r = h" − h' */
+const FR = {
+ '404А': [[-50,137.8,4.407,339.2,1314.12],[-45,143.5,5.532,342.4,1299.839],
+  [-40,149.3,6.873,345.7,1285.173],[-35,155.3,8.457,348.9,1270.1],
+  [-30,161.3,10.316,352.1,1254.598],[-25,167.4,12.484,355.3,1238.637],
+  [-20,173.6,14.999,358.4,1222.189],[-15,180,17.902,361.4,1205.217],
+  [-10,186.5,21.242,364.4,1187.681],[-5,193.2,25.07,367.4,1169.535],
+  [0,200,29.447,370.2,1150.724],[5,207,34.443,372.9,1131.185],
+  [10,214.2,40.141,375.5,1110.838],[15,221.6,46.637,378,1089.592],
+  [20,229.2,54.048,380.3,1067.331],[25,237.1,62.517,382.4,1043.909],
+  [30,245.3,72.226,384.3,1019.138],[35,253.8,83.404,385.9,992.77],
+  [40,262.7,96.357,387.2,964.463],[45,272.1,111.504,388,933.725],
+  [50,282.2,129.45,388.4,899.803]],
+ '407С': [[-50,136,2.322,384.9,1399.335],[-45,141.9,2.997,388.1,1384.623],
+  [-40,148,3.822,391.3,1369.646],[-35,154.1,4.821,394.5,1354.386],
+  [-30,160.4,6.017,397.7,1338.825],[-25,166.7,7.437,400.8,1322.942],
+  [-20,173.1,9.108,403.9,1306.713],[-15,179.6,11.061,407,1290.112],
+  [-10,186.3,13.328,410,1273.11],[-5,193.1,15.944,412.9,1255.673],
+  [0,200,18.947,415.7,1237.761],[5,207.1,22.383,418.4,1219.33],
+  [10,214.3,26.299,421.1,1200.329],[15,221.7,30.755,423.6,1180.695],
+  [20,229.3,35.817,426,1160.357],[25,237.1,41.568,428.2,1139.227],
+  [30,245.2,48.108,430.3,1117.197],[35,253.5,55.561,432.1,1094.138],
+  [40,262.1,64.088,433.8,1069.88],[45,271,73.896,435.1,1044.209],
+  [50,280.3,85.269,436,1016.836]],
+ '132А': [[-50,136,1.654,367.3,1442.547],[-45,142.3,2.158,370.5,1428.411],
+  [-40,148.5,2.777,373.6,1414.175],[-35,154.9,3.532,376.7,1399.816],
+  [-30,161.2,4.44,379.7,1385.306],[-25,167.6,5.525,382.8,1370.619],
+  [-20,174,6.809,385.8,1355.725],[-15,180.4,8.319,388.8,1340.593],
+  [-10,186.9,10.082,391.7,1325.19],[-5,193.4,12.129,394.6,1309.479],
+  [0,200,14.492,397.4,1293.424],[5,206.6,17.209,400.2,1276.98],
+  [10,213.3,20.32,403,1260.104],[15,220.1,23.87,405.6,1242.744],
+  [20,227,27.912,408.2,1224.845],[25,233.9,32.503,410.8,1206.345],
+  [30,241,37.712,413.2,1187.173],[35,248.1,43.617,415.6,1167.25],
+  [40,255.4,50.313,417.8,1146.481],[45,262.9,57.911,419.9,1124.757],
+  [50,270.5,66.551,421.9,1101.943]],
+};
+/* поправка по типу компрессора — лист 2, N24:O26 */
+const KCOMP = { 'спиральный': 1, 'поршневой': 0.75, 'винтовой': 0.9 };
+/* сортамент медной трубы — лист 2, M1:P6 (наружный диаметр) */
+const TUBES = [[6.3,'1/4"'],[9.5,'3/8"'],[12.7,'1/2"'],[15.8,'5/8"'],[19.05,'3/4"'],
+               [22,'7/8"'],[28,'1 1/8"'],[34,'1 3/8"'],[53,'2 1/8"'],[66,'2 5/8"']];
+
+let calcTab = 'q';
+const cNum = v => { const x = parseFloat(String(v).replace(',', '.')); return isFinite(x) ? x : NaN; };
+const cFix = (v, n) => (Math.round(v * Math.pow(10, n)) / Math.pow(10, n))
+  .toLocaleString('ru-RU', { minimumFractionDigits: n, maximumFractionDigits: n });
+const hcOpts = sel => HC.map((h, i) =>
+  `<option value="${i}"${i === sel ? ' selected' : ''}>${h[0]}</option>`).join('');
+/* точка таблицы хладагента: температуры в файле идут через 5 °С */
+function frAt(ref, t) {
+  const rows = FR[ref] || [];
+  return rows.find(r => r[0] === t) || null;
+}
+const frTemps = ref => (FR[ref] || []).map(r => r[0]);
+
+function calcOpen() { $('#calc').classList.add('open'); calcPaint(); }
+function calcClose() { $('#calc').classList.remove('open'); }
+
+function calcPaint() {
+  document.querySelectorAll('#cTabs .ctab').forEach(t =>
+    t.classList.toggle('on', t.dataset.t === calcTab));
+  const b = $('#cBody');
+  if (calcTab === 'q') b.innerHTML = calcQForm();
+  else if (calcTab === 'comp') b.innerHTML = calcCompForm();
+  else if (calcTab === 'pipe') b.innerHTML = calcPipeForm();
+  else b.innerHTML = calcPumpForm();
+  b.querySelectorAll('input,select').forEach(el => {
+    el.oninput = calcRun; el.onchange = calcRun;
+  });
+  calcRun();
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest && e.target.closest('#cTabs .ctab');
+  if (t) { calcTab = t.dataset.t; calcPaint(); }
+});
+
+/* ── 1. Холодильная мощность (лист «Q кВт») ───────────────────────────── */
+function calcQForm() {
+  return `
+    <div class="crow"><label>Что известно</label>
+      <select id="qMode">
+        <option value="flow">Расход хладоносителя, м³/ч</option>
+        <option value="vol">Объём, который охлаждаем, м³</option>
+      </select></div>
+    <div class="crow"><label id="qValLb">Расход, м³/ч</label>
+      <input type="number" id="qVal" value="10" step="0.1" min="0"></div>
+    <div class="crow" id="qTimeRow" style="display:none"><label>За какое время охладить, ч</label>
+      <input type="number" id="qTime" value="8" step="0.5" min="0.1">
+      <span class="hint">объём — это энергия; мощность зависит от времени</span></div>
+    <div class="crow"><label>Хладоноситель</label>
+      <select id="qHc">${hcOpts(4)}</select></div>
+    <div class="crow"><label>Температура на входе, °С</label>
+      <input type="number" id="qT1" value="20" step="0.5"></div>
+    <div class="crow"><label>Температура на выходе, °С</label>
+      <input type="number" id="qT2" value="-4" step="0.5"></div>
+    <div class="cout" id="qOut"></div>`;
+}
+function calcQ() {
+  const mode = $('#qMode').value, v = cNum($('#qVal').value);
+  const h = HC[+$('#qHc').value], t1 = cNum($('#qT1').value), t2 = cNum($('#qT2').value);
+  const dt = t1 - t2;
+  if (!isFinite(v) || !isFinite(dt)) return null;
+  const m = v * h[1];                       // кг/ч (расход) либо кг (масса объёма)
+  const base = m * (h[2] / 3600) * dt / 1000;
+  if (mode === 'flow') return { kind: 'flow', q: base, m: m, h: h, dt: dt };
+  const hours = cNum($('#qTime').value) || 1;
+  return { kind: 'vol', energy: base, q: base / hours, hours: hours, m: m, h: h, dt: dt };
+}
+function calcQPaint() {
+  const r = calcQ(), out = $('#qOut');
+  const volMode = $('#qMode').value === 'vol';
+  $('#qTimeRow').style.display = volMode ? '' : 'none';
+  $('#qValLb').textContent = volMode ? 'Объём, м³' : 'Расход, м³/ч';
+  if (!r) { out.innerHTML = '<div class="csteps">Заполните поля</div>'; return; }
+  if (r.kind === 'flow') {
+    out.innerHTML =
+      `<div class="cbig"><b>${cFix(r.q, 2)}</b><span>кВт — холодильная мощность</span></div>
+       <div class="csteps">
+         масса: <i>${cFix(r.m, 0)} кг/ч</i> = расход × плотность ${r.h[1]} кг/м³<br>
+         теплоёмкость: <i>${r.h[2]} Дж/(кг·К)</i> · перепад <i>${cFix(r.dt, 1)} К</i><br>
+         Q = масса × c ÷ 3600 × Δt ÷ 1000
+       </div>
+       <div class="cpick"><button onclick="calcToComp(${r.q.toFixed(2)})">→ Подобрать компрессор</button>
+         <button onclick="calcToPump(${r.q.toFixed(2)})">→ Насос под эту мощность</button></div>`;
+  } else {
+    out.innerHTML =
+      `<div class="cbig"><b>${cFix(r.q, 2)}</b><span>кВт — при захолаживании за ${cFix(r.hours, 1)} ч</span></div>
+       <div class="csteps">
+         снять тепла: <i>${cFix(r.energy, 1)} кВт·ч</i> — масса <i>${cFix(r.m, 0)} кг</i>,
+         перепад <i>${cFix(r.dt, 1)} К</i><br>
+         мощность = энергия ÷ время
+       </div>
+       <div class="cwarn">В вашем файле при вводе объёма получается именно
+         <b>${cFix(r.energy, 1)} кВт·ч</b> — это энергия, а не мощность, хотя ячейка
+         подписана «кВт». Чтобы получить киловатты, её нужно поделить на время
+         захолаживания — здесь это делается полем выше.</div>
+       <div class="cpick"><button onclick="calcToComp(${r.q.toFixed(2)})">→ Подобрать компрессор</button>
+         <button onclick="calcToPump(${r.q.toFixed(2)})">→ Насос под эту мощность</button></div>`;
+  }
+}
+
+/* ── 2. Объёмная производительность компрессора (лист 2) ──────────────── */
+function calcCompForm() {
+  const refs = Object.keys(FR).map(r => `<option${r === '407С' ? ' selected' : ''}>${r}</option>`).join('');
+  return `
+    <div class="crow"><label>Холодопроизводительность, кВт</label>
+      <input type="number" id="kQ" value="5.5" step="0.1" min="0"></div>
+    <div class="crow"><label>Хладагент</label><select id="kRef">${refs}</select></div>
+    <div class="crow"><label>Температура кипения, °С</label><select id="kT0"></select></div>
+    <div class="crow"><label>Температура конденсации, °С</label><select id="kTk"></select></div>
+    <div class="crow"><label>Тип компрессора</label>
+      <select id="kType">${Object.keys(KCOMP).map(k =>
+        `<option${k === 'спиральный' ? ' selected' : ''}>${k}</option>`).join('')}</select></div>
+    <div class="cout" id="kOut"></div>`;
+}
+function calcCompTemps() {
+  const ref = $('#kRef').value, ts = frTemps(ref);
+  [['#kT0', -10], ['#kTk', 45]].forEach(([sel, def]) => {
+    const el = $(sel), cur = el.value ? +el.value : def;
+    el.innerHTML = ts.map(t => `<option value="${t}"${t === cur ? ' selected' : ''}>${t}</option>`).join('');
+  });
+}
+function calcCompPaint() {
+  calcCompTemps();
+  const Q = cNum($('#kQ').value), ref = $('#kRef').value;
+  const t0 = +$('#kT0').value, tk = +$('#kTk').value, type = $('#kType').value;
+  const a = frAt(ref, t0), b = frAt(ref, tk), out = $('#kOut');
+  if (!isFinite(Q) || !a || !b) { out.innerHTML = '<div class="csteps">Заполните поля</div>'; return; }
+  const rhoV = a[2], hV = a[3], hL = b[1], k = KCOMP[type];
+  const q0 = hV - hL;                       // кДж/кг — холодильный эффект
+  const mass = Q / q0 * 3600;               // кг/ч
+  const vol = mass / rhoV * k;              // м³/ч
+  out.innerHTML =
+    `<div class="cbig"><b>${cFix(vol, 2)}</b><span>м³/ч — объёмная производительность</span></div>
+     <div class="csteps">
+       холодильный эффект: <i>${cFix(q0, 1)} кДж/кг</i> = h″ пара при ${t0} °С (${hV})
+       − h′ жидкости при ${tk} °С (${hL})<br>
+       расход хладагента: <i>${cFix(mass, 1)} кг/ч</i> = Q × 3600 ÷ q₀<br>
+       плотность пара при ${t0} °С: <i>${rhoV} кг/м³</i> · поправка «${type}»: <i>${k}</i>
+     </div>
+     ${type !== 'спиральный' ? `<div class="cwarn">Поправка по типу взята из вашего файла
+       (поршневой 0,75, винтовой 0,9) и <b>уменьшает</b> потребный объём. Обычно объёмный
+       КПД работает наоборот: поршневому нужен больший описываемый объём, то есть делить,
+       а не умножать. Проверьте, что это именно ваш коэффициент запаса.</div>` : ''}
+     <div class="cpick"><button onclick="calcShowSection('compressors')">→ Компрессоры в базе</button></div>`;
+}
+
+/* ── 3. Диаметры жидкостной и газовой линий (лист 2, правый блок) ─────── */
+function calcPipeForm() {
+  const refs = Object.keys(FR).map(r => `<option${r === '404А' ? ' selected' : ''}>${r}</option>`).join('');
+  return `
+    <div class="crow"><label>Холодопроизводительность, кВт</label>
+      <input type="number" id="pQ" value="100" step="0.5" min="0"></div>
+    <div class="crow"><label>Хладагент</label><select id="pRef">${refs}</select></div>
+    <div class="crow"><label>Температура кипения, °С</label><select id="pT0"></select></div>
+    <div class="crow"><label>Скорость в жидкостной, м/с</label>
+      <input type="number" id="pWl" value="0.5" step="0.1" min="0.1">
+      <span class="hint">норма 0,3…1,0</span></div>
+    <div class="crow"><label>Скорость в газовой, м/с</label>
+      <input type="number" id="pWg" value="10" step="0.5" min="1">
+      <span class="hint">норма 5…10</span></div>
+    <div class="cout" id="pOut"></div>`;
+}
+function calcPipePaint() {
+  const ref = $('#pRef').value, ts = frTemps(ref), el = $('#pT0');
+  const cur = el.value ? +el.value : 0;
+  el.innerHTML = ts.map(t => `<option value="${t}"${t === cur ? ' selected' : ''}>${t}</option>`).join('');
+  const Q = cNum($('#pQ').value), t0 = +el.value;
+  const wl = cNum($('#pWl').value), wg = cNum($('#pWg').value);
+  const a = frAt(ref, t0), out = $('#pOut');
+  if (!isFinite(Q) || !a) { out.innerHTML = '<div class="csteps">Заполните поля</div>'; return; }
+  const r = a[3] - a[1], rhoL = a[4], rhoV = a[2];
+  const mass = Q / r;                                     // кг/с
+  const dia = (rho, w) => Math.sqrt(4 * (mass / rho) / (Math.PI * w)) * 1000;
+  const dl = dia(rhoL, wl), dg = dia(rhoV, wg);
+  const pick = d => TUBES.find(t => t[0] >= d) || TUBES[TUBES.length - 1];
+  const tl = pick(dl), tg = pick(dg);
+  out.innerHTML =
+    `<div class="csteps" style="margin-bottom:10px">
+       теплота парообразования при ${t0} °С: <i>${cFix(r, 1)} кДж/кг</i> ·
+       расход <i>${cFix(mass, 4)} кг/с</i>
+     </div>
+     <div class="ctube">Жидкостная линия: <b>${cFix(dl, 2)} мм</b> расчётный ·
+       ближайшая труба <b>${cFix(tl[0], 2)} мм (${tl[1]})</b>
+       <div class="csteps">плотность жидкости ${rhoL} кг/м³, скорость ${cFix(wl, 2)} м/с</div></div>
+     <div class="ctube" style="margin-top:10px">Газовая линия: <b>${cFix(dg, 2)} мм</b> расчётный ·
+       ближайшая труба <b>${cFix(tg[0], 2)} мм (${tg[1]})</b>
+       <div class="csteps">плотность пара ${rhoV} кг/м³, скорость ${cFix(wg, 2)} м/с</div></div>
+     <div class="cwarn">Расчёт даёт <b>внутренний</b> диаметр, а сортамент в файле — наружные
+       размеры медной трубы. Подбор идёт «наружный ≥ расчётного», то есть с запасом в толщину
+       стенки. Если у вас принято иначе — скажите, поправлю.</div>
+     <div class="cpick"><button onclick="calcShowSection('pipe')">→ Трубопроводы в базе</button></div>`;
+}
+
+/* ── 4. Производительность насоса (лист 3) ────────────────────────────── */
+function calcPumpForm() {
+  return `
+    <div class="crow"><label>Холодопроизводительность, кВт</label>
+      <input type="number" id="uQ" value="17" step="0.5" min="0"></div>
+    <div class="crow"><label>Хладоноситель</label><select id="uHc">${hcOpts(0)}</select></div>
+    <div class="crow"><label>Перепад температур Δt, К</label>
+      <input type="number" id="uDt" value="3" step="0.5" min="0.5"></div>
+    <div class="cout" id="uOut"></div>`;
+}
+function calcPumpPaint() {
+  const Q = cNum($('#uQ').value), h = HC[+$('#uHc').value], dt = cNum($('#uDt').value);
+  const out = $('#uOut');
+  if (!isFinite(Q) || !isFinite(dt) || dt <= 0) {
+    out.innerHTML = '<div class="csteps">Заполните поля</div>'; return;
+  }
+  const g = Q * 3600 / (h[2] * h[1] * dt) * 1000;    // м³/ч, с плотностью
+  const gFile = Q * 1000 / (h[2] / 3600 * dt) / 1000; // как в файле: плотность всегда 1000
+  const diff = Math.abs(g - gFile) / g * 100;
+  out.innerHTML =
+    `<div class="cbig"><b>${cFix(g, 2)}</b><span>м³/ч — подача насоса</span></div>
+     <div class="csteps">
+       G = Q × 3600 ÷ (c × ρ × Δt): <i>${Q} кВт</i> ·
+       c <i>${h[2]} Дж/(кг·К)</i> · ρ <i>${h[1]} кг/м³</i> · Δt <i>${cFix(dt, 1)} К</i>
+     </div>
+     ${diff > 0.5 ? `<div class="cwarn">В файле плотность не участвует — там всегда делится
+       на 1000, как для воды, и получается <b>${cFix(gFile, 2)} м³/ч</b> (расхождение
+       ${cFix(diff, 1)} %). Для гликолей это заметно: их плотность ${h[1]} кг/м³.
+       Здесь считается с плотностью выбранного хладоносителя.</div>` : ''}
+     <div class="cpick"><button onclick="calcShowSection('pumps')">→ Насосы в базе</button></div>`;
+}
+
+function calcRun() {
+  if (calcTab === 'q') calcQPaint();
+  else if (calcTab === 'comp') calcCompPaint();
+  else if (calcTab === 'pipe') calcPipePaint();
+  else calcPumpPaint();
+}
+/* переходы между вкладками с переносом результата */
+function calcToComp(q) { calcTab = 'comp'; calcPaint(); $('#kQ').value = q; calcRun(); }
+function calcToPump(q) { calcTab = 'pump'; calcPaint(); $('#uQ').value = q; calcRun(); }
+/* показать раздел базы: расчёт закончился — дальше выбираем железо */
+function calcShowSection(sec) {
+  calcClose();
+  f.sec = sec; f.sub = null; f.brand = null; f.st = 'ready';
+  draw();
+  document.querySelector('main').scrollTop = 0;
+}
+
 async function dlStep(d){
   // файлы лежат рядом: наш STEP в pack/step, файл завода — по прямой ссылке
   const a=document.createElement('a');
