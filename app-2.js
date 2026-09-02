@@ -796,7 +796,8 @@ async function loadHomeDashboard() {
 }
 
 // v2.45.406: «Собрать к отгрузке» на Главной — список договоров с активным запросом
-// сборки. Для каждого: контрагент, прогресс «собрано X/Y» и кнопка «Собрать по QR».
+// сборки. Первое нажатие фиксирует «Начать сборку» и гасит голос в цехе;
+// дальше кнопка открывает продолжение QR-комплектации.
 async function loadHomeGatherings() {
   const wrap = document.getElementById('home-gatherings-wrap');
   const block = document.getElementById('home-gatherings-block');
@@ -818,6 +819,7 @@ async function loadHomeGatherings() {
     const done = it.gathered || 0;
     const pct = total > 0 ? Math.round(done / total * 100) : 0;
     const complete = total > 0 && done >= total;
+    const started = !!it.started_at;
     const num = escapeHtml(it.number || ('№' + it.contract_id));
     const who = escapeHtml(it.contractor_name || '');
     const sep = idx < items.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
@@ -829,8 +831,12 @@ async function loadHomeGatherings() {
     html += '<div class="ship-progress-bar" style="flex:1;"><div class="ship-progress-fill ' + (complete ? 'complete' : '') + '" style="width:' + pct + '%"></div></div>';
     html += '<div style="font-size:12px;color:var(--text-light);white-space:nowrap;">собрано ' + done + '/' + total + '</div>';
     html += '</div></div>';
-    html += '<button class="ship-start-btn" style="margin-top:8px;" onclick="openShipmentMode(' + it.contract_id + ', \'gather\')">' +
-            '<i class="ti ti-scan"></i> ' + (complete ? 'Собрано · открыть' : 'Собрать по QR') + '</button>';
+    const action = started
+      ? "openShipmentMode(" + it.contract_id + ", 'gather')"
+      : 'startShipmentAssembly(' + it.contract_id + ')';
+    const actionText = complete ? 'Собрано · открыть' : (started ? 'Продолжить сборку' : 'Начать сборку');
+    html += '<button class="ship-start-btn" style="margin-top:8px;" onclick="' + action + '">' +
+            '<i class="ti ti-scan"></i> ' + actionText + '</button>';
     html += '</div>';
   });
   html += '</div>';
@@ -13251,6 +13257,24 @@ async function requestShipmentAssembly(contractId) {
   }
 }
 
+// Сборщик подтверждает, что взял запрос. Сервер сразу исключает договор из
+// голосовых напоминаний, а сам договор остаётся в списке до полной комплектации.
+async function startShipmentAssembly(contractId) {
+  if (!contractId) return;
+  try {
+    const resp = await apiPost('/api/contracts/' + contractId + '/start-shipment-assembly', {});
+    const d = (resp && resp.data) || {};
+    if (resp.ok && d.ok) {
+      showToast('Сборка начата — напоминания в цехе остановлены', 'success');
+      openShipmentMode(contractId, 'gather');
+    } else {
+      showToast((d && (d.message || d.error)) || 'Не удалось начать сборку', 'error');
+    }
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+  }
+}
+
 // v2.45.429: отозвать запрос сборки к отгрузке — снять отметку «сборка запрошена».
 // Возвращает блок к состоянию с кнопкой «Запросить сборку к отгрузке».
 async function cancelShipmentAssembly(contractId) {
@@ -13383,9 +13407,14 @@ async function loadContractShipmentBlock(contractId) {
             '<i class="ti ti-bell-ringing"></i> Запросить сборку к отгрузке</button>';
         }
       }
-      // «Собрать по QR» — сборщику (мастер/слесарь): комплектация по сканам
-      html += '<button class="ship-start-btn" style="margin-top:8px;" onclick="openShipmentMode(' + contractId + ', \'gather\')">' +
-        '<i class="ti ti-scan"></i> ' + (gComplete ? 'Собрано · открыть' : 'Собрать по QR') + '</button>';
+      // Первое нажатие гасит голос в цехе; затем кнопка продолжает QR-сборку.
+      const gatherStarted = !!req.started;
+      const gatherAction = gatherStarted
+        ? "openShipmentMode(" + contractId + ", 'gather')"
+        : 'startShipmentAssembly(' + contractId + ')';
+      const gatherText = gComplete ? 'Собрано · открыть' : (gatherStarted ? 'Продолжить сборку' : 'Начать сборку');
+      html += '<button class="ship-start-btn" style="margin-top:8px;" onclick="' + gatherAction + '">' +
+        '<i class="ti ti-scan"></i> ' + gatherText + '</button>';
       // v2.45.425: откат сборки к отгрузке — снять все отметки «собрано» (склад не трогается)
       if (gDone > 0) {
         html += '<button onclick="rollbackContractGathering(' + contractId + ')" ' +
