@@ -58,6 +58,10 @@ test('сотрудник прикладывает файлы, но только 
   assert.match(ui, /Прикрепить файл/);
   assert.match(html, /dchat-attach-label">Файл/);
   assert.match(css, /dchat-employee-readonly \.dchat-attach-label \{ display: inline/);
+  assert.match(ui, /файлы можно перетащить прямо в окно/);
+  const dropHost = app.slice(app.indexOf('function _devChatDropHost'),
+    app.indexOf('function _devChatDropIsFiles'));
+  assert.doesNotMatch(dropHost, /_devChatEmployeeMode/);
   const picker = app.slice(app.indexOf('function devChatAttachPick'),
     app.indexOf('// ---- v2.45.961'));
   assert.match(picker, /document\.createElement\('input'\)/);

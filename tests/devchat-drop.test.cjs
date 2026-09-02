@@ -41,7 +41,13 @@ function dropContext(opts) {
         if (id === 'devchat-input' || id === 'devchat-drawer-input') return { focus() { ctx.focused += 1; } };
         return null;
       },
-      querySelector() { return null; },
+      querySelector(selector) {
+        if (selector === '.screen[data-screen="devchat"]' &&
+            ['devchat', 'codex', 'sitechat'].includes(ctx.state.currentScreen)) {
+          return { querySelector() { return { id: 'dchat-main' }; } };
+        }
+        return null;
+      },
     },
   };
   const code = section('function devChatPickFiles(files)', '// Вложения показываем плиткой');
@@ -98,6 +104,17 @@ test('при открытой шторке файлы кладутся в её �
   assert.equal(ctx.activeHost(), 'drawer');
 });
 
+test('общий чат сайта принимает файлы перетаскиванием', () => {
+  const ctx = dropContext({ screen: 'sitechat' });
+
+  assert.ok(ctx.host(), 'экран общего сайта должен показывать приёмник файлов');
+  ctx.take(transfer(['макет.html', 'референс.png']), false);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.picked().map((f) => f.name))),
+    ['макет.html', 'референс.png']);
+  assert.equal(ctx.sends, 0, 'бросок прикрепляет файлы и даёт дописать задачу');
+});
+
 test('лимит в пять файлов держится и на перетаскивании', () => {
   const ctx = dropContext();
 
@@ -123,4 +140,6 @@ test('приёмник виден и подключён', () => {
   assert.match(css, /\.dchat-drop\.show \{/);
   assert.match(css, /\.dchat-drop \.dcd-go \{/);
   assert.match(html, /Файлы можно перетащить прямо в окно/);
+  const host = section('function _devChatDropHost()', 'function _devChatDropIsFiles');
+  assert.doesNotMatch(host, /_devChatEmployeeMode/, 'общий чат сайта не должен отключать drop');
 });
