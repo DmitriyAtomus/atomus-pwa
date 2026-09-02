@@ -3808,7 +3808,13 @@ function tankBracketRows(fr,P0,P1,W,zFloor){
   /* Бак и верхние М6 остаются на штатной отметке 250. До верхней плоскости
      конкретного дна доводим только прямой низ стойки, пластину и четыре М8. */
   const support=SH_STD_SUPPORT;
-  const baseDrop=Math.max(0,support-SH_OEM_BASE_DROP-zFloor);
+  /* v2.46.129: кронштейн опирается на РЕАЛЬНОЕ дно корпуса. Раньше поправку
+     обрезали снизу нулём, и у корпуса с высоким полом (свой STEP, рама с
+     подставкой) пластина оставалась на штатной отметке 50 — кронштейны
+     проваливались сквозь дно и торчали наружу. Теперь стойку и укорачиваем:
+     низ пластины = дно, каким бы оно ни было. Ниже 30 мм стойки не остаётся —
+     дальше кронштейн не нужен, бак и так почти на полу. */
+  const baseDrop=Math.max(-(SH_OEM_BASE_DROP-30),support-SH_OEM_BASE_DROP-zFloor);
   return {support:support,low:support+SH_POST_Z0,
           top:support+SH_POST_Z1,rows:null,fixed:true,direct:true,
           baseDrop:baseDrop,
@@ -4122,7 +4128,9 @@ const shMat=new THREE.MeshStandardMaterial({color:0x8d959c,metalness:.6,roughnes
 const shPadMat=new THREE.MeshStandardMaterial({color:0x20282c,metalness:.05,roughness:.9});
 const SH_OEM_GEO=new Map();
 function tankOemBracketGeo(baseDrop){
-  baseDrop=Math.max(0,+baseDrop||0);
+  /* отрицательная поправка укорачивает стойку — так кронштейн садится на
+     высокое дно, а не проваливается под него */
+  baseDrop=Math.max(-(SH_OEM_BASE_DROP-30),+baseDrop||0);
   const key=baseDrop.toFixed(3);
   if(SH_OEM_GEO.has(key))return SH_OEM_GEO.get(key);
   const MS=globalThis.TANK_OEM_BRACKET_MESH;
@@ -4147,6 +4155,21 @@ function tankOemBracketGeo(baseDrop){
   g.userData.source=MS.source;g.userData.assembly=MS.assembly;
   g.userData.shared=true;g.userData.baseDrop=baseDrop;
   SH_OEM_GEO.set(key,g);return g;
+}
+/* Насколько опустить (или укоротить) стойку кронштейна, чтобы его пластина
+   легла на дно этого корпуса. Считаем от реального дна: у своего STEP-корпуса
+   пол бывает выше штатной отметки, и сохранённая в проекте поправка врёт. */
+function shBaseDrop(it,sh){
+  const saved=+(sh&&sh.baseDrop)||0;
+  const fr=it&&it.link&&placed.find(p=>p.uid===it.link.to);
+  if(!fr||!fr.obj||!fr.obj.geometry)return saved;
+  const PT=fr.obj.geometry.userData.parts||[],B=framePartLocalBoxes(fr);
+  if(!B||!PT.length)return saved;
+  const iFloor=PT.findIndex(x=>/дно|поддон|настил/i.test((x&&x.name)||''));
+  if(iFloor<0||!B[iFloor]||B[iFloor].isEmpty())return saved;
+  const zFloor=B[iFloor].max.z;
+  const drop=(sh.z==null?SH_STD_SUPPORT:sh.z)-SH_OEM_BASE_DROP-zFloor;
+  return Math.max(-(SH_OEM_BASE_DROP-30),drop);
 }
 function shelfClear(it){
   if(!it||!it._shelf)return;
@@ -4197,7 +4220,9 @@ function shelfMark(it){
     /* v7: исходные поверхности и штатный крепёж прямо из STEP. Меш хранится
        относительно центра опорной плоскости бака: +X направлен внутрь корпуса. */
     if(sh.v>=7){
-      const geo=tankOemBracketGeo(sh.baseDrop);
+      /* v2.46.129: поправку берём не из проекта, а по фактическому дну — в
+         старых проектах она была обрезана нулём, и кронштейн уходил под пол */
+      const geo=tankOemBracketGeo(shBaseDrop(it,sh));
       if(geo){
         const m=new THREE.Mesh(geo,[shMat,boltMat]);
         m.position.set(sh.ax==='x'?sh.ca:sh.cw,sh.ax==='x'?sh.cw:sh.ca,sh.z);
