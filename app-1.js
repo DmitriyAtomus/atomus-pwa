@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.124";
+const APP_VERSION = "v2.46.125";
 const APP_VERSION_DATE = "02.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2174,7 +2174,8 @@ function _devChatApplyAgentUi() {
   const hint = document.querySelector('[data-screen="devchat"] .dchat-hint');
   if (hint) hint.textContent = employee
     ? 'Enter — отправить · Shift+Enter — новая строка · Клава работает через локальный Codex · '
-      + 'общая переписка · сайт создаёт, меняет и публикует полностью · CRM только читает'
+      + 'файлы можно перетащить прямо в окно · общая переписка · '
+      + 'сайт создаёт, меняет и публикует полностью · CRM только читает'
     : 'Enter — отправить, Shift+Enter — новая строка. Файлы можно перетащить прямо в окно. ' +
       name + ' работает на офисном компьютере и правит проекты сам.';
   const badge = document.getElementById('devchat-mode-badge');
@@ -4692,7 +4693,6 @@ let _devChatDropWatch = null;
 
 // Куда рисуем приёмник: открытая шторка важнее экрана — она лежит поверх него.
 function _devChatDropHost() {
-  if (typeof _devChatEmployeeMode === 'function' && _devChatEmployeeMode()) return null;
   const drawer = document.getElementById('devchat-drawer');
   if (drawer && drawer.style.display === 'flex') return drawer;
   if (state.currentScreen === 'devchat' || state.currentScreen === 'codex' ||
