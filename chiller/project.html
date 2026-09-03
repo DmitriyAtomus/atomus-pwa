@@ -9932,8 +9932,11 @@ function schApply(){const sv=$('#schSvg');if(sv)sv.style.transform='translate('+
 function schFit(){
   const v=$('#schView');if(!v)return;
   const W=v.clientWidth,H=v.clientHeight;if(!W||!H)return;
-  const z=Math.min((W-32)/900,(H-32)/722);
-  schZ.z=z;schZ.x=(W-900*z)/2;schZ.y=(H-722*z)/2;schZ.fit=true;schApply();
+  /* справа живёт блок расчёта — лист вписываем левее него, чтобы он не
+     ложился на конденсатор */
+  const cb=$('#schCalc'),R=(cb&&cb.offsetWidth&&W>1100)?cb.offsetWidth+28:0;
+  const z=Math.min((W-R-32)/900,(H-32)/722);
+  schZ.z=z;schZ.x=(W-R-900*z)/2;schZ.y=(H-722*z)/2;schZ.fit=true;schApply();
 }
 function schZoomAt(f,cx,cy){
   const v=$('#schView');if(!v)return;
