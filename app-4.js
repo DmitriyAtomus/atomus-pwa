@@ -15908,6 +15908,86 @@ function _tcColorIdx(s) {
   return h;
 }
 
+// v2.46.135: хаб чатов — вкладки, поиск, «мяч» и статус расчёта, архив.
+// Дмитрий путался: 21 чат одной кучей, живые вперемешку с отказами, и не
+// видно, где требуется твой ход. Теперь логика явная.
+var _tcFilter = 'all';
+var _tcQuery = '';
+const TC_CALC_ST = {
+  new: ['Новый', 'n'], in_progress: ['Считаем', 'w'], done: ['Готов', 'd'],
+  to_offer: ['Ушло в КП', 'o'], cancelled: ['Отказ', 'c'],
+};
+function _tcBallMine(c, myEmpId) {
+  return !!(c.calc && Number(c.calc.ball_employee_id) === Number(myEmpId) &&
+    ['new', 'in_progress'].indexOf(c.calc.status) >= 0);
+}
+// видимые чаты по вкладке и поиску — чистая функция, гоняется тестом
+function _tcVisibleChats(chats, filter, q, myEmpId) {
+  let list = (chats || []).slice();
+  if (q) list = list.filter(c => String(c.title || '').toLowerCase().includes(q));
+  if (filter === 'arch') list = list.filter(c => c.archived);
+  else {
+    list = list.filter(c => !c.archived);
+    if (filter === 'ball') list = list.filter(c => _tcBallMine(c, myEmpId));
+    else if (filter === 'unread') list = list.filter(c => (c.unread || 0) > 0);
+  }
+  if (filter === 'all') {
+    // сначала «мяч у вас», потом непрочитанные, потом по свежести
+    list.sort((a, b) =>
+      (_tcBallMine(b, myEmpId) - _tcBallMine(a, myEmpId)) ||
+      (((b.unread || 0) > 0) - ((a.unread || 0) > 0)) ||
+      String(b.last_at || '').localeCompare(String(a.last_at || '')));
+  }
+  return list;
+}
+function _tcTabsBar(chats, myEmpId) {
+  const live = (chats || []).filter(c => !c.archived);
+  const nBall = live.filter(c => _tcBallMine(c, myEmpId)).length;
+  const nUn = live.filter(c => (c.unread || 0) > 0).length;
+  const nArch = (chats || []).filter(c => c.archived).length;
+  const tab = (f, label, n, cls) =>
+    '<span class="tch-tab' + (f === _tcFilter ? ' on' : '') + (cls || '') + '" onclick="_tcSetFilter(\'' + f + '\')">' +
+    label + (n ? ' <b>' + n + '</b>' : '') + '</span>';
+  return '<div class="tch-tabs">' +
+    tab('all', 'Все', live.length, '') +
+    tab('ball', '🎾 Мой ход', nBall, nBall ? ' hot' : '') +
+    tab('unread', 'Непрочитанные', nUn, '') +
+    tab('arch', 'Архив', nArch, '') +
+    '<input class="tch-q" id="tch-q" placeholder="Поиск по чатам…" value="' + escapeHtml(_tcQuery) + '"' +
+    ' oninput="_tcSetQuery(this.value)">' +
+    '</div>';
+}
+function _tcSetFilter(f) {
+  _tcFilter = f;
+  renderTeamChatList(state._teamChats || []);
+}
+function _tcSetQuery(v) {
+  _tcQuery = String(v || '').trim().toLowerCase();
+  const box = document.getElementById('team-chats-content');
+  renderTeamChatList(state._teamChats || []);
+  const q = document.getElementById('tch-q');
+  if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+}
+async function _tcArchive(ev, chatId, flag) {
+  ev.stopPropagation();
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/team-chats/' + chatId + '/archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ archived: !!flag }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.message || 'Не получилось');
+    const c = (state._teamChats || []).find(x => x.id === chatId);
+    if (c) c.archived = !!flag;
+    renderTeamChatList(state._teamChats || []);
+    showToast(flag ? 'Чат убран в архив' : 'Чат возвращён из архива', 'success');
+  } catch (e) {
+    showToast(String(e.message || e), 'error');
+  }
+}
+
 // v2.45.6xx: строка-карточка чата (новый вид)
 function _tcRowV2(c) {
   const lm = c.last_message;
@@ -15925,10 +16005,27 @@ function _tcRowV2(c) {
   const crown = c.role === 'owner' ? '<span class="tc2-crown"><i class="ti ti-crown"></i></span>' : '';
   const owner = c.role === 'owner' ? ' · <span class="tc2-own">вы владелец</span>' : '';
   const mc = c.members_count || 1;
+  // v2.46.135: чипы «мяч» и статус расчёта + архив
+  const myEmpId = state.user && state.user.employee_id;
+  let chips = '';
+  if (c.calc) {
+    const st = TC_CALC_ST[c.calc.status];
+    if (st) chips += '<span class="tc2-st s-' + st[1] + '">' + st[0] + '</span>';
+    if (['new', 'in_progress'].indexOf(c.calc.status) >= 0 && c.calc.ball_holder_name) {
+      chips += _tcBallMine(c, myEmpId)
+        ? '<span class="tc2-ball mine">🎾 ваш ход' + (c.calc.ball_days > 0 ? ' · ' + c.calc.ball_days + ' дн' : '') + '</span>'
+        : '<span class="tc2-ball">🎾 ход: ' + escapeHtml(c.calc.ball_holder_name) + '</span>';
+    }
+  }
+  const archBtn = '<span class="tc2-archbtn" onclick="_tcArchive(event,' + c.id + ',' + (c.archived ? 'false' : 'true') + ')" ' +
+    'title="' + (c.archived ? 'Вернуть из архива' : 'В архив') + '">' +
+    '<i class="ti ' + (c.archived ? 'ti-arrow-back-up' : 'ti-archive') + '"></i></span>';
   return '<div class="tc2-row' + (isUnread ? ' unread' : '') + '" onclick="openTeamChat(' + c.id + ')">'
     + '<div class="tc2-ava a' + _tcColorIdx(c.title) + '">' + escapeHtml(_tcInitials(c.title)) + crown + '</div>'
     + '<div class="tc2-main">'
-    + '<div class="tc2-r1"><span class="tc2-title">' + escapeHtml(c.title) + '</span><span class="tc2-time">' + escapeHtml(t) + '</span></div>'
+    + '<div class="tc2-r1"><span class="tc2-title">' + escapeHtml(c.title) + '</span>'
+    + '<span class="tc2-time">' + escapeHtml(t) + '</span>' + archBtn + '</div>'
+    + (chips ? '<div class="tc2-chips">' + chips + '</div>' : '')
     + '<div class="tc2-r2"><span class="tc2-preview' + (sys ? ' sys' : '') + '">' + escapeHtml(_tcTrim(preview, 80)) + '</span>' + unread + '</div>'
     + '<div class="tc2-meta"><i class="ti ti-users"></i> ' + mc + ' ' + _plural(mc, ['участник', 'участника', 'участников']) + owner + '</div>'
     + '</div></div>';
@@ -15941,9 +16038,12 @@ function renderTeamChatList(chats) {
   if (!box) return;
   state._teamChats = chats;
   window.TC_V2 = (localStorage.getItem('tcV2') !== '0');
-  const toggle = _tcToggleBar();
+  const myEmpId = state.user && state.user.employee_id;
+  const tabs = _tcTabsBar(chats, myEmpId);
+  const shown = _tcVisibleChats(chats, _tcFilter, _tcQuery, myEmpId);
+  const toggle = tabs + _tcToggleBar();
   const cchHtml = _contractChatsSectionHtml();   // v2.45.717: чаты договоров
-  if (counter) counter.textContent = chats.length + ((window._contractChats || []).length);
+  if (counter) counter.textContent = chats.filter(c => !c.archived).length + ((window._contractChats || []).length);
   if (!chats.length) {
     box.innerHTML = toggle + '<div class="empty-block" style="padding:40px 18px;text-align:center;color:var(--text-light);">'
       + '<i class="ti ti-messages" style="font-size:42px;opacity:.4;"></i><br><br>'
@@ -15952,12 +16052,21 @@ function renderTeamChatList(chats) {
       + '</div>' + cchHtml;
     return;
   }
+  if (!shown.length) {
+    const msg = _tcFilter === 'ball' ? 'Мяч не у вас — все расчёты ждут хода других. 👍'
+      : _tcFilter === 'unread' ? 'Непрочитанных нет — всё просмотрено.'
+      : _tcFilter === 'arch' ? 'Архив пуст. Кнопка 🗄 на чате убирает его сюда.'
+      : 'По поиску ничего не нашлось.';
+    box.innerHTML = toggle + '<div class="empty-block" style="padding:26px 18px;text-align:center;color:var(--text-light);">' +
+      msg + '</div>' + cchHtml;
+    return;
+  }
   if (window.TC_V2) {
-    box.innerHTML = toggle + '<div class="tc2-list">' + chats.map(_tcRowV2).join('') + '</div>' + cchHtml;
+    box.innerHTML = toggle + '<div class="tc2-list">' + shown.map(_tcRowV2).join('') + '</div>' + cchHtml;
     return;
   }
   let html = toggle + '<div class="tcl-list">';
-  chats.forEach(c => {
+  shown.forEach(c => {
     const lm = c.last_message;
     let preview = 'Нет сообщений';
     if (lm) {

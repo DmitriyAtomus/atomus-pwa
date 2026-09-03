@@ -19908,6 +19908,30 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 
 /* ===== Чаты (список) — новый вид (v2.45.6xx) ===== */
 .tc2-list{display:flex;flex-direction:column;gap:8px;}
+/* v2.46.135: хаб чатов — вкладки, чипы мяча/статуса, архив */
+.tch-tabs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; }
+.tch-tab { font-size: 12px; color: var(--text-mid); border: 1px solid var(--border-strong); border-radius: 16px; padding: 5px 13px; cursor: pointer; user-select: none; background: var(--surface); }
+.tch-tab b { font-weight: 700; color: var(--text-light); }
+.tch-tab.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.tch-tab.on b { color: #fff; }
+.tch-tab.hot:not(.on) { border-color: var(--warning); color: var(--warning); }
+.tch-tab.hot:not(.on) b { color: var(--warning); }
+.tch-q { margin-left: auto; min-width: 180px; border: 1px solid var(--border-strong); border-radius: 16px; padding: 6px 14px; font-size: 12.5px; outline: none; background: var(--surface); color: var(--text-dark); }
+.tch-q:focus { border-color: var(--brand); }
+.tc2-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 3px; }
+.tc2-st { font-size: 10px; font-weight: 700; border-radius: 9px; padding: 1px 8px; letter-spacing: .2px; }
+.tc2-st.s-n { background: var(--info-bg); color: var(--info); }
+.tc2-st.s-w { background: var(--warning-bg); color: var(--warning); }
+.tc2-st.s-d { background: var(--success-bg); color: var(--success); }
+.tc2-st.s-o { background: #EFE8FA; color: #6B3FA0; }
+.tc2-st.s-c { background: var(--bg); color: var(--text-light); }
+.tc2-ball { font-size: 10px; font-weight: 600; border-radius: 9px; padding: 1px 8px; background: var(--bg); color: var(--text-mid); }
+.tc2-ball.mine { background: var(--warning-bg); color: var(--warning); border: 1px solid #E8D5AE; }
+.tc2-archbtn { flex: none; color: var(--text-faint); cursor: pointer; padding: 2px 4px; border-radius: 6px; opacity: 0; transition: opacity .15s; }
+.tc2-row:hover .tc2-archbtn { opacity: .9; }
+.tc2-archbtn:hover { color: var(--brand); background: var(--brand-bg); }
+@media (max-width: 700px) { .tc2-archbtn { opacity: .6; } .tch-q { min-width: 130px; flex: 1; } }
+
 .tc2-row{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px 15px;display:flex;align-items:center;gap:13px;box-shadow:0 1px 2px rgba(27,32,48,.04);cursor:pointer;transition:box-shadow .12s,border-color .12s;}
 .tc2-row:hover{box-shadow:0 3px 11px rgba(27,32,48,.08);}
 .tc2-row.unread{background:#FBFCFF;border-color:#CFE0F5;}
