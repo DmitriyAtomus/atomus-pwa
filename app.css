@@ -21331,6 +21331,31 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 
 /* v2.45.662: файлы задачи в карточке */
 .task-files { margin: 10px 0 4px; }
+
+/* v2.46.133: обсуждение задачи — комментарии и события одной лентой */
+.task-disc { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+.task-disc-t { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+.task-disc-t .cnt { font-size: 11px; font-weight: 600; color: var(--brand); background: var(--brand-bg); border-radius: 10px; padding: 1px 8px; }
+.task-disc-feed { max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px 2px 6px; }
+.task-disc-empty { font-size: 12.5px; color: var(--text-light); padding: 10px 2px; }
+.task-disc-msg { max-width: 92%; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; align-self: flex-start; }
+.task-disc-msg.mine { align-self: flex-end; background: var(--brand-bg); border-color: var(--brand-bg-strong); }
+.task-disc-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.task-disc-head b { font-size: 12px; }
+.task-disc-head .ago, .task-disc-ev .ago { font-size: 10.5px; color: var(--text-faint); white-space: nowrap; }
+.task-disc-del { margin-left: auto; color: var(--text-faint); cursor: pointer; font-size: 12px; opacity: .0; transition: opacity .15s; }
+.task-disc-msg:hover .task-disc-del { opacity: .8; }
+.task-disc-del:hover { color: var(--danger); }
+.task-disc-text { font-size: 13px; line-height: 1.5; word-break: break-word; }
+.task-disc-ev { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-light); padding: 0 4px; }
+.task-disc-ev i { font-size: 13px; opacity: .7; }
+.task-disc-input { display: flex; gap: 8px; align-items: flex-end; margin-top: 10px; }
+.task-disc-input textarea { flex: 1; resize: none; min-height: 38px; max-height: 120px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); color: var(--text-dark); font: inherit; font-size: 13px; padding: 9px 12px; outline: none; }
+.task-disc-input textarea:focus { border-color: var(--brand); }
+.task-disc-send { flex: none; width: 40px; height: 38px; border: none; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; font-size: 15px; }
+.task-disc-send:disabled { opacity: .5; cursor: default; }
+.tkr-tag.cmt { color: var(--brand); }
+.task-meta-comments { opacity: .85; }
 .task-files-t { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: #64748B; margin-bottom: 7px; display: flex; align-items: center; gap: 6px; }
 .task-files-t .cnt { background: #E2E8F0; border-radius: 999px; padding: 1px 7px; font-size: 10.5px; }
 .task-file-row {

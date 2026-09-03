@@ -2958,6 +2958,9 @@ function _renderTaskBoardCard(t) {
   if (t.contract_number) {
     meta.push('<span class="task-meta-contract" onclick="event.stopPropagation();openContractFromTask(' + t.contract_id + ')"><i class="ti ti-file-text"></i>' + escapeHtml(t.contract_number) + '</span>');
   }
+  if (t.comments_count) {
+    meta.push('<span class="task-meta-comments"><i class="ti ti-message-circle"></i>' + t.comments_count + '</span>');
+  }
   return '<div class="tasks-board-card priority-' + pri + '"' +
            ' draggable="true"' +
            ' ondragstart="_tasksBoardDragStart(event,' + t.id + ',\'' + t.status + '\')"' +
@@ -3092,6 +3095,9 @@ function renderTaskRow(t) {
       'onclick="event.stopPropagation(); openContractFromTask(' + t.contract_id + ')" ' +
       'title="' + (archived ? 'Договор в архиве' : 'Перейти в договор') + '">📄 ' +
       escapeHtml(t.contract_number + (t.contractor_name ? ' · ' + t.contractor_name : '')) + '</span>');
+  }
+  if (t.comments_count) {
+    tags.push('<span class="tkr-tag cmt" title="Комментарии в обсуждении">💬 ' + t.comments_count + '</span>');
   }
   if (!isDone && t.created_at) {
     let ageTxt = '', ageOld = false;
@@ -3376,10 +3382,130 @@ function renderTaskDetail(t) {
     html += '</div>';
   }
 
+  // v2.46.133: обсуждение — комментарии и события правок одной лентой
+  html += renderTaskDiscussion(t);
+
   html += '</div>';   // task-detail-body
   html += '</div>';   // task-detail-card
 
   container.innerHTML = html;
+  const feed = document.getElementById('task-disc-feed');
+  if (feed) feed.scrollTop = feed.scrollHeight;
+}
+
+// «5 мин назад» — в ленте важна свежесть, а не полная дата (она в title)
+function taskTimeAgo(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(String(iso).replace(' ', 'T') + 'Z');
+    const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+    if (s < 60) return 'только что';
+    if (s < 3600) return Math.floor(s / 60) + ' мин назад';
+    if (s < 86400) return Math.floor(s / 3600) + ' ч назад';
+    if (s < 172800) return 'вчера ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ' ' +
+           d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  } catch (e) { return ''; }
+}
+
+function _taskDiscItemHtml(c) {
+  const ago = '<span class="ago" title="' + escapeHtml(formatTaskDateTime(c.created_at)) + '">' +
+              taskTimeAgo(c.created_at) + '</span>';
+  if (c.kind === 'event') {
+    return '<div class="task-disc-ev"><i class="ti ti-arrows-exchange"></i>' +
+      escapeHtml((c.author_name ? c.author_name + ' · ' : '') + c.text) + ago + '</div>';
+  }
+  return '<div class="task-disc-msg' + (c.mine ? ' mine' : '') + '" data-cid="' + c.id + '">' +
+    '<div class="task-disc-head"><b>' + escapeHtml(c.author_name || '—') + '</b>' + ago +
+    (c.can_delete ? '<span class="task-disc-del" onclick="deleteTaskComment(' + c.id + ')" title="Удалить"><i class="ti ti-trash"></i></span>' : '') +
+    '</div><div class="task-disc-text">' + escapeHtml(c.text).replace(/\n/g, '<br>') + '</div></div>';
+}
+
+function renderTaskDiscussion(t) {
+  const items = t.comments || [];
+  const live = items.filter(c => c.kind !== 'event').length;
+  let h = '<div class="task-disc">';
+  h += '<div class="task-disc-t"><i class="ti ti-messages"></i> Обсуждение' +
+       '<span class="cnt" id="task-disc-cnt"' + (live ? '' : ' style="display:none"') + '>' + live + '</span></div>';
+  h += '<div class="task-disc-feed" id="task-disc-feed">';
+  if (!items.length) {
+    h += '<div class="task-disc-empty" id="task-disc-empty">Пока тихо. Напиши первым — исполнители и постановщик получат уведомление.</div>';
+  }
+  items.forEach(c => { h += _taskDiscItemHtml(c); });
+  h += '</div>';
+  h += '<div class="task-disc-input">' +
+    '<textarea id="task-disc-inp" rows="1" maxlength="2000" placeholder="Написать комментарий…" ' +
+      'oninput="_taskDiscGrow(this)" onkeydown="_taskDiscKey(event)"></textarea>' +
+    '<button class="task-disc-send" id="task-disc-send" onclick="sendTaskComment()" title="Отправить (Enter)">' +
+      '<i class="ti ti-send"></i></button></div>';
+  h += '</div>';
+  return h;
+}
+
+function _taskDiscGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function _taskDiscKey(e) {
+  // Enter — отправить, Shift+Enter — новая строка
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTaskComment(); }
+}
+
+async function sendTaskComment() {
+  const inp = document.getElementById('task-disc-inp');
+  const btn = document.getElementById('task-disc-send');
+  const text = (inp && inp.value || '').trim();
+  if (!text || !state.currentTaskId) return;
+  if (btn) btn.disabled = true;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/tasks/' + state.currentTaskId + '/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ text: text }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.message || 'Не удалось отправить');
+    // не перерисовываем всю карточку — просто дописываем реплику в ленту
+    const feed = document.getElementById('task-disc-feed');
+    const empty = document.getElementById('task-disc-empty');
+    if (empty) empty.remove();
+    if (feed) {
+      feed.insertAdjacentHTML('beforeend', _taskDiscItemHtml(d.item || { text: text, mine: true, kind: 'comment' }));
+      feed.scrollTop = feed.scrollHeight;
+    }
+    const cnt = document.getElementById('task-disc-cnt');
+    if (cnt) { cnt.textContent = String((parseInt(cnt.textContent, 10) || 0) + 1); cnt.style.display = ''; }
+    inp.value = '';
+    _taskDiscGrow(inp);
+    inp.focus();
+  } catch (e) {
+    showToast('Комментарий не отправлен: ' + (e.message || e), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function deleteTaskComment(cid) {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/tasks/comments/' + cid, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!r.ok) throw new Error('Не удалось удалить');
+    const el = document.querySelector('.task-disc-msg[data-cid="' + cid + '"]');
+    if (el) el.remove();
+    const cnt = document.getElementById('task-disc-cnt');
+    if (cnt) {
+      const n = Math.max(0, (parseInt(cnt.textContent, 10) || 1) - 1);
+      cnt.textContent = String(n);
+      if (!n) cnt.style.display = 'none';
+    }
+  } catch (e) {
+    showToast(String(e.message || e), 'error');
+  }
 }
 
 function formatTaskDateTime(iso) {
