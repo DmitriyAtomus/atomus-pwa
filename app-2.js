@@ -3260,13 +3260,16 @@ function renderTaskDetail(t) {
 
   let html = '<div class="task-detail-card">';
 
-  // === HERO === цветной блок со статусом и приоритетом
-  html += '<div class="task-detail-hero s-' + status + '">' +
-            '<div class="task-detail-hero-label"><i class="ti ' + statusIcon + '"></i>СТАТУС</div>' +
+  // v2.46.134: hero стал компактной полосой — раньше баннер съедал пол-экрана,
+  // а обсуждение и описание были зажаты внизу
+  html += '<div class="task-detail-hero compact s-' + status + '">' +
+            '<i class="ti ' + statusIcon + ' hero-ic"></i>' +
             '<div class="task-detail-hero-status">' + escapeHtml(t.status_label || status) + '</div>' +
+            (t.deadline && deadlineCls ? '<span class="hero-dl' + (deadlineCls === 'urgent' ? ' late' : '') + '">' +
+              '<i class="ti ti-clock"></i>' + escapeHtml(formatTaskDeadline(t.deadline)) + '</span>' : '') +
             '<div class="task-detail-hero-priority' + (prio === 'urgent' ? ' urgent' : '') + '">' +
               '<i class="ti ' + prioMeta.icon + '"></i>' +
-              'Приоритет: ' + escapeHtml(t.priority_label || prioMeta.label) +
+              escapeHtml(t.priority_label || prioMeta.label) +
             '</div>' +
           '</div>';
 
@@ -3283,6 +3286,9 @@ function renderTaskDetail(t) {
     });
     html += '</div>';
   }
+
+  html += '<div class="task-detail-cols">';
+  html += '<div class="task-col-main">';
 
   // Описание
   if (t.description) {
@@ -3304,6 +3310,11 @@ function renderTaskDetail(t) {
     });
     html += '</div>';
   }
+
+  // v2.46.134: обсуждение — главный инструмент, живёт в широкой колонке
+  html += renderTaskDiscussion(t);
+  html += '</div>';   // task-col-main
+  html += '<div class="task-col-side">';
 
   // Карточки-факты
   html += '<div class="task-facts-grid">';
@@ -3382,8 +3393,8 @@ function renderTaskDetail(t) {
     html += '</div>';
   }
 
-  // v2.46.133: обсуждение — комментарии и события правок одной лентой
-  html += renderTaskDiscussion(t);
+  html += '</div>';   // task-col-side
+  html += '</div>';   // task-detail-cols
 
   html += '</div>';   // task-detail-body
   html += '</div>';   // task-detail-card
