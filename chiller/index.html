@@ -2280,6 +2280,14 @@ function frAt(ref, t) {
 const frTemps = ref => (FR[ref] || []).map(r => r[0]);
 
 function calcOpen() { $('#calc').classList.add('open'); calcPaint(); }
+/* по ссылке #calc из конструктора — сразу открыть расчёт */
+window.addEventListener('load', () => {
+  if (location.hash !== '#calc') return;
+  const t = setInterval(() => {
+    if (typeof DATA === 'undefined' || !DATA || !DATA.length) return;
+    clearInterval(t); calcOpen();
+  }, 200);
+});
 function calcClose() { $('#calc').classList.remove('open'); }
 
 function calcPaint() {
@@ -2402,6 +2410,7 @@ function calcCompPaint() {
   const q0 = hV - hL;                       // кДж/кг — холодильный эффект
   const mass = Q / q0 * 3600;               // кг/ч
   const vol = mass / rhoV * k;              // м³/ч
+  calcSave({ comp: { Q: Q, ref: ref, t0: t0, tk: tk, type: type, vol: vol } });
   out.innerHTML =
     `<div class="cbig"><b>${cFix(vol, 2)}</b><span>м³/ч — объёмная производительность</span></div>
      <div class="csteps">
@@ -2464,6 +2473,7 @@ function calcPipePaint() {
      наружного на две стенки */
   const pick = d => TUBES.find(t => tubeIn(t) >= d) || TUBES[TUBES.length - 1];
   const tl = pick(dl), tg = pick(dg);
+  calcSave({ pipe: { ref: ref, t0: t0, Q: Q, dl: dl, dg: dg, odl: tl[0], odg: tg[0] } });
   out.innerHTML =
     `<div class="csteps" style="margin-bottom:10px">
        теплота парообразования при ${t0} °С: <i>${cFix(r, 1)} кДж/кг</i> ·
@@ -2506,6 +2516,7 @@ function calcPumpPaint() {
     out.innerHTML = '<div class="csteps">Заполните поля</div>'; return;
   }
   const g = Q * 3600 / (h[2] * h[1] * dt) * 1000;    // м³/ч, с плотностью
+  calcSave({ pump: { Q: Q, hc: h[0], dt: dt, g: g } });
   const gFile = Q * 1000 / (h[2] / 3600 * dt) / 1000; // как в файле: плотность всегда 1000
   const diff = Math.abs(g - gFile) / g * 100;
   out.innerHTML =
@@ -2529,6 +2540,16 @@ function calcPumpPaint() {
 function calcPickPump(g) {
   const sel = document.getElementById('uKind');
   calcShowSection('pumps', sel ? sel.value : '', { label: 'подача', value: g, unit: 'м³/ч' });
+}
+/* ═══ v2.46.133: расчёт помнится для схемы ═══
+   Диаметры, подача насоса и режим уезжают в конструктор: на листе схемы
+   они подписываются прямо на линиях. Хранилище общее — localStorage. */
+function calcSave(part) {
+  try {
+    const o = JSON.parse(localStorage.getItem('chiller.calc') || '{}');
+    Object.assign(o, part); o.ts = Date.now();
+    localStorage.setItem('chiller.calc', JSON.stringify(o));
+  } catch (e) {}
 }
 function calcRun() {
   if (calcTab === 'q') calcQPaint();

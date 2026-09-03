@@ -376,8 +376,8 @@ button.back{background:none;font:inherit}
 .pov-new:hover{background:var(--panel2)}
 .pov-empty{padding:22px 16px;text-align:center;color:var(--faint);font-size:12.5px;line-height:1.6}
 /* схема */
-#swrap{position:absolute;inset:0;background:#081426;z-index:8;display:none;overflow:auto}
-#swrap.on{display:block}
+#swrap{position:absolute;inset:0;background:#081426;z-index:8;display:none;flex-direction:column;overflow:hidden}
+#swrap.on{display:flex}
 /* v2.46.010: на вкладке «Схема» слои сцены гасим целиком. Раньше метки «+»,
    панель выделения и подписи присоединений висели поверх листа схемы —
    часть даже за его краем: у #rots и #swrap был один z-index, и сверху
@@ -446,6 +446,100 @@ svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 #schSvg .supb rect{stroke-width:.8}
 #schSvg .bnd{fill:none;stroke:#2c6fae;stroke-width:1.1;stroke-dasharray:7 4;opacity:.75}
 #schSvg .bndt{font:700 6.5px 'Segoe UI',sans-serif;fill:#2c6fae;letter-spacing:.5px}
+/* ═══ v2.46.133: схема — рабочее место ═══ */
+#schBar{display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--line);background:var(--panel);z-index:2;flex:none}
+#schBar .sp{flex:1}
+#schLayers{display:flex;gap:5px;flex-wrap:wrap}
+#schLayers span{font-size:10.5px;border:1px solid var(--line2);border-radius:12px;padding:3px 10px;color:var(--dim);cursor:pointer;user-select:none}
+#schLayers span.on{color:var(--ice);border-color:var(--ice2);background:rgba(27,159,216,.14)}
+#schZoom{display:flex;gap:4px}
+#schZoom b{width:26px;height:26px;border-radius:7px;border:1px solid var(--line2);background:#0a1425;color:var(--ice);display:grid;place-items:center;cursor:pointer;font-weight:700;user-select:none}
+#schZoom b:hover{filter:brightness(1.2)}
+#schView{flex:1;position:relative;overflow:hidden;min-height:0;background:radial-gradient(ellipse at 50% 40%,#122442 0%,#0B1728 70%);cursor:grab;touch-action:none}
+#schView.drag{cursor:grabbing}
+#schView svg{position:absolute;left:0;top:0;width:900px;height:722px;max-width:none;margin:0;transform-origin:0 0;filter:drop-shadow(0 18px 50px rgba(0,0,0,.55))}
+body.mob #schView svg{width:900px;max-width:none}
+#schCalc{position:absolute;right:12px;top:12px;z-index:3;background:rgba(15,29,49,.94);border:1px solid var(--line2);border-radius:10px;padding:8px 12px;font-size:11.5px;color:var(--dim);display:grid;grid-template-columns:auto auto;gap:2px 14px;max-width:260px}
+#schCalc b{color:var(--txt);font-variant-numeric:tabular-nums;text-align:right}
+#schCalc .t{grid-column:1/3;color:var(--faint);font-size:10.5px;letter-spacing:.08em;margin-bottom:2px}
+#schCalc .t a{color:var(--ice);text-decoration:none;margin-left:8px;letter-spacing:0;cursor:pointer}
+#schCalc .no{grid-column:1/3;line-height:1.45}
+#schHint{font-size:10.5px;color:var(--faint);white-space:nowrap;margin-right:10px}
+body.mob #schHint{display:none}
+/* линии: наведение подсвечивает весь контур */
+#schSvg polyline{transition:opacity .15s,stroke-width .15s}
+#schSvg.h-hot polyline:not(.hot),#schSvg.h-liq polyline:not(.liq),#schSvg.h-suc polyline:not(.suc),#schSvg.h-wtr polyline:not(.wtr),#schSvg.h-byp polyline:not(.byp){opacity:.18}
+#schSvg.h-hot .hot,#schSvg.h-liq .liq,#schSvg.h-suc .suc,#schSvg.h-wtr .wtr,#schSvg.h-byp .byp{stroke-width:4.4}
+#schSvg .dia{font:700 6.4px 'Cascadia Mono',Consolas,monospace;paint-order:stroke;stroke:#fbfcfe;stroke-width:2.6px;stroke-linejoin:round;pointer-events:none}
+#schSvg .dia.l{fill:#b45f00}#schSvg .dia.h{fill:#b0221a}#schSvg .dia.s{fill:#2b73a8}#schSvg .dia.w{fill:#0b7a3a}
+/* бирки крупнее — читаются при вписанном листе */
+#schSvg .tag{font-size:8.2px}
+#schSvg .shn{font-size:8px}
+#schSvg .shc{font-size:6.4px}
+#schSvg .selr{fill:none;stroke:#1B9FD8;stroke-width:1.5;stroke-dasharray:3 2}
+#schSvg g.sn.sel .tag{font-weight:800}
+/* левая колонка в режиме схемы — список позиций */
+#schList{display:none}
+body.sch .col.cat>*:not(#schList){display:none!important}
+body.sch #schList{display:flex;flex-direction:column;flex:1;min-height:0}
+.sl-filt{display:flex;gap:5px;padding:0 12px 8px;flex-wrap:wrap}
+.sl-filt span{font-size:10.5px;border:1px solid var(--line2);border-radius:12px;padding:2px 9px;color:var(--dim);cursor:pointer;user-select:none}
+.sl-filt span.on{background:rgba(27,159,216,.14);border-color:var(--ice2);color:var(--ice)}
+.sl-filt span[data-f=wait]{border-color:#5c4a1a;color:var(--gold)}.sl-filt span[data-f=wait].on{background:rgba(201,162,39,.14)}
+.sl-filt span[data-f=none]{border-color:#5a2a26;color:#e8907f}.sl-filt span[data-f=none].on{background:rgba(232,112,95,.14)}
+.sl-auto{margin:0 12px 8px;padding:8px 11px;border:1px dashed #5c4a1a;border-radius:10px;font-size:11.5px;color:var(--dim);line-height:1.45}
+.sl-auto b{color:var(--gold);display:block;margin-bottom:2px}.sl-auto u{color:var(--ice);text-decoration:none;cursor:pointer;display:block;margin-top:3px}
+.sl-auto.done{border-style:solid;border-color:#22513c}.sl-auto.done b{color:var(--green)}
+#slBody{overflow:auto;flex:1;min-height:0;padding-bottom:10px}
+.sl-g{padding:8px 12px 3px;display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;position:sticky;top:0;background:var(--panel);z-index:1}
+.sl-g .gb{flex:1;height:3px;background:#1a2a44;border-radius:2px;overflow:hidden}.sl-g .gb i{display:block;height:100%;background:var(--green)}
+.sl-g em{font-style:normal;color:var(--dim)}
+.sl-r{display:grid;grid-template-columns:12px 40px 1fr;gap:7px;align-items:center;padding:5px 12px;cursor:pointer;border-left:2px solid transparent}
+.sl-r:hover{background:rgba(143,211,244,.06)}.sl-r.cur{background:rgba(27,159,216,.12);border-left-color:var(--ice2)}
+.sl-r .st{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--gold);background:transparent}
+.sl-r .st.a{border-color:var(--green);background:linear-gradient(90deg,var(--green) 50%,transparent 50%)}
+.sl-r .st.m{border-color:var(--green);background:var(--green)}
+.sl-r .st.x{border-color:#e8705f;background:#e8705f}
+.sl-r .tg{font:700 11px 'Cascadia Mono',Consolas,monospace;color:var(--ice)}
+.sl-r .nm{min-width:0}.sl-r .nm b{display:block;font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sl-r .nm small{display:block;color:var(--faint);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sl-r .nm small.wt{color:var(--gold)}.sl-r .nm small.er{color:#e8907f}.sl-r .nm small.out{color:#d9a45a}
+.sl-none{padding:18px 12px;font-size:12px;color:var(--faint);text-align:center}
+/* правая колонка в режиме схемы — карточка позиции */
+#schCard{display:none}
+body.sch #right>*:not(#schCard){display:none!important}
+body.sch #schCard{display:block;overflow:auto;flex:1;min-height:0}
+.sc-h{padding:12px 14px 4px;display:flex;align-items:baseline;gap:8px}
+.sc-h .sc-tg{font:800 20px 'Cascadia Mono',Consolas,monospace;color:var(--ice)}
+.sc-h span{font-weight:600;font-size:13px}.sc-h .sc-x{margin-left:auto;font-style:normal;color:var(--faint);cursor:pointer;padding:2px 6px}
+.sc-h .sc-x:hover{color:var(--txt)}
+.sc-d{padding:0 14px 10px;font-size:11.5px;color:var(--dim);line-height:1.5}
+.sc-model{display:grid;grid-template-columns:64px 1fr;gap:10px;margin:0 14px 10px;padding:10px;border:1px solid var(--line2);border-radius:10px;background:#0a1425}
+.sc-model .ph3{width:64px;height:64px;border-radius:8px;background:linear-gradient(135deg,#1d3556,#0f1f36);display:grid;place-items:center;color:var(--faint);font-size:10px;overflow:hidden}
+.sc-model .ph3 img{width:100%;height:100%;object-fit:contain}
+.sc-model b{display:block;font-size:13px;line-height:1.3}.sc-model small{font-size:11px;color:var(--faint)}
+.sc-model em{display:block;font-style:normal;font-size:11px;margin-top:4px}.sc-model em.ok{color:var(--green)}.sc-model em.wt{color:var(--gold)}
+.sc-kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:12px;margin:0 14px 10px}.sc-kv span{color:var(--faint)}.sc-kv b{font-weight:600;font-variant-numeric:tabular-nums;text-align:right;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-seg{display:flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin:0 14px 10px}
+.sc-seg span{flex:1;text-align:center;font-size:10.5px;padding:5px 2px;color:var(--dim);cursor:pointer;border-right:1px solid var(--line2)}.sc-seg span:last-child{border-right:0}
+.sc-seg span.on{background:rgba(79,191,139,.15);color:var(--green)}
+.sc-acts{display:flex;gap:6px;margin:0 14px 12px;flex-wrap:wrap}.sc-acts .btn{flex:1;text-align:center;padding:7px 6px;margin:0}
+.sc-empty{margin:0 14px 10px;padding:10px 12px;border:1px dashed #5c4a1a;border-radius:10px;font-size:12px;color:var(--gold);line-height:1.45}
+.sc-empty.er{border-color:#5a2a26;color:#e8907f}
+.sc-sum{border-top:1px solid var(--line);padding:10px 14px 14px}
+.sc-sum h4{margin:0 0 8px;font-size:10.5px;letter-spacing:.12em;color:var(--faint);font-weight:600}
+.sc-tot{display:grid;grid-template-columns:1fr auto;gap:5px 10px;font-size:12px}.sc-tot b{font-variant-numeric:tabular-nums;text-align:right}.sc-tot .big{font-size:16px;color:var(--ice)}
+.sc-tot .sub{color:var(--faint);font-size:11px}
+.sc-warn{margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(232,112,95,.1);border:1px solid rgba(232,112,95,.35);font-size:11.5px;color:#f0a596;line-height:1.45;cursor:pointer}
+.sc-warn b{color:#e8705f}
+.sc-idle{padding:14px;font-size:12px;color:var(--faint);line-height:1.5}
+/* прогресс в шапке */
+#schProg{display:none;align-items:center;gap:8px;font-size:11.5px;color:var(--dim);margin-left:12px}
+body.sch #schProg{display:flex}
+#schProg .bar{width:140px;height:6px;border-radius:3px;background:#1a2a44;overflow:hidden;position:relative}
+#schProg .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--green)}#schProg .bar u{position:absolute;top:0;bottom:0;background:#2b7a55;opacity:.7}
+#schProg b{color:var(--txt)}
+
 /* модалка назначения модели узлу */
 #asg{position:fixed;inset:0;background:rgba(3,8,16,.72);z-index:21;display:none;align-items:center;justify-content:center}
 #asg.on{display:flex}
@@ -1242,6 +1336,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
     </div>
     <div class="pname" id="projName" title="Переименовать проект"><b>…</b></div>
     <div class="pname">· <b id="hCnt">0 деталей</b></div>
+    <div id="schProg" title="Позиции схемы: в машине · подобрано · ждут"></div>
     <button class="back" id="bFS" style="margin-left:auto" title="Во весь экран (F11)">⛶ <span id="fsTxt">Во весь экран</span></button>
     <button class="back" id="chatBtn" onclick="toggleChat()" style="display:none;margin-left:8px"
             title="Чат по чиллерам">💬 Чат</button>
@@ -1263,6 +1358,14 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
       <div id="cprev"><div class="cp-h" id="cprevT"></div><div class="cp-b" id="cprevB"></div>
         <div class="cp-a"><div class="btn pri" id="cprevAdd">+ В сцену</div>
         <div class="btn" id="cprevMore">Подробнее</div></div></div>
+      <div id="schList">
+        <div class="ph">Позиции схемы <span class="m" id="slCnt"></span></div>
+        <div class="search"><span style="color:var(--faint)">⌕</span><input id="slQ"
+          placeholder="бирка, название, модель…" autocomplete="off"></div>
+        <div class="sl-filt" id="slFilt"><span data-f="all" class="on">все</span><span data-f="wait">ждут</span><span data-f="out">вне комплекта</span><span data-f="none">нет в базе</span></div>
+        <div class="sl-auto" id="slAuto"><b>◈ Подобрать по расчёту</b><span id="slAutoT"></span><u id="slAutoGo">Запустить →</u></div>
+        <div id="slBody"></div>
+      </div>
       <div class="note">Клик или «+» — деталь встаёт на своё место по функции: компрессор на пол,
         арматура на средний ярус, конденсатор на крышу. Дальше её можно двигать руками.<br>
         «/» — поиск · ↑↓ — выбор · Enter — поставить.</div>
@@ -1305,11 +1408,13 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
       <div id="empty"><div class="in"><b>Сцена пустая</b><br>Выбери деталь слева — она встанет на своё место:<br>компрессор на пол, конденсатор на крышу.<br>Начни с корпуса — по нему считается вся компоновка.</div></div>
       <div id="schz"><b data-sz="1" title="Крупнее">+</b><b data-sz="-1" title="Мельче">−</b><b data-sz="0" title="Во всю ширину">↺</b></div>
       <div id="swrap">
-        <div id="schChips" class="sch-chips"></div>
-        <svg id="schSvg" viewBox="0 0 900 722"></svg>
+        <div id="schBar"><div id="schLayers"></div><span class="sp"></span>
+          <span id="schHint">колесо — зум · протяни фон — панорама · наведи на линию — контур · Tab — следующая ждущая · Esc — снять выбор</span>
+          <div id="schZoom"><b data-z="1" title="Крупнее">+</b><b data-z="-1" title="Мельче">−</b><b data-z="0" title="Вписать лист в окно">↺</b><b data-z="p" title="Печать листа Г3">⎙</b></div></div>
+        <div id="schView"><svg id="schSvg" viewBox="0 0 900 722"></svg>
+          <div id="schCalc"></div>
+        </div>
         <div id="schTip"></div>
-        <div class="sch-note">Лист АГ.ЧИЛ-104 Г3 — гидравлическая схема чиллера 7 кВт. Клик по бирке позиции — подбор модели из базы:
-          зелёная бирка — назначено, янтарная «назначить» — ждёт. Зимний комплект и защита — на полке под листом. Назначения хранятся в проекте.</div>
       </div>
       <div id="partsBox">
         <div class="ph2"><b id="pTitle">Детали узла</b><span id="pCount"></span>
@@ -1418,6 +1523,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
         <div class="btn pri" id="bBom">→ BOM · чертёж сборки</div>
         <div class="btn ghost" id="bClear">Очистить сцену</div>
       </div>
+      <div id="schCard"></div>
     </div>
   </div>
 
@@ -9592,10 +9698,17 @@ function supCycle(k){
   save();renderSchema();
   toast(k+' · '+supRec(k)[1]);
 }
+/* v2.46.133: где стоит бирка — одно место для листа, списка и фокуса */
+function schNodePos(nd){
+  const off=nd.off!=null;
+  const oc=off?nd.off%6:0, orw=off?Math.floor(nd.off/6):0;
+  const px=off?34+oc*143:nd.px, py=off?(640+orw*32):nd.py;
+  return {off:off,px:px,py:py,w:11+5.2*nd.t.length,
+          nx:off?px:nd.nx, ny:off?(py+18):nd.ny, na:off?'start':nd.na};
+}
 function renderSchema(){
   const svg=$('#schSvg');
   if(!svg)return;
-  const PW=t=>10+4.6*t.length;         // ширина пилюли по длине тега
   let h=SCH_SHEET;
   // полка позиций, которых нет на листе 7 кВт
   /* v2.46.010: полка в два ряда — на неё приехали водяной буфер и клапаны
@@ -9605,27 +9718,26 @@ function renderSchema(){
     +'<text class="shs" x="34" y="631">ПОЗИЦИИ ВНЕ ЛИСТА 7 кВт · ЗИМНИЙ КОМПЛЕКТ, ЗАЩИТА, ВОДЯНОЙ БУФЕР</text>';
   const next=SCH_NODES.find(n=>!schemaData[n.k]);
   SCH_NODES.forEach(nd=>{
-    const off=nd.off!=null;
-    const oc=off?nd.off%6:0, orw=off?Math.floor(nd.off/6):0;
-    const px=off?34+oc*143:nd.px, py=off?(640+orw*32):nd.py;
-    const nx=off?px:nd.nx, ny=off?(py+18):nd.ny, na=off?'start':nd.na;
-    const w=PW(nd.t);
+    const P=schNodePos(nd),off=P.off,px=P.px,py=P.py,w=P.w,nx=P.nx,ny=P.ny,na=P.na;
     const asg=schemaData[nd.k];
-    const dim=schGrpSel&&nd.grp!==schGrpSel?' dim':'';
-    h+='<g class="sn'+dim+'" data-k="'+nd.k+'">';
+    const nob=!asg&&schNoBase(nd);
+    /* слой «только ждущие» гасит назначенные; группа — как раньше */
+    const dim=(schGrpSel&&nd.grp!==schGrpSel)||(SCHL.wait&&asg)?' dim':'';
+    h+='<g class="sn'+dim+(nd.k===schSel?' sel':'')+'" data-k="'+nd.k+'">';
     if(nd.lead)h+='<line class="lead" x1="'+nd.lead[0]+'" y1="'+nd.lead[1]+'" x2="'+nd.lead[2]+'" y2="'+nd.lead[3]+'"/>';
-    if(next===nd)h+='<rect class="sch-pulse" x="'+(px-2.5)+'" y="'+(py-2.5)+'" width="'+(w+5)+'" height="16" rx="8" fill="none" stroke="#C9A227" stroke-width="1.1" stroke-dasharray="4 2.6"/>';
-    h+='<rect x="'+px+'" y="'+py+'" width="'+w+'" height="11" rx="5.5" fill="'+(asg?'#eef7f0':'#fdf3e2')+'" stroke="'+(asg?'#9ec9ad':'#d9b678')+'" stroke-width="0.6"/>';
-    h+='<text class="tag" x="'+(px+5)+'" y="'+(py+8)+'" fill="'+(asg?'#1a6b3e':'#b0721a')+'">'+nd.t+'</text>';
+    if(nd.k===schSel)h+='<rect class="selr" x="'+(px-13)+'" y="'+(py-5)+'" width="'+(w+22)+'" height="23" rx="11"/>';
+    else if(next===nd)h+='<rect class="sch-pulse" x="'+(px-3)+'" y="'+(py-4)+'" width="'+(w+6)+'" height="19" rx="9.5" fill="none" stroke="#C9A227" stroke-width="1.1" stroke-dasharray="4 2.6"/>';
+    h+='<rect x="'+px+'" y="'+(py-1)+'" width="'+w+'" height="13" rx="6.5" fill="'+(asg?'#eef7f0':(nob?'#fdeaea':'#fdf3e2'))+'" stroke="'+(asg?'#9ec9ad':(nob?'#e09a9a':'#d9b678'))+'" stroke-width="0.7"/>';
+    h+='<text class="tag" x="'+(px+5.5)+'" y="'+(py+8.6)+'" fill="'+(asg?'#1a6b3e':(nob?'#b3261e':'#b0721a'))+'">'+nd.t+'</text>';
     /* v2.46.021: точка справа от бирки — деталь этой позиции стоит в 3D.
        Зелёная бирка говорила только «модель подобрана»; встала ли она в
        машину (модель не готова, автопостановка выключена, деталь удалили
        руками) — было не видно */
-    if(asg)h+='<circle class="in3d" data-k="'+esc(nd.k)+'" cx="'+(px+w+3.6)+'" cy="'+(py+5.5)+'" r="1.7"'
-      +' fill="none" stroke="#c9b98a" stroke-width="0.7"/>';
-    if(off)h+='<text class="shs" x="'+(px+w+9)+'" y="'+(py+8)+'">'+esc(nd.n)+'</text>';
-    h+='<text class="shn '+(asg?'ok':'wt')+'" x="'+nx+'" y="'+ny+'" text-anchor="'+na+'">'
-      +(asg?esc(String(asg.name).slice(0,nd.mx)):'назначить')+'</text>';
+    if(asg&&SCHL.in3d)h+='<circle class="in3d" data-k="'+esc(nd.k)+'" cx="'+(px+w+4.2)+'" cy="'+(py+5.5)+'" r="2.1"'
+      +' fill="none" stroke="#c9b98a" stroke-width="0.8"/>';
+    if(off)h+='<text class="shs" x="'+(px+w+10)+'" y="'+(py+8)+'">'+esc(nd.n)+'</text>';
+    h+='<text class="shn '+(asg?'ok':'wt')+'" x="'+nx+'" y="'+ny+'" text-anchor="'+na+'"'+(nob?' fill="#b3261e"':'')+'>'
+      +(asg?esc(String(asg.name).slice(0,nd.mx)):(nob?'нет в базе':'назначить'))+'</text>';
     /* второй строкой — присоединение: резьба и проход, как в монтаже */
     if(asg){
       const cn=schConn(asg);
@@ -9633,13 +9745,26 @@ function renderSchema(){
         +esc(cn.slice(0,nd.mx+12))+'</text>';
     }
     h+='</g>';
-    /* квадратик границы поставки у бирки: клик — переключить */
+    /* квадратик границы поставки у бирки: клик — переключить (слой «Поставка») */
     const sr=supRec(nd.k);
-    h+='<g class="supb'+dim+'" data-sup="'+nd.k+'"><title>'+esc(nd.t+' · '+sr[1]
+    if(SCHL.sup)h+='<g class="supb'+dim+'" data-sup="'+nd.k+'"><title>'+esc(nd.t+' · '+sr[1]
       +' — клик меняет')+'</title>'
-      +'<rect x="'+(px-9)+'" y="'+(py+1.5)+'" width="7" height="7" rx="1.6" fill="'+sr[3]
+      +'<rect x="'+(px-10)+'" y="'+(py+1.5)+'" width="8" height="8" rx="1.8" fill="'+sr[3]
       +'" stroke="'+sr[2]+'"'+(sr[0]==='ag'?'':' stroke-dasharray="1.8 1.2"')+'/></g>';
   });
+  /* слой «Ø по расчёту»: диаметры, режим и подача насоса — на линиях */
+  if(SCHL.dia){
+    const C=schCalc();
+    if(C){
+      const fx=(v,d)=>(Math.round(v*Math.pow(10,d||0))/Math.pow(10,d||0)).toString().replace('.',',');
+      if(C.pipe){
+        h+='<text class="dia l" x="596" y="339">Ø'+esc(fx(C.pipe.odl,1))+' жидк.</text>'
+          +'<text class="dia s" x="540" y="222">Ø'+esc(fx(C.pipe.odg,1))+' всас · '+esc(C.pipe.ref)+'</text>'
+          +'<text class="dia s" x="600" y="509">t₀ '+esc(fx(C.pipe.t0))+' °C · Q₀ '+esc(fx(C.pipe.Q,1))+' кВт</text>';
+      }
+      if(C.pump)h+='<text class="dia w" x="204" y="428">'+esc(fx(C.pump.g,2))+' м³/ч · '+esc(String(C.pump.hc).slice(0,14))+'</text>';
+    }
+  }
   /* рамка «граница поставки»: всё внутри едет собранным на раме */
   /* рамку ведём так, чтобы насос и реле протока остались внутри машины,
      а входы-выходы теплоносителя и водяная арматура — снаружи */
@@ -9647,8 +9772,9 @@ function renderSchema(){
     +'<text class="bndt" x="146" y="55">ГРАНИЦА ПОСТАВКИ · МАШИНА В СБОРЕ</text>';
   const done=SCH_NODES.filter(n=>schemaData[n.k]).length;
   const nsup=SCH_NODES.filter(n=>schemaData[n.k]&&supOf(n.k)!=='ag').length;
-  h+='<text class="shl" id="schCnt" x="22" y="34">Назначено: '+done+' из '+SCH_NODES.length+'</text>';
-  h+='<text class="shs" x="22" y="46">клик по бирке — подбор модели; квадратик слева — граница поставки; точка справа — деталь стоит в машине</text>';
+  const CC=schCalc();
+  h+='<text class="shl" x="22" y="34">Гидравлическая схема · 7 кВт'+(CC&&CC.pipe?' · '+esc(CC.pipe.ref):'')+'</text>';
+  h+='<text class="shs" id="schCnt" x="22" y="46">Назначено: '+done+' из '+SCH_NODES.length+'</text>';
   SUP.forEach((sp,i)=>{
     h+='<rect x="'+(22+i*104)+'" y="55" width="7" height="7" rx="1.6" fill="'+sp[3]
       +'" stroke="'+sp[2]+'"'+(sp[0]==='ag'?'':' stroke-dasharray="1.8 1.2"')+'/>'
@@ -9658,12 +9784,30 @@ function renderSchema(){
   svg.innerHTML=h;
   schRenderChips();
   schSceneMarks();
+  schListDraw();
+  schCardDraw();
   const tip=document.getElementById('schTip');
   svg.querySelectorAll('g.supb').forEach(g=>{
     g.onclick=ev=>{ev.stopPropagation();supCycle(g.dataset.sup);};
   });
+  /* линии: наведение подсвечивает весь контур и говорит, что в нём течёт */
+  svg.querySelectorAll('polyline').forEach(pl=>{
+    const c=['hot','liq','suc','wtr','byp'].find(x=>pl.classList.contains(x));
+    if(!c)return;
+    pl.style.pointerEvents='stroke';
+    pl.onmouseenter=()=>svg.classList.add('h-'+c);
+    pl.onmouseleave=()=>{svg.classList.remove('h-'+c);if(tip)tip.style.display='none';};
+    pl.onmousemove=e=>{if(!tip)return;
+      tip.innerHTML='<div class="t">'+SCH_LINE[c][0]+'</div><div class="d">'+esc(schLineInfo(c))+'</div>';
+      tip.style.display='block';
+      let x=e.clientX+14,y=e.clientY+14;
+      if(x+tip.offsetWidth>innerWidth-8)x=e.clientX-tip.offsetWidth-14;
+      if(y+tip.offsetHeight>innerHeight-8)y=e.clientY-tip.offsetHeight-14;
+      tip.style.left=x+'px';tip.style.top=y+'px';};
+  });
   svg.querySelectorAll('g.sn').forEach(g=>{
-    g.onclick=()=>openAssign(g.dataset.k);
+    /* клик: назначенная — карточка справа; пустая — сразу подбор */
+    g.onclick=ev=>{ev.stopPropagation();const k=g.dataset.k;schSelect(k);if(!schemaData[k])openAssign(k);};
     if(!tip)return;
     g.onmousemove=(e)=>{
       const nd=SCH_NODES.find(n=>n.k===g.dataset.k);
@@ -9716,6 +9860,303 @@ function schRenderChips(){
   }).join('');
   box.querySelectorAll('span').forEach(el=>el.onclick=()=>schGrpToggle(el.dataset.g));
 }
+/* ═══ v2.46.133: схема как рабочее место ═══
+   Раньше лист висел посреди пустого экрана, слева — каталог, которому тут
+   нечего делать, справа — пустая спецификация. Теперь: слева список позиций
+   со статусами и фильтрами, лист во весь экран с зумом и слоями, справа
+   карточка выбранной позиции и итог комплекта. Расчёт (Ø труб, режим,
+   подача насоса) подписывается прямо на линиях. */
+let schSel=null;
+const SCHL=Object.assign({dia:true,sup:true,in3d:true,wait:false},
+  (()=>{try{return JSON.parse(localStorage.getItem('chiller.schl')||'{}');}catch(e){return {};}})());
+const SCH_LAYERS=[['dia','Ø по расчёту'],['sup','Поставка'],['in3d','В машине'],['wait','Только ждущие']];
+const SCH_LINE={hot:['Пар высокого давления · нагнетание','h'],liq:['Жидкость высокого давления','l'],
+  suc:['Пар низкого давления · всасывание','s'],wtr:['Вода / гликоль · контур потребителя','w'],byp:['Байпас горячего газа','b']};
+function schCalc(){try{return JSON.parse(localStorage.getItem('chiller.calc')||'null');}catch(e){return null;}}
+const schFx=(v,d)=>(Math.round((+v||0)*Math.pow(10,d||0))/Math.pow(10,d||0)).toString().replace('.',',');
+function schLineInfo(c){
+  const C=schCalc()||{};
+  if(c==='liq'&&C.pipe)return 'Ø'+schFx(C.pipe.odl,1)+' мм по расчёту · '+C.pipe.ref+' · внутренний проход не меньше '+schFx(C.pipe.dl,1)+' мм';
+  if(c==='suc'&&C.pipe)return 'Ø'+schFx(C.pipe.odg,1)+' мм по расчёту · '+C.pipe.ref+' · t₀ '+schFx(C.pipe.t0)+' °C';
+  if(c==='hot'&&C.comp)return 'объёмная производительность компрессора '+schFx(C.comp.vol,2)+' м³/ч · tк '+schFx(C.comp.tk)+' °C';
+  if(c==='wtr'&&C.pump)return 'подача насоса '+schFx(C.pump.g,2)+' м³/ч · '+C.pump.hc+' · Δt '+schFx(C.pump.dt,1)+' К';
+  return 'расчёта по этой линии нет — «∑ Расчёт» в базе 3D';
+}
+function schlSave(){try{localStorage.setItem('chiller.schl',JSON.stringify(SCHL));}catch(e){}}
+function schLayersDraw(){
+  const b=$('#schLayers');if(!b)return;
+  b.innerHTML=SCH_LAYERS.map(l=>'<span class="'+(SCHL[l[0]]?'on':'')+'" data-l="'+l[0]+'">'+l[1]+'</span>').join('');
+  b.querySelectorAll('span').forEach(x=>x.onclick=()=>{SCHL[x.dataset.l]=!SCHL[x.dataset.l];schlSave();renderSchema();});
+  schCalcDraw();
+}
+function schCalcDraw(){
+  const box=$('#schCalc');if(!box)return;
+  const C=schCalc();
+  const link='<a href="index.html#calc" target="_blank">'+(C?'изменить →':'открыть →')+'</a>';
+  if(!C||(!C.pipe&&!C.pump&&!C.comp)){
+    box.innerHTML='<span class="t">РАСЧЁТ'+link+'</span><span class="no">Расчёт ещё не делали — диаметры труб и подача насоса появятся на линиях, как только посчитаешь.</span>';
+    return;
+  }
+  let h='<span class="t">ИЗ РАСЧЁТА'+link+'</span>';
+  const Q=(C.pipe&&C.pipe.Q)||(C.comp&&C.comp.Q)||(C.pump&&C.pump.Q);
+  if(Q)h+='<span>Q₀ холод</span><b>'+schFx(Q,1)+' кВт</b>';
+  if(C.pipe)h+='<span>Хладагент</span><b>'+esc(C.pipe.ref)+' · t₀ '+schFx(C.pipe.t0)+' °C</b>'
+    +'<span>Жидкостная</span><b>Ø '+schFx(C.pipe.odl,1)+' мм</b><span>Всасывание</span><b>Ø '+schFx(C.pipe.odg,1)+' мм</b>';
+  if(C.comp)h+='<span>Компрессор</span><b>'+schFx(C.comp.vol,2)+' м³/ч</b>';
+  if(C.pump)h+='<span>Насос</span><b>'+schFx(C.pump.g,2)+' м³/ч · '+esc(String(C.pump.hc).slice(0,12))+'</b>';
+  box.innerHTML=h;
+}
+/* нет ли в базе моделей под позицию — красная бирка «нет в базе» */
+function schNoBase(nd){
+  const c=asgResolveCat(nd);
+  if(!c.sec)return false;
+  return asgCnt(c.sec,c.sub)===0;
+}
+function schSelect(k,opt){
+  opt=opt||{};
+  schSel=k||null;
+  renderSchema();
+  if(k&&opt.focus)schFocus(k);
+}
+function schUnassign(key){
+  /* v2.46.017: убрали назначение — деталь этой позиции уходит и из сцены */
+  const h=histBegin('снятие назначения на схеме');
+  let off=false;
+  try{off=schDrop(key,true);delete schemaData[key];}finally{histEnd(h);}
+  renderSchema();refresh();save();
+  if(off)toast('Назначение снято — деталь убрана из сцены');
+}
+/* ── зум и панорама листа ── */
+const schZ={z:1,x:0,y:0,fit:false};
+function schApply(){const sv=$('#schSvg');if(sv)sv.style.transform='translate('+schZ.x+'px,'+schZ.y+'px) scale('+schZ.z+')';}
+function schFit(){
+  const v=$('#schView');if(!v)return;
+  const W=v.clientWidth,H=v.clientHeight;if(!W||!H)return;
+  const z=Math.min((W-32)/900,(H-32)/722);
+  schZ.z=z;schZ.x=(W-900*z)/2;schZ.y=(H-722*z)/2;schZ.fit=true;schApply();
+}
+function schZoomAt(f,cx,cy){
+  const v=$('#schView');if(!v)return;
+  if(cx==null){cx=v.clientWidth/2;cy=v.clientHeight/2;}
+  const nz=Math.min(6,Math.max(.25,schZ.z*f)),k=nz/schZ.z;
+  schZ.x=cx-(cx-schZ.x)*k;schZ.y=cy-(cy-schZ.y)*k;schZ.z=nz;schApply();
+}
+/* привезти бирку в центр окна (клик по строке списка) */
+function schFocus(k){
+  const nd=SCH_NODES.find(n=>n.k===k),v=$('#schView');if(!nd||!v)return;
+  const P=schNodePos(nd);
+  if(schZ.z<1.4)schZ.z=1.6;
+  schZ.x=v.clientWidth/2-(P.px+P.w/2)*schZ.z;
+  schZ.y=v.clientHeight/2-(P.py+6)*schZ.z;
+  schApply();
+}
+(function(){
+  const v=$('#schView');if(!v)return;
+  v.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const r=v.getBoundingClientRect();
+    schZoomAt(e.deltaY<0?1.12:1/1.12,e.clientX-r.left,e.clientY-r.top);
+  },{passive:false});
+  /* панорама — протянуть фон; бирки и квадратики поставки не трогаем */
+  let dr=null,pt=new Map();
+  v.addEventListener('pointerdown',e=>{
+    if(e.target.closest('g.sn,g.supb,#schCalc,#schZoom'))return;
+    pt.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pt.size===1){dr={x:e.clientX-schZ.x,y:e.clientY-schZ.y,moved:false};v.classList.add('drag');}
+    v.setPointerCapture(e.pointerId);
+  });
+  v.addEventListener('pointermove',e=>{
+    if(!pt.has(e.pointerId))return;
+    pt.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pt.size===2){                        // два пальца — щипок
+      const a=[...pt.values()];
+      const d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);
+      if(v._pd){const r=v.getBoundingClientRect();
+        schZoomAt(d/v._pd,(a[0][0]+a[1][0])/2-r.left,(a[0][1]+a[1][1])/2-r.top);}
+      v._pd=d;dr=null;return;
+    }
+    if(!dr)return;
+    schZ.x=e.clientX-dr.x;schZ.y=e.clientY-dr.y;dr.moved=true;schApply();
+  });
+  const up=e=>{pt.delete(e.pointerId);if(!pt.size){v._pd=0;
+    if(dr&&!dr.moved&&!e.target.closest('g.sn,g.supb'))schSelect(null);
+    dr=null;v.classList.remove('drag');}};
+  v.addEventListener('pointerup',up);v.addEventListener('pointercancel',up);
+  document.querySelectorAll('#schZoom b').forEach(b=>b.onclick=()=>{
+    const z=b.dataset.z;
+    if(z==='p')schPrint();else if(z==='0')schFit();else schZoomAt(z==='1'?1.25:0.8);
+  });
+  document.querySelectorAll('#schz b').forEach(b=>b.onclick=()=>{
+    const z=b.dataset.sz;if(z==='0')schFit();else schZoomAt(z==='1'?1.25:0.8);
+  });
+  window.addEventListener('resize',()=>{if(document.body.classList.contains('sch'))schFit();});
+})();
+/* ── список позиций слева ── */
+let slF='all',slQ='';
+function schStatus(nd){
+  const a=schemaData[nd.k];
+  if(a)return schItem(nd.k)?'m':'a';
+  return schNoBase(nd)?'x':'';
+}
+function schListDraw(){
+  const box=$('#slBody');if(!box)return;
+  const q=slQ.trim().toLowerCase();
+  const pass=nd=>{
+    const a=schemaData[nd.k];
+    if(slF==='wait'&&a)return false;
+    if(slF==='out'&&!(a&&supOf(nd.k)!=='ag'))return false;
+    if(slF==='none'&&!(!a&&schNoBase(nd)))return false;
+    if(q&&!(nd.t+' '+nd.n+' '+(a?a.name:'')).toLowerCase().includes(q))return false;
+    return true;
+  };
+  let h='',shown=0;
+  SCH_GROUPS.forEach(g=>{
+    const ids=SCH_NODES.filter(n=>n.grp===g[0]),done=ids.filter(n=>schemaData[n.k]).length;
+    const rows=ids.filter(pass);if(!rows.length)return;
+    h+='<div class="sl-g">'+esc(g[1])+'<span class="gb"><i style="width:'+(100*done/ids.length)+'%"></i></span><em>'+done+'/'+ids.length+'</em></div>';
+    rows.forEach(nd=>{shown++;
+      const a=schemaData[nd.k],st=schStatus(nd),out=a&&supOf(nd.k)!=='ag';
+      const sub=a?(out?'<small class="out">'+esc(a.name)+' · '+esc(supRec(nd.k)[1])+'</small>':'<small>'+esc(a.name)+'</small>')
+        :(st==='x'?'<small class="er">в базе нет моделей</small>':'<small class="wt">назначить</small>');
+      h+='<div class="sl-r'+(nd.k===schSel?' cur':'')+'" data-k="'+nd.k+'"><i class="st '+st+'"></i><span class="tg">'+esc(nd.t)+'</span><span class="nm"><b>'+esc(nd.n)+'</b>'+sub+'</span></div>';
+    });
+  });
+  if(!shown)h='<div class="sl-none">Ничего не подошло под фильтр</div>';
+  box.innerHTML=h;
+  box.querySelectorAll('.sl-r').forEach(r=>r.onclick=()=>{
+    const k=r.dataset.k;schSelect(k,{focus:true});if(!schemaData[k])openAssign(k);});
+  const cur=box.querySelector('.sl-r.cur');
+  if(cur&&cur.scrollIntoView)cur.scrollIntoView({block:'nearest'});
+  /* счётчики: шапка списка, прогресс в шапке страницы, фильтры */
+  const N=SCH_NODES.length,done=SCH_NODES.filter(n=>schemaData[n.k]).length,
+        in3d=SCH_NODES.filter(n=>schItem(n.k)).length,
+        out=SCH_NODES.filter(n=>schemaData[n.k]&&supOf(n.k)!=='ag').length,
+        nob=SCH_NODES.filter(n=>!schemaData[n.k]&&schNoBase(n)).length;
+  const c=$('#slCnt');if(c)c.textContent=N+' поз. · назначено '+done;
+  const pr=$('#schProg');
+  if(pr)pr.innerHTML='<span class="bar"><i style="width:'+(100*in3d/N)+'%"></i><u style="left:'+(100*in3d/N)+'%;width:'+(100*(done-in3d)/N)+'%"></u></span>'
+    +'<span><b>'+in3d+'</b> в машине · <b>'+(done-in3d)+'</b> подобрано · <b>'+(N-done)+'</b> ждут</span>';
+  const F=$('#slFilt');
+  if(F){F.querySelector('[data-f=wait]').textContent='ждут '+(N-done);
+    F.querySelector('[data-f=out]').textContent='вне комплекта '+out;
+    F.querySelector('[data-f=none]').textContent='нет в базе '+nob;
+    F.querySelectorAll('span').forEach(x=>x.classList.toggle('on',x.dataset.f===slF));}
+  /* автоподбор: что возьмём и сколько заполним */
+  const A=$('#slAuto'),T=$('#slAutoT');
+  if(A&&T){
+    const C=schCalc(),Q=C&&((C.pipe&&C.pipe.Q)||(C.comp&&C.comp.Q)||(C.pump&&C.pump.Q));
+    const can=SCH_NODES.filter(n=>!schemaData[n.k]&&schAutoPickFor(n)).length;
+    A.classList.toggle('done',!can);
+    T.textContent=(Q?'Q₀ '+schFx(Q,1)+' кВт'+(C.pipe?', '+C.pipe.ref+', t₀ '+schFx(C.pipe.t0)+' °C':'')+'. ':'Расчёта нет — возьму типовые под лист 7 кВт. ')
+      +(can?'Заполнит '+can+' пуст'+(can===1?'ую позицию':(can<5?'ые позиции':'ых позиций'))+' первыми подходящими моделями — потом каждую можно сменить.':'Все позиции, под которые есть модели, уже назначены.');
+    $('#slAutoGo').style.display=can?'block':'none';
+  }
+}
+(function(){
+  const q=$('#slQ');if(q)q.addEventListener('input',()=>{slQ=q.value;schListDraw();});
+  const F=$('#slFilt');if(F)F.querySelectorAll('span').forEach(x=>x.onclick=()=>{slF=x.dataset.f;schListDraw();});
+  const go=$('#slAutoGo');if(go)go.onclick=schAutoPick;
+})();
+/* ── автоподбор: первая подходящая модель под каждую пустую позицию ── */
+function schAutoPickFor(nd){
+  const rec=asgResolveCat(nd);if(!rec.sec)return null;
+  const used=new Set();
+  SCH_NODES.forEach(n=>{const a=schemaData[n.k];if(a&&a.id)used.add(a.id);});
+  const C=schCalc(),Q=(C&&((C.pipe&&C.pipe.Q)||(C.comp&&C.comp.Q)||(C.pump&&C.pump.Q)))||7;
+  const list=DATA.filter(d=>d.ready&&d.section===rec.sec&&(!rec.sub||d.sub===rec.sub));
+  if(!list.length)return null;
+  const hasKw=list.some(d=>asgKw(d)>0);
+  /* мощность ближе к расчётной; из равных — та, что ещё не занята другой позицией */
+  return list.slice().sort((a,b)=>
+    (hasKw?Math.abs(asgKw(a)-Q)-Math.abs(asgKw(b)-Q):0)||
+    (used.has(a.id)?1:0)-(used.has(b.id)?1:0))[0];
+}
+async function schAutoPick(){
+  const todo=SCH_NODES.filter(n=>!schemaData[n.k]);
+  const h=histBegin('автоподбор позиций схемы');
+  let n=0,placed3d=0;
+  try{
+    for(const nd of todo){
+      const d=schAutoPickFor(nd);if(!d)continue;
+      schemaData[nd.k]={id:d.id,name:(d.brand?d.brand+' ':'')+d.name};n++;
+      if(SCHAUTO){try{if(await schPlace(nd.k))placed3d++;}catch(e){}}
+    }
+  }finally{histEnd(h);}
+  renderSchema();refresh();save();
+  toast(n?'Подобрано '+n+' поз.'+(placed3d?' · в машину встало '+placed3d:'')+' · Ctrl+Z отменит всё разом':'Подбирать нечего');
+}
+/* ── карточка позиции справа ── */
+function schCardDraw(){
+  const box=$('#schCard');if(!box)return;
+  const nd=SCH_NODES.find(n=>n.k===schSel);
+  let h='';
+  if(nd){
+    const a=schemaData[nd.k],d=a&&DATA.find(x=>x.id===a.id),here=a&&schItem(nd.k);
+    h+='<div class="sc-h"><b class="sc-tg">'+esc(nd.t)+'</b><span>'+esc(nd.n)+'</span><i class="sc-x" id="scX" title="Снять выбор · Esc">✕</i></div>';
+    h+='<div class="sc-d">'+esc(nd.d||SCH_DESC[nd.k]||'')+'</div>';
+    if(a){
+      const f=d&&d.g&&GEOMS[d.g]&&GEOMS[d.g].f;
+      h+='<div class="sc-model"><div class="ph3">'+(f?'<img data-th="'+esc(f)+'" alt="">':'нет фото')+'</div><div>'
+        +'<small>'+esc(d?[d.brand,tagLine(d)||d.kind].filter(Boolean).join(' · '):'')+'</small>'
+        +'<b>'+esc(d?d.name:a.name)+'</b>'
+        +'<em class="'+(here?'ok':'wt')+'">'+(here?'● стоит в машине':(d&&d.ready?'◐ в 3D не стоит — «⤓ Собрать по схеме»':'◐ модель без 3D — только в спецификации'))+'</em></div></div>';
+      const kv=[];
+      const cn=schConn(a);if(cn)kv.push(['Присоединение',cn]);
+      (d&&d.specs||[]).slice(0,9).forEach(r=>{if(r&&r[0]&&r[1]!=null&&r[1]!=='')kv.push([String(r[0]),String(r[1])]);});
+      if(kv.length)h+='<div class="sc-kv">'+kv.map(r=>'<span>'+esc(r[0])+'</span><b title="'+esc(r[1])+'">'+esc(r[1])+'</b>').join('')+'</div>';
+      h+='<div class="sc-seg" id="scSup">'+SUP.map(sp=>'<span data-s="'+sp[0]+'" class="'+(supOf(nd.k)===sp[0]?'on':'')+'">'+esc(sp[1])+'</span>').join('')+'</div>';
+      h+='<div class="sc-acts"><div class="btn" id="scPick">⇄ Сменить</div>'+(here?'<div class="btn" id="sc3d">👁 В 3D</div>':'')+'<div class="btn ghost" id="scOff">✕ Снять</div></div>';
+    }else{
+      const nob=schNoBase(nd);
+      h+='<div class="sc-empty'+(nob?' er':'')+'">'+(nob?'В базе нет ни одной модели этой категории. Добавь её в «База 3D» или пометь позицию как поставку заказчика.':'Модель не назначена.')+'</div>';
+      h+='<div class="sc-acts"><div class="btn pri" id="scPick">Назначить из базы</div></div>';
+    }
+  }else{
+    h+='<div class="sc-idle">Выбери позицию на листе или в списке слева — здесь будет её карточка: модель, присоединения, характеристики, граница поставки.</div>';
+  }
+  /* итог комплекта */
+  const N=SCH_NODES.length,done=SCH_NODES.filter(n=>schemaData[n.k]).length,in3d=SCH_NODES.filter(n=>schItem(n.k)).length;
+  const bySup={};SUP.forEach(sp=>bySup[sp[0]]=0);
+  let mass=0,massN=0;
+  SCH_NODES.forEach(n=>{const a=schemaData[n.k];if(!a)return;bySup[supOf(n.k)]++;
+    const d=DATA.find(x=>x.id===a.id);const m=d&&(d.specs||[]).find(r=>/^масса/i.test(String(r[0])));
+    if(m){const v=parseFloat(String(m[1]).replace(',','.'));if(isFinite(v)){mass+=v;massN++;}}});
+  const nob=SCH_NODES.filter(n=>!schemaData[n.k]&&schNoBase(n));
+  h+='<div class="sc-sum"><h4>ИТОГ КОМПЛЕКТА</h4><div class="sc-tot">'
+    +'<span>Назначено</span><b class="big">'+done+' из '+N+'</b>'
+    +'<span class="sub">стоит в машине</span><b>'+in3d+'</b>'
+    +SUP.map(sp=>'<span class="sub">'+esc(sp[1])+'</span><b>'+bySup[sp[0]]+'</b>').join('')
+    +(massN?'<span class="sub">масса по '+massN+' поз.</span><b>'+schFx(mass,1)+' кг</b>':'')
+    +'</div>'
+    +nob.map(n=>'<div class="sc-warn" data-k="'+n.k+'"><b>'+esc(n.t+' '+n.n)+'</b> — в базе нет ни одной модели. Добавить в «База 3D» или пометить «поставка заказчика».</div>').join('')
+    +'</div>';
+  box.innerHTML=h;
+  const on=(id,f)=>{const el=document.getElementById(id);if(el)el.onclick=f;};
+  on('scX',()=>schSelect(null));
+  on('scPick',()=>openAssign(schSel));
+  on('scOff',()=>schUnassign(schSel));
+  on('sc3d',()=>{const it=schItem(schSel);setMode('3d');if(it){select(it);if(typeof flyTo==='function')flyTo(it);}});
+  box.querySelectorAll('#scSup span').forEach(x=>x.onclick=()=>{
+    const a=schemaData[schSel];if(!a)return;a.sup=x.dataset.s;save();renderSchema();toast(schSel+' · '+supRec(schSel)[1]);});
+  box.querySelectorAll('.sc-warn').forEach(w=>w.onclick=()=>schSelect(w.dataset.k,{focus:true}));
+  if(typeof fillThumbsIn==='function')fillThumbsIn('#schCard');
+}
+/* ── печать листа Г3 ── */
+function schPrint(){
+  const svg=$('#schSvg');if(!svg)return;
+  const css=[...document.querySelectorAll('style')].map(s=>s.textContent).join('\n');
+  const w=window.open('','_blank');
+  if(!w){toast('Браузер не дал открыть окно печати');return;}
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(($('#projName b')||{}).textContent||'Схема')+' — лист Г3</title><style>'+css
+    +'\nhtml,body{background:#fff!important;margin:0}#schSvg{position:static!important;transform:none!important;width:100%!important;height:auto!important;filter:none!important;max-width:none}'
+    +'@page{size:A3 landscape;margin:8mm}</style></head><body>'+svg.outerHTML+'</body></html>');
+  w.document.close();
+  setTimeout(()=>{w.focus();w.print();},400);
+}
+document.addEventListener('keydown',e=>{
+  if(!document.body.classList.contains('sch'))return;
+  if(e.key==='Escape'&&!$('#asg').classList.contains('on')&&schSel){schSelect(null);e.preventDefault();}
+});
 /* ═══ описание позиции базы (v2.45.997) ═══
    У каждой позиции в базе есть заводское наименование, характеристики и
    разбор геометрии, но в компоновке ничего этого видно не было: в списке
@@ -9960,13 +10401,7 @@ function openAssign(key){
   $('#asgQ').value=cat.sec?'':(nd.hint||'');
   $('#asgSub').textContent=SCH_DESC[key]||'';
   $('#asgUnset').style.display=schemaData[key]?'block':'none';
-  $('#asgUnset').onclick=()=>{
-    /* v2.46.017: убрали назначение — деталь этой позиции уходит и из сцены */
-    const h=histBegin('снятие назначения на схеме');
-    let off=false;
-    try{off=schDrop(key,true);delete schemaData[key];}finally{histEnd(h);}
-    $('#asg').classList.remove('on');renderSchema();refresh();save();
-    if(off)toast('Назначение снято — деталь убрана из сцены');};
+  $('#asgUnset').onclick=()=>{$('#asg').classList.remove('on');schUnassign(key);};
   $('#asgAuto').onclick=schAutoToggle;schAutoBtn();
   drawAsgHead();
   drawAsgList();
@@ -10148,7 +10583,8 @@ function setMode(m){
      поверх неё (меню ПКМ, выбор ответной части, панель координат) */
   $('#vwrap').classList.toggle('schm',m==='sch');
   document.body.classList.toggle('sch',m==='sch');
-  if(m==='sch'){ctxClose();rotPickClose();hideMnt();posHide();renderSchema();}
+  if(m==='sch'){ctxClose();rotPickClose();hideMnt();posHide();schLayersDraw();renderSchema();
+    requestAnimationFrame(()=>{if(!schZ.fit)schFit();});}
 }
 $('#tab3d').onclick=()=>setMode('3d');
 $('#tabSch').onclick=()=>setMode('sch');
