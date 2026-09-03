@@ -3096,6 +3096,9 @@ function renderTaskRow(t) {
       'title="' + (archived ? 'Договор в архиве' : 'Перейти в договор') + '">📄 ' +
       escapeHtml(t.contract_number + (t.contractor_name ? ' · ' + t.contractor_name : '')) + '</span>');
   }
+  if (t.category === 'automation') {
+    tags.push('<span class="tkr-tag auto" title="Правка щита управления">⚡ ' + escapeHtml(t.panel || 'щит') + '</span>');
+  }
   if (t.comments_count) {
     tags.push('<span class="tkr-tag cmt" title="Комментарии в обсуждении">💬 ' + t.comments_count + '</span>');
   }
@@ -3151,6 +3154,51 @@ function formatTaskDeadline(iso) {
     if (diff < 7) return 'через ' + diff + ' дн.';
     return formatDateLong(iso);
   } catch (e) { return iso; }
+}
+
+// ---- v2.46.139: поток «Автоматика» — правки щитов управления ----
+async function loadTasksAuto() {
+  const container = document.getElementById('tasks-auto-content');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  try {
+    const d = await apiGet('/api/tasks?category=automation');
+    renderTasksAuto(d.tasks || []);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+function openNewTaskAuto() {
+  state.taskAutoPreset = true;
+  openNewTask();
+}
+
+function renderTasksAuto(tasks) {
+  const container = document.getElementById('tasks-auto-content');
+  const open = tasks.filter(t => t.status === 'new' || t.status === 'in_progress');
+  const done = tasks.filter(t => t.status === 'done' || t.status === 'cancelled');
+  let html = '<div class="tasks-auto-head">' +
+    '<div class="tah-text">Сюда заносим правки щитов управления: что поменять в схеме, уставках, прошивке. ' +
+    'В поле «щит» пишем какой — ЩУ-004, ЩУ-005, зимний комплект…</div>' +
+    '<button class="btn btn-primary" onclick="openNewTaskAuto()"><i class="ti ti-bolt"></i> Новая правка</button>' +
+    '</div>';
+  if (!tasks.length) {
+    html += '<div class="empty-block" style="text-align:center; padding:34px;">' +
+      '<i class="ti ti-bolt" style="font-size:38px; opacity:.35;"></i><br><br>' +
+      'Пока пусто. Заноси первую правку щита — и она не потеряется.</div>';
+    container.innerHTML = html;
+    return;
+  }
+  if (open.length) {
+    html += '<div class="tasks-group-title">⚡ В РАБОТЕ И НОВЫЕ <span>' + open.length + '</span></div>';
+    open.forEach(t => { html += renderTaskRow(t); });
+  }
+  if (done.length) {
+    html += '<div class="tasks-group-title done">✓ СДЕЛАНО <span>' + done.length + '</span></div>';
+    done.forEach(t => { html += renderTaskRow(t); });
+  }
+  container.innerHTML = html;
 }
 
 // ---- «Назначенные мне» ----
@@ -3348,6 +3396,16 @@ function renderTaskDetail(t) {
               '<div class="task-fact-body">' +
                 '<div class="task-fact-label">Создана</div>' +
                 '<div class="task-fact-value muted">' + escapeHtml(formatTaskDateTime(t.created_at)) + '</div>' +
+              '</div></div>';
+  }
+  // v2.46.139: щит — для задач потока «Автоматика»
+  if (t.category === 'automation') {
+    html += '<div class="task-fact">' +
+              '<div class="task-fact-icon c-orange"><i class="ti ti-bolt"></i></div>' +
+              '<div class="task-fact-body">' +
+                '<div class="task-fact-label">Щит управления</div>' +
+                '<div class="task-fact-value' + (t.panel ? '' : ' muted') + '">' +
+                  escapeHtml(t.panel || 'не указан') + '</div>' +
               '</div></div>';
   }
   // Источник
@@ -3620,6 +3678,7 @@ function discardTaskDraft() {
     title: '', description: '', assignee_ids: [],
     deadline: '', priority: 'normal', source: '',
     contract_id: null, contract_label: '',
+    category: '', panel: '',
   };
   if (state.currentScreen === 'task-form') renderTaskForm();
   showToast('Черновик очищен', 'info');
@@ -3641,7 +3700,10 @@ function openNewTask() {
     title: '', description: '', assignee_ids: [],
     deadline: '', priority: 'normal', source: '',
     contract_id: preContractId, contract_label: preContractLabel,
+    category: state.taskAutoPreset ? 'automation' : '',
+    panel: '',
   };
+  state.taskAutoPreset = false;
   // Восстановление черновика — только для «чистой» новой задачи (не из договора)
   state.taskDraftRestored = false;
   if (!preContractId) {
@@ -3680,6 +3742,8 @@ async function openEditTask() {
       source: t.source || '',
       contract_id: t.contract_id || null,
       contract_label: contractLabel,
+      category: t.category || '',
+      panel: t.panel || '',
     };
     selectSidebarItem('task-form');
   } catch (e) {
@@ -3819,6 +3883,18 @@ function renderTaskForm() {
           '<label>Источник <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(напр. «Планёрка 14.05.2026» или «Звонок клиента»)</span></label>' +
           '<input type="text" id="tf-source" value="' + escapeHtml(f.source) + '" placeholder="Откуда задача">' +
           '</div></div>';
+
+  // v2.46.139: поток «Автоматика» — правка щита управления
+  const isAuto = f.category === 'automation';
+  html += '<div class="tf-auto-box' + (isAuto ? ' on' : '') + '">' +
+          '<label class="tf-auto-toggle"><input type="checkbox" id="tf-auto"' + (isAuto ? ' checked' : '') + '> ' +
+          '<span>⚡ Правка щита управления</span>' +
+          '<span class="hint">задача попадёт в отдельный поток «Автоматика»</span></label>' +
+          '<div id="tf-panel-wrap" style="' + (isAuto ? '' : 'display:none') + '; margin-top:8px;">' +
+          '<label>Какой щит</label>' +
+          '<input type="text" id="tf-panel" value="' + escapeHtml(f.panel || '') + '" ' +
+          'placeholder="напр. ЩУ-004.008 вентиляция или ЩУ-005 дефростация">' +
+          '</div></div>';
   html += '</div>';
 
   // Кнопки
@@ -3837,6 +3913,13 @@ function renderTaskForm() {
   document.getElementById('tf-description').addEventListener('input', e => { state.taskForm.description = e.target.value; _saveTaskDraft(); });
   document.getElementById('tf-deadline').addEventListener('change', e => { state.taskForm.deadline = e.target.value; _saveTaskDraft(); });
   document.getElementById('tf-source').addEventListener('input', e => { state.taskForm.source = e.target.value; _saveTaskDraft(); });
+  document.getElementById('tf-auto').addEventListener('change', e => {
+    state.taskForm.category = e.target.checked ? 'automation' : '';
+    document.getElementById('tf-panel-wrap').style.display = e.target.checked ? '' : 'none';
+    document.querySelector('.tf-auto-box').classList.toggle('on', e.target.checked);
+    _saveTaskDraft();
+  });
+  document.getElementById('tf-panel').addEventListener('input', e => { state.taskForm.panel = e.target.value; _saveTaskDraft(); });
 }
 
 // v2.45.80: голосовой ввод текста в произвольное поле через Web Speech API.
@@ -3992,6 +4075,8 @@ async function submitTaskForm() {
     priority: f.priority || 'normal',
     source: f.source.trim(),
     contract_id: f.contract_id || null,        // ЭТАП 16В-2
+    category: f.category || '',                // v2.46.139: автоматика
+    panel: (f.panel || '').trim(),
   };
 
   const isEdit = state.taskFormMode === 'edit';

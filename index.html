@@ -399,6 +399,9 @@
         <button class="nav-item active" data-nav="tasks-list" onclick="selectSidebarItem('tasks-list')">
           <i class="ti ti-list-check"></i><span>Все задачи</span>
         </button>
+        <button class="nav-item" data-nav="tasks-auto" onclick="selectSidebarItem('tasks-auto')">
+          <i class="ti ti-bolt"></i><span>Автоматика</span>
+        </button>
         <button class="nav-item" data-nav="tasks-mine" onclick="selectSidebarItem('tasks-mine')">
           <i class="ti ti-user-check"></i><span>Назначенные мне</span>
         </button>
@@ -2808,6 +2811,19 @@
           <div id="tasks-list-content">
             <div class="loading-block">Загружаем…</div>
           </div>
+        </div>
+      </div>
+
+      <!-- v2.46.139: поток «Автоматика» — правки щитов управления -->
+      <div class="screen" data-screen="tasks-auto" data-section="tasks">
+        <div class="mobile-topbar">
+          <h2>Автоматика</h2>
+        </div>
+        <div class="page-header">
+          <div><h1>⚡ Автоматика</h1><div class="page-subtitle">Правки щитов управления</div></div>
+        </div>
+        <div class="content-inner" id="tasks-auto-content">
+          <div class="loading-block">Загружаем…</div>
         </div>
       </div>
 

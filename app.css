@@ -21416,6 +21416,19 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .task-disc-send { flex: none; width: 40px; height: 38px; border: none; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; font-size: 15px; }
 .task-disc-send:disabled { opacity: .5; cursor: default; }
 .tkr-tag.cmt { color: var(--brand); }
+/* v2.46.139: поток «Автоматика» — правки щитов */
+.tkr-tag.auto { color: var(--warning); background: var(--warning-bg); border-radius: 8px; }
+.tf-auto-box { margin-top: 12px; border: 1px dashed var(--border-strong); border-radius: 10px; padding: 11px 13px; }
+.tf-auto-box.on { border-style: solid; border-color: var(--warning); background: var(--warning-bg); }
+.tf-auto-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; font-size: 13px; }
+.tf-auto-toggle .hint { font-weight: 400; font-size: 11px; color: var(--text-light); }
+.tasks-auto-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px;
+  background: var(--warning-bg); border: 1px solid #EAD9B0; border-radius: 12px; padding: 12px 15px; }
+.tasks-auto-head .tah-text { flex: 1; font-size: 12.5px; color: var(--text-mid); line-height: 1.5; }
+.tasks-group-title { font-size: 11px; font-weight: 700; letter-spacing: .5px; color: var(--warning);
+  margin: 16px 0 8px; display: flex; align-items: center; gap: 7px; }
+.tasks-group-title.done { color: var(--success); }
+.tasks-group-title span { background: var(--bg); border-radius: 9px; padding: 0 8px; color: var(--text-light); }
 .task-meta-comments { opacity: .85; }
 .task-files-t { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: #64748B; margin-bottom: 7px; display: flex; align-items: center; gap: 6px; }
 .task-files-t .cnt { background: #E2E8F0; border-radius: 999px; padding: 1px 7px; font-size: 10.5px; }
