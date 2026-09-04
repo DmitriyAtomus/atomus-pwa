@@ -2672,10 +2672,16 @@ const TASK_STATUSES = [
   { code: 'cancelled',   label: 'Отменено' },
 ];
 
-function canManageTasks() {
+function canManageTasks(category) {
   if (!state.user) return false;
   const r = state.user.roles || [];
-  return r.includes('director') || r.includes('zam') || r.includes('manager');
+  if (r.includes('director') || r.includes('zam') || r.includes('manager')) return true;
+  // v2.46.140: инженер ведёт поток «Автоматика» — правки щитов управления
+  return category === 'automation' && r.includes('engineer');
+}
+// инженер без офисных прав: задачи только в потоке «Автоматика»
+function tasksAutoOnly() {
+  return !canManageTasks() && canManageTasks('automation');
 }
 
 // Кнопка «Планёрка»: одним нажатием объявить голосом на офисном ТВ, что планёрка
@@ -3181,7 +3187,9 @@ function renderTasksAuto(tasks) {
   let html = '<div class="tasks-auto-head">' +
     '<div class="tah-text">Сюда заносим правки щитов управления: что поменять в схеме, уставках, прошивке. ' +
     'В поле «щит» пишем какой — ЩУ-004, ЩУ-005, зимний комплект…</div>' +
-    '<button class="btn btn-primary" onclick="openNewTaskAuto()"><i class="ti ti-bolt"></i> Новая правка</button>' +
+    (canManageTasks('automation')
+      ? '<button class="btn btn-primary" onclick="openNewTaskAuto()"><i class="ti ti-bolt"></i> Новая правка</button>'
+      : '') +
     '</div>';
   if (!tasks.length) {
     html += '<div class="empty-block" style="text-align:center; padding:34px;">' +
@@ -3275,7 +3283,7 @@ function renderTaskDetail(t) {
   document.getElementById('task-detail-subtitle').textContent = sub.join(' · ') || '—';
 
   const container = document.getElementById('task-detail-content');
-  const canEdit = canManageTasks();
+  const canEdit = canManageTasks(t.category);
   const myChatId = state.user && state.user.chat_id;
   const myEmpId = state.user && state.user.employee_id;
   const isCreator = t.creator_chat_id === myChatId;
@@ -3685,8 +3693,10 @@ function discardTaskDraft() {
 }
 
 function openNewTask() {
-  if (!canManageTasks()) {
-    showToast('Создавать задачи может директор, зам или менеджер', 'error');
+  if (!canManageTasks(state.taskAutoPreset ? 'automation' : '')) {
+    showToast(tasksAutoOnly()
+      ? 'Инженер заносит правки щитов — в разделе «Автоматика»'
+      : 'Создавать задачи может директор, зам или менеджер', 'error');
     return;
   }
   state.taskFormMode = 'new';
@@ -3885,11 +3895,13 @@ function renderTaskForm() {
           '</div></div>';
 
   // v2.46.139: поток «Автоматика» — правка щита управления
+  const lockAuto = tasksAutoOnly();
+  if (lockAuto) f.category = 'automation';
   const isAuto = f.category === 'automation';
   html += '<div class="tf-auto-box' + (isAuto ? ' on' : '') + '">' +
-          '<label class="tf-auto-toggle"><input type="checkbox" id="tf-auto"' + (isAuto ? ' checked' : '') + '> ' +
+          '<label class="tf-auto-toggle"><input type="checkbox" id="tf-auto"' + (isAuto ? ' checked' : '') + (lockAuto ? ' disabled' : '') + '> ' +
           '<span>⚡ Правка щита управления</span>' +
-          '<span class="hint">задача попадёт в отдельный поток «Автоматика»</span></label>' +
+          '<span class="hint">' + (lockAuto ? 'инженер заносит правки щитов — поток «Автоматика»' : 'задача попадёт в отдельный поток «Автоматика»') + '</span></label>' +
           '<div id="tf-panel-wrap" style="' + (isAuto ? '' : 'display:none') + '; margin-top:8px;">' +
           '<label>Какой щит</label>' +
           '<input type="text" id="tf-panel" value="' + escapeHtml(f.panel || '') + '" ' +
