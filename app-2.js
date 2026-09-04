@@ -2676,8 +2676,9 @@ function canManageTasks(category) {
   if (!state.user) return false;
   const r = state.user.roles || [];
   if (r.includes('director') || r.includes('zam') || r.includes('manager')) return true;
-  // v2.46.140: инженер ведёт поток «Автоматика» — правки щитов управления
-  return category === 'automation' && r.includes('engineer');
+  // v2.46.140: инженер ведёт поток «Автоматика» — правки щитов управления;
+  // v2.46.141: и мастер — щиты собирает он
+  return category === 'automation' && (r.includes('engineer') || r.includes('master'));
 }
 // инженер без офисных прав: задачи только в потоке «Автоматика»
 function tasksAutoOnly() {
