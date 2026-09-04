@@ -3170,6 +3170,8 @@ async function loadTasksAuto() {
   container.innerHTML = '<div class="loading-block">Загружаем…</div>';
   try {
     const d = await apiGet('/api/tasks?category=automation');
+    state.autoPanelsSeen = [];
+    (d.tasks || []).forEach(t => { const pn = (t.panel || '').trim(); if (pn && state.autoPanelsSeen.indexOf(pn) < 0) state.autoPanelsSeen.push(pn); });
     renderTasksAuto(d.tasks || []);
   } catch (e) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Ошибка: ' + escapeHtml(String(e)) + '</div>';
@@ -3813,126 +3815,182 @@ async function ensureEmployeesLoaded() {
 }
 
 function renderTaskForm() {
+  /* v2.46.142: форма задачи заново. Было: одна длинная колонка полей с
+     одинаковыми рамками, галочка «правка щита» в самом низу и поле «какой
+     щит» рядом с ней. Стало: слева — что делаем (тип, крупное название,
+     щит, описание), справа — кому, когда, приоритет, договор, источник;
+     внизу липкая кнопка. Все id полей прежние — черновик, голосовой ввод
+     и submitTaskForm работают как раньше. */
   const f = state.taskForm;
   const container = document.getElementById('task-form-content');
-  let html = '<div class="sales-form">';
+  const lockAuto = tasksAutoOnly();
+  if (lockAuto) f.category = 'automation';
+  const isAuto = f.category === 'automation';
+  const isEdit = state.taskFormMode === 'edit';
+  const h1 = document.getElementById('task-form-title');
+  const hm = document.getElementById('task-form-mob-title');
+  const ttl = isAuto ? (isEdit ? 'Правка щита' : 'Новая правка щита') : (isEdit ? 'Задача' : 'Новая задача');
+  if (h1) h1.textContent = ttl;
+  if (hm) hm.textContent = ttl;
+  const sub = h1 && h1.parentElement && h1.parentElement.querySelector('.page-subtitle');
+  if (sub) sub.textContent = isAuto ? 'Что поменять в щите: схема, уставки, прошивка, компоновка' : 'Коротко — что, кому и к какому сроку';
 
-  // Восстановленный черновик — показываем плашку с возможностью очистить
+  let html = '<div class="tf2' + (isAuto ? ' auto' : '') + '">';
+
   if (state.taskFormMode === 'new' && state.taskDraftRestored) {
-    html += '<div class="task-draft-banner">' +
+    html += '<div class="task-draft-banner tf2-span">' +
             '<i class="ti ti-history"></i>' +
             '<span>Восстановлен черновик незаконченной задачи.</span>' +
             '<button type="button" class="btn-link" onclick="discardTaskDraft()">Очистить</button>' +
             '</div>';
   }
 
-  // Название
-  html += '<div class="sales-form-section">';
-  html += '<div class="sales-form-row cols-1"><div>' +
-          '<label>Название задачи <span class="req">*</span></label>' +
-          '<div style="display:flex;gap:6px;align-items:stretch;">' +
-            '<input type="text" id="tf-title" value="' + escapeHtml(f.title) + '" maxlength="200" placeholder="Кратко: что нужно сделать" style="flex:1;">' +
-            '<button type="button" id="tf-title-mic" class="mic-btn" onclick="_voiceToField(\'tf-title\', \'title\')" title="Надиктовать (Chrome/Edge)">' +
-              '<i class="ti ti-microphone"></i>' +
-            '</button>' +
-          '</div>' +
-          '</div></div>';
-  html += '<div class="sales-form-row cols-1"><div>' +
-          '<label>Описание <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально)</span></label>' +
-          '<div style="display:flex;gap:6px;align-items:stretch;">' +
-            '<textarea id="tf-description" rows="3" placeholder="Подробности задачи" style="flex:1;">' + escapeHtml(f.description) + '</textarea>' +
-            '<button type="button" id="tf-description-mic" class="mic-btn" onclick="_voiceToField(\'tf-description\', \'description\')" title="Надиктовать (Chrome/Edge)">' +
-              '<i class="ti ti-microphone"></i>' +
-            '</button>' +
-          '</div>' +
-          '</div></div>';
-  html += '</div>';
-
-  // Исполнители + дедлайн
-  html += '<div class="sales-form-section">';
-  html += '<div class="sales-form-row">';
-  html += '<div><label>Исполнители <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(можно выбрать нескольких)</span></label>' +
-          '<div id="tf-assignees-picker">' + renderTaskAssigneePicker() + '</div></div>';
-  html += '<div><label>Дедлайн <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально)</span></label>' +
-          '<input type="date" id="tf-deadline" value="' + escapeHtml(f.deadline) + '"></div>';
-  html += '</div>';
-
-  // ЭТАП 16В-2: привязка к договору (опционально)
-  html += '<div class="sales-form-row cols-1"><div>' +
-          '<label>Договор <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(опционально)</span></label>';
-  if (f.contract_id) {
-    html += '<div class="picker-display">' +
-            '<div class="picker-display-value">' +
-              '<i class="ti ti-file-text" style="color:var(--brand);"></i> ' +
-              escapeHtml(f.contract_label || '№ ' + f.contract_id) +
-            '</div>' +
-            '<div class="picker-display-actions">' +
-              '<button type="button" class="btn-link" onclick="openContractPickerForTask()">Сменить</button>' +
-              '<button type="button" class="btn-link btn-link-danger" onclick="clearTaskContract()">Очистить</button>' +
-            '</div>' +
-          '</div>';
+  /* ── левая колонка: что делаем ── */
+  html += '<div class="tf2-main">';
+  // тип: задача / правка щита
+  if (!lockAuto) {
+    html += '<div class="tf2-kind">' +
+      '<button type="button" class="' + (!isAuto ? 'on' : '') + '" onclick="setTaskKind(\'\')"><i class="ti ti-checkbox"></i> Задача</button>' +
+      '<button type="button" class="' + (isAuto ? 'on auto' : '') + '" onclick="setTaskKind(\'automation\')"><i class="ti ti-bolt"></i> Правка щита</button>' +
+      '</div>';
   } else {
-    html += '<button type="button" class="btn btn-secondary picker-empty-btn" onclick="openContractPickerForTask()">' +
-            '<i class="ti ti-link"></i> Привязать к договору' +
-          '</button>';
+    html += '<div class="tf2-kind locked"><span class="on auto"><i class="ti ti-bolt"></i> Правка щита управления</span>' +
+      '<small>поток «Автоматика»</small></div>';
   }
-  html += '</div></div>';
+  html += '<input type="hidden" id="tf-auto"' + (isAuto ? ' checked' : '') + '>';
 
-  // Приоритет
-  html += '<div class="sales-form-row cols-1"><div>' +
-          '<label>Приоритет</label>' +
-          '<div class="priority-row">';
+  // название — крупно
+  html += '<div class="tf2-title">' +
+    '<input type="text" id="tf-title" value="' + escapeHtml(f.title) + '" maxlength="200" ' +
+      'placeholder="' + (isAuto ? 'Что поменять в щите?' : 'Что нужно сделать?') + '" autocomplete="off">' +
+    '<button type="button" id="tf-title-mic" class="tf2-mic" onclick="_voiceToField(\'tf-title\', \'title\')" title="Надиктовать (Chrome/Edge)"><i class="ti ti-microphone"></i></button>' +
+    '</div>';
+
+  // щит — только для правки
+  const panels = _taskPanelsKnown();
+  html += '<div id="tf-panel-wrap" class="tf2-panel"' + (isAuto ? '' : ' style="display:none"') + '>' +
+    '<div class="tf2-lbl"><i class="ti ti-server-2"></i> Какой щит</div>' +
+    '<div class="tf2-chips">' + panels.map(pn =>
+      '<button type="button" class="' + ((f.panel || '').trim() === pn ? 'on' : '') + '" onclick="setTaskPanel(' + JSON.stringify(pn).replace(/"/g, '&quot;') + ')">' + escapeHtml(pn) + '</button>').join('') + '</div>' +
+    '<input type="text" id="tf-panel" value="' + escapeHtml(f.panel || '') + '" placeholder="или впиши: ЩУ-004.008, ЩУ-005, зимний комплект…" autocomplete="off">' +
+    '</div>';
+
+  // описание
+  html += '<div class="tf2-desc">' +
+    '<div class="tf2-lbl"><i class="ti ti-align-left"></i> Подробности <small>не обязательно</small></div>' +
+    '<div class="tf2-ta">' +
+    '<textarea id="tf-description" rows="5" placeholder="' + (isAuto ? 'Что именно: какая уставка, какой узел схемы, версия прошивки, откуда пришло замечание…' : 'Детали, ссылки, что считать сделанным…') + '">' + escapeHtml(f.description) + '</textarea>' +
+    '<button type="button" id="tf-description-mic" class="tf2-mic" onclick="_voiceToField(\'tf-description\', \'description\')" title="Надиктовать (Chrome/Edge)"><i class="ti ti-microphone"></i></button>' +
+    '</div></div>';
+  html += '</div>';
+
+  /* ── правая колонка: кому, когда ── */
+  html += '<div class="tf2-side">';
+  html += '<div class="tf2-card"><div class="tf2-lbl"><i class="ti ti-users"></i> Исполнители <small>можно нескольких</small></div>' +
+    '<div id="tf-assignees-picker">' + renderTaskAssigneePicker() + '</div></div>';
+
+  html += '<div class="tf2-card"><div class="tf2-lbl"><i class="ti ti-calendar-event"></i> Срок</div>' +
+    '<div class="tf2-quick">' +
+    [['today', 'Сегодня'], ['tomorrow', 'Завтра'], ['friday', 'До пятницы'], ['week', '+ неделя']].map(q =>
+      '<button type="button" class="' + (_taskQuickDate(q[0]) === f.deadline ? 'on' : '') + '" onclick="setTaskDeadlineQuick(\'' + q[0] + '\')">' + q[1] + '</button>').join('') +
+    '</div>' +
+    '<input type="date" id="tf-deadline" value="' + escapeHtml(f.deadline) + '">' +
+    '</div>';
+
+  html += '<div class="tf2-card"><div class="tf2-lbl"><i class="ti ti-flag"></i> Приоритет</div><div class="priority-row tf2-prio">';
   TASK_PRIORITIES.forEach(p => {
     const active = p.code === f.priority;
     html += '<button type="button" class="priority-btn' + (active ? ' active ' + p.code : '') + '" onclick="setTaskPriority(\'' + p.code + '\')">' +
             '<i class="ti ' + p.icon + '"></i>' + p.label + '</button>';
   });
-  html += '</div></div></div>';
+  html += '</div></div>';
 
-  // Источник
-  html += '<div class="sales-form-row cols-1"><div>' +
-          '<label>Источник <span class="hint" style="text-transform:none; font-weight:400; color:var(--text-light); font-size:11px;">(напр. «Планёрка 14.05.2026» или «Звонок клиента»)</span></label>' +
-          '<input type="text" id="tf-source" value="' + escapeHtml(f.source) + '" placeholder="Откуда задача">' +
-          '</div></div>';
-
-  // v2.46.139: поток «Автоматика» — правка щита управления
-  const lockAuto = tasksAutoOnly();
-  if (lockAuto) f.category = 'automation';
-  const isAuto = f.category === 'automation';
-  html += '<div class="tf-auto-box' + (isAuto ? ' on' : '') + '">' +
-          '<label class="tf-auto-toggle"><input type="checkbox" id="tf-auto"' + (isAuto ? ' checked' : '') + (lockAuto ? ' disabled' : '') + '> ' +
-          '<span>⚡ Правка щита управления</span>' +
-          '<span class="hint">' + (lockAuto ? 'инженер заносит правки щитов — поток «Автоматика»' : 'задача попадёт в отдельный поток «Автоматика»') + '</span></label>' +
-          '<div id="tf-panel-wrap" style="' + (isAuto ? '' : 'display:none') + '; margin-top:8px;">' +
-          '<label>Какой щит</label>' +
-          '<input type="text" id="tf-panel" value="' + escapeHtml(f.panel || '') + '" ' +
-          'placeholder="напр. ЩУ-004.008 вентиляция или ЩУ-005 дефростация">' +
-          '</div></div>';
+  html += '<div class="tf2-card"><div class="tf2-lbl"><i class="ti ti-file-text"></i> Договор <small>не обязательно</small></div>';
+  if (f.contract_id) {
+    html += '<div class="tf2-contract"><b>' + escapeHtml(f.contract_label || '№ ' + f.contract_id) + '</b>' +
+      '<span><button type="button" class="btn-link" onclick="openContractPickerForTask()">Сменить</button>' +
+      '<button type="button" class="btn-link btn-link-danger" onclick="clearTaskContract()">Убрать</button></span></div>';
+  } else {
+    html += '<button type="button" class="tf2-link" onclick="openContractPickerForTask()"><i class="ti ti-link"></i> Привязать к договору</button>';
+  }
   html += '</div>';
 
-  // Кнопки
-  html += '<div class="sales-action-bar">';
-  html += '<button class="btn btn-secondary" onclick="cancelTaskForm()">Отмена</button>';
-  html += '<button class="btn btn-primary" id="tf-submit" onclick="submitTaskForm()">' +
-          '<i class="ti ti-check"></i> ' + (state.taskFormMode === 'edit' ? 'Сохранить' : 'Создать задачу') + '</button>';
+  html += '<div class="tf2-card"><div class="tf2-lbl"><i class="ti ti-map-pin"></i> Источник</div>' +
+    '<input type="text" id="tf-source" value="' + escapeHtml(f.source) + '" placeholder="Планёрка 14.05, звонок клиента…" autocomplete="off"></div>';
   html += '</div>';
-  html += '<div id="tf-error"></div>';
 
+  /* ── низ: кнопки ── */
+  html += '<div class="tf2-bar tf2-span">' +
+    '<div id="tf-error"></div>' +
+    '<button class="btn btn-secondary" onclick="cancelTaskForm()">Отмена</button>' +
+    '<button class="btn btn-primary tf2-go" id="tf-submit" onclick="submitTaskForm()">' +
+      '<i class="ti ' + (isAuto ? 'ti-bolt' : 'ti-check') + '"></i> ' + (isEdit ? 'Сохранить' : (isAuto ? 'Занести правку' : 'Создать задачу')) + '</button>' +
+    '</div>';
   html += '</div>';
   container.innerHTML = html;
 
-  // Подвязка
+  // Подвязка (id полей прежние)
   document.getElementById('tf-title').addEventListener('input', e => { state.taskForm.title = e.target.value; _saveTaskDraft(); });
-  document.getElementById('tf-description').addEventListener('input', e => { state.taskForm.description = e.target.value; _saveTaskDraft(); });
-  document.getElementById('tf-deadline').addEventListener('change', e => { state.taskForm.deadline = e.target.value; _saveTaskDraft(); });
+  const ta = document.getElementById('tf-description');
+  const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.max(110, ta.scrollHeight + 2) + 'px'; };
+  ta.addEventListener('input', e => { state.taskForm.description = e.target.value; _saveTaskDraft(); grow(); });
+  grow();
+  document.getElementById('tf-deadline').addEventListener('change', e => { state.taskForm.deadline = e.target.value; _saveTaskDraft(); _tfQuickSync(); });
   document.getElementById('tf-source').addEventListener('input', e => { state.taskForm.source = e.target.value; _saveTaskDraft(); });
-  document.getElementById('tf-auto').addEventListener('change', e => {
-    state.taskForm.category = e.target.checked ? 'automation' : '';
-    document.getElementById('tf-panel-wrap').style.display = e.target.checked ? '' : 'none';
-    document.querySelector('.tf-auto-box').classList.toggle('on', e.target.checked);
-    _saveTaskDraft();
+  document.getElementById('tf-panel').addEventListener('input', e => { state.taskForm.panel = e.target.value; _saveTaskDraft(); _tfPanelSync(); });
+  if (state.taskFormMode === 'new' && !f.title) setTimeout(() => { const t = document.getElementById('tf-title'); if (t) t.focus(); }, 60);
+}
+
+/* тип задачи: обычная или правка щита — перерисовываем форму, поля не теряем */
+function setTaskKind(kind) {
+  if (!state.taskForm) return;
+  state.taskForm.category = kind === 'automation' ? 'automation' : '';
+  _saveTaskDraft();
+  renderTaskForm();
+}
+function setTaskPanel(name) {
+  if (!state.taskForm) return;
+  state.taskForm.panel = (state.taskForm.panel || '').trim() === name ? '' : name;
+  const inp = document.getElementById('tf-panel');
+  if (inp) inp.value = state.taskForm.panel;
+  _saveTaskDraft();
+  _tfPanelSync();
+}
+function _tfPanelSync() {
+  const cur = (state.taskForm && state.taskForm.panel || '').trim();
+  document.querySelectorAll('.tf2-panel .tf2-chips button').forEach(b => b.classList.toggle('on', b.textContent.trim() === cur));
+}
+/* щиты, которые уже встречались в правках, плюс наши типовые */
+function _taskPanelsKnown() {
+  const base = ['ЩУ-004.008 вентиляция', 'ЩУ-005.003 дефростация', 'АГ.СХ-060 зимний комплект'];
+  const seen = [];
+  (state.autoPanelsSeen || []).forEach(pn => { if (pn && base.indexOf(pn) < 0 && seen.indexOf(pn) < 0) seen.push(pn); });
+  return seen.slice(0, 5).concat(base);
+}
+function _taskQuickDate(kind) {
+  const d = new Date(); d.setHours(12, 0, 0, 0);
+  if (kind === 'tomorrow') d.setDate(d.getDate() + 1);
+  else if (kind === 'week') d.setDate(d.getDate() + 7);
+  else if (kind === 'friday') { const wd = d.getDay(); const add = (5 - wd + 7) % 7 || 7; d.setDate(d.getDate() + (wd === 5 ? 0 : add)); }
+  const z = n => (n < 10 ? '0' : '') + n;
+  return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate());
+}
+function setTaskDeadlineQuick(kind) {
+  if (!state.taskForm) return;
+  const v = _taskQuickDate(kind);
+  state.taskForm.deadline = state.taskForm.deadline === v ? '' : v;
+  const inp = document.getElementById('tf-deadline');
+  if (inp) inp.value = state.taskForm.deadline;
+  _saveTaskDraft();
+  _tfQuickSync();
+}
+function _tfQuickSync() {
+  const cur = state.taskForm && state.taskForm.deadline || '';
+  const map = { 'Сегодня': 'today', 'Завтра': 'tomorrow', 'До пятницы': 'friday', '+ неделя': 'week' };
+  document.querySelectorAll('.tf2-quick button').forEach(b => {
+    const k = map[b.textContent.trim()];
+    b.classList.toggle('on', !!k && _taskQuickDate(k) === cur && !!cur);
   });
-  document.getElementById('tf-panel').addEventListener('input', e => { state.taskForm.panel = e.target.value; _saveTaskDraft(); });
 }
 
 // v2.45.80: голосовой ввод текста в произвольное поле через Web Speech API.
@@ -4002,33 +4060,33 @@ function _voiceToField(fieldId, stateKey) {
 }
 
 function renderTaskAssigneePicker() {
+  /* v2.46.142: сотрудники плитками с инициалами; выбранные — залиты.
+     Кнопка «Я» ставит текущего пользователя одним нажатием. */
   const list = cache.activeEmployees || [];
   const selectedIds = (state.taskForm && state.taskForm.assignee_ids || []).map(Number);
-  const selected = list.filter(emp => selectedIds.indexOf(Number(emp.id)) >= 0);
-  let html = '<div class="task-assignee-picker">';
-  if (selected.length) {
-    html += '<div class="task-assignee-selected">';
-    selected.forEach(emp => {
-      const name = emp.short_name || emp.full_name || '—';
-      html += '<button type="button" class="task-assignee-chip" onclick="toggleTaskAssignee(' + Number(emp.id) + ')" title="Убрать исполнителя">' +
-        '<i class="ti ti-user-check"></i>' + escapeHtml(name) + '<i class="ti ti-x"></i></button>';
-    });
-    html += '<button type="button" class="btn-link task-assignee-clear" onclick="clearTaskAssignees()">Очистить</button></div>';
-  } else {
-    html += '<div class="task-assignee-empty"><i class="ti ti-users"></i> Исполнители пока не выбраны</div>';
+  const meId = state.user && Number(state.user.employee_id);
+  const ini = n => String(n || '').split(/[\s.]+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || '·';
+  let html = '<div class="ta2">';
+  if (!list.length) return html + '<div class="ta2-empty">Активные сотрудники не найдены</div></div>';
+  const meIn = list.some(e => Number(e.id) === meId);
+  html += '<div class="ta2-grid">';
+  if (meIn) {
+    const on = selectedIds.indexOf(meId) >= 0;
+    html += '<button type="button" class="ta2-me' + (on ? ' on' : '') + '" onclick="toggleTaskAssignee(' + meId + ')"><i class="ti ti-user-star"></i> Я</button>';
   }
-  html += '<div class="task-assignee-options">';
   list.forEach(e => {
     const id = Number(e.id);
-    const isSelected = selectedIds.indexOf(id) >= 0;
+    if (id === meId && meIn) return;
+    const on = selectedIds.indexOf(id) >= 0;
     const name = e.short_name || e.full_name || '—';
-    html += '<button type="button" class="task-assignee-option' + (isSelected ? ' selected' : '') + '" ' +
-      'role="checkbox" aria-checked="' + (isSelected ? 'true' : 'false') + '" onclick="toggleTaskAssignee(' + id + ')">' +
-      '<span class="task-assignee-check"><i class="ti ' + (isSelected ? 'ti-check' : 'ti-user-plus') + '"></i></span>' +
-      '<span>' + escapeHtml(name) + '</span></button>';
+    html += '<button type="button" class="ta2-p' + (on ? ' on' : '') + '" role="checkbox" aria-checked="' + on + '" onclick="toggleTaskAssignee(' + id + ')" title="' + escapeHtml(e.full_name || name) + '">' +
+      '<i>' + escapeHtml(ini(name)) + '</i><span>' + escapeHtml(name) + '</span></button>';
   });
-  if (!list.length) html += '<div class="task-assignee-empty">Активные сотрудники не найдены</div>';
-  html += '</div></div>';
+  html += '</div>';
+  html += '<div class="ta2-foot">' + (selectedIds.length
+    ? '<b>' + selectedIds.length + '</b> выбрано <button type="button" class="btn-link" onclick="clearTaskAssignees()">снять всех</button>'
+    : 'пока никому не назначена') + '</div>';
+  html += '</div>';
   return html;
 }
 
