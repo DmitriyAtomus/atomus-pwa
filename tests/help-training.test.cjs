@@ -25,14 +25,18 @@ function courses() {
   return new Function(code + 'return TRAINING_COURSES;')();
 }
 
-// v2.46.145: курсов три — у каждого проверяем целостность одинаково
-test('все курсы целы: 6 глав, чек-лист, 12 корректных вопросов, сдача от 10', () => {
+// v2.46.146: школ десять — по всем разделам; у каждой проверяем целостность одинаково
+test('все курсы целы: главы, чек-лист, 12 корректных вопросов, сдача от 10', () => {
   const list = courses();
-  assert.deepEqual(list.map(c => c.id), ['upd_intake', 'contract_new', 'shipment']);
+  assert.deepEqual(list.map(c => c.id).sort(), [
+    'contract_new', 'defects', 'hr', 'logistics', 'production',
+    'shipment', 'supply_cycle', 'tasks', 'upd_intake', 'warehouse',
+  ]);
   list.forEach(c => {
+    assert.ok(c.cat && c.cat.length > 2, c.id + ': нет раздела (cat)');
     assert.equal(c.pass, 10, c.id + ': проходной балл');
-    assert.equal(c.chapters.length, 6, c.id + ': глав должно быть 6');
-    assert.ok(c.checklist.length >= 5, c.id + ': короткий чек-лист');
+    assert.ok(c.chapters.length >= 4 && c.chapters.length <= 8, c.id + ': глав ' + c.chapters.length);
+    assert.ok(c.checklist.length >= 4, c.id + ': короткий чек-лист');
     assert.equal(c.quiz.length, 12, c.id + ': вопросов должно быть 12');
     c.quiz.forEach((q, i) => {
       assert.ok(q.q && q.q.length > 10, c.id + ': пустой вопрос #' + (i + 1));
@@ -60,6 +64,35 @@ test('ключевые темы каждой школы на месте', () => 
   assert.match(shp, /Отгрузить по коду/);
   assert.match(shp, /Расход: отгружена по договору/);
   assert.match(shp, /Откатить отгрузку/);
+  // v2.46.146: новые школы
+  const prod = JSON.stringify(list.find(c => c.id === 'production'));
+  assert.match(prod, /Начать частично/);
+  assert.match(prod, /вакуумирован/i);
+  assert.match(prod, /На склад.*По договору/);
+  const wh = JSON.stringify(list.find(c => c.id === 'warehouse'));
+  assert.match(wh, /Свободные/);
+  assert.match(wh, /Списание/);
+  assert.match(wh, /Что закупить/);
+  const sc = JSON.stringify(list.find(c => c.id === 'supply_cycle'));
+  assert.match(sc, /Закрыть заявку/);
+  assert.match(sc, /Заказан → Оплачен → В пути → На складе/);
+  const tk = JSON.stringify(list.find(c => c.id === 'tasks'));
+  assert.match(tk, /Автоматика/);
+  assert.match(tk, /Enter отправляет/);
+  const df = JSON.stringify(list.find(c => c.id === 'defects'));
+  assert.match(df, /Сообщить о замечании/);
+  assert.match(df, /директор и зам/i);
+  const lg = JSON.stringify(list.find(c => c.id === 'logistics'));
+  assert.match(lg, /Забрать сейчас/);
+  const hr = JSON.stringify(list.find(c => c.id === 'hr'));
+  assert.match(hr, /Уровни доступа|уровнем доступа/i);
+});
+
+test('список курсов группируется по разделам', () => {
+  const lh = slice(app4, 'async function loadHelpTraining()', 'function openTrainingCourse');
+  assert.match(lh, /tr-sec/);
+  assert.match(lh, /TR_CAT_ORDER/);
+  assert.match(lh, /Promise\.all/);   // результаты 10 курсов тянутся параллельно
 });
 
 test('_trScore честно считает балл', () => {
@@ -87,7 +120,8 @@ test('балл уезжает на сервер, «сдано» подтверж
 test('сводка по команде рисуется, когда бэкенд её отдал (директор)', () => {
   const lh = slice(app4, 'async function loadHelpTraining()', 'function openTrainingCourse');
   assert.match(lh, /res && res\.team/);
-  assert.match(lh, /Кто сдавал/);
+  assert.match(lh, /Результаты команды/);
+  assert.match(lh, /Учебный центр/);       // v2.46.146: шапка с общим прогрессом
 });
 
 test('подсказка в Базе знаний: конспект приёмки УПД со ссылкой на курс', () => {

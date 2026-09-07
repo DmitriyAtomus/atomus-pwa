@@ -26529,14 +26529,36 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
 
 /* ============ v2.46.144: Помощь → Обучение (курсы + тест) ============ */
 .tr-course { display:flex; align-items:center; gap:14px; background:var(--surface);
-  border:1px solid var(--border); border-radius:12px; padding:14px 16px; margin:0 0 10px;
-  cursor:pointer; box-shadow:0 1px 3px rgba(23,38,58,.06); }
-.tr-course:hover { border-color:var(--brand); }
-.tr-course-icon { width:44px; height:44px; border-radius:10px; background:var(--brand-bg);
-  color:var(--brand); display:flex; align-items:center; justify-content:center; font-size:22px; flex:none; }
-.tr-course-title { font-weight:700; font-size:15.5px; }
-.tr-course-sum { font-size:13px; color:var(--text-light); margin:2px 0 4px; }
-.tr-course-meta { font-size:12px; color:var(--text-faint); }
+  border:1px solid var(--border); border-radius:14px; padding:14px 16px; margin:0;
+  cursor:pointer; box-shadow:0 1px 3px rgba(23,38,58,.06); position:relative; overflow:hidden;
+  transition:transform .12s, box-shadow .12s, border-color .12s; }
+.tr-course::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px;
+  background:var(--trc, var(--brand)); opacity:.9; }
+.tr-course:hover { border-color:var(--trc, var(--brand)); transform:translateY(-1px);
+  box-shadow:0 6px 16px rgba(23,38,58,.10); }
+.tr-course.is-done { background:linear-gradient(0deg, var(--success-bg), var(--surface) 65%); }
+.tr-course-icon { width:52px; height:52px; border-radius:14px; color:#fff; position:relative;
+  display:flex; align-items:center; justify-content:center; font-size:26px; flex:none;
+  box-shadow:0 4px 10px rgba(23,38,58,.18); }
+.tr-done-tick { position:absolute; right:-5px; bottom:-5px; width:20px; height:20px; border-radius:50%;
+  background:var(--success); color:#fff; display:flex; align-items:center; justify-content:center;
+  font-size:12px; border:2px solid var(--surface); }
+.tr-course-chev { color:var(--text-faint); transition:transform .12s; }
+.tr-course:hover .tr-course-chev { transform:translateX(3px); color:var(--trc, var(--brand)); }
+.tr-course-title { font-weight:800; font-size:15.5px; letter-spacing:.1px; }
+.tr-course-sum { font-size:12.5px; color:var(--text-light); margin:2px 0 5px; line-height:1.45; }
+.tr-course-meta { font-size:11.5px; color:var(--text-faint); }
+/* шапка открытого курса — в цвете раздела */
+.tr-chero { display:flex; gap:16px; align-items:flex-start; color:#fff; border-radius:16px;
+  padding:20px 22px; margin:0 0 14px; box-shadow:0 6px 16px rgba(23,38,58,.18); }
+.tr-chero-ic { width:54px; height:54px; border-radius:14px; background:rgba(255,255,255,.18);
+  display:flex; align-items:center; justify-content:center; font-size:28px; flex:none;
+  border:1px solid rgba(255,255,255,.3); }
+.tr-chero-cat { font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; opacity:.85; }
+.tr-chero-t { font-size:21px; font-weight:800; margin:2px 0; }
+.tr-chero-s { font-size:13px; opacity:.9; max-width:70ch; }
+.tr-chero-meta { font-size:12px; font-weight:700; opacity:.85; margin-top:8px; }
+@media (max-width:720px){ .tr-chero { padding:16px; } .tr-chero-t { font-size:18px; } }
 .tr-chip { display:inline-block; border-radius:999px; padding:1px 9px; font-size:11.5px; font-weight:700; }
 .tr-chip.pass { background:var(--success-bg); color:var(--success); }
 .tr-chip.fail { background:var(--warning-bg); color:var(--warning); }
@@ -26587,3 +26609,19 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
 .tr-verdict.fail { color:var(--danger); }
 .tr-review { border-left:4px solid var(--danger); background:var(--danger-bg); border-radius:0 10px 10px 0;
   padding:9px 13px; margin:8px 0; font-size:13.5px; }
+/* v2.46.146: учебный центр — красивый список школ */
+.tr-hero { display:flex; align-items:center; gap:18px; border-radius:16px; padding:20px 24px;
+  margin:0 0 18px; color:#fff; background:linear-gradient(120deg, #1D4064, var(--brand) 55%, #4A7FAB);
+  box-shadow:0 6px 18px rgba(45,95,139,.28); }
+.tr-hero-ic { font-size:40px; line-height:1; filter:drop-shadow(0 2px 4px rgba(0,0,0,.25)); }
+.tr-hero-t { font-size:20px; font-weight:800; letter-spacing:.2px; }
+.tr-hero-s { font-size:13px; opacity:.88; margin-top:2px; max-width:64ch; }
+.tr-hero-barrow { display:flex; align-items:center; gap:10px; margin-top:10px; }
+.tr-hero-bar { flex:1; max-width:280px; height:8px; border-radius:4px; background:rgba(255,255,255,.25); overflow:hidden; }
+.tr-hero-bar i { display:block; height:100%; border-radius:4px; background:#7EE3B8; transition:width .4s; }
+.tr-hero-cnt { font-size:12px; font-weight:700; white-space:nowrap; opacity:.95; }
+.tr-sec { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:800;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--text-light); margin:20px 2px 10px; }
+.tr-sec i { width:8px; height:8px; border-radius:3px; display:inline-block; }
+.tr-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(330px, 1fr)); gap:10px; }
+@media (max-width:720px){ .tr-grid { grid-template-columns:1fr; } .tr-hero { padding:16px 18px; gap:12px; } }
