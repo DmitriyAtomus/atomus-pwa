@@ -25,26 +25,41 @@ function courses() {
   return new Function(code + 'return TRAINING_COURSES;')();
 }
 
-test('курс «Школа приёмки УПД»: 6 глав, чек-лист, 12 корректных вопросов', () => {
+// v2.46.145: курсов три — у каждого проверяем целостность одинаково
+test('все курсы целы: 6 глав, чек-лист, 12 корректных вопросов, сдача от 10', () => {
   const list = courses();
-  const c = list.find(x => x.id === 'upd_intake');
-  assert.ok(c, 'нет курса upd_intake');
-  assert.equal(c.pass, 10);
-  assert.equal(c.chapters.length, 6);
-  assert.ok(c.checklist.length >= 5);
-  assert.equal(c.quiz.length, 12);
-  c.quiz.forEach((q, i) => {
-    assert.ok(q.q && q.q.length > 10, 'пустой вопрос #' + (i + 1));
-    assert.ok(Array.isArray(q.o) && q.o.length >= 2, 'мало вариантов #' + (i + 1));
-    assert.ok(Number.isInteger(q.a) && q.a >= 0 && q.a < q.o.length,
-      'кривой индекс ответа #' + (i + 1));
-    assert.ok(q.why && q.why.length > 5, 'нет разбора #' + (i + 1));
+  assert.deepEqual(list.map(c => c.id), ['upd_intake', 'contract_new', 'shipment']);
+  list.forEach(c => {
+    assert.equal(c.pass, 10, c.id + ': проходной балл');
+    assert.equal(c.chapters.length, 6, c.id + ': глав должно быть 6');
+    assert.ok(c.checklist.length >= 5, c.id + ': короткий чек-лист');
+    assert.equal(c.quiz.length, 12, c.id + ': вопросов должно быть 12');
+    c.quiz.forEach((q, i) => {
+      assert.ok(q.q && q.q.length > 10, c.id + ': пустой вопрос #' + (i + 1));
+      assert.ok(Array.isArray(q.o) && q.o.length >= 2, c.id + ': мало вариантов #' + (i + 1));
+      assert.ok(Number.isInteger(q.a) && q.a >= 0 && q.a < q.o.length,
+        c.id + ': кривой индекс ответа #' + (i + 1));
+      assert.ok(q.why && q.why.length > 5, c.id + ': нет разбора #' + (i + 1));
+    });
   });
-  // ключевые темы курса на месте
-  const all = JSON.stringify(c);
-  assert.match(all, /счёт на оплату/i);
-  assert.match(all, /дубликат/i);
-  assert.match(all, /Не разнесено/i);
+});
+
+test('ключевые темы каждой школы на месте', () => {
+  const list = courses();
+  const upd = JSON.stringify(list.find(c => c.id === 'upd_intake'));
+  assert.match(upd, /счёт на оплату/i);
+  assert.match(upd, /дубликат/i);
+  assert.match(upd, /Не разнесено/i);
+  const con = JSON.stringify(list.find(c => c.id === 'contract_new'));
+  assert.match(con, /спецификаци/i);
+  assert.match(con, /На хранении/);
+  assert.match(con, /Готов к отгрузке → Отгружен частично/);
+  assert.match(con, /на основе КП/);
+  const shp = JSON.stringify(list.find(c => c.id === 'shipment'));
+  assert.match(shp, /Сборка к отгрузке/i);
+  assert.match(shp, /Отгрузить по коду/);
+  assert.match(shp, /Расход: отгружена по договору/);
+  assert.match(shp, /Откатить отгрузку/);
 });
 
 test('_trScore честно считает балл', () => {
@@ -81,4 +96,14 @@ test('подсказка в Базе знаний: конспект приёмк
   const art = slice(app3, "id: 'sup-upd-intake'", "id: 'sup-supplier'");
   assert.match(art, /selectSidebarItem\(\\'help-training\\'\)/);
   assert.match(art, /дубликат/i);
+});
+
+// v2.46.145: статьи о договоре и отгрузке ведут в свои школы
+test('статьи «новый договор» и «отгрузка по QR» ссылаются на обучение', () => {
+  const contract = slice(app3, "id: 'sales-new-contract'", "id: 'sales-offers'");
+  assert.match(contract, /Школа договора/);
+  assert.match(contract, /selectSidebarItem\(\\'help-training\\'\)/);
+  const ship = slice(app3, "id: 'wh-ship-qr'", "id: 'sales-box-content'");
+  assert.match(ship, /Школа отгрузки/);
+  assert.match(ship, /selectSidebarItem\(\\'help-training\\'\)/);
 });
