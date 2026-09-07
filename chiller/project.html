@@ -8354,9 +8354,36 @@ const SCH_EDGES=[
   {a:'I1',  b:'AB1', t:'вода',       pa:/вода|гликол|выход/i,   pb:/вход|обрат/i},
 ];
 const schNodeT=k=>{const n=SCH_NODES.find(x=>x.k===k);return n?(n.t+' '+n.n):k;};
+/* v2.46.149: деталь узла ищем в три захода. Связь конвейера (p.sch) →
+   назначение на вкладке «Схема» (schemaData) → по роли и имени: у Дмитрия
+   узлы стоят в сцене из каталога напрямую, без назначения, и обвязка честно
+   отвечала «нет в сцене» на конденсатор, который стоит перед глазами.
+   Найденную по роли деталь тут же усыновляем (p.sch=k), чтобы дальше всё —
+   схема, отчёт, сохранение — про неё знало. */
+const BIND_ROLE={
+  KM1:p=>roleOf(p.d)==='comp',
+  AVO1:p=>roleOf(p.d)==='cond',
+  RS1:p=>roleOf(p.d)==='recv',
+  I1:p=>roleOf(p.d)==='evap',
+  OZH1:p=>roleOf(p.d)==='sep'||/отделител/i.test(p.d.name||''),
+  N1:p=>roleOf(p.d)==='pump',
+  AB1:p=>roleOf(p.d)==='tank'||isTankAny(p.d),
+  F1:p=>(p.d.sub||'')==='filt'||/фильтр/i.test(p.d.name||''),
+  SI1:p=>/стекл|смотров|индикатор влаг/i.test(p.d.name||''),
+  UA1:p=>/соленоид/i.test(p.d.name||'')&&!/байпас/i.test(p.d.name||''),
+  TRV1:p=>(p.d.sub||'')==='trv'||/трв|терморегулир|txv|tge\b/i.test(p.d.name||''),   // \b с кириллицей не дружит
+};
 function bindItemOf(k){
-  return placed.find(p=>p.sch===k)
-    ||((schemaData[k]&&schemaData[k].id)?placed.find(p=>p.id===schemaData[k].id):null)||null;
+  const direct=placed.find(p=>p.sch===k)
+    ||((schemaData[k]&&schemaData[k].id)?placed.find(p=>p.id===schemaData[k].id):null);
+  if(direct)return direct;
+  const test=BIND_ROLE[k];if(!test)return null;
+  const busy=new Set(placed.filter(p=>p.sch).map(p=>p.sch));
+  const cand=placed.filter(p=>!p.sch&&roleOf(p.d)!=='pipe'&&roleOf(p.d)!=='frame'&&test(p));
+  if(!cand.length||busy.has(k))return cand[0]||null;
+  cand[0].sch=k;                                     // усыновили — дальше связь штатная
+  if(!schemaData[k])schemaData[k]={id:cand[0].id,name:cand[0].d.name};
+  return cand[0];
 }
 const bindZoneTaken=(it,zi)=>placed.some(p=>p.link&&p.link.mount==='rot'&&
   p.link.to===it.uid&&p.link.zi===zi);
@@ -8395,7 +8422,8 @@ function bindZone(it,rx,other,used){
 async function bindEdge(e,used){
   const A=bindItemOf(e.a),B=bindItemOf(e.b);
   if(!A||!B)return {ok:0,why:'нет в сцене: '+
-    [!A&&schNodeT(e.a),!B&&schNodeT(e.b)].filter(Boolean).join(' и ')};
+    [!A&&schNodeT(e.a),!B&&schNodeT(e.b)].filter(Boolean).join(' и ')+
+    ' — назначь на вкладке «Схема» и «Собрать по схеме»'};
   const za=bindZone(A,e.pa,B,used),zb=bindZone(B,e.pb,A,used);
   if(za.busyAll&&zb.busyAll)return {ok:2,why:'уже обвязано'};
   if(za.err)return {ok:0,why:schNodeT(e.a)+': '+za.err};

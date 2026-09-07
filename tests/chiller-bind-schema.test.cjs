@@ -79,3 +79,13 @@ test('кнопка и отчёт на месте', () => {
   assert.match(br, /легло: /);
   assert.match(br, /перестановкой узла/);
 });
+
+// v2.46.149: детали, поставленные из каталога без назначения, находятся по роли
+test('узел без назначения находится по роли детали и усыновляется', () => {
+  const bi = slice('const BIND_ROLE={', 'const bindZoneTaken');
+  ['KM1', 'AVO1', 'RS1', 'I1', 'OZH1', 'N1', 'AB1', 'F1', 'SI1', 'UA1', 'TRV1'].forEach(k => {
+    assert.match(bi, new RegExp('\\b' + k + ':p=>'), 'нет правила роли для ' + k);
+  });
+  assert.match(bi, /cand\[0\]\.sch=k/);          // усыновили — связь дальше штатная
+  assert.doesNotMatch(bi, /\\bтрв\\b/);          // \b с кириллицей не работает
+});
