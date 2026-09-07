@@ -30,7 +30,7 @@ test('все курсы целы: главы, чек-лист, 12 коррект
   const list = courses();
   assert.deepEqual(list.map(c => c.id).sort(), [
     'contract_new', 'defects', 'hr', 'logistics', 'production',
-    'shipment', 'supply_cycle', 'tasks', 'upd_intake', 'warehouse',
+    'sales_calcs', 'shipment', 'supply_cycle', 'tasks', 'upd_intake', 'warehouse',
   ]);
   list.forEach(c => {
     assert.ok(c.cat && c.cat.length > 2, c.id + ': нет раздела (cat)');
@@ -86,6 +86,12 @@ test('ключевые темы каждой школы на месте', () => 
   assert.match(lg, /Забрать сейчас/);
   const hr = JSON.stringify(list.find(c => c.id === 'hr'));
   assert.match(hr, /Уровни доступа|уровнем доступа/i);
+  // v2.46.147: школа расчётов
+  const cl = JSON.stringify(list.find(c => c.id === 'sales_calcs'));
+  assert.match(cl, /Передать мяч|передай мяч/i);
+  assert.match(cl, /завис/);
+  assert.match(cl, /Создать КП/);
+  assert.match(cl, /На мне/);
 });
 
 test('список курсов группируется по разделам', () => {
