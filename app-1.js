@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.148";
+const APP_VERSION = "v2.46.149";
 const APP_VERSION_DATE = "07.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2113,6 +2113,8 @@ let _devChatSince = 0;
 let _devChatFiles = [];
 let _devChatBusy = false;
 let _devChatPending = new Set();   // свои сообщения, по которым агент ещё не отчитался
+let _devChatActiveTaskId = 0;      // точная задача для кнопки «Стоп»
+let _devChatActiveTaskStatus = '';
 let _devChatHost = 'screen';       // где сейчас показываем ленту: 'screen' | 'drawer'
 let _devChatTicking = false;       // тик уже идёт — второй дорисовал бы те же сообщения
 let _devChatDayKey = '';           // день последнего нарисованного сообщения — для разделителя
@@ -3460,7 +3462,7 @@ function _devChatTyping(feed, on) {
         '<div class="wk-bar"><i></i></div>' +
         '<div class="wk-act">' +
           '<button type="button" class="pri" onclick="devChatTermOpen()">Смотреть вживую</button>' +
-          '<button type="button" onclick="devChatStop()">Остановить</button>' +
+          '<button type="button" data-stop-task onclick="devChatStop()">Остановить</button>' +
         '</div>' +
       '</div>';
   }
@@ -3486,12 +3488,18 @@ function _devChatWorkFill(el) {
   // Чаты идут параллельно, поэтому ждать можно только предыдущую задачу
   // ЭТОЙ ленты: соседние разговоры больше не задерживают.
   else if (now && !_devChatRunSince) now.textContent = 'жду очереди — ' + _devChatAgentName() + ' доделывает предыдущую задачу этого чата';
+  if (now && _devChatActiveTaskStatus === 'stopping') now.textContent = 'останавливаю задачу…';
   const tm = el.querySelector('[data-timer]');
   if (tm) {
     const sec = _devChatRunSince ? Math.max(0, Math.round((Date.now() - _devChatRunSince) / 1000)) : 0;
     tm.textContent = _devChatRunSince
       ? Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0')
       : 'в очереди';
+  }
+  const stop = el.querySelector('[data-stop-task]');
+  if (stop) {
+    stop.disabled = _devChatActiveTaskStatus === 'stopping';
+    stop.textContent = stop.disabled ? 'Останавливаю…' : 'Остановить';
   }
 }
 
@@ -3511,21 +3519,28 @@ function _devChatWorkTick(on) {
 // Останавливаем ту задачу, которую сервер считает текущей, — фронт может
 // отстать на пару секунд, а номер знает БД.
 async function devChatStop() {
-  // номер задачи не шлём: у фронта в «ожидающих» может висеть старая незакрытая
-  // задача, а остановить надо ту, что грызёт машину сейчас — это знает сервер.
-  // v2.45.976: но чат шлём обязательно. Без него сервер брал свою текущую
-  // задачу, чей бы чат её ни поставил: кнопка в ленте по чиллерам убивала
-  // правку фронта из другого разговора.
+  // Шлём и чат, и точный id: раньше сервер выбирал последнее сообщение и мог
+  // остановить новую очередь, оставив старую реально работающую задачу живой.
   let r;
   try {
-    r = await apiPost(_devChatApi('/stop'), { thread_id: _devChatThreadId || 0 });
+    r = await apiPost(_devChatApi('/stop'), {
+      thread_id: _devChatThreadId || 0,
+      msg_id: _devChatActiveTaskId || 0,
+    });
   } catch (e) {
     showToast('Нет связи с сервером', 'error');
     return;
   }
   if (r && r.ok) {
-    showToast('Прошу ' + _devChatAgentName() + ' остановиться', 'success');
-    _devChatSetStatus('останавливаю…', 'working');
+    _devChatActiveTaskId = Number(r.msg_id || _devChatActiveTaskId || 0);
+    _devChatActiveTaskStatus = r.status || 'stopping';
+    if (r.status === 'stopped') {
+      _devChatPending.delete(_devChatActiveTaskId);
+      showToast('Задача снята с очереди', 'success');
+    } else {
+      showToast('Прошу ' + _devChatAgentName() + ' остановиться', 'success');
+      _devChatSetStatus('останавливаю…', 'working');
+    }
   } else {
     showToast((r && r.data && r.data.message) || 'Не вышло остановить', 'error');
   }
@@ -3651,6 +3666,8 @@ function _devChatSetStatus(text, mode) {
 async function _devChatRefreshStatuses() {
   const feed = _devChatEl('feed');
   if (!_devChatPending.size) {
+    _devChatActiveTaskId = 0;
+    _devChatActiveTaskStatus = '';
     _devChatSetStatus(_devChatEmployeeMode() ? 'Готова ответить' : 'Готов к работе', 'ready');
     if (feed) _devChatTyping(feed, false);
     return;
@@ -3666,6 +3683,7 @@ async function _devChatRefreshStatuses() {
 
   let working = false;
   let running = false;   // именно «грызёт сейчас», а не «стоит в очереди»
+  let runningId = 0, stoppingId = 0, queuedId = 0, activeRunAt = '';
   ((data && data.messages) || []).forEach(function (m) {
     if (!_devChatPending.has(m.id)) return;
     const span = document.querySelector('[data-msg-id="' + m.id + '"] [data-status]');
@@ -3680,20 +3698,28 @@ async function _devChatRefreshStatuses() {
     // v2.45.955: засекаем момент «взял в работу» — для таймера в терминале.
     // v2.45.962: отсчёт от времени задачи, а не от момента, когда её увидела
     // ЭТА вкладка. Иначе открыл чат с телефона через полчаса — а в карточке
-    // «0:04», будто Клава только начала. Поллер забирает задачу за секунды,
-    // так что ts сообщения — честное начало работы.
+    // «0:04», будто Клава только начала. Берём серверный run_at — точный
+    // момент захвата задачи; ts остаётся запасным значением для старого API.
     if (m.status === 'running') {
       running = true;
-      if (!_devChatRunSince) {
-        const started = m.ts ? Date.parse(m.ts) : NaN;
-        _devChatRunSince = (!isNaN(started) && started <= Date.now()) ? started : Date.now();
-      }
+      if (!runningId) { runningId = m.id; activeRunAt = m.run_at || m.ts || ''; }
+    } else if (m.status === 'stopping' && !stoppingId) {
+      stoppingId = m.id;
+      activeRunAt = activeRunAt || m.run_at || m.ts || '';
+    } else if (m.status === 'new' && !queuedId) {
+      queuedId = m.id;
     }
   });
+  _devChatActiveTaskId = runningId || stoppingId || queuedId || 0;
+  _devChatActiveTaskStatus = runningId ? 'running' : (stoppingId ? 'stopping' : (queuedId ? 'new' : ''));
+  if ((runningId || stoppingId) && !_devChatRunSince) {
+    const started = activeRunAt ? Date.parse(activeRunAt) : NaN;
+    _devChatRunSince = (!isNaN(started) && started <= Date.now()) ? started : Date.now();
+  }
   // v2.45.974: таймер живёт ровно столько, сколько идёт РАБОТА в этом чате.
   // Раньше он обнулялся только когда очередь пустела — задача, стоящая в
   // очереди, показывала время чужой, уже бегущей задачи.
-  if (!running) _devChatRunSince = null;
+  if (!runningId && !stoppingId) _devChatRunSince = null;
   // в шапке — последнее действие агента, если он его прислал
   const progLines = working ? _devChatProgLines() : null;
   _devChatSetStatus(
@@ -4534,6 +4560,8 @@ function _devChatResetLive() {
   window._devChatTermLog = [];
   _devChatTermSeen = {};
   _devChatRunSince = null;
+  _devChatActiveTaskId = 0;
+  _devChatActiveTaskStatus = '';
 }
 
 function _devChatLogProgress() {
