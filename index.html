@@ -669,6 +669,10 @@
         <button class="nav-item active" data-nav="help-knowledge" onclick="selectSidebarItem('help-knowledge')">
           <i class="ti ti-book"></i><span>База знаний</span>
         </button>
+        <!-- v2.46.144: обучение с тестами («Школа приёмки УПД» и будущие курсы) -->
+        <button class="nav-item" data-nav="help-training" onclick="selectSidebarItem('help-training')">
+          <i class="ti ti-school"></i><span>Обучение</span>
+        </button>
         <button class="nav-item" data-nav="help-faq" onclick="selectSidebarItem('help-faq')">
           <i class="ti ti-question-mark"></i><span>Частые вопросы</span>
         </button>
@@ -3124,6 +3128,19 @@
             </div>
           </div>
           <div id="help-knowledge-body"></div>
+        </div>
+      </div>
+
+      <!-- ============ ПОМОЩЬ: Обучение (v2.46.144) ============ -->
+      <div class="screen" data-screen="help-training" data-section="help">
+        <div class="content-inner" style="max-width: 860px;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-school"></i>
+              <h1>Обучение</h1>
+            </div>
+          </div>
+          <div id="help-training-body"><div class="loading-block">Загружаем курсы…</div></div>
         </div>
       </div>
 

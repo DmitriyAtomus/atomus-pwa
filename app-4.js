@@ -2643,6 +2643,385 @@ function closeHelpModal() {
   document.getElementById('help-modal').classList.remove('visible');
 }
 
+// ============ v2.46.144: ОБУЧЕНИЕ — курсы с главами и тестом ============
+// Раздел «Помощь → Обучение». Курс = главы (тот же блочный формат, что статьи
+// Базы знаний) + чек-лист стажировки (галочки в localStorage) + экзамен.
+// Балл уезжает POST /api/training/results: «сдано» считает СЕРВЕР по проходному
+// баллу, директору приходит пуш, а сводка по команде видна ему на этом экране.
+
+const TRAINING_COURSES = [
+  {
+    id: 'upd_intake', icon: 'ti-package-import',
+    title: 'Школа приёмки УПД',
+    summary: 'Принять документы поставщика так, чтобы склад совпадал с реальностью: от фото у ворот до «Оприходовать и закрыть».',
+    pass: 10,
+    chapters: [
+      { icon: 'ti-target', title: 'Зачем вообще приходовать', blocks: [
+        { p: 'УПД — универсальный передаточный документ. Поставщик привёз товар — с ним приехала УПД (или ТОРГ-12, или счёт-фактура — CRM понимает все три). Пока ты её не оприходовал, для CRM этого товара <b>не существует</b>.' },
+        { p: 'Одно нажатие «Оприходовать» запускает цепочку:' },
+        { ul: [
+          '<b>Остатки на складе растут</b> — производство видит, что детали есть',
+          'Позиции <b>уходят из «Что закупить»</b> — снабжение не закажет второй раз',
+          '<b>Заказ поставщику закрывается</b> автоматически — CRM сверяет, что приехало всё, что заказывали',
+        ] },
+        { note: '<b>Главное правило:</b> приходуем только то, что реально стоит на складе, и ровно в том количестве, которое пересчитали руками. CRM верит тебе.' },
+      ] },
+      { icon: 'ti-cloud-download', title: 'Откуда УПД попадают в CRM', blocks: [
+        { h: 'A. Из 1С-ЭДО — сами (основной путь)' },
+        { p: 'Поставщик отправил документ по ЭДО → он появляется в <b>«Поступления по ЭДО»</b>, придёт пуш. Открой карточку и нажми <b>«Оприходовать»</b> — документ уедет в «Приёмку УПД». Если чип «не привязан» — сначала <b>«Привязать»</b> к заказу (метка ORD-N), тогда сверка посчитается сама.' },
+        { note: '<b>Счета на оплату на склад не трогаем.</b> Из ЭДО прилетают и УПД, и счета. Счёт (чип «🧾 счёт на оплату») кнопкой «На согласование» уходит директору. На склад попадают только УПД.' },
+        { h: 'B. Фото с телефона' },
+        { p: 'Водитель привёз бумажную накладную — сфотографируй кнопкой <b>«УПД»</b> (камера) прямо у ворот. Фото повиснет «ждёт распознавания» — распознавание запускаешь потом с компьютера кнопкой <b>«Распознать»</b>. Несколько листов? Сначала «Добавить страницу», потом распознавай.' },
+        { h: 'C. Файл или вручную' },
+        { p: 'Прислали PDF — на экране «Приёмка УПД» жми <b>«Загрузить»</b> и перетащи файл: ИИ разберёт реквизиты и позиции за 15–30 секунд. Совсем нет документа — кнопка <b>«Вручную»</b>.' },
+      ] },
+      { icon: 'ti-progress-check', title: 'Статусы на экране «Приёмка УПД»', blocks: [
+        { ul: [
+          '<b>⏳ Ждёт распознавания</b> — файл загружен, ИИ не запускали. Действие: открыть и нажать «Распознать»',
+          '<b>📝 Черновик</b> — ИИ разобрал, ждёт твоей проверки. Действие: сверить и оприходовать',
+          '<b>✅ Оприходовано</b> — готово, склад обновлён',
+          '<b>⚠️ С отказами</b> — оприходовано, но часть позиций не принята (брак и т.п.)',
+        ] },
+        { note: '<b>Ориентир на день:</b> в конце смены в группах «Ждут распознавания» и «Черновики» — пусто. Всё привезённое за день оприходовано в тот же день.' },
+      ] },
+      { icon: 'ti-list-check', title: 'Проверка черновика — главная работа', blocks: [
+        { h: '1. Реквизиты и бумага' },
+        { p: 'Три карточки сверху: <b>Поставщик</b> (ИНН), <b>Документ</b> (№ и дата), <b>Основание</b> (договор). Сверь номер и поставщика с бумажной накладной — ИИ изредка путает цифры. Жёлтый блок «Предупреждения ИИ» — прочитай каждое.' },
+        { h: '2. Цветная точка у каждой позиции' },
+        { ul: [
+          '<b>Зелёная</b> — совпало с карточкой в базе. Проверь глазами, что это правда она',
+          '<b>Жёлтая</b> — ИИ сомневается: нажми подсказку и <b>выбери вариант сам</b>. Жёлтые как есть не оставляем',
+          '<b>Красная</b> — в базе нет: при оприходовании <b>создастся новая карточка</b>. Обязательно выбери раздел склада, иначе позиция упадёт в «Разное»',
+        ] },
+        { h: '3. Название, количество, фасовка' },
+        { ul: [
+          'Криво распознанное <b>название</b> — нажми и поправь',
+          '<b>Количество</b> = сколько пересчитал руками, а не сколько в бумаге',
+          'Позиция в упаковках? Под количеством перевод «<b>= 1000 шт (×100)</b>». Множитель кривой — нажми и исправь',
+        ] },
+        { h: '4. Колонка «Куда»' },
+        { ul: [
+          '<b>Производство</b> — склад комплектующих (по умолчанию)',
+          '<b>Готовый склад</b> — готовые изделия · <b>Инструмент</b> — расходка цеха',
+          '<b>На заказ</b> — под конкретный заказ клиента · <b>Списать сразу</b> — в расход без склада',
+          '<b>Не принять</b> — отказ с причиной: брак / не заказывали / пересортица / перебор / другое',
+        ] },
+        { p: 'Много однотипных позиций — отметь галочками: панель снизу задаст «Куда» и раздел разом. Два товара одной строкой — «Разделить позицию». Чего-то нет — «Добавить позицию вручную».' },
+      ] },
+      { icon: 'ti-checks', title: 'Оприходование и сверка', blocks: [
+        { p: 'Всё проверил — зелёная кнопка <b>«Оприходовать и закрыть УПД»</b>.' },
+        { note: '<b>После этой кнопки изменить ничего нельзя</b> — она последняя. Не успел проверить — «Сохранить черновик» и вернись позже.' },
+        { p: 'CRM покажет отчёт (сколько оприходовано, новых карточек, отказов) и карточку <b>«Сверка с заказами»</b>:' },
+        { ul: [
+          '<b>Разнесено</b> — строки легли в заказ, всё сошлось',
+          '<b>Не разнесено</b> — строка ни в один заказ не попала: разнеси кнопкой в ORD-N или спроси директора',
+          '<b>Заказ ждёт ещё</b> — привезли меньше заказанного. Это нормально: заказ «частично», остаток доприходуешь со следующей машиной',
+        ] },
+        { p: 'Ошибся — <b>«Отменить оприходование»</b>: остатки спишутся обратно, УПД вернётся в черновик.' },
+      ] },
+      { icon: 'ti-alert-triangle', title: 'Особые случаи — шпаргалка', blocks: [
+        { ul: [
+          '<b>«Похоже на дубликат»</b> — УПД уже оприходована. Второй раз не приходуем: остатки задвоятся',
+          '<b>Привезли меньше</b> — ставь факт, разницу не дотягивай: заказ сам встанет «частично»',
+          '<b>Брак</b> — «Не принять» с причиной «Брак», сфотографируй, сообщи директору',
+          '<b>Пересортица</b> — лишнее «Добавить позицию вручную», недовезённое «Не принять» с причиной',
+          '<b>Товар без документов</b> — прими физически, оформи «Вручную», предупреди директора',
+          '<b>«Ошибка ИИ»</b> — «Попробовать ещё раз», не помогло — заведи «Вручную»',
+          '<b>В приёмке заказа плашка «оприходовано по УПД №…»</b> — оставь «Уже на складе»: позиция закроется без второго прихода',
+        ] },
+        { note: '<b>Золотое правило:</b> сомневаешься — не жми зелёную кнопку. Черновик подождёт, а кривые остатки расхлёбывает всё производство. Вопросы директору — это нормально.' },
+      ] },
+    ],
+    checklist: [
+      { t: 'Прочитал все главы курса', s: 'Понял, чем УПД отличается от счёта на оплату' },
+      { t: 'Посмотрел, как приходует наставник', s: 'Одна приёмка от начала до конца: точки, количество, «Куда», зелёная кнопка, сверка' },
+      { t: 'Сфотографировал накладную с телефона', s: 'Кнопка «УПД» у ворот → на компе нажал «Распознать»' },
+      { t: 'Оприходовал 2–3 УПД под присмотром', s: 'Наставник проверяет перед нажатием зелёной кнопки' },
+      { t: 'Разобрал один сложный случай', s: 'Жёлтая точка, красная точка или отказ — сам, с проверкой после' },
+      { t: 'Сдал тест на 10+ из 12', s: 'После этого принимаешь самостоятельно' },
+    ],
+    quiz: [
+      { q: 'Какими путями УПД попадает в CRM?',
+        o: ['Только вручную — все позиции набиваются руками',
+            'Из 1С-ЭДО автоматически, фото с телефона, загрузка файла или вручную',
+            'Только по электронной почте от поставщика'],
+        a: 1, why: 'Три пути: «Поступления по ЭДО» (авто), фото кнопкой «УПД», загрузка PDF/фото или ручной ввод.' },
+      { q: 'Из ЭДО прилетел документ с чипом «🧾 счёт на оплату». Твои действия?',
+        o: ['Оприходовать на склад, как обычную УПД',
+            'Удалить — счета нам не нужны',
+            'Отправить кнопкой «На согласование» директору — на склад счёт не приходуется'],
+        a: 2, why: 'Счета на оплату идут директору на согласование. На склад попадают только УПД.' },
+      { q: 'Сфотографировал накладную с телефона у ворот. Что дальше?',
+        o: ['Ничего — фото само распознается и оприходуется',
+            'С компьютера открыть документ и нажать «Распознать», потом проверить черновик',
+            'Фото нужно ещё раз загрузить кнопкой «Загрузить»'],
+        a: 1, why: 'Фото висит «ждёт распознавания» — распознавание запускаешь с компа кнопкой «Распознать».' },
+      { q: 'У позиции жёлтая точка и подсказка «? 2 варианта». Что делаешь?',
+        o: ['Оставляю как есть — ИИ сам разберётся при оприходовании',
+            'Нажимаю подсказку и сам выбираю правильный вариант из базы',
+            'Удаляю позицию из черновика'],
+        a: 1, why: 'Жёлтая точка = ИИ сомневается. Выбор всегда за тобой, жёлтые строки как есть не оставляем.' },
+      { q: 'У позиции красная точка — «нет в базе». Что произойдёт и что проверить?',
+        o: ['Позиция не оприходуется вообще',
+            'Создастся новая карточка на складе — надо выбрать ей правильный раздел, иначе упадёт в «Разное»',
+            'CRM откажется закрывать УПД, пока директор не добавит карточку'],
+        a: 1, why: 'Красная = создастся новая карточка. Твоя задача — выбрать раздел склада в выпадашке.' },
+      { q: 'В бумаге 10 коробок, под количеством написано «= 1000 шт (×100)». Что это значит?',
+        o: ['Это цена: 1000 рублей за 100 штук',
+            'Позиция считается упаковками, на склад ляжет 1000 штук; множитель фасовки можно поправить, если распознался криво',
+            'Это внутренний код позиции, трогать нельзя'],
+        a: 1, why: 'Перевод упаковок в штуки: 10 упак × 100 шт. Клик по переводу правит фасовку.' },
+      { q: 'Заказывали 20 штук, привезли 14. Какое количество ставишь в приёмке?',
+        o: ['20 — как в заказе, чтобы заказ закрылся',
+            '14 — сколько реально пересчитал; заказ сам станет «частично» и дождётся остатка',
+            '0 — пока не привезут всё'],
+        a: 1, why: 'Количество = факт. Недовоз CRM отработает сама: заказ «частично», остаток доприходуешь потом.' },
+      { q: 'Привезли товар с явным браком. Твои действия в приёмке?',
+        o: ['«Куда» → «Не принять», причина «Брак»; сфотографировать и сообщить директору',
+            'Принять на склад, а брак выкинуть',
+            '«Куда» → «Списать сразу»'],
+        a: 0, why: 'Брак не принимаем: отказ с причиной «Брак» + фото + сообщить директору.' },
+      { q: 'Что происходит после кнопки «Оприходовать и закрыть УПД»?',
+        o: ['Ничего страшного — черновик можно продолжать править',
+            'Изменить уже нельзя; остатки выросли, заказ сверился. Откат — только «Отменить оприходование»',
+            'УПД уходит директору на подпись'],
+        a: 1, why: 'Зелёная кнопка — точка невозврата: склад обновлён. Ошибся — «Отменить оприходование».' },
+      { q: 'Открыл черновик, а сверху красный блок «Похоже на дубликат». Что делаешь?',
+        o: ['Приходую — лишний запас не помешает',
+            'Не приходую второй раз: сверяю с уже оприходованной приёмкой, дубликат удаляю; сомневаюсь — спрашиваю директора',
+            'Меняю номер УПД, чтобы предупреждение исчезло'],
+        a: 1, why: 'Дубликат = остатки задвоятся. Второй раз не приходуем никогда.' },
+      { q: 'После оприходования в «Сверке с заказами» строка попала в «Не разнесено». Что это значит?',
+        o: ['Строка УПД не легла ни в один заказ — надо разнести её в заказ ORD-N или разобраться, чей это товар',
+            'Строка не оприходовалась на склад',
+            'Это просто информация, делать ничего не нужно'],
+        a: 0, why: 'Товар на склад лёг, но заказ о нём не узнал и будет висеть «ждём поставки». Разнеси или спроси.' },
+      { q: 'Принимаешь заказ списком, у строки плашка «📄 оприходовано по УПД №…». Что ставишь?',
+        o: ['«На склад» — пусть оприходуется ещё раз для надёжности',
+            '«Уже на складе» — товар лёг через УПД, позиция закроется без второго прихода',
+            'Отказ — раз уже оприходовано, принимать нельзя'],
+        a: 1, why: '«Уже на складе» закрывает позицию заказа, не двигая остаток.' },
+    ],
+  },
+];
+
+state._training = { courseId: null, quiz: null, results: {} };
+
+// Чистый подсчёт балла — отдельно, чтобы гонять тестами
+function _trScore(questions, answers) {
+  let s = 0;
+  questions.forEach((qq, i) => { if (answers[i] === qq.a) s++; });
+  return s;
+}
+
+function _trBlocksHtml(blocks) {
+  let h = '';
+  (blocks || []).forEach(b => {
+    if (b.p)    h += '<p>' + b.p + '</p>';
+    if (b.h)    h += '<h4 class="help-h">' + escapeHtml(b.h) + '</h4>';
+    if (b.ol)   h += '<ol class="help-ol">' + b.ol.map(x => '<li>' + x + '</li>').join('') + '</ol>';
+    if (b.ul)   h += '<ul class="help-ul">' + b.ul.map(x => '<li>' + x + '</li>').join('') + '</ul>';
+    if (b.note) h += '<div class="help-note"><i class="ti ti-info-circle"></i><div>' + b.note + '</div></div>';
+  });
+  return h;
+}
+
+async function loadHelpTraining() {
+  const body = document.getElementById('help-training-body');
+  if (!body) return;
+  state._training.courseId = null;
+  state._training.quiz = null;
+  let html = '<div style="font-size:13px;color:var(--text-light);margin:-6px 0 14px;">' +
+    'Курсы по работе в CRM: читаешь главы, проходишь стажировку по чек-листу, сдаёшь тест. ' +
+    'Результат теста видит директор.</div>';
+  for (const c of TRAINING_COURSES) {
+    let res = null;
+    try { res = await apiGet('/api/training/results?course_id=' + c.id); } catch (e) {}
+    state._training.results[c.id] = res || {};
+    const mine = (res && res.mine) || [];
+    const best = mine.reduce((m, r) => (!m || r.score > m.score) ? r : m, null);
+    const total = c.quiz.length;
+    let chip;
+    if (best && best.passed) chip = '<span class="tr-chip pass"><i class="ti ti-rosette-discount-check"></i> сдано · ' + best.score + '/' + total + '</span>';
+    else if (best) chip = '<span class="tr-chip fail">лучшая попытка ' + best.score + '/' + total + ' · нужно ' + c.pass + '</span>';
+    else chip = '<span class="tr-chip new">тест ещё не сдавался</span>';
+    html += '<div class="tr-course" onclick="openTrainingCourse(\'' + c.id + '\')">' +
+      '<div class="tr-course-icon"><i class="ti ' + c.icon + '"></i></div>' +
+      '<div class="tr-course-body">' +
+        '<div class="tr-course-title">' + escapeHtml(c.title) + '</div>' +
+        '<div class="tr-course-sum">' + escapeHtml(c.summary) + '</div>' +
+        '<div class="tr-course-meta">' + c.chapters.length + ' глав · тест из ' + total + ' вопросов · сдача от ' + c.pass + ' &nbsp;' + chip + '</div>' +
+      '</div>' +
+      '<i class="ti ti-chevron-right" style="color:var(--text-light);"></i>' +
+    '</div>';
+    // Сводка по команде — приезжает только директору/заму
+    const team = res && res.team;
+    if (team && team.length) {
+      html += '<div class="tr-team"><div class="tr-team-title"><i class="ti ti-users"></i> Кто сдавал «' + escapeHtml(c.title) + '»</div>';
+      team.forEach(r => {
+        const ok = !!r.passed;
+        html += '<div class="tr-team-row">' +
+          '<span class="tr-team-st ' + (ok ? 'ok' : 'no') + '">' + (ok ? '✓ сдал' : '✗ пока нет') + '</span>' +
+          '<span class="tr-team-name">' + escapeHtml(r.employee_name || ('#' + r.chat_id)) + '</span>' +
+          '<span class="tr-team-score">' + r.best_score + '/' + r.total + '</span>' +
+          '<span class="tr-team-meta">' + r.attempts + ' ' + _plural(r.attempts, 'попытка', 'попытки', 'попыток') +
+            (r.last_at ? ' · ' + siFmtDate(r.last_at) : '') + '</span>' +
+        '</div>';
+      });
+      html += '</div>';
+    }
+  }
+  body.innerHTML = html;
+}
+
+function openTrainingCourse(courseId) {
+  const c = TRAINING_COURSES.find(x => x.id === courseId);
+  const body = document.getElementById('help-training-body');
+  if (!c || !body) return;
+  state._training.courseId = courseId;
+  state._training.quiz = null;
+  let html = '<button class="btn" onclick="loadHelpTraining()" style="margin-bottom:12px;"><i class="ti ti-arrow-left"></i> К курсам</button>';
+  html += '<h2 style="margin:0 0 4px;font-size:21px;">' + escapeHtml(c.title) + '</h2>';
+  html += '<div style="font-size:13.5px;color:var(--text-light);margin-bottom:14px;">' + escapeHtml(c.summary) + '</div>';
+  // Главы — раскрывашки
+  c.chapters.forEach((ch, i) => {
+    html += '<details class="tr-ch"' + (i === 0 ? ' open' : '') + '>' +
+      '<summary><span class="tr-ch-n">' + (i + 1) + '</span><i class="ti ' + ch.icon + '"></i>' + escapeHtml(ch.title) +
+        '<i class="ti ti-chevron-down tr-ch-arrow"></i></summary>' +
+      '<div class="tr-ch-body help-article-body">' + _trBlocksHtml(ch.blocks) + '</div>' +
+    '</details>';
+  });
+  // Чек-лист стажировки
+  if (c.checklist && c.checklist.length) {
+    html += '<h3 style="margin:20px 0 8px;font-size:16px;"><i class="ti ti-clipboard-check"></i> Чек-лист стажировки</h3>';
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('trCk_' + c.id) || '{}') || {}; } catch (e) {}
+    c.checklist.forEach((ck, i) => {
+      html += '<label class="tr-check' + (saved[i] ? ' done' : '') + '">' +
+        '<input type="checkbox"' + (saved[i] ? ' checked' : '') + ' onchange="trToggleCheck(\'' + c.id + '\',' + i + ',this.checked)">' +
+        '<span><b>' + escapeHtml(ck.t) + '</b><em>' + escapeHtml(ck.s) + '</em></span>' +
+      '</label>';
+    });
+  }
+  // Экзамен
+  html += '<h3 style="margin:20px 0 8px;font-size:16px;"><i class="ti ti-certificate"></i> Экзамен</h3>';
+  html += '<div id="tr-quiz" class="tr-quiz"></div>';
+  body.innerHTML = html;
+  trQuizIntro();
+}
+
+function trToggleCheck(courseId, idx, checked) {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('trCk_' + courseId) || '{}') || {}; } catch (e) {}
+  saved[idx] = !!checked;
+  try { localStorage.setItem('trCk_' + courseId, JSON.stringify(saved)); } catch (e) {}
+  const el = event && event.target && event.target.closest('.tr-check');
+  if (el) el.classList.toggle('done', !!checked);
+}
+
+function _trCourse() {
+  return TRAINING_COURSES.find(x => x.id === state._training.courseId);
+}
+
+function trQuizIntro() {
+  const c = _trCourse();
+  const box = document.getElementById('tr-quiz');
+  if (!c || !box) return;
+  const res = state._training.results[c.id] || {};
+  const mine = res.mine || [];
+  const best = mine.reduce((m, r) => (!m || r.score > m.score) ? r : m, null);
+  let h = '<div style="font-size:14px;color:var(--text-mid);margin-bottom:10px;">' +
+    c.quiz.length + ' вопросов по курсу, по одному, назад нельзя. Сдача — <b>' + c.pass + ' и больше</b>. ' +
+    'Результат сохранится, директор увидит, что тест сдан.</div>';
+  h += '<button class="btn btn-primary" onclick="trStartQuiz()"><i class="ti ti-player-play"></i> Начать тест</button>';
+  if (best) h += '<div style="font-size:13px;color:var(--text-light);margin-top:10px;">Лучший результат: <b>' + best.score + ' из ' + c.quiz.length + '</b>' + (best.passed ? ' · сдано ✓' : '') + '</div>';
+  box.innerHTML = h;
+}
+
+function trStartQuiz() {
+  state._training.quiz = { i: 0, answers: [] };
+  trQuizRender();
+}
+
+function trQuizProgress(c, qz, doneMap) {
+  let h = '<div class="tr-qprog">';
+  for (let k = 0; k < c.quiz.length; k++) {
+    let cls = '';
+    if (doneMap) cls = (qz.answers[k] === c.quiz[k].a) ? 'hit' : 'miss';
+    else if (k < qz.i) cls = 'seen';
+    else if (k === qz.i) cls = 'on';
+    h += '<i class="' + cls + '"></i>';
+  }
+  return h + '</div>';
+}
+
+function trQuizRender() {
+  const c = _trCourse();
+  const qz = state._training.quiz;
+  const box = document.getElementById('tr-quiz');
+  if (!c || !qz || !box) return;
+  const Q = c.quiz[qz.i];
+  let h = trQuizProgress(c, qz, false);
+  h += '<div class="tr-qnum">Вопрос ' + (qz.i + 1) + ' из ' + c.quiz.length + '</div>';
+  h += '<div class="tr-qtext">' + escapeHtml(Q.q) + '</div>';
+  Q.o.forEach((opt, idx) => {
+    h += '<button class="tr-qopt" onclick="trAnswer(' + idx + ')">' + escapeHtml(opt) + '</button>';
+  });
+  box.innerHTML = h;
+  box.scrollIntoView({ block: 'nearest' });
+}
+
+function trAnswer(idx) {
+  const c = _trCourse();
+  const qz = state._training.quiz;
+  if (!c || !qz) return;
+  qz.answers[qz.i] = idx;
+  qz.i++;
+  if (qz.i >= c.quiz.length) trFinishQuiz(); else trQuizRender();
+}
+
+async function trFinishQuiz() {
+  const c = _trCourse();
+  const qz = state._training.quiz;
+  const box = document.getElementById('tr-quiz');
+  if (!c || !qz || !box) return;
+  const score = _trScore(c.quiz, qz.answers);
+  const passed = score >= c.pass;
+  // Балл — на сервер: «сдано» подтверждает бэкенд, директору уходит пуш
+  let saved = false;
+  try {
+    const r = await apiPost('/api/training/results', { course_id: c.id, score: score });
+    saved = !!(r && (r.ok || (r.data && r.data.ok)));
+  } catch (e) {}
+  let h = trQuizProgress(c, qz, true);
+  h += '<div style="text-align:center;padding:6px 0;">' +
+    '<div class="tr-resbig">' + score + ' / ' + c.quiz.length + '</div>' +
+    '<div class="tr-verdict ' + (passed ? 'pass' : 'fail') + '">' +
+      (passed ? 'Сдано — допуск к самостоятельной работе' : 'Пока не сдано — нужно ' + c.pass + ' и больше') + '</div>' +
+    '<div style="font-size:13px;color:var(--text-light);">' +
+      (saved ? 'Результат записан, директор увидит его в этом разделе' : 'Не удалось сохранить результат — проверь связь и пройди ещё раз') +
+    '</div></div>';
+  const wrong = [];
+  c.quiz.forEach((Q, k) => { if (qz.answers[k] !== Q.a) wrong.push({ k: k, Q: Q, given: qz.answers[k] }); });
+  if (wrong.length) {
+    h += '<h4 style="margin:14px 0 6px;">Разбор ошибок · ' + wrong.length + '</h4>';
+    wrong.forEach(w => {
+      h += '<div class="tr-review"><b>' + (w.k + 1) + '. ' + escapeHtml(w.Q.q) + '</b>' +
+        '<div>Твой ответ: ' + escapeHtml(w.Q.o[w.given] || '—') + '</div>' +
+        '<div><b>Правильно:</b> ' + escapeHtml(w.Q.o[w.Q.a]) + '</div>' +
+        '<div style="color:var(--text-mid);">' + escapeHtml(w.Q.why) + '</div></div>';
+    });
+  }
+  h += '<div style="display:flex;gap:8px;margin-top:14px;">' +
+    '<button class="btn" onclick="trQuizIntro()">К началу</button>' +
+    '<button class="btn btn-primary" onclick="trStartQuiz()"><i class="ti ti-refresh"></i> Пройти ещё раз</button></div>';
+  box.innerHTML = h;
+  // Обновить лучший результат в состоянии
+  try {
+    state._training.results[c.id] = await apiGet('/api/training/results?course_id=' + c.id);
+  } catch (e) {}
+}
+
 // FAQ
 function loadHelpFaq() {
   const container = document.getElementById('help-faq-body');
