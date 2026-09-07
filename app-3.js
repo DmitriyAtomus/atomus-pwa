@@ -11194,6 +11194,58 @@ function renderSupplyShopping(d) {
       '</tr>';
     }).join('');
 
+    // v2.46.143: «почему покупаем» — по-человечески, с цифрами.
+    // Раньше было сухое «остаток / мин: 14 / 15» — директор просил расписать.
+    function sv2WhyHtml(it) {
+      const own = Number(it.qty_on_stock || 0);
+      const v = Number(it.variants_stock || 0);
+      const a = Number(it.assm_stock || 0);
+      const eff = it.effective_stock != null ? Number(it.effective_stock) : own;
+      const min = Number(it.min_stock || 0);
+      const plan = Number(it.shortage_plan || 0);
+      const rec = Number(it.recommended_qty || 0);
+      const reorder = Number(it.reorder_qty || 0);
+      const pack = Number(it.purchase_pack || 0);
+      const unit = it.unit || 'шт';
+      const needLow = Math.max(0, min - eff);
+      const parts = [];
+      let stock = 'На складе <b>' + eff + ' ' + escapeHtml(unit) + '</b>';
+      if (v > 0 || a > 0) {
+        const br = ['свои ' + own];
+        if (v > 0) br.push('варианты ' + v);
+        if (a > 0) br.push('в готовых сборках ' + a);
+        stock += ' <span class="m">(' + br.join(' + ') + ')</span>';
+      }
+      if (min > 0 && needLow > 0) {
+        parts.push(stock + ', а неснижаемый минимум — <b>' + min + '</b>: не хватает <b>' + needLow + '</b>.');
+      } else {
+        parts.push(stock + '.');
+      }
+      if (plan > 0) {
+        const pc = (Array.isArray(it.plan_contracts) ? it.plan_contracts : []).slice(0, 3).map(n => '№' + n).join(', ');
+        parts.push('Под ' + (pc ? 'договоры ' + escapeHtml(pc) : 'план производства') +
+          ' не хватает ещё <b>' + Math.ceil(plan) + '</b>.');
+      }
+      if (rec > 0) {
+        let why = '';
+        if (plan > 0 && Math.ceil(plan) >= rec) why = 'закрывает дефицит под план';
+        else if (reorder > 0 && rec === Math.ceil(reorder)) why = 'фиксированная партия из карточки позиции';
+        else if (pack > 0) why = 'дефицит, округлён до упаковки по ' + pack;
+        else if (rec === needLow) why = 'ровно дефицит до минимума';
+        const after = eff + rec;
+        parts.push('<span class="ok">→ к заказу <b>' + rec + ' ' + escapeHtml(unit) + '</b>' +
+          (why ? ' — ' + why : '') + '. После прихода: <b>' + after + '</b>' +
+          (min > 0 ? (after >= min ? ' — запас восстановлен ✓' : ' — всё ещё ниже минимума ⚠') : '') + '</span>');
+      }
+      let bar = '';
+      if (min > 0) {
+        const p = Math.max(4, Math.min(100, Math.round(eff / min * 100)));
+        const cls = eff <= min * 0.5 ? 'crit' : (eff <= min ? 'warn' : 'okb');
+        bar = '<div class="sv2-bar ' + cls + '" title="остаток к минимуму"><i style="width:' + p + '%"></i></div>';
+      }
+      return '<div class="sv2-why">' + bar + '<div class="sv2-why-t">' + parts.join(' ') + '</div></div>';
+    }
+
     // v2.45.442 (редизайн Снабжения, под переключателем): позиции карточками sv2 + степпер
     const itemCardsV2 = (g.items || []).map(it => {
       const crit = it.is_critical ? '<i class="ti ti-alert-triangle" style="color:#DC2626;font-size:13px;margin-right:4px;" title="критичный компонент"></i>' : '';
@@ -11212,23 +11264,12 @@ function renderSupplyShopping(d) {
       // v2.45.7xx: показываем ЭФФЕКТИВНЫЙ остаток (своё + варианты + в свободных
       // собранных узлах на складе), а не только собственный. Если есть варианты
       // или узлы — даём разбивку, чтобы было понятно, откуда наличие.
-      const _own = Number(it.qty_on_stock || 0);
-      const _v = Number(it.variants_stock || 0);
-      const _a = Number(it.assm_stock || 0);
-      const _eff = (it.effective_stock != null ? Number(it.effective_stock) : _own);
-      let _brk = '';
-      if (_v > 0 || _a > 0) {
-        const _p = ['своё ' + _own];
-        if (_v > 0) _p.push('вариантов ' + _v);
-        if (_a > 0) _p.push('в сборках ' + _a);
-        _brk = ' <span style="color:var(--text-light);font-weight:400;font-size:11px;">(' + _p.join(', ') + ')</span>';
-      }
       return '<div class="sv2-item">' +
         '<div class="sv2-item-top">' +
           '<div class="sv2-item-body" onclick="openComponentDetail(' + it.component_id + ')">' +
             '<div class="sv2-item-name">' + crit + escapeHtml(it.component_name || '') +
               (it.sku ? ' <span class="sv2-sku">' + escapeHtml(it.sku) + '</span>' : '') + '</div>' +
-            '<div class="sv2-item-stock">остаток / мин: <b>' + escapeHtml(String(_eff)) + ' / ' + escapeHtml(String(it.min_stock)) + '</b>' + _brk + '</div>' +
+            sv2WhyHtml(it) +
           '</div>' +
           '<button class="sv2-item-x" title="Приход на склад (оприходовать)" style="color:#15803D;" onclick="event.stopPropagation();openComponentReceiveModal(' + it.component_id + ')"><i class="ti ti-package-import"></i></button>' +
           '<button class="sv2-item-x" title="Убрать из заказа" onclick="event.stopPropagation();shopHideItem(' + it.component_id + ',' + sName + ')"><i class="ti ti-x"></i></button>' +

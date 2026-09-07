@@ -21429,6 +21429,18 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   margin: 16px 0 8px; display: flex; align-items: center; gap: 7px; }
 .tasks-group-title.done { color: var(--success); }
 .tasks-group-title span { background: var(--bg); border-radius: 9px; padding: 0 8px; color: var(--text-light); }
+/* v2.46.143: «почему покупаем» в карточке закупки */
+.sv2-why { margin-top: 5px; }
+.sv2-bar { position: relative; height: 5px; border-radius: 3px; background: var(--bg); overflow: hidden; margin-bottom: 5px; max-width: 340px; border: 1px solid var(--border); }
+.sv2-bar i { display: block; height: 100%; border-radius: 3px; }
+.sv2-bar.crit i { background: var(--danger); }
+.sv2-bar.warn i { background: var(--warning); }
+.sv2-bar.okb i { background: var(--success); }
+.sv2-why-t { font-size: 12px; color: var(--text-mid); line-height: 1.55; }
+.sv2-why-t b { color: var(--text-dark); }
+.sv2-why-t .m { color: var(--text-light); font-size: 11px; }
+.sv2-why-t .ok { display: block; margin-top: 2px; color: var(--success); }
+.sv2-why-t .ok b { color: var(--success); }
 .task-meta-comments { opacity: .85; }
 .task-files-t { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: #64748B; margin-bottom: 7px; display: flex; align-items: center; gap: 6px; }
 .task-files-t .cnt { background: #E2E8F0; border-radius: 999px; padding: 1px 7px; font-size: 10.5px; }
