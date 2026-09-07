@@ -9152,7 +9152,11 @@ function _dellinOrderCard(sh, configured) {
         '<button class="btn btn-secondary btn-small" onclick="dellinSetStatus(' + sh.id + ')"><i class="ti ti-edit"></i> Статус</button>') +
       '<button class="dl-hide" onclick="dellinRemove(' + sh.id + ')" title="Скрыть из CRM"><i class="ti ti-eye-off"></i></button>' +
     '</div>' +
-    (canBill ? '<div class="dl-doc" id="dl-doc-' + sh.id + '" data-open="0" style="display:none;"></div>' : '') +
+    (canBill ? '<div class="dl-doc" id="dl-doc-' + sh.id + '" data-open="0"' +
+      ' data-payer-ours="' + (sh.payer_is_ours ? '1' : '0') + '"' +
+      ' data-docs-ready="' + (sh.docs_ready ? '1' : '0') + '"' +
+      ' data-payer-name="' + escapeHtml(String(sh.payer_name || '')) + '"' +
+      ' style="display:none;"></div>' : '') +
   '</div>';
   return h;
 }
@@ -9165,6 +9169,20 @@ const DELLIN_DOC_MODES = [
   { mode: 'invoice', label: 'Счёт-фактура',  icon: 'ti-file-text' },
   { mode: 'order',   label: 'Накладная',     icon: 'ti-file-description' },
 ];
+
+// Почему форма недоступна — пусто, если её можно запрашивать.
+// Правила ДЛ: счёт-фактура выдаётся только плательщику по накладной, а любые
+// формы появляются лишь после закрытия заказа (пока груз едет — их нет).
+function _dellinDocBlockReason(mode, payerOurs, docsReady, payerName) {
+  if (!docsReady) {
+    return 'Документы появятся, когда ДЛ закроют заказ и выдадут груз получателю.';
+  }
+  if (mode === 'invoice' && !payerOurs) {
+    return 'Счёт-фактуру ДЛ отдают только плательщику по накладной, а платит ' +
+      (payerName || 'другая сторона') + '.';
+  }
+  return '';
+}
 
 function _dellinDocClose(cont) {
   const node = cont.querySelector('[data-blob-url]');
@@ -9185,15 +9203,37 @@ async function dellinDoc(id, mode) {
     if (btn) btn.innerHTML = '<i class="ti ti-file-invoice"></i> Счёт';
     return;
   }
+  const payerOurs = cont.dataset.payerOurs !== '0';
+  const docsReady = cont.dataset.docsReady !== '0';
+  const payerName = cont.dataset.payerName || '';
+  const blocked = _dellinDocBlockReason(mode, payerOurs, docsReady, payerName);
   _dellinDocClose(cont);
   cont.style.display = 'block';
   cont.dataset.open = '1';
   cont.dataset.mode = mode;
   cont.innerHTML = '<div style="padding:14px;color:var(--text-light);text-align:center;font-size:13px;">Запрашиваем в кабинете ДЛ…</div>';
   if (btn && mode === 'bill') btn.innerHTML = '<i class="ti ti-eye-off"></i> Скрыть';
-  const tabs = DELLIN_DOC_MODES.map(m =>
-    '<button class="btn ' + (m.mode === mode ? 'btn-primary' : 'btn-secondary') + ' btn-small" onclick="dellinDoc(' + id + ',\'' + m.mode + '\')"><i class="ti ' + m.icon + '"></i> ' + m.label + '</button>'
-  ).join('');
+  const tabs = DELLIN_DOC_MODES.map(m => {
+    const why = _dellinDocBlockReason(m.mode, payerOurs, docsReady, payerName);
+    const cls = m.mode === mode ? 'btn-primary' : 'btn-secondary';
+    if (why) {
+      return '<button class="btn ' + cls + ' btn-small" disabled title="' +
+        escapeHtml(why) + '" style="opacity:.45;cursor:not-allowed;"><i class="ti ' +
+        m.icon + '"></i> ' + m.label + '</button>';
+    }
+    return '<button class="btn ' + cls + ' btn-small" onclick="dellinDoc(' + id + ',\'' + m.mode + '\')"><i class="ti ' + m.icon + '"></i> ' + m.label + '</button>';
+  }).join('');
+  // Заведомо недоступную форму не спрашиваем у ДЛ: они на всё отвечают
+  // одинаковым «накладная не найдена», и получалась красная ошибка на пустом
+  // месте. Объясняем причину сразу.
+  if (blocked) {
+    cont.innerHTML =
+      '<div class="dl-doc-tabs">' + tabs + '</div>' +
+      '<div style="padding:12px 14px;color:var(--text-mid);font-size:13px;line-height:1.5;">' +
+        '<i class="ti ti-info-circle"></i> ' + escapeHtml(blocked) +
+      '</div>';
+    return;
+  }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/logistics/dellin/' + id + '/printable?mode=' + mode, {
