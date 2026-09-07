@@ -39,6 +39,8 @@ test('«Стоп» уходит на сервер и не молчит при о
   assert.match(fn.slice(0, 900), /apiPost\(_devChatApi\('\/stop'\)/);
   // сервер выбирает текущую задачу, но только внутри открытого чата
   assert.match(fn.slice(0, 900), /thread_id: _devChatThreadId \|\| 0/);
+  assert.match(fn.slice(0, 900), /msg_id: _devChatActiveTaskId \|\| 0/,
+    'кнопка должна останавливать точную работающую задачу, а не последнюю в очереди');
   assert.match(fn.slice(0, 900), /showToast\(/);
   // статусы «останавливаю»/«остановлено» должны быть известны ленте
   assert.match(app, /stopping: \{ text: 'останавливаю…'/);
@@ -46,6 +48,13 @@ test('«Стоп» уходит на сервер и не молчит при о
   const open = app.slice(app.indexOf('function _devChatOpen'));
   assert.match(open.slice(0, 300), /status === 'stopping'/,
     'пока агент не подтвердил остановку, за задачей надо следить');
+});
+
+test('активная задача выбирается раньше очередной и таймер идёт от run_at', () => {
+  const fn = app.slice(app.indexOf('async function _devChatRefreshStatuses'));
+  assert.match(fn.slice(0, 2600), /runningId \|\| stoppingId \|\| queuedId/);
+  assert.match(fn.slice(0, 2600), /m\.run_at \|\| m\.ts/);
+  assert.match(app, /data-stop-task/);
 });
 
 test('вместо трёх точек — карточка работы с таймером и двумя кнопками', () => {
