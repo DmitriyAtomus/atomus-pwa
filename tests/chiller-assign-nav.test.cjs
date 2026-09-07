@@ -53,10 +53,11 @@ test('категория узла резолвится по именам раз�
   assert.deepEqual(asgResolveCat({}), { sec: null, sub: null });
 });
 
-test('у каждого из 24 узлов схемы задана категория', () => {
+test('у каждого узла схемы задана категория', () => {
   const nodes = slice('const SCH_NODES=[', 'const SCH_DESC={');
   const keys = nodes.match(/\{k:'(\w+)'/g).map((m) => m.slice(4, -1));
-  assert.equal(keys.length, 24);
+  // v2.46.148: узлов было 24, Клава добавила байпас и клапаны Шрадера — держим нижнюю планку
+  assert.ok(keys.length >= 24, 'узлов меньше 24: ' + keys.length);
   for (const k of keys) {
     const row = nodes.slice(nodes.indexOf("{k:'" + k + "'"));
     assert.match(row.slice(0, 200), / cat:\[/, 'нет категории у узла ' + k);

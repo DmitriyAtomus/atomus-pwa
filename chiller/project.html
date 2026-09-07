@@ -421,6 +421,22 @@ svg g.sn.dim{opacity:.22}
 #schTip .st2.wt{color:#C9A227;border:1px solid #5c4a1a}
 #schTip .d{font-size:11.5px;color:var(--dim);line-height:1.5}
 #schTip .h{font-size:10px;color:var(--faint);margin-top:6px;border-top:1px solid var(--line);padding-top:5px}
+/* v2.46.148: отчёт «Обвязать по схеме» */
+#bindRep{position:fixed;inset:0;z-index:80;background:rgba(4,10,20,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+#bindRep .br-in{width:min(560px,94vw);max-height:84vh;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+#bindRep .br-h{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+#bindRep .br-h b{font-size:14px}
+#bindRep .br-h span{font-size:11px;color:var(--dim)}
+#bindRep .br-h i{margin-left:auto;font-style:normal;cursor:pointer;color:var(--faint);padding:2px 8px}
+#bindRep .br-h i:hover{color:var(--txt)}
+#bindRep .br-row{display:flex;gap:10px;align-items:flex-start;padding:8px 16px;border-bottom:1px solid var(--line);font-size:12px}
+#bindRep .br-row em{font-style:normal;font-weight:800;width:14px;flex:none}
+#bindRep .br-row.ok em{color:var(--green)}
+#bindRep .br-row.wa em{color:var(--dim)}
+#bindRep .br-row.no em{color:#e8907f}
+#bindRep .br-row b{display:block;font-size:12.5px}
+#bindRep .br-row small{color:var(--dim);line-height:1.45}
+#bindRep .br-f{padding:10px 16px 14px;font-size:11px;color:var(--faint);line-height:1.5}
 svg g.sn{cursor:pointer}
 svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 /* v2.45.1017: вкладка «Схема» — заводской лист АГ.ЧИЛ-104 Г3 (бумага, объёмные элементы) */
@@ -1520,6 +1536,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
       <div class="acts">
         <div class="btn" id="bAuto">✦ Расставить по функциям</div>
         <div class="btn" id="bFromSch">⤓ Собрать по схеме</div>
+        <div class="btn" id="bBind">⚡ Обвязать по схеме</div>
         <div class="btn pri" id="bBom">→ BOM · чертёж сборки</div>
         <div class="btn ghost" id="bClear">Очистить сцену</div>
       </div>
@@ -8312,6 +8329,131 @@ async function pullPick(it,zi){
   await pullRun(a,b);
 }
 
+/* ═══ v2.46.148: «⚡ Обвязать по схеме» — магистрали тянутся сами ═══
+   Формула Дмитрия: «выбрали схему, корпус, комплектующие — и чтобы всё чётко
+   обвязалось по размерам, а потом дало спецификацию». Рёбра листа АГ.ЧИЛ-104
+   зашиты парами узлов; для каждого ребра берём детали сцены (p.sch — связь
+   конвейера назначения), выбираем патрубки — по имени линии и по геометрии
+   (ось патрубка должна смотреть в сторону второй детали) — и зовём ту же
+   протяжку, что работает вручную: прямая/Г/Z-трасса, автопереходники, метраж
+   в спецификацию. Что не легло — не молчит: в отчёте причина по каждой линии.
+   Узлы «вне листа» (зимний комплект) и капилляры автоматики (SAE) в обвязку
+   не входят — им штатная врезка и капилляр. */
+const SCH_EDGES=[
+  {a:'KM1', b:'AVO1',t:'нагнетание', pa:/нагнет|dis|горяч/i,    pb:/вход|газ|нагнет/i},
+  {a:'AVO1',b:'RS1', t:'жидкость',   pa:/жидк|выход|liq/i,      pb:/вход|жидк/i},
+  {a:'RS1', b:'F1',  t:'жидкость',   pa:/выход|жидк/i,          pb:/вход/i},
+  {a:'F1',  b:'SI1', t:'жидкость',   pa:/выход/i,               pb:/вход/i},
+  {a:'SI1', b:'UA1', t:'жидкость',   pa:/выход/i,               pb:/вход/i},
+  {a:'UA1', b:'TRV1',t:'жидкость',   pa:/выход/i,               pb:/вход|жидк/i},
+  {a:'TRV1',b:'I1',  t:'жидкость',   pa:/выход/i,               pb:/фреон|хлад|вход/i},
+  {a:'I1',  b:'OZH1',t:'всасывание', pa:/пар|газ|выход|фреон/i, pb:/вход/i},
+  {a:'OZH1',b:'KM1', t:'всасывание', pa:/выход|всас/i,          pb:/всас|suc/i},
+  {a:'AB1', b:'N1',  t:'вода',       pa:/выход|подач/i,         pb:/вход|всас/i},
+  {a:'N1',  b:'I1',  t:'вода',       pa:/выход|напор/i,         pb:/вода|гликол|вход/i},
+  {a:'I1',  b:'AB1', t:'вода',       pa:/вода|гликол|выход/i,   pb:/вход|обрат/i},
+];
+const schNodeT=k=>{const n=SCH_NODES.find(x=>x.k===k);return n?(n.t+' '+n.n):k;};
+function bindItemOf(k){
+  return placed.find(p=>p.sch===k)
+    ||((schemaData[k]&&schemaData[k].id)?placed.find(p=>p.id===schemaData[k].id):null)||null;
+}
+const bindZoneTaken=(it,zi)=>placed.some(p=>p.link&&p.link.mount==='rot'&&
+  p.link.to===it.uid&&p.link.zi===zi);
+/* центр детали в мире — цель, в сторону которой должен смотреть патрубок */
+function bindCenter(it){
+  return new THREE.Box3().setFromObject(it.obj).getCenter(new THREE.Vector3());
+}
+/* Патрубок под линию: свободный; при нескольких кандидатах решают имя (rx)
+   и геометрия — чья ось смотрит в сторону второй детали. SAE-штуцеры
+   (манометры, Шрадер) — не магистраль, пропускаем. */
+function bindZone(it,rx,other,used){
+  const zs=it.zn||[];
+  const mag=[],free=[];
+  for(let i=0;i<zs.length;i++){
+    const z=zoneAt(it,i);if(!z||!z.p0||!z.dir)continue;
+    if(z.ctype==='sae'||/SAE|шрадер/i.test(String(z.name||'')))continue;
+    mag.push(i);
+    if(used.has(it.uid+'|'+i)||bindZoneTaken(it,i))continue;
+    free.push(i);
+  }
+  if(!mag.length)return {err:'у детали не размечены патрубки'};
+  if(!free.length)return {busyAll:true,err:'патрубки заняты'};
+  if(free.length===1)return {zi:free[0]};
+  const tgt=other?bindCenter(other):null;
+  let best=null,bestScore=-1e9;
+  free.forEach(i=>{
+    const p=pullPort(it,i);
+    let s=0;
+    const z=zoneAt(it,i);
+    if(rx.test(String((z.name||'')+' '+(z.conn||''))))s+=2;
+    if(p&&tgt)s+=p.d.dot(tgt.clone().sub(p.p).normalize());
+    if(s>bestScore){bestScore=s;best=i;}
+  });
+  return best!=null?{zi:best}:{err:'патрубок не выбрать — протяни линию вручную'};
+}
+async function bindEdge(e,used){
+  const A=bindItemOf(e.a),B=bindItemOf(e.b);
+  if(!A||!B)return {ok:0,why:'нет в сцене: '+
+    [!A&&schNodeT(e.a),!B&&schNodeT(e.b)].filter(Boolean).join(' и ')};
+  const za=bindZone(A,e.pa,B,used),zb=bindZone(B,e.pb,A,used);
+  if(za.busyAll&&zb.busyAll)return {ok:2,why:'уже обвязано'};
+  if(za.err)return {ok:0,why:schNodeT(e.a)+': '+za.err};
+  if(zb.err)return {ok:0,why:schNodeT(e.b)+': '+zb.err};
+  if(!zoneReady(A,za.zi)||!zoneReady(B,zb.zi))
+    return {ok:0,why:'не хватает данных патрубка — начни протяжку этой линии вручную, конструктор спросит параметры'};
+  const a=pullPort(A,za.zi),b=pullPort(B,zb.zi);
+  if(!a||!b||!a.c||!b.c)return {ok:0,why:'база не дала ось или присоединение патрубка'};
+  const q=pullCheck(a,b);
+  if(q.err)return {ok:0,why:q.err};
+  const made=[];let err=null;
+  try{err=await pullLay(made,a,b,q.pl,q.pts,q.dirs);}
+  catch(x){err=(x&&x.message)?x.message:String(x);}
+  if(err){madeRemove(made);return {ok:0,why:err};}
+  used.add(A.uid+'|'+za.zi);used.add(B.uid+'|'+zb.zi);
+  return {ok:1,why:q.pl.t.c.txt+' · '+q.pl.total+' мм'+
+    (q.dirs.length>1?(' · отводов '+(q.dirs.length-1)):'')};
+}
+async function bindBySchema(){
+  if(!placed.length){toast('Сцена пустая — сначала назначь узлы и «Собрать по схеме»');return;}
+  const h=histBegin('обвязку по схеме');
+  const rep=[],used=new Set();
+  try{
+    for(const e of SCH_EDGES){
+      let r;
+      try{r=await bindEdge(e,used);}
+      catch(x){r={ok:0,why:String((x&&x.message)||x)};}
+      rep.push({e:e,r:r});
+    }
+  }finally{histEnd(h);}
+  PULL=null;select(null);
+  checkCollisions();refresh();save();rotRebuild();
+  bindReport(rep);
+}
+function bindReport(rep){
+  const n1=rep.filter(x=>x.r.ok===1).length,n2=rep.filter(x=>x.r.ok===2).length,
+        n0=rep.length-n1-n2;
+  let m=document.getElementById('bindRep');if(m)m.remove();
+  m=document.createElement('div');m.id='bindRep';
+  m.innerHTML='<div class="br-in">'+
+    '<div class="br-h"><b>⚡ Обвязка по схеме</b>'+
+      '<span>легло: '+n1+' · было: '+n2+' · не легло: '+n0+'</span><i id="brX">✕</i></div>'+
+    rep.map(x=>{
+      const cls=x.r.ok===1?'ok':(x.r.ok===2?'wa':'no');
+      const mark=x.r.ok===1?'✓':(x.r.ok===2?'◦':'✕');
+      return '<div class="br-row '+cls+'"><em>'+mark+'</em><div><b>'+
+        esc(schNodeT(x.e.a))+' → '+esc(schNodeT(x.e.b))+'</b>'+
+        '<small>'+esc(x.e.t)+(x.r.why?' · '+esc(x.r.why):'')+'</small></div></div>';
+    }).join('')+
+    '<div class="br-f">Не легло — обычно лечится перестановкой узла: оси патрубков '+
+    'должны сходиться (протяжка строит прямую, Г- и Z-трассу). Дальше можно '+
+    'дотянуть вручную: метка патрубка → «протянуть трубу». Зимний комплект — '+
+    'врезкой, манометры — капилляром. Метраж и фитинги уже в спецификации.</div></div>';
+  document.body.appendChild(m);
+  m.onclick=ev=>{if(ev.target===m)m.remove();};
+  document.getElementById('brX').onclick=()=>m.remove();
+}
+
 /* ═══ v2.46.023: врезка арматуры в разрыв трубы ═══
    Вентиль, фильтр-осушитель, смотровое стекло, обратный клапан, муфта стоят
    не на конце линии, а в её разрыве: трубу режут, концы заводят в арматуру с
@@ -8800,6 +8942,7 @@ $('#bDown').onclick=()=>lift(-50);
 $('#bFloor').onclick=toFloor;
 $('#bAuto').onclick=autoLayout;
 $('#bFromSch').onclick=buildFromSchema;
+$('#bBind').onclick=bindBySchema;
 async function dupSel(){if(!sel)return;
   const p=sel.obj.position,r=sel.obj.rotation;
   const h=histBegin('дублирование детали');
