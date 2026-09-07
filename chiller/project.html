@@ -437,6 +437,28 @@ svg g.sn.dim{opacity:.22}
 #bindRep .br-row b{display:block;font-size:12.5px}
 #bindRep .br-row small{color:var(--dim);line-height:1.45}
 #bindRep .br-f{padding:10px 16px 14px;font-size:11px;color:var(--faint);line-height:1.5}
+/* v2.46.151: отчёт стенда вариаций */
+#stressRep{position:fixed;inset:0;z-index:80;background:rgba(4,10,20,.6);display:flex;align-items:center;justify-content:center;padding:20px}
+#stressRep .sr-in{width:min(860px,96vw);max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+#stressRep .br-h{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:1}
+#stressRep .br-h b{font-size:14px}#stressRep .br-h span{font-size:11px;color:var(--dim)}
+#stressRep .br-h i{margin-left:auto;font-style:normal;cursor:pointer;color:var(--faint);padding:2px 8px}
+.sr-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 16px}
+.sr-kpi{border:1px solid var(--line2);border-radius:10px;padding:8px 10px;background:#0b1830}
+.sr-kpi b{display:block;font:800 20px 'Cascadia Mono',Consolas,monospace}.sr-kpi span{font-size:10.5px;color:var(--dim);line-height:1.3}
+.sr-kpi.g b{color:var(--green)}.sr-kpi.y b{color:var(--gold)}.sr-kpi.r b{color:#e8907f}
+.sr-note{margin:0 16px 8px;font-size:11px;color:var(--gold)}
+.sr-tops{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:0 16px 10px}
+.sr-top{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:11.5px}
+.sr-top b{display:block;margin-bottom:4px;color:var(--ice)}
+.sr-top div{display:flex;gap:8px;color:var(--dim);line-height:1.4}.sr-top em{font-style:normal;font-weight:800;min-width:22px;color:var(--txt)}
+.sr-tbl{margin:0 16px;border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:11.5px}
+.sr-row{display:grid;grid-template-columns:36px 1fr 52px 52px 52px 70px;gap:6px;padding:5px 10px;border-top:1px solid var(--line);cursor:pointer}
+.sr-row:hover{background:rgba(27,159,216,.08)}.sr-row.sr-head{background:#0b1830;color:var(--faint);font-size:10px;letter-spacing:.06em;text-transform:uppercase;cursor:default;border-top:none}
+.sr-row.bad span:first-child{color:#e8907f}.sr-row.ok span:first-child{color:var(--green)}
+.sr-row span:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sr-f{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px 14px;font-size:11px;color:var(--faint)}
+@media(max-width:760px){.sr-kpis{grid-template-columns:repeat(2,1fr)}.sr-tops{grid-template-columns:1fr}}
 svg g.sn{cursor:pointer}
 svg g.sn:hover{filter:brightness(1.06) saturate(1.15)}
 /* v2.45.1017: вкладка «Схема» — заводской лист АГ.ЧИЛ-104 Г3 (бумага, объёмные элементы) */
@@ -1536,7 +1558,9 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
       <div class="acts">
         <div class="btn" id="bAuto">✦ Расставить по функциям</div>
         <div class="btn" id="bFromSch">⤓ Собрать по схеме</div>
+        <div class="btn" id="bCircuit" title="Узлы цепочкой по схеме: патрубок в патрубок, с зазором под трубу">⤳ Расставить по контуру</div>
         <div class="btn" id="bBind">⚡ Обвязать по схеме</div>
+        <div class="btn ghost" id="bStress" title="Стенд: сто случайных сборок — наезды, упоры, обвязка">🧪 Прогон вариаций</div>
         <div class="btn pri" id="bBom">→ BOM · чертёж сборки</div>
         <div class="btn ghost" id="bClear">Очистить сцену</div>
       </div>
@@ -8442,19 +8466,24 @@ async function bindEdge(e,used){
   return {ok:1,why:q.pl.t.c.txt+' · '+q.pl.total+' мм'+
     (q.dirs.length>1?(' · отводов '+(q.dirs.length-1)):'')};
 }
+/* v2.46.151: тихий прогон по рёбрам — без отчёта, для стенда вариаций */
+async function bindRunAll(){
+  const rep=[],used=new Set();
+  for(const e of SCH_EDGES){
+    let r;
+    try{r=await bindEdge(e,used);}
+    catch(x){r={ok:0,why:String((x&&x.message)||x)};}
+    rep.push({e:e,r:r});
+  }
+  PULL=null;
+  return rep;
+}
 async function bindBySchema(){
   if(!placed.length){toast('Сцена пустая — сначала назначь узлы и «Собрать по схеме»');return;}
   const h=histBegin('обвязку по схеме');
-  const rep=[],used=new Set();
-  try{
-    for(const e of SCH_EDGES){
-      let r;
-      try{r=await bindEdge(e,used);}
-      catch(x){r={ok:0,why:String((x&&x.message)||x)};}
-      rep.push({e:e,r:r});
-    }
-  }finally{histEnd(h);}
-  PULL=null;select(null);
+  let rep;
+  try{rep=await bindRunAll();}finally{histEnd(h);}
+  select(null);
   checkCollisions();refresh();save();rotRebuild();
   bindReport(rep);
 }
@@ -8481,6 +8510,332 @@ function bindReport(rep){
   m.onclick=ev=>{if(ev.target===m)m.remove();};
   document.getElementById('brX').onclick=()=>m.remove();
 }
+
+/* ═══ v2.46.151: ⤳ расстановка по контуру ═══
+   Стенд вариаций показал: «Расставить по функциям» кладёт узлы по ярусам,
+   не глядя на схему, и обвязка не ложится вовсе — оси патрубков смотрят
+   куда угодно, только не друг на друга. Здесь узлы ставятся цепочкой по
+   рёбрам листа: у каждого следующего узла патрубок входа разворачивается
+   навстречу патрубку выхода предыдущего и встаёт на его ось с зазором под
+   отрезок трубы. Ряд упёрся в стенку корпуса — змейкой в следующий ряд
+   (Z-трасса с двумя отводами закроет переход). Водяной контур подвешивается
+   к испарителю тем же приёмом. Дальше — «Обвязать по схеме». */
+const CIRCUIT_GAP=320;   // мм между патрубками соседних узлов: отрезок + фитинги
+const CIRCUIT_MARG=90;   // отступ от стенок полости корпуса
+function circuitPortPick(it,rx,used){
+  const zs=it.zn||[];let best=null,bs=-1;
+  for(let i=0;i<zs.length;i++){
+    const z=zoneAt(it,i);if(!z||!z.p0||!z.dir)continue;
+    if(z.ctype==='sae'||/SAE|шрадер/i.test(String(z.name||'')))continue;
+    if(used&&used.has(it.uid+'|'+i))continue;
+    let sc=0;
+    if(rx.test(String((z.name||'')+' '+(z.conn||''))))sc+=2;
+    if(Math.abs(z.dir[2]||0)<.5)sc+=1;                 // горизонтальный порт тянуть проще
+    if(sc>bs){bs=sc;best=i;}
+  }
+  return best;
+}
+/* развернуть B вокруг Z так, чтобы порт zi смотрел навстречу dirW, и поставить
+   его точку на ось: anchor + dirW·gap. По высоте подтягиваем, если это не
+   уронит деталь под пол — иначе оставляем на полу, разницу закроет Z-трасса */
+function circuitAlign(B,zi,dirW,anchor,gap){
+  const z=zoneAt(B,zi);if(!z)return;
+  const l=new THREE.Vector3(z.dir[0],z.dir[1],z.dir[2]||0).normalize();
+  const want=dirW.clone().negate();
+  if(Math.abs(l.z)<.5&&Math.abs(want.z)<.5){
+    B.obj.rotation.set(0,0,Math.atan2(want.y,want.x)-Math.atan2(l.y,l.x));
+  }
+  B.obj.updateMatrixWorld(true);
+  const p=rotSeatLocal(z).applyMatrix4(B.obj.matrixWorld);
+  const t=anchor.clone().addScaledVector(dirW,gap);
+  B.obj.position.x+=t.x-p.x;B.obj.position.y+=t.y-p.y;
+  B.obj.updateMatrixWorld(true);
+  const bb=new THREE.Box3().setFromObject(B.obj),dz=t.z-p.z;
+  const fl=(placed.some(q=>roleOf(q.d)==='frame')&&INSIDE.has(roleOf(B.d)))?floorZ():0;
+  if(bb.min.z+dz>=fl-1)B.obj.position.z+=dz;
+  B.obj.updateMatrixWorld(true);
+}
+function circuitInner(){
+  if(placed.some(p=>roleOf(p.d)==='frame')){const z=siteIn();return {min:z.min.clone(),max:z.max.clone()};}
+  return {min:new THREE.Vector3(0,0,0),max:new THREE.Vector3(1e6,1e6,1e6)};
+}
+function layoutByCircuit(){
+  /* v2: ярусы от «по функциям» остаются (конденсатор на крыше, арматура на
+     среднем ярусе, бак снаружи) — это знание о машине. Поверх него каждый
+     следующий узел контура разворачивается патрубком навстречу предыдущему и
+     ставится на его ось в плане; перепад высот ярусов закрывает Z-трасса.
+     Вышел за полость — прижимаем внутрь по оси; наехал — отодвигаем по ней. */
+  const inner=circuitInner();
+  const used=new Set(),done=new Set();
+  const stat={placed:0,rows:1,skipped:[]};
+  const box=it=>new THREE.Box3().setFromObject(it.obj);
+  const others=it=>placed.filter(p=>p!==it&&!NOCOLL.has(roleOf(p.d)));
+  const inFrame=placed.some(q=>roleOf(q.d)==='frame');
+  const unstick=(B,dW)=>{
+    for(let k=0;k<8;k++){
+      const bb=box(B);
+      if(!others(B).some(o=>box(o).intersectsBox(bb)))return true;
+      B.obj.position.x+=dW.x*80;B.obj.position.y+=dW.y*80;B.obj.updateMatrixWorld(true);
+    }
+    return false;
+  };
+  /* B встаёт к A: порт B навстречу порту A, на его ось в плане, высота своя.
+     Не влезает по ходу — возвратный ряд: B встаёт рядом, портом в ту же
+     сторону, что и выход A (П-образная трасса, два отвода). Поперёк оси
+     деталь не двигаем: тогда оси и не сойдутся. */
+  const alongOK=(B,dW)=>{
+    const bb=box(B);
+    if(!inFrame||!INSIDE.has(roleOf(B.d)))return true;
+    const lo=inner.min.clone().addScalar(CIRCUIT_MARG),hi=inner.max.clone().subScalar(CIRCUIT_MARG);
+    return bb.min.x>=lo.x&&bb.max.x<=hi.x&&bb.min.y>=lo.y&&bb.max.y<=hi.y;
+  };
+  const rotTo=(B,zb,want)=>{
+    const z=zoneAt(B,zb),l=new THREE.Vector3(z.dir[0],z.dir[1],0);
+    if(l.length()>.5){l.normalize();B.obj.rotation.set(0,0,Math.atan2(want.y,want.x)-Math.atan2(l.y,l.x));}
+    B.obj.updateMatrixWorld(true);
+  };
+  const putPort=(B,zb,target)=>{
+    const pB=rotSeatLocal(zoneAt(B,zb)).applyMatrix4(B.obj.matrixWorld);
+    B.obj.position.x+=target.x-pB.x;B.obj.position.y+=target.y-pB.y;B.obj.updateMatrixWorld(true);
+  };
+  const alignXY=(A,za,B,zb)=>{
+    const a=pullPort(A,za);if(!a)return 'нет оси';
+    let dW=new THREE.Vector3(a.d.x,a.d.y,0);
+    if(dW.length()<.5)dW=new THREE.Vector3(1,0,0);else dW.normalize();
+    const save={p:B.obj.position.clone(),r:B.obj.rotation.clone()};
+    /* 1) прямо по ходу */
+    rotTo(B,zb,dW.clone().negate());
+    putPort(B,zb,a.p.clone().addScaledVector(dW,CIRCUIT_GAP));
+    if(alongOK(B,dW)&&unstick(B,dW)&&alongOK(B,dW))return null;
+    /* 2) возвратный ряд: порт B смотрит туда же, куда выход A; сдвиг поперёк
+       на глубину детали + место под два отвода */
+    B.obj.position.copy(save.p);B.obj.rotation.copy(save.r);B.obj.updateMatrixWorld(true);
+    rotTo(B,zb,dW.clone());
+    const sz=box(B).getSize(new THREE.Vector3());
+    const side=new THREE.Vector3(-dW.y,dW.x,0);          // поперёк оси
+    const back=Math.max(sz.x,sz.y)/2+PULL_LEAD+120;
+    for(const extra of [0,200,420])for(const sgn of [1,-1]){
+      const target=a.p.clone().addScaledVector(side,sgn*(back+extra)).addScaledVector(dW,-CIRCUIT_GAP/2);
+      putPort(B,zb,target);
+      if(alongOK(B,dW)&&unstick(B,dW.clone().negate())&&alongOK(B,dW))return null;
+    }
+    /* 3) по ходу, но короче: отрезок + фитинги ещё влезают */
+    rotTo(B,zb,dW.clone().negate());
+    putPort(B,zb,a.p.clone().addScaledVector(dW,PIPE_MIN+140));
+    if(alongOK(B,dW)&&unstick(B,dW)&&alongOK(B,dW))return null;
+    B.obj.position.copy(save.p);B.obj.rotation.copy(save.r);B.obj.updateMatrixWorld(true);
+    return 'не влезает ни по ходу, ни возвратным рядом';
+  };
+  const step=(e,reverse)=>{
+    const A=bindItemOf(e.a),B=bindItemOf(e.b);
+    if(!A||!B)return;
+    const fixed=reverse?B:A,mov=reverse?A:B;
+    if(!done.has(fixed.uid)||done.has(mov.uid))return;
+    const zf=circuitPortPick(fixed,reverse?e.pb:e.pa,used),zm=circuitPortPick(mov,reverse?e.pa:e.pb,used);
+    if(zf==null||zm==null){stat.skipped.push(schNodeT(reverse?e.a:e.b)+': нет патрубка');return;}
+    const save={p:mov.obj.position.clone(),r:mov.obj.rotation.clone()};
+    const err=alignXY(fixed,zf,mov,zm);
+    if(err){stat.skipped.push(schNodeT(reverse?e.a:e.b)+': '+err);return;}
+    /* v3.2: встал на ось, но упёрся в корпус или наехал — лучше место от
+       «по функциям», чем красная деталь: откатываем и честно пишем в отчёт */
+    checkHits();
+    const bb=box(mov);
+    if(hitSet.has(mov.uid)||others(mov).some(o=>box(o).intersectsBox(bb))){
+      mov.obj.position.copy(save.p);mov.obj.rotation.copy(save.r);mov.obj.updateMatrixWorld(true);
+      stat.skipped.push(schNodeT(reverse?e.a:e.b)+': на оси упирается — оставлен по функциям');return;
+    }
+    used.add(fixed.uid+'|'+zf);used.add(mov.uid+'|'+zm);
+    done.add(mov.uid);stat.placed++;
+  };
+  const KM=bindItemOf('KM1');
+  if(!KM){toast('Нет компрессора — расставлять по контуру не от чего');return stat;}
+  done.add(KM.uid);
+  SCH_EDGES.filter(e=>e.t!=='вода').forEach(e=>step(e,false));
+  /* вода: насос подвешиваем к входу воды испарителя, бак — к входу насоса */
+  SCH_EDGES.filter(e=>e.t==='вода').forEach(e=>step(e,true));
+  SCH_EDGES.filter(e=>e.t==='вода').forEach(e=>step(e,false));
+  placed.forEach(p=>{if(p._pinBox&&p._pinBox.update)p._pinBox.update();});
+  checkCollisions();
+  return stat;
+}
+function layoutByCircuitUI(){
+  if(!placed.length){toast('Сцена пустая — сначала «Собрать по схеме»');return;}
+  const h=histBegin('расстановку по контуру');
+  let st;
+  try{st=layoutByCircuit();}finally{histEnd(h);}
+  select(null);refresh();save();
+  toast('По контуру: расставлено '+st.placed+' узлов, рядов '+st.rows+
+    (st.skipped.length?(' · пропущено: '+st.skipped.join(', ')):'')+' · теперь «⚡ Обвязать по схеме»');
+}
+
+/* ═══ v2.46.151: 🧪 прогон вариаций — стенд качества сборки ═══
+   Дмитрий: «отработай сам 100 вариаций: наезжают друг на друга или нет».
+   Стенд берёт случайную модель на каждый узел контура (по категории узла,
+   как конвейер подбора) и случайный корпус, ставит всё «Собрать по схеме»,
+   раскладывает «Расставить по функциям», меряет наезды, упоры в корпус,
+   выход за габарит, «не входит», а затем тихо обвязывает по схеме и
+   считает, что легло. Сто раз подряд. Итог — сводка: доля чистых сборок,
+   топ причин, топ проблемных моделей и корпусов; любую вариацию можно
+   открыть в сцене одним нажатием. Проект пользователя на время прогона
+   снимается в память и возвращается в конце, история и автосохранение
+   молчат. */
+let STRESS=null;
+const SCH_EDGE_KEYS=new Set(SCH_EDGES.flatMap(e=>[e.a,e.b]));
+function stressCandidates(){
+  const per={};
+  SCH_NODES.filter(n=>SCH_EDGE_KEYS.has(n.k)).forEach(nd=>{
+    const rec=asgResolveCat(nd);
+    per[nd.k]=DATA.filter(d=>d.ready&&d.g&&roleOf(d)!=='frame'&&roleOf(d)!=='pipe'&&
+      (!rec.sec||d.section===rec.sec)&&(!rec.sub||d.sub===rec.sub));
+  });
+  const frames=DATA.filter(d=>d.ready&&d.g&&roleOf(d)==='frame');
+  return {per:per,frames:frames};
+}
+function stressBar(txt){
+  const el=$('#fMode');if(!el)return;
+  if(!STRESS){el.textContent=txt||'';return;}
+  el.textContent='🧪 прогон '+STRESS.i+' / '+STRESS.n+' · Esc — остановить';
+}
+const stressNm=uid=>{const p=placed.find(x=>x.uid===uid);return p?p.d.name:'#'+uid;};
+/* одна вариация: сцена по выбору моделей → раскладка → замеры → обвязка */
+async function stressOne(pick,fr){
+  clearScene();schemaData={};
+  Object.keys(pick).forEach(k=>{schemaData[k]={id:pick[k].id,name:pick[k].name};});
+  if(fr)await addItem(fr,null);
+  for(const k of Object.keys(pick))await schPlace(k,true);
+  autoLayout();
+  const mode=(STRESS&&STRESS.mode)||window._stressMode||'circuit';
+  if(mode!=='function')layoutByCircuit();
+  checkCollisions();
+  const items=placed.filter(p=>roleOf(p.d)!=='frame'&&roleOf(p.d)!=='pipe');
+  const coll=[...collSet].map(stressNm);
+  const hits=[...hitSet].map(u=>stressNm(u)+' → '+(hitNames(u)||'корпус'));
+  const out=[...outSet].map(stressNm);
+  const fit=items.map(it=>({n:it.d.name,w:fitWhy(it)})).filter(x=>x.w).map(x=>x.n+': '+x.w);
+  const bind=await bindRunAll();
+  checkCollisions();
+  return {coll:coll,hits:hits,out:out,fit:fit,
+    bind:bind.map(b=>({l:schNodeT(b.e.a)+' → '+schNodeT(b.e.b),ok:b.r.ok,why:b.r.why||''}))};
+}
+async function stressRun(n){
+  n=Math.max(1,Math.min(500,(n|0)||100));
+  const C=stressCandidates();
+  const keys=Object.keys(C.per).filter(k=>C.per[k].length);
+  const miss=Object.keys(C.per).filter(k=>!C.per[k].length).map(schNodeT);
+  if(!keys.length){toast('В базе нет готовых моделей под узлы контура');return;}
+  const backup=projPayload(),schBackup=JSON.parse(JSON.stringify(schemaData||{}));
+  const wasLoading=_loading;_loading=true;const wasHold=HIST.hold;HIST.hold=true;
+  STRESS={i:0,n:n,stop:false,rows:[],miss:miss,cand:C,t0:Date.now(),mode:(window._stressMode||'circuit')};
+  const rnd=a=>a[Math.floor(Math.random()*a.length)];
+  try{
+    for(let i=0;i<n&&!STRESS.stop;i++){
+      STRESS.i=i+1;stressBar();
+      const pick={};keys.forEach(k=>{pick[k]=rnd(C.per[k]);});
+      const fr=C.frames.length?rnd(C.frames):null;
+      let m;
+      try{m=await stressOne(pick,fr);}
+      catch(x){m={err:String((x&&x.message)||x),coll:[],hits:[],out:[],fit:[],bind:[]};}
+      m.i=i+1;m.frame=fr?fr.name:'— без корпуса';m.frameId=fr?fr.id:null;
+      m.pick=Object.fromEntries(keys.map(k=>[k,pick[k].id]));
+      m.pickN=Object.fromEntries(keys.map(k=>[k,pick[k].name]));
+      STRESS.rows.push(m);
+      await new Promise(r=>setTimeout(r,0));
+    }
+  }finally{
+    clearScene();
+    try{await loadProjectData({items:backup.items,schema:schBackup});}catch(e){}
+    _loading=wasLoading;HIST.hold=wasHold;
+    checkCollisions();refresh();
+  }
+  const done=STRESS;STRESS=null;stressBar('');
+  stressReport(done);
+}
+/* открыть вариацию в сцене — посмотреть глазами, что и во что упёрлось */
+async function stressOpen(i){
+  const st=window._stressLast;if(!st)return;
+  const m=st.rows[i-1];if(!m)return;
+  const el=document.getElementById('stressRep');if(el)el.remove();
+  const pick={};Object.keys(m.pick).forEach(k=>{const d=DATA.find(x=>x.id===m.pick[k]);if(d)pick[k]=d;});
+  const fr=m.frameId?DATA.find(x=>x.id===m.frameId):null;
+  const h=histBegin('вариацию стенда #'+i);
+  try{await stressOne(pick,fr);}finally{histEnd(h);}
+  refresh();save();
+  toast('Вариация #'+i+' в сцене: '+m.frame);
+}
+function stressTop(list,n){
+  const cnt=new Map();list.forEach(x=>cnt.set(x,(cnt.get(x)||0)+1));
+  return [...cnt.entries()].sort((a,b)=>b[1]-a[1]).slice(0,n||8);
+}
+function stressReport(st){
+  window._stressLast=st;
+  const R=st.rows,N=R.length;
+  const pct=k=>N?Math.round(100*R.filter(k).length/N):0;
+  const clean=pct(m=>!m.err&&!m.coll.length&&!m.hits.length&&!m.out.length&&!m.fit.length);
+  const noColl=pct(m=>!m.coll.length),noHit=pct(m=>!m.hits.length),noOut=pct(m=>!m.out.length);
+  const bindAll=pct(m=>m.bind.length&&m.bind.every(b=>b.ok));
+  const bindLines=R.flatMap(m=>m.bind);
+  const laid=bindLines.filter(b=>b.ok===1).length,tot=bindLines.length;
+  const whyCut=w=>String(w).replace(/\d+ мм/g,'N мм').replace(/«[^»]*»/g,'«…»').slice(0,90);
+  const topWhy=stressTop(bindLines.filter(b=>!b.ok).map(b=>whyCut(b.why)),8);
+  const topHit=stressTop(R.flatMap(m=>m.hits.map(h=>h.split(' → ')[0])),8);
+  const topColl=stressTop(R.flatMap(m=>m.coll),8);
+  const topFrame=stressTop(R.filter(m=>m.hits.length||m.fit.length).map(m=>m.frame),6);
+  const secs=Math.round((Date.now()-st.t0)/1000);
+  const kpi=(v,l,cls)=>'<div class="sr-kpi '+(cls||'')+'"><b>'+v+'</b><span>'+l+'</span></div>';
+  const topHtml=(t,arr,pre)=>arr.length?'<div class="sr-top"><b>'+t+'</b>'+arr.map(x=>
+    '<div><em>'+x[1]+'</em>'+esc(String(x[0]))+'</div>').join('')+'</div>':'';
+  let m=document.getElementById('stressRep');if(m)m.remove();
+  m=document.createElement('div');m.id='stressRep';
+  m.innerHTML='<div class="sr-in">'+
+    '<div class="br-h"><b>🧪 Прогон вариаций · '+N+(st.stop?' (остановлен)':'')+'</b>'+
+      '<span>'+secs+' с · корпусов в базе: '+st.cand.frames.length+'</span><i id="srX">✕</i></div>'+
+    '<div class="sr-kpis">'+
+      kpi(clean+'%','чистые сборки: без наездов, упоров и выхода за корпус',clean>=70?'g':(clean>=40?'y':'r'))+
+      kpi(noColl+'%','без наездов узел на узел',noColl>=70?'g':(noColl>=40?'y':'r'))+
+      kpi(noHit+'%','без упора в корпус',noHit>=70?'g':(noHit>=40?'y':'r'))+
+      kpi(noOut+'%','всё внутри габарита',noOut>=70?'g':(noOut>=40?'y':'r'))+
+      kpi(bindAll+'%','обвязалось целиком',bindAll>=70?'g':(bindAll>=40?'y':'r'))+
+      kpi(tot?Math.round(100*laid/tot)+'%':'—','линий легло ('+laid+' из '+tot+')','')+
+    '</div>'+
+    (st.miss.length?'<div class="sr-note">Узлы без моделей в базе (в прогон не вошли): '+esc(st.miss.join(', '))+'</div>':'')+
+    '<div class="sr-tops">'+
+      topHtml('Почему не легли линии',topWhy)+
+      topHtml('Чаще всего упираются в корпус',topHit)+
+      topHtml('Чаще всего наезжают',topColl)+
+      topHtml('Корпуса с упорами',topFrame)+
+    '</div>'+
+    '<div class="sr-tbl"><div class="sr-row sr-head"><span>#</span><span>корпус</span><span>наезд</span><span>упор</span><span>вне</span><span>линии</span></div>'+
+    R.map(m2=>{
+      const ok=m2.bind.filter(b=>b.ok).length,tt=m2.bind.length;
+      const bad=m2.err||m2.coll.length||m2.hits.length||m2.out.length;
+      return '<div class="sr-row'+(bad?' bad':' ok')+'" onclick="stressOpen('+m2.i+')" title="'+esc(Object.values(m2.pickN).join(' · '))+'">'+
+        '<span>'+m2.i+'</span><span>'+esc(m2.frame)+'</span><span>'+(m2.coll.length||'·')+'</span>'+
+        '<span>'+(m2.hits.length||'·')+'</span><span>'+(m2.out.length||'·')+'</span>'+
+        '<span>'+(m2.err?'ошибка':(ok+'/'+tt))+'</span></div>';
+    }).join('')+'</div>'+
+    '<div class="sr-f"><span>Клик по строке — открыть вариацию в сцене.</span>'+
+      '<button class="btn" id="srCopy">⧉ Скопировать JSON для Клода</button></div>'+
+  '</div>';
+  document.body.appendChild(m);
+  m.onclick=ev=>{if(ev.target===m)m.remove();};
+  document.getElementById('srX').onclick=()=>m.remove();
+  document.getElementById('srCopy').onclick=async()=>{
+    const js=JSON.stringify({n:N,clean:clean,noColl:noColl,noHit:noHit,noOut:noOut,bindAll:bindAll,
+      laid:laid,tot:tot,topWhy:topWhy,topHit:topHit,topColl:topColl,topFrame:topFrame,
+      miss:st.miss,rows:R},null,1);
+    try{await navigator.clipboard.writeText(js);toast('Отчёт в буфере — вставь в чат Клоду');}
+    catch(e){prompt('Скопируй отчёт:',js);}
+  };
+}
+function stressAsk(){
+  if(STRESS){STRESS.stop=true;toast('Останавливаю прогон…');return;}
+  const v=prompt('Сколько вариаций прогнать? Каждая — случайные модели на узлы контура и случайный корпус, раскладка, замеры и обвязка. Твой проект вернётся на место.','100');
+  if(v===null)return;
+  stressRun(parseInt(v,10)||100);
+}
+if(typeof document!=='undefined')document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&STRESS){STRESS.stop=true;}
+});
 
 /* ═══ v2.46.023: врезка арматуры в разрыв трубы ═══
    Вентиль, фильтр-осушитель, смотровое стекло, обратный клапан, муфта стоят
@@ -8970,7 +9325,9 @@ $('#bDown').onclick=()=>lift(-50);
 $('#bFloor').onclick=toFloor;
 $('#bAuto').onclick=autoLayout;
 $('#bFromSch').onclick=buildFromSchema;
+$('#bCircuit').onclick=layoutByCircuitUI;
 $('#bBind').onclick=bindBySchema;
+$('#bStress').onclick=stressAsk;
 async function dupSel(){if(!sel)return;
   const p=sel.obj.position,r=sel.obj.rotation;
   const h=histBegin('дублирование детали');
