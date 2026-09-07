@@ -23,10 +23,12 @@ test('экран потока: раздельные группы, настоящ
   let out = '';
   const container = {};
   Object.defineProperty(container, 'innerHTML', { set(v) { out = v; }, get() { return out; } });
-  const render = new Function('document', 'renderTaskRow', 'escapeHtml', code)(
+  // v2.46.142: Клава добавила проверку прав в шапке потока — стабим её тоже
+  const render = new Function('document', 'renderTaskRow', 'escapeHtml', 'canManageTasks', code)(
     { getElementById: () => container },
     (t) => '<row>' + t.title + '</row>',
-    (v) => String(v));
+    (v) => String(v),
+    () => true);
   render([
     { id: 1, title: 'Поменять уставку', status: 'new' },
     { id: 2, title: 'Добавить реле', status: 'in_progress' },
@@ -41,10 +43,11 @@ test('экран потока: раздельные группы, настоящ
   assert.match(out, /Заноси первую правку щита/);
 });
 
-test('форма: тумблер автоматики, поле щита и черновик', () => {
-  assert.match(app2, /id="tf-auto"/);
+test('форма: переключатель «Задача / Правка щита», поле щита и черновик', () => {
+  // v2.46.142: Клава переделала тумблер в кнопки-виды с пресетами щитов
+  assert.ok(app2.includes("setTaskKind(\\'automation\\')"));   // onclick с экранированными кавычками
   assert.match(app2, /id="tf-panel"/);
-  assert.match(app2, /state\.taskForm\.category = e\.target\.checked \? 'automation' : ''/);
+  assert.match(app2, /setTaskPanel\(/);
   assert.match(app2, /category: f\.category \|\| '',/);
   assert.match(app2, /panel: \(f\.panel \|\| ''\)\.trim\(\)/);
   // предзаполнение из потока и из редактирования
