@@ -49,6 +49,7 @@ function formContext(opts) {
     _cfAutoUnit() {},
     async apiGet(url) {
       context.calls = (context.calls || []).concat(url);
+      if (url === `/api/components/${o.componentId || 5}`) return o.serverComponent || {};
       if (url === '/api/components/categories') return { categories: o.serverCats || [] };
       if (url === '/api/suppliers') return { suppliers: [] };
       if (url === '/api/supply-items') return { items: [] };
@@ -87,6 +88,38 @@ test('уже загруженный справочник повторно не �
 
   assert.ok(!(ctx.calls || []).includes('/api/components/categories'));
   assert.match(ctx._modal.innerHTML, /<option value="7" selected>Холодильное<\/option>/);
+});
+
+test('редактирование со страницы нового склада загружает полную карточку по id', async () => {
+  const ctx = formContext({
+    cachedCats: CATS,
+    components: [],              // новый склад держит строки в state.ptData
+    componentId: 81,
+    serverComponent: {
+      id: 81,
+      name: 'Муфта 20х1/2н',
+      category_id: 3,
+      sku: 'MUFTA-20-12',
+      unit: 'шт.',
+    },
+  });
+
+  await ctx.open(81);
+
+  assert.ok(ctx.calls.includes('/api/components/81'), 'полная карточка запрошена по id');
+  assert.match(ctx._modal.innerHTML, /id="cf-name"[^>]*value="Муфта 20х1\/2н"/);
+  assert.match(ctx._modal.innerHTML, /id="cf-sku"[^>]*value="MUFTA-20-12"/);
+  assert.match(ctx._modal.innerHTML, /<option value="3" selected>Сантехника<\/option>/);
+  assert.equal(ctx.toast, undefined, 'форма открылась без ошибки');
+});
+
+test('при недоступной карточке пустая форма редактирования не открывается', async () => {
+  const ctx = formContext({ cachedCats: CATS, components: [], componentId: 81 });
+
+  await ctx.open(81);
+
+  assert.deepEqual(ctx.toast, { msg: 'Не удалось загрузить комплектующее', type: 'error' });
+  assert.equal(ctx._modal.innerHTML, '');
 });
 
 test('категория, которой нет в справочнике, не подменяется первой', async () => {
