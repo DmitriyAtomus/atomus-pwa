@@ -338,7 +338,7 @@ test('общая тема: директор заводит, список гру�
   assert.match(lh, /Общие темы/);
   assert.match(lh, /it\.shared/);
   assert.match(lh, /в работе<\/span>/);                        // счётчик раундов
-  const am = slice(app4, 'function _ideaAddMsg(role, text, when, files, local, author)', 'function _ideaAttr');
+  const am = slice(app4, 'function _ideaAddMsg(role, text, when, files, local, author, ctx)', 'function _ideaAttr');
   assert.match(am, /is-other/);
   assert.match(am, /state\._ideas\.me/);
   assert.match(am, /ich-who/);

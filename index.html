@@ -3684,6 +3684,29 @@
 <script src="/app-2.js"></script>
 <script src="/app-3.js"></script>
 <script src="/app-4.js"></script>
+<script src="/klava-pick.js"></script>
+<script>
+// v2.46.161: «Показать Клаве» — метки прямо на экране CRM уходят в чат идей
+(function(){
+  if(!window.KlavaPick)return;
+  KlavaPick.init({
+    apiBase: API_BASE, token: function(){ try{return localStorage.getItem(TOKEN_KEY);}catch(e){return null;} },
+    page: 'crm', version: function(){ return APP_VERSION; },
+    role: function(){ return ((state.user&&state.user.roles)||[]).join(','); },
+    screen: function(){
+      var s=state.currentScreen||''; var nav=document.querySelector('.nav-item.active');
+      var scr=s?document.querySelector('[data-screen="'+s+'"]'):null;
+      var h=scr?scr.querySelector('h1,h2,.page-title'):null;
+      return ['Atom CRM', nav?nav.textContent.trim().replace(/\s+/g,' '):'', h?h.textContent.trim().replace(/\s+/g,' ').slice(0,60):'', s?'('+s+')':''].filter(Boolean).join(' → ');
+    },
+    codeHint: function(el){
+      var s=state.currentScreen||''; var m={ 'warehouse':'loadFinishedProductsDashboard / _renderFpRow (app-3.js)', 'contracts':'loadContracts (app-2.js)', 'tasks':'loadTasks (app-2.js)', 'help-training':'loadHelpTraining / TRAINING_COURSES (app-4.js)', 'ideas':'loadIdeas (app-4.js)' };
+      return m[s]||'';
+    },
+    fabStyle: { right:'18px', bottom:'84px' }
+  });
+})();
+</script>
 
 <!-- ============ ЭТАП 39 (v2.19.0): МОДАЛКА УВЕДОМЛЕНИЙ ============ -->
 <div class="notif-modal-overlay" id="notif-modal" onclick="closeNotifModal(event)">

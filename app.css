@@ -25078,6 +25078,8 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
 .ich-ava.is-person { background: #E0EAFB; color: #1E4E8C; font-size: 11px; font-weight: 800; letter-spacing: .3px; }
 .ich-row.is-other .ich-bubble { background: #F1F5F9; border: 1px solid #E2E8F0; }
 .ich-who { font-size: 11px; font-weight: 800; color: #1E4E8C; margin-bottom: 3px; }
+.ich-ctx { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; font-size: 10.5px; font-weight: 700; background: #FEF3C7; color: #92400E; border-radius: 6px; padding: 2px 7px; }
+.ich-row.is-mine .ich-ctx { background: rgba(255,255,255,.18); color: #fff; }
 .ich-note-shared { color: #1E4E8C; }
 .ich-go { box-shadow: 0 0 0 3px rgba(45,95,139,.18); }
 

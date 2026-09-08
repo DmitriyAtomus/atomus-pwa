@@ -13572,4 +13572,50 @@ setTimeout(()=>{try{camFitSoon(0);}catch(e){}},1200);
 addEventListener('resize',mobSync);
 if(MOBQ.addEventListener)MOBQ.addEventListener('change',mobSync);
 mobSync();
+</script>
+<script src="../klava-pick.js"></script>
+<script>
+/* v2.46.161: «Показать Клаве» в конструкторе — клик по детали в сцене, по кнопке
+   или рамка по области; Клава получает узел схемы, положение, наезды и код */
+(function(){
+  if(!window.KlavaPick)return;
+  const codeOf=d=>{const sec=(d&&d.section)||'';
+    if(sec==='pipe')return 'pullLay / pullCheck / madeRemove (project.html)';
+    if(sec==='frames')return 'frames · fitCheck (project.html)';
+    if(sec==='pumps'||sec==='vessels'||sec==='compressors'||sec==='hx')return 'layoutByCircuit / autoLayout / bindEdge (project.html)';
+    if(sec==='valves')return 'bindZone / bindEdge / stBuild (project.html)';
+    return 'placed[] · addItem (project.html)';};
+  const rectOf=it=>{try{
+    const cvr=document.getElementById('cv').getBoundingClientRect();
+    const bb=new THREE.Box3().setFromObject(it.obj);const xs=[],ys=[];
+    [bb.min.x,bb.max.x].forEach(x=>[bb.min.y,bb.max.y].forEach(y=>[bb.min.z,bb.max.z].forEach(z=>{
+      const v=new THREE.Vector3(x,y,z).project(camera);xs.push(cvr.left+(v.x+1)/2*cvr.width);ys.push(cvr.top+(1-v.y)/2*cvr.height);})));
+    const x0=Math.min(...xs),y0=Math.min(...ys);return [x0,y0,Math.max(...xs)-x0,Math.max(...ys)-y0];
+  }catch(e){return null;}};
+  KlavaPick.init({
+    apiBase:'', token:()=>TOKEN, page:'chiller', preferTopic:'чиллер',
+    version:()=>{const v=document.querySelector('#ver,.ver');return (v?v.textContent.trim():'')||'Атом Чиллер';},
+    screen:()=>'Атом Чиллер → Конструктор → '+((document.querySelector('.mtab.on')||{}).textContent||'Компоновка').trim(),
+    project:()=>{const n=document.getElementById('projName');return n?n.textContent.trim():'';},
+    hostCanvas:'#cv',
+    partAt:(x,y)=>{
+      const it=(typeof pickItem==='function')?pickItem({clientX:x,clientY:y},true):null;
+      if(!it||!it.d)return null;
+      const o=it.obj,p=o.position,rz=Math.round((o.rotation.z||0)*180/Math.PI);
+      const d=it.d, name=(d.brand?d.brand+' ':'')+(d.name||d.id||'деталь');
+      const node=it.sch?(typeof schNodeT==='function'?schNodeT(it.sch):it.sch)+' ('+it.sch+')':'без узла схемы';
+      let hit='';try{const f=document.getElementById('fColl');hit=f?f.textContent.trim():'';}catch(e){}
+      return {label:(it.sch?it.sch+' · ':'')+name,
+        detail:'узел: '+node+' · x='+Math.round(p.x)+' y='+Math.round(p.y)+' z='+Math.round(p.z)+' · поворот '+rz+'°'+(d.st?' · прорисовка по габаритам':'')+(it.hid?' · скрыта':''),
+        selector:'placed uid '+it.uid+' · id '+(d.id||''), code:codeOf(d),
+        rectFn:()=>rectOf(it)};
+    },
+    sceneShot:()=>typeof sceneShot==='function'?sceneShot():Promise.resolve(null),
+    checks:()=>{const g=id=>{const e=document.getElementById(id);return e?e.textContent.trim():'';};
+      const o={};if(g('fCnt'))o['детали']=g('fCnt');if(g('fDims'))o['габарит']=g('fDims');if(g('fColl'))o['проверка']=g('fColl');return o;},
+    codeHint:el=>{const id=el.id||'';const m={bBind:'bindBySchema',bCircuit:'layoutByCircuit',bAuto:'autoLayout',bFromSch:'buildFromSchema',bStress:'stressRun',bBom:'bomOpen',spec:'refreshSpec',schCard:'schCard'};
+      for(const k in m)if(id===k||el.closest('#'+k))return m[k]+' (project.html)';return '';},
+    fabStyle:{right:'70px',bottom:'16px'}
+  });
+})();
 </script></body></html>

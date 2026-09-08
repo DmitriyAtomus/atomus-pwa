@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.161';
+const CACHE_VERSION = 'atomus-v1.8.162';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -19,6 +19,7 @@ const STATIC_ASSETS = [
   '/app-2.js',
   '/app-3.js',
   '/app-4.js',
+  '/klava-pick.js',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

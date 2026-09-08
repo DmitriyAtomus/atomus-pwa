@@ -1990,7 +1990,7 @@ async function ideasOpen(id) {
   feed.innerHTML = '';
   (th.messages || []).forEach(function (m) {
     _ideaAddMsg(m.role, m.text, m.created_at, m.files, false,
-      th.shared ? { chat_id: m.author_chat_id, name: m.author_name } : null);
+      th.shared ? { chat_id: m.author_chat_id, name: m.author_name } : null, m.context);
   });
   if (th.spec_text) _ideaAddSpec(th.spec_text, th.spec_card);
   _ideasRenderActions(th);
@@ -2116,7 +2116,16 @@ function _ideaFormat(text) {
   return escapeHtml(String(text || '')).replace(/\n/g, '<br>');
 }
 
-function _ideaAddMsg(role, text, when, files, local, author) {
+// v2.46.161: метки «Показать Клаве» под сообщением — чип «📍 N меток · экран»
+function _ideaCtxHtml(ctx) {
+  if (!ctx || !ctx.marks || !ctx.marks.length) return '';
+  const n = ctx.marks.length;
+  const items = ctx.marks.map(function (m) { return escapeHtml((m.n || '') + ' ' + (m.label || '')); }).join(' · ');
+  return '<div class="ich-ctx" title="' + items + '"><i class="ti ti-map-pin"></i> ' + n + ' ' +
+    _plural(n, ['метка', 'метки', 'меток']) + (ctx.screen ? ' · ' + escapeHtml(ctx.screen) : '') + '</div>';
+}
+
+function _ideaAddMsg(role, text, when, files, local, author, ctx) {
   const feed = document.getElementById('ideas-feed');
   if (!feed) return null;
   // v2.46.160: в общей теме чужие реплики — слева, с именем и инициалами;
@@ -2139,6 +2148,7 @@ function _ideaAddMsg(role, text, when, files, local, author) {
   bubble.className = 'ich-bubble';
   bubble.innerHTML = (other ? '<div class="ich-who">' + escapeHtml(author.name || '') + '</div>' : '') +
     (text ? '<div class="ich-text">' + _ideaFormat(text) + '</div>' : '') +
+    _ideaCtxHtml(ctx) +
     _ideaFilesHtml(files, local) +
     (when ? '<div class="ich-time">' + escapeHtml(_ideasWhen(when)) + '</div>' : '');
   row.appendChild(bubble);
