@@ -1347,8 +1347,9 @@ function renderHrTimeline() {
       const startIdx = Math.max(0, Math.round((vs - start) / (1000 * 60 * 60 * 24)));
       const endIdx = Math.min(totalDays - 1, Math.round((ve - start) / (1000 * 60 * 60 * 24)));
       if (startIdx > endIdx) return;
-      // Бар стоит на первой клетке диапазона и тянется через flexibility
-      // Используем абсолютное позиционирование: подсчитываем left/width по колонкам
+      // Бар стоит внутри первой клетки диапазона и тянется до последней клетки.
+      // v2.46.153: стартовая клетка уже задаёт горизонтальную позицию бара,
+      // поэтому дополнительный offsetLeft сдвигал отпуск второй раз — в следующий месяц.
       const startCell = cells[startIdx];
       const endCell = cells[endIdx];
       if (!startCell || !endCell) return;
@@ -1357,7 +1358,7 @@ function renderHrTimeline() {
       const width = endLeft - startLeft;
       const bar = document.createElement('div');
       bar.className = 'hr-tl-bar';
-      bar.style.left = startLeft + 'px';
+      bar.style.left = '0px';
       bar.style.width = width + 'px';
       bar.textContent = v.days_total + ' дн.';
       bar.title = (v.employee_full_name || '') + ': ' + v.start_date + ' — ' + v.end_date + (v.comment ? ' (' + v.comment + ')' : '');
