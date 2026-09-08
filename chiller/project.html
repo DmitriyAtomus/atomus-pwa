@@ -437,6 +437,16 @@ svg g.sn.dim{opacity:.22}
 #bindRep .br-row b{display:block;font-size:12.5px}
 #bindRep .br-row small{color:var(--dim);line-height:1.45}
 #bindRep .br-f{padding:10px 16px 14px;font-size:11px;color:var(--faint);line-height:1.5}
+/* v2.46.157: серии фильтров в конвейере */
+.asg-ser{margin:4px 0 8px;padding:8px 10px;border:1px solid var(--line2);border-radius:10px;background:#0b1830}
+.asg-ser>b{font-size:10.5px;letter-spacing:.06em;color:var(--faint)}
+.asg-ser-hint{display:block;font-size:11px;color:var(--dim);margin:3px 0 6px;line-height:1.45}.asg-ser-hint u{color:var(--green);text-decoration:none;font-weight:700}
+.asg-ser-row{display:flex;gap:5px;flex-wrap:wrap}
+.asg-ser-row span{font-size:11.5px;font-weight:700;border:1px solid var(--line2);border-radius:12px;padding:2px 9px;color:var(--dim);cursor:pointer;user-select:none}
+.asg-ser-row span small{font-weight:400;color:var(--faint)}
+.asg-ser-row span.rec{border-color:#22513c;color:var(--green)}
+.asg-ser-row span.on{background:rgba(27,159,216,.14);border-color:var(--ice2);color:var(--ice)}
+.asg-ser-txt{font-size:11px;color:var(--txt);margin-top:6px;line-height:1.45}
 /* v2.46.152: схема из спецификации */
 #specModal{position:fixed;inset:0;z-index:80;background:rgba(4,10,20,.6);display:flex;align-items:center;justify-content:center;padding:20px}
 #specModal .sp-in{width:min(760px,96vw);max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.6)}
@@ -1782,6 +1792,8 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
 
 <script src="three.min.js"></script>
 <script src="tank-oem-brackets.js"></script>
+<script src="atypes.js"></script>
+<script src="pedrollo.js"></script>
 <script>
 /* ═══ данные: тот же контракт, что у базы (index.html) ═══ */
 const BASE=(window.ATOMUS3D_BASE||'./pack/').replace(/\/?$/,'/');
@@ -8653,6 +8665,15 @@ function stBuild(shape,[L,B,H]){
       for(let k=0;k<3;k++){const g=new THREE.BoxGeometry(R*0.9,R*0.22,8);g.rotateZ(k*Math.PI*2/3);g.translate(Math.cos(k*Math.PI*2/3)*R*0.5,Math.sin(k*Math.PI*2/3)*R*0.5,H/2);parts.push(g);}
       return stMerge(parts);
     }
+    case 'pump':{     // насос: улитка спереди, двигатель по оси X, лапы
+      const r=B/2,zc=H*0.42;
+      return stMerge([
+        (()=>{const g=new THREE.CylinderGeometry(r,r,L*0.58,28);g.rotateZ(Math.PI/2);g.translate(L*0.21,0,zc+r*0.1);return g;})(),   // двигатель
+        (()=>{const g=new THREE.CylinderGeometry(r*0.95,r*0.95,B*0.45,28);g.rotateZ(Math.PI/2);g.translate(-L/2+B*0.25,0,zc);return g;})(), // улитка
+        (()=>{const g=new THREE.CylinderGeometry(r*0.42,r*0.42,H-zc,20);g.rotateX(Math.PI/2);g.translate(-L/2+B*0.35,0,zc+(H-zc)/2);return g;})(), // напорный патрубок вверх
+        (()=>{const g=new THREE.BoxGeometry(L*0.9,B*1.1,H*0.06);g.translate(0,0,H*0.03);return g;})(),   // плита-лапы
+      ]);
+    }
     case 'disc':{     // манометр: диск + штуцер вниз
       return stMerge([(()=>{const g=new THREE.CylinderGeometry(L/2,L/2,B*0.6,32);g.translate(0,0,H/2);return g;})(),
         stCylZ(6,H/2-L/2,0)]);
@@ -8695,6 +8716,32 @@ function specAnalog(name,key){
      заглушка с верными габаритами и патрубками честнее такого аналога. */
   const need=rec.sub?2:3;
   return (best&&bs>=need)?{d:best,sc:bs}:null;
+}
+
+/* ═══ v2.46.157: насосы Pedrollo в конструкторе ═══
+   Пункт 5 списка Дмитрия. Справочник pedrollo.js даёт характеристики и
+   кривую Q–H; здесь каждой модели даётся прорисовка по каталожным габаритам
+   (корпус насоса + двигатель) с резьбовыми патрубками: всас по оси спереди,
+   напор вверх. Подбор по расходу — теги «подача до N м³/ч». */
+function pedrolloMerge(){
+  if(!window.PEDROLLO)return;
+  const have=new Set(DATA.map(d=>d.id));
+  window.PEDROLLO.items().forEach(d=>{
+    if(have.has(d.id))return;
+    const P=d.ped,[L,B,H]=P.dims;
+    const zn=[
+      {kind:'eq',name:'ВСАС G'+P.dn[0],p0:[-L/2,0,H*0.42],dir:[-1,0,0],tip:[-L/2-40,0,H*0.42],ctype:'thr',conn:'G'+P.dn[0].replace('"',''),sex:'f',seat:0,od:P.dn1mm+8},
+      {kind:'eq',name:'НАПОР G'+P.dn[1],p0:[-L/2+B*0.35,0,H],dir:[0,0,1],tip:[-L/2+B*0.35,0,H+40],ctype:'thr',conn:'G'+P.dn[1].replace('"',''),sex:'f',seat:0,od:P.dn2mm+8},
+    ];
+    const e=Object.assign({},d,{ready:true,g:d.id,st:{key:'N1',want:d.name,dims:P.dims,shape:'pump',zn:zn},_zn:zn,
+      geom:{rows:[['Габарит',P.dims.join('×')+' мм'],['Начало координат','низ лап, центр в плане; ось двигателя — X']],
+            conn:'всас G'+P.dn[0]+' · напор G'+P.dn[1],ports:['всас G'+P.dn[0],'напор G'+P.dn[1]],bolt:[0,0],bolt_plane:'none',
+            lod:'Прорисовка по каталожным габаритам Pedrollo: форма типовая, присоединения и размеры — из даташита. STEP завода подгружается позже.'}});
+    GEOMS[e.id]={f:e.id,zn:zn,bb:{lo:[-L/2,-B/2,0],hi:[L/2,B/2,H]}};
+    DATA.push(e);
+  });
+  const ps=SECTIONS.find(x=>x[0]==='pumps');
+  if(ps){ps[2]=ps[2]||[];window.PEDROLLO.SUBS.forEach(sb=>{if(!ps[2].some(x=>x[0]===sb[0]))ps[2].push(sb);});}
 }
 
 /* ═══ v2.46.152: 📋 из спецификации — схема заполняется списком ═══
@@ -11252,7 +11299,7 @@ let asgKey=null;
    меняться, русские имена стабильны), сверху полка «подходит сюда», лента
    всех узлов со статусами, и после назначения окно само идёт к следующему
    неназначенному — вся схема закрывается одной серией кликов. */
-let asgSt={sec:null,sub:null,brand:null,pow:null,all:false,sort:'fit'};
+let asgSt={sec:null,sub:null,type:null,brand:null,pow:null,all:false,sort:'fit'};
 function asgResolveCat(nd){
   const cat=nd.cat;
   if(!cat||!SECTIONS||!SECTIONS.length)return {sec:null,sub:null};
@@ -11301,7 +11348,9 @@ function openAssign(key){
   asgKey=key;
   const nd=SCH_NODES.find(n=>n.k===key);
   const cat=asgResolveCat(nd);
-  asgSt={sec:cat.sec,sub:cat.sub,brand:null,pow:null,all:false,sort:'fit'};
+  /* v2.46.157: узел открывает сразу свой тип (Ф1 — фильтры, СИ1 — стёкла), а не весь подраздел */
+  const ty=(window.ATYPES&&ATYPES.NODE[key])||null;
+  asgSt={sec:cat.sec,sub:cat.sub,type:(cat.sec&&ty)?ty:null,brand:null,pow:null,all:false,sort:'fit'};
   $('#asgTitle').textContent=nd.t+' · '+nd.n;
   // если категория не разрешилась (нет раздела в базе) — старый добрый hint
   $('#asgQ').value=cat.sec?'':(nd.hint||'');
@@ -11348,6 +11397,34 @@ async function assignTo(d){
   if(next)openAssign(next);
   else $('#asg').classList.remove('on');
 }
+/* ═══ v2.46.157: серии фильтров-осушителей — какая куда (пункт 3) ═══
+   Над списком фильтров — раскладка по сериям DFL/DML/DCL/DGL/DAS/DCR с
+   пояснением, и подсветка «нужен именно этот»: под лист берём хладагент и
+   мощность из «Расчёта чиллера» (localStorage chiller.calc), присоединение —
+   из жидкостной линии расчёта труб. Новая машина → жидкостной DFL/DML;
+   кислотные и всасывающие — только после сгорания компрессора. */
+let asgSer=null;
+function asgCalcCtx(){
+  try{const o=JSON.parse(localStorage.getItem('chiller.calc')||'{}')||{};
+    return {ref:o.comp&&o.comp.ref,Q:o.comp&&o.comp.Q,od:o.pipe&&o.pipe.odl};}catch(e){return {};}
+}
+function asgFilterSeriesHtml(pool){
+  const cnt={};pool.forEach(d=>{const sr=ATYPES.series(d);if(sr)cnt[sr]=(cnt[sr]||0)+1;});
+  const sers=Object.keys(cnt).sort();
+  if(!sers.length)return '';
+  const ctx=asgCalcCtx();
+  const need=['DFL','DML'];   // новая машина, жидкостная линия
+  let h='<div class="asg-ser"><b>СЕРИЯ ФИЛЬТРА</b><span class="asg-ser-hint">'+
+    (ctx.ref?('под лист: '+esc(String(ctx.ref))+(ctx.Q?' · '+esc(String(ctx.Q))+' кВт':'')+(ctx.od?' · жидкостная Ø'+esc(String(ctx.od)):'')+' → '):'новая машина → ')+
+    '<u>жидкостной DFL / DML</u>; DCL / DGL — только после сгорания компрессора; DAS — на всасывание; DCR — разборный для больших машин</span><div class="asg-ser-row">'+
+    sers.map(sr=>{const inf=ATYPES.FILTER_SERIES[sr]||{txt:'серия '+sr};const rec=need.includes(sr);
+      return '<span class="'+(asgSer===sr?'on':'')+(rec?' rec':'')+'" data-ser="'+sr+'" title="'+esc(inf.txt)+'">'+sr+(rec?' ✓':'')+' <small>'+cnt[sr]+'</small></span>';}).join('')+
+    '</div>'+(asgSer&&ATYPES.FILTER_SERIES[asgSer]?'<div class="asg-ser-txt">'+esc(asgSer+' — '+ATYPES.FILTER_SERIES[asgSer].txt)+'</div>':'')+'</div>';
+  setTimeout(()=>{document.querySelectorAll('.asg-ser-row span').forEach(el=>el.onclick=()=>{
+    asgSer=asgSer===el.dataset.ser?null:el.dataset.ser;
+    $('#asgQ').value=asgSer||'';drawAsgList();});},0);
+  return h;
+}
 function drawAsgList(){
   const q=($('#asgQ').value||'').trim();
   const tk=qTok(q);   /* поиск по нескольким словам, как в каталоге базы (v2.45.1023) */
@@ -11357,6 +11434,7 @@ function drawAsgList(){
   const inCat=d=>{
     if(S.sec&&d.section!==S.sec)return false;
     if(S.sub&&d.sub!==S.sub)return false;
+    if(S.type&&ATYPES.of(d)!==S.type)return false;
     if(S.brand&&(d.brand||'')!==S.brand)return false;
     if(S.pow){const[a,b]=S.pow.split('-').map(Number);const kw=asgKw(d);if(!(kw>=a&&kw<b))return false;}
     return true;
@@ -11411,24 +11489,29 @@ function drawAsgList(){
     dd.querySelectorAll('div').forEach(o=>o.onclick=(ev)=>{
       ev.stopPropagation();
       if(kind==='sec'){S.sec=o.dataset.id||null;S.sub=null;}else S.sub=o.dataset.id||null;
-      S.brand=null;S.pow=null;dd.classList.remove('on');drawAsgList();
+      S.type=null;S.brand=null;S.pow=null;dd.classList.remove('on');drawAsgList();
     });
   });
   const rstEl=document.getElementById('asgRst');
-  if(rstEl)rstEl.onclick=()=>{S.sec=rec.sec;S.sub=rec.sub;S.brand=null;S.pow=null;drawAsgList();};
-  // фильтры: бренды текущей выборки + мощность, если есть у позиций
-  const pool=DATA.filter(d=>d.ready&&(!S.sec||d.section===S.sec)&&(!S.sub||d.sub===S.sub));
+  if(rstEl)rstEl.onclick=()=>{S.sec=rec.sec;S.sub=rec.sub;S.type=(ATYPES.NODE[asgKey]||null);S.brand=null;S.pow=null;drawAsgList();};
+  // фильтры: тип (третий уровень), бренды текущей выборки + мощность, если есть у позиций
+  const pool0=DATA.filter(d=>d.ready&&(!S.sec||d.section===S.sec)&&(!S.sub||d.sub===S.sub));
+  const tys=S.sec?ATYPES.types(pool0):[];
+  const pool=S.type?pool0.filter(d=>ATYPES.of(d)===S.type):pool0;
   const bc={};pool.forEach(d=>{if(d.brand)bc[d.brand]=(bc[d.brand]||0)+1;});
   const brands=Object.keys(bc).sort((a,b)=>bc[b]-bc[a]).slice(0,6);
   const kwN=pool.filter(d=>asgKw(d)>0).length;
   let fl='';
-  if(brands.length>1)fl+='<b>БРЕНД</b>'+brands.map(b=>'<span class="'+(S.brand===b?'on':'')+'" data-f="b:'+esc(b)+'">'+esc(b)+'</span>').join('');
+  if(tys.length>1)fl+='<b>ТИП</b>'+tys.map(t=>'<span class="'+(S.type===t.key?'on':'')+'" data-f="t:'+esc(t.key)+'">'+esc(t.label)+' '+t.n+'</span>').join('');
+  if(brands.length>1)fl+='<b'+(tys.length>1?' style="margin-left:6px"':'')+'>БРЕНД</b>'+brands.map(b=>'<span class="'+(S.brand===b?'on':'')+'" data-f="b:'+esc(b)+'">'+esc(b)+'</span>').join('');
   if(kwN>=3)fl+='<b style="margin-left:6px">МОЩНОСТЬ</b>'+[['до 5','0-5'],['5–10','5-10'],['10–20','10-20'],['20+','20-999']]
     .map(([nm,r])=>'<span class="'+(S.pow===r?'on':'')+'" data-f="p:'+r+'">'+nm+' кВт</span>').join('');
   $('#asgFl').innerHTML=fl;$('#asgFl').style.display=fl?'flex':'none';
   document.querySelectorAll('#asgFl span').forEach(el=>el.onclick=()=>{
-    const m=/^(b|p):(.+)$/.exec(el.dataset.f);
-    if(m[1]==='b')S.brand=S.brand===m[2]?null:m[2];else S.pow=S.pow===m[2]?null:m[2];
+    const m=/^(b|p|t):(.+)$/.exec(el.dataset.f);if(!m)return;
+    if(m[1]==='b')S.brand=S.brand===m[2]?null:m[2];
+    else if(m[1]==='t'){S.type=S.type===m[2]?null:m[2];S.brand=null;}
+    else S.pow=S.pow===m[2]?null:m[2];
     drawAsgList();});
   // поиск, сортировка, охват
   $('#asgQ').placeholder='поиск в «'+(S.sub?asgSubName(S.sec,S.sub):asgSecName(S.sec))+'»…';
@@ -11445,7 +11528,7 @@ function drawAsgList(){
     return String(a.name).localeCompare(String(b.name),'ru');
   }).slice(0,60);
   const mine=sorted.filter(d=>used.has(d.id)),rest=sorted.filter(d=>!used.has(d.id));
-  let h='';
+  let h=S.type==='filt'?asgFilterSeriesHtml(pool):'';
   if(mine.length)h+='<div class="asg-grp">УЖЕ В ПРОЕКТЕ</div>'+mine.map(d=>catRow(d,'→',tk)).join('')
     +(rest.length?'<div class="asg-grp">'+(S.sub||S.sec?'ВСЯ КАТЕГОРИЯ':'ВСЯ БАЗА')+'</div>':'');
   h+=rest.map(d=>catRow(d,'→',tk)).join('');
@@ -12649,7 +12732,7 @@ addEventListener('keydown',e=>{
    раскрывает базу на весь экран: дерево раздел → подраздел, крупные карточки,
    фильтры бренда и мощности, сравнение до трёх позиций бок-о-бок и жёлтая
    полка «по схеме назначено, а в сцене не стоит» — ставится одним кликом. */
-let nomSt={sec:null,sub:null,open:null,brand:null,pow:null,view:'grid',lim:60,cmp:[]};
+let nomSt={sec:null,sub:null,type:null,open:null,brand:null,pow:null,view:'grid',lim:60,cmp:[]};
 function nomNeedList(data,schema,placedArr,schNodes){
   // назначено узлу схемы, позиция готова, но в сцене её нет
   const out=[];
@@ -12670,6 +12753,7 @@ function nomMatch(d){
   if(q)return q.split(/\s+/).every(t=>hay(d).includes(t));  // поиск словами — по всей базе
   if(nomSt.sec&&d.section!==nomSt.sec)return false;
   if(nomSt.sub&&d.sub!==nomSt.sub)return false;
+  if(nomSt.type&&ATYPES.of(d)!==nomSt.type)return false;
   if(nomSt.brand&&(d.brand||'')!==nomSt.brand)return false;
   if(nomSt.pow){const[a,b]=nomSt.pow.split('-').map(Number);const kw=asgKw(d);if(!(kw>=a&&kw<b))return false;}
   return true;
@@ -12716,7 +12800,7 @@ function drawNom(){
     if(sub){nomSt.sec=sec;nomSt.sub=nomSt.sub===sub?null:sub;}
     else if(!sec){nomSt.sec=null;nomSt.sub=null;nomSt.open=null;}
     else{nomSt.open=(nomSt.open===sec&&nomSt.sec===sec&&!nomSt.sub)?null:sec;nomSt.sec=sec;nomSt.sub=null;}
-    nomSt.brand=null;nomSt.pow=null;nomSt.lim=60;drawNom();
+    nomSt.type=null;nomSt.brand=null;nomSt.pow=null;nomSt.lim=60;drawNom();
   });
   // полка «не хватает по схеме»
   const need=nomNeedList(DATA,schemaData,placed,SCH_NODES);
@@ -12727,20 +12811,25 @@ function drawNom(){
   $('#nomNeedRow').querySelectorAll('.nom-nc').forEach(el=>el.onclick=()=>{
     const n=need[+el.dataset.need];nomPut(n.d,n.tag);});
   // фильтры
-  const pool=DATA.filter(d=>d.ready&&(!nomSt.sec||d.section===nomSt.sec)&&(!nomSt.sub||d.sub===nomSt.sub));
+  const pool0=DATA.filter(d=>d.ready&&(!nomSt.sec||d.section===nomSt.sec)&&(!nomSt.sub||d.sub===nomSt.sub));
+  const tys=nomSt.sec?ATYPES.types(pool0):[];
+  const pool=nomSt.type?pool0.filter(d=>ATYPES.of(d)===nomSt.type):pool0;
   const bc={};pool.forEach(d=>{if(d.brand)bc[d.brand]=(bc[d.brand]||0)+1;});
   const brands=Object.keys(bc).sort((a,b)=>bc[b]-bc[a]).slice(0,7);
   const list=DATA.filter(d=>d.ready).filter(nomMatch);
   let fl='';
-  if(brands.length>1)fl+='<b>БРЕНД</b>'+brands.map(b=>'<span class="'+(nomSt.brand===b?'on':'')+'" data-f="b:'+esc(b)+'">'+esc(b)+' '+bc[b]+'</span>').join('');
+  if(tys.length>1)fl+='<b>ТИП</b>'+tys.map(t=>'<span class="'+(nomSt.type===t.key?'on':'')+'" data-f="t:'+esc(t.key)+'">'+esc(t.label)+' '+t.n+'</span>').join('');
+  if(brands.length>1)fl+='<b'+(tys.length>1?' style="margin-left:8px"':'')+'>БРЕНД</b>'+brands.map(b=>'<span class="'+(nomSt.brand===b?'on':'')+'" data-f="b:'+esc(b)+'">'+esc(b)+' '+bc[b]+'</span>').join('');
   if(pool.filter(d=>asgKw(d)>0).length>=3)
     fl+='<b style="margin-left:8px">МОЩНОСТЬ</b>'+[['до 5','0-5'],['5–10','5-10'],['10–20','10-20'],['20+','20-999']]
       .map(([nm,r])=>'<span class="'+(nomSt.pow===r?'on':'')+'" data-f="p:'+r+'">'+nm+' кВт</span>').join('');
   fl+='<span class="cnt">'+list.length+' из '+DATA.filter(d=>d.ready).length+'</span>';
   $('#nomFl').innerHTML=fl;
   $('#nomFl').querySelectorAll('span[data-f]').forEach(el=>el.onclick=()=>{
-    const m=/^(b|p):(.+)$/.exec(el.dataset.f);
-    if(m[1]==='b')nomSt.brand=nomSt.brand===m[2]?null:m[2];else nomSt.pow=nomSt.pow===m[2]?null:m[2];
+    const m=/^(b|p|t):(.+)$/.exec(el.dataset.f);if(!m)return;
+    if(m[1]==='b')nomSt.brand=nomSt.brand===m[2]?null:m[2];
+    else if(m[1]==='t'){nomSt.type=nomSt.type===m[2]?null:m[2];nomSt.brand=null;}
+    else nomSt.pow=nomSt.pow===m[2]?null:m[2];
     nomSt.lim=60;drawNom();});
   // сетка
   const g=$('#nomGrid');
@@ -13289,7 +13378,7 @@ function chGrow(el){
     $('#cat').innerHTML='<div style="padding:14px 6px;font-size:12px;color:var(--bad)">База не отдалась ('+e.message+').<br>Открой прототип из CRM (Производство → Атом Чиллер), чтобы был токен.</div>';
     return;
   }
-  DATA=ix.items;GEOMS=ix.geoms;SECTIONS=ix.sections;secNames();fixPprRoutePorts();fixPprTurnPorts();
+  DATA=ix.items;GEOMS=ix.geoms;SECTIONS=ix.sections;secNames();pedrolloMerge();secNames();fixPprRoutePorts();fixPprTurnPorts();
   VER=(ix.version||ix.built||'').replace(/[^0-9a-zA-Z]/g,'');
   Object.values(GEOMS).forEach(g=>{if(g&&g.f&&g.v)RV[g.f]=g.v;});
   await loadUserModels();
