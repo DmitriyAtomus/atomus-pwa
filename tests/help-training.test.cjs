@@ -73,6 +73,14 @@ test('ключевые темы каждой школы на месте', () => 
   assert.match(wh, /Свободные/);
   assert.match(wh, /Списание/);
   assert.match(wh, /Что закупить/);
+  // v2.46.156: инвентаризация и приход вручную
+  assert.match(wh, /Инвентаризация: три способа/);
+  assert.match(wh, /Сверка по фото/);
+  assert.match(wh, /Восстановить/);
+  assert.match(wh, /Приход комплектующих вручную/);
+  const whC = list.find(c => c.id === 'warehouse');
+  assert.ok(whC.quiz.filter(q => /инвентариз|сверка по фото|бланк/i.test(q.q + q.o.join(' '))).length >= 4,
+    'в тесте склада мало вопросов про инвентаризацию');
   const sc = JSON.stringify(list.find(c => c.id === 'supply_cycle'));
   assert.match(sc, /Закрыть заявку/);
   assert.match(sc, /Заказан → Оплачен → В пути → На складе/);
