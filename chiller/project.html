@@ -452,6 +452,7 @@ svg g.sn.dim{opacity:.22}
 .sp-row b{display:block;font-size:12px}.sp-row small{color:var(--dim)}
 .sp-row.ok small{color:var(--green)}.sp-row.no small{color:#e8907f}.sp-row.mut small{color:var(--dim)}
 .sp-row i{font-style:normal;color:var(--gold)}
+.sp-kpis .an{color:var(--gold)}.sp-kpis .st{color:#9fb8d8}.sp-row.an small{color:var(--gold)}.sp-row.st small{color:#9fb8d8}
 /* v2.46.151: отчёт стенда вариаций */
 #stressRep{position:fixed;inset:0;z-index:80;background:rgba(4,10,20,.6);display:flex;align-items:center;justify-content:center;padding:20px}
 #stressRep .sr-in{width:min(860px,96vw);max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.6)}
@@ -1867,6 +1868,7 @@ async function meshOf(G){
 const GEO_CACHE=new Map();
 async function geoOf(d){
   if(d.tk)return tkGeoOf(d);          // бак строится по размерам, меша в базе нет
+  if(d.st)return stGeoOf(d);          // v2.46.153: заглушка-габарит вместо отсутствующей модели
   const key=d.g;
   if(GEO_CACHE.has(key))return GEO_CACHE.get(key);
   const MS=await meshOf(GEOMS[key]);
@@ -8527,6 +8529,114 @@ function bindReport(rep){
   document.getElementById('brX').onclick=()=>m.remove();
 }
 
+/* ═══ v2.46.153: нет модели в базе — машина всё равно собирается ═══
+   «Когда нет 3D-модели — чтобы автоматически начал проставлять». Два уровня
+   замены. Аналог: та же категория, ближе всего по артикулу (YH104T1-210 →
+   другой Invotech YH…); стоит с пометкой «заменить, когда появится STEP».
+   Заглушка-габарит: если в категории пусто — параметрический бокс с типовыми
+   размерами узла и патрубками нужного размера из строки спецификации
+   (1/2", 5/8"…), чтобы компоновка и обвязка шли, не дожидаясь модели.
+   Заглушка живёт в проекте как бак (поле st) и переживает перезагрузку. */
+const STUB_DIMS={   // [Д, Ш, В] мм и патрубки: сторона, высота, среда, размер по умолчанию
+  KM1:{d:[300,300,420],ports:[['НАГНЕТАНИЕ','+x',350,'dis','5/8'],['ВСАСЫВАНИЕ','+y',300,'suc','3/4']],sec:'compressors',sub:'scroll'},
+  AVO1:{d:[700,300,700],ports:[['ВХОД ГАЗА','-x',450,'dis','5/8'],['ВЫХОД ЖИДКОСТИ','+x',200,'liq','1/2']],sec:'hx',sub:'cond'},
+  M1:{d:[450,450,150],ports:[],sec:'hx',sub:'fan'},
+  RS1:{d:[160,160,450],ports:[['ВХОД','-x',380,'liq','1/2'],['ВЫХОД','+x',80,'liq','1/2']],sec:'vessels',sub:'recv'},
+  F1:{d:[200,80,80],ports:[['ВХОД','-x',40,'liq','1/2'],['ВЫХОД','+x',40,'liq','1/2']],sec:'valves',sub:'filt'},
+  SI1:{d:[70,60,60],ports:[['ВХОД','-x',30,'liq','1/2'],['ВЫХОД','+x',30,'liq','1/2']],sec:'valves',sub:'sight'},
+  UA1:{d:[110,60,90],ports:[['ВХОД','-x',30,'liq','1/2'],['ВЫХОД','+x',30,'liq','1/2']],sec:'valves',sub:'sol'},
+  UA2:{d:[80,50,70],ports:[['ВХОД','-x',25,'liq','1/4'],['ВЫХОД','+x',25,'liq','1/4']],sec:'valves',sub:'sol'},
+  TRV1:{d:[110,80,130],ports:[['ВХОД','-x',40,'liq','1/2'],['ВЫХОД','+x',40,'liq','1/2']],sec:'valves',sub:'trv'},
+  I1:{d:[120,310,530],ports:[['ВХОД ФРЕОНА','-y',110,'liq','1/2'],['ВЫХОД ПАРА','-y',430,'suc','3/4'],['ВХОД ВОДЫ','+y',110,'eq','G1'],['ВЫХОД ВОДЫ','+y',430,'eq','G1']],sec:'hx',sub:'plate'},
+  OZH1:{d:[120,120,350],ports:[['ВХОД','-x',300,'suc','3/4'],['ВЫХОД','+y',280,'suc','3/4']],sec:'vessels',sub:'sep'},
+  N1:{d:[260,180,320],ports:[['ВХОД (ВСАС)','+y',150,'eq','G1'],['ВЫХОД НАПОР','-y',250,'eq','G1']],sec:'pumps',sub:''},
+  AB1:{d:[500,400,600],ports:[['ВЫХОД ПОДАЧА','-x',150,'eq','G1'],['ВХОД ОБРАТКА','-x',450,'eq','G1']],sec:'vessels',sub:'tank'},
+  KD1:{d:[110,60,90],ports:[['ВХОД','-x',30,'liq','1/2'],['ВЫХОД','+x',30,'liq','1/2']],sec:'valves',sub:''},
+  KR1:{d:[110,60,90],ports:[['ВХОД','-x',30,'liq','1/2'],['ВЫХОД','+x',30,'liq','1/2']],sec:'valves',sub:''},
+  VN1:{d:[90,60,80],ports:[['ВХОД','-x',30,'liq','1/2'],['ВЫХОД','+x',30,'liq','1/2']],sec:'valves',sub:''},
+  KO1:{d:[90,50,60],ports:[['ВХОД','-x',25,'dis','5/8'],['ВЫХОД','+x',25,'dis','5/8']],sec:'valves',sub:''},
+  KO2:{d:[80,45,55],ports:[['ВХОД','-x',22,'liq','3/8'],['ВЫХОД','+x',22,'liq','3/8']],sec:'valves',sub:''},
+  RP1:{d:[120,60,140],ports:[['ВХОД','-x',40,'eq','G3/4'],['ВЫХОД','+x',40,'eq','G3/4']],sec:'automation',sub:''},
+  RD1:{d:[100,60,120],ports:[],sec:'automation',sub:''},RD2:{d:[100,60,120],ports:[],sec:'automation',sub:''},RD3:{d:[100,60,120],ports:[],sec:'automation',sub:''},
+  MN1:{d:[80,40,80],ports:[],sec:'automation',sub:'gauge'},MN2:{d:[80,40,80],ports:[],sec:'automation',sub:'gauge'},
+  KSH1:{d:[30,30,60],ports:[],sec:'valves',sub:''},KSH2:{d:[30,30,60],ports:[],sec:'valves',sub:''},
+  EK1:{d:[200,200,40],ports:[],sec:'heat',sub:''},
+};
+/* размер присоединения из строки спецификации: «1/2"» → 12,7 мм пайка; «G1» — резьба */
+function stubConnFrom(name,def){
+  const m=String(name||'').match(/(\d\/\d|\d)\s*"|(\d+)\s*мм/);
+  if(m&&m[1])return {ctype:'odf',size:Math.round(inchMm(m[1])*10)/10};
+  if(m&&m[2])return {ctype:'odf',size:+m[2]};
+  if(/^G/i.test(def))return {ctype:'thr',size:def};
+  return {ctype:'odf',size:Math.round(inchMm(def)*10)/10};
+}
+function stubPorts(key,name){
+  const T=STUB_DIMS[key];if(!T)return [];
+  const [L,B,H]=T.d;
+  return T.ports.map(pt=>{
+    const [nm,side,z,kind,def]=pt;
+    const dir=side==='+x'?[1,0,0]:side==='-x'?[-1,0,0]:side==='+y'?[0,1,0]:[0,-1,0];
+    const p0=[dir[0]*L/2,dir[1]*B/2,z];
+    const c=/фреон|liq|dis|suc/.test(kind)?stubConnFrom(name,def):{ctype:'thr',size:def};
+    if(c.ctype==='thr')return {kind:kind,name:nm,p0:p0,dir:dir,tip:[p0[0]+dir[0]*40,p0[1]+dir[1]*40,z],
+      ctype:'thr',conn:String(c.size),sex:'m',seat:0,od:34};
+    return {kind:kind,name:nm,p0:p0,dir:dir,tip:[p0[0]+dir[0]*40,p0[1]+dir[1]*40,z],
+      ctype:'odf',conn:String(c.size),od:c.size,sex:'f',seat:0};
+  });
+}
+function stubId(P){return 'STUB-'+P.key+'-'+specNorm(P.want).slice(0,24);}
+function stubModel(P){
+  const T=STUB_DIMS[P.key]||{d:[200,200,200],ports:[],sec:'',sub:''};
+  const nd=SCH_NODES.find(n=>n.k===P.key),rec=nd?asgResolveCat(nd):{sec:null,sub:null};
+  const zn=P.zn||stubPorts(P.key,P.want);
+  return {id:stubId(P),name:'Заглушка · '+P.want,brand:'',kind:'габарит вместо модели',
+    section:rec.sec||T.sec,sub:rec.sub||T.sub,ready:true,st:{key:P.key,want:P.want,dims:P.dims||T.d,zn:zn},
+    tags:['габарит '+(P.dims||T.d).join('×'),'нет STEP — заглушка'],
+    specs:[['Что это','Габаритная заглушка: модели в базе 3D нет, размеры типовые для узла '+(nd?nd.t:P.key)],
+           ['Заменить на','STEP позиции «'+P.want+'» — после загрузки назначь её на узел, заглушка уйдёт']],
+    _zn:zn};
+}
+function stubEnsure(P){
+  const id=stubId(P);
+  let d=DATA.find(x=>x.id===id);
+  if(!d){d=stubModel(P);d.g=id;GEOMS[id]={f:id,zn:d._zn,bb:{lo:[-d.st.dims[0]/2,-d.st.dims[1]/2,0],hi:[d.st.dims[0]/2,d.st.dims[1]/2,d.st.dims[2]]}};DATA.push(d);}
+  return d;
+}
+const ST_CACHE=new Map();
+function stGeoOf(d){
+  if(!ST_CACHE.has(d.id)){
+    const [L,B,H]=d.st.dims;
+    const g=new THREE.BoxGeometry(L,B,H);g.translate(0,0,H/2);g.computeBoundingBox();
+    g.userData.parts=null;g.userData.zoneMats=false;g.userData.zones=d._zn||d.st.zn||[];
+    ST_CACHE.set(d.id,g);
+  }
+  return ST_CACHE.get(d.id);
+}
+/* аналог из базы: та же категория узла, ближе всего по артикулу */
+function specAnalog(name,key){
+  const nd=SCH_NODES.find(n=>n.k===key);if(!nd)return null;
+  const rec=asgResolveCat(nd);if(!rec.sec)return null;
+  const pool=DATA.filter(d=>d.ready&&d.g&&!d.st&&!d.tk&&roleOf(d)!=='frame'&&
+    d.section===rec.sec&&(!rec.sub||d.sub===rec.sub));
+  if(!pool.length)return null;
+  const toks=specTokens(name).map(specNorm);
+  const pref=(a,b)=>{let n=0;while(n<a.length&&n<b.length&&a[n]===b[n])n++;return n;};
+  let best=null,bs=-1;
+  pool.forEach(d=>{
+    const hay=specNorm(d.id+' '+(d.brand||'')+' '+(d.name||''));
+    let sc=0;
+    toks.forEach(t=>{if(t.length<3)return;const words=hay.match(/[a-z]+\d+[a-z0-9]*|[a-z]{3,}/g)||[];
+      words.forEach(w=>{const k=pref(t,w);if(k>=3)sc=Math.max(sc,k);});});
+    if(sc>bs){bs=sc;best=d;}
+  });
+  /* похожесть по артикулу обязательна: в узкой категории (подраздел совпал)
+     хватит общего корня из двух знаков (YH104 → YH69), в широкой — трёх.
+     Иначе «аналогом» вентилятора становился конденсатор, а клапана — фильтр:
+     заглушка с верными габаритами и патрубками честнее такого аналога. */
+  const need=rec.sub?2:3;
+  return (best&&bs>=need)?{d:best,sc:bs}:null;
+}
+
 /* ═══ v2.46.152: 📋 из спецификации — схема заполняется списком ═══
    «Сначала надо принципиальную схему заполнить» — да. Дмитрий приносит
    спецификацию машины (27 строк на 7 кВт: артикулы Danfoss/Ридан, наши
@@ -8634,7 +8744,7 @@ function specFindModel(name,key){
     return {sc:sc,ok:strong>0||weak>=2};
   };
   let best=null;
-  const pool=DATA.filter(d=>d.ready&&d.g&&roleOf(d)!=='frame');
+  const pool=DATA.filter(d=>d.ready&&d.g&&!d.st&&roleOf(d)!=='frame');
   [pool.filter(inCat),pool].forEach((list,pass)=>{
     if(best)return;
     list.forEach(d=>{const r=score(d);if(r.ok&&(!best||r.sc>best.sc))best={d:d,sc:r.sc,other:pass===1};});
@@ -8662,30 +8772,50 @@ function specRun(){
   const txt=(document.getElementById('spTxt')||{}).value||'';
   const rows=specMap(specParse(txt));
   if(!rows.length){toast('Список пустой');return;}
-  rows.forEach(r=>{r.model=r.key?specFindModel(r.name,r.key):null;});
+  rows.forEach(r=>{
+    r.model=r.key?specFindModel(r.name,r.key):null;
+    /* v2.46.153: модели нет — аналог из категории, а без него заглушка-габарит */
+    if(r.key&&!r.model){
+      const an=specAnalog(r.name,r.key);
+      if(an){r.analog=an.d;}
+      else if(STUB_DIMS[r.key]){r.stub=stubEnsure({key:r.key,want:r.name});}
+    }
+  });
   SPEC_LAST=rows;
-  const found=rows.filter(r=>r.key&&r.model),miss=rows.filter(r=>r.key&&!r.model),off=rows.filter(r=>!r.key);
+  const found=rows.filter(r=>r.key&&r.model),analog=rows.filter(r=>r.analog),stub=rows.filter(r=>r.stub),
+        miss=rows.filter(r=>r.key&&!r.model&&!r.analog&&!r.stub),off=rows.filter(r=>!r.key);
   const box=document.getElementById('spRes');
-  box.innerHTML='<div class="sp-kpis"><span class="ok">найдено в базе: <b>'+found.length+'</b></span>'+
-      '<span class="no">нет модели: <b>'+miss.length+'</b></span><span class="mut">вне листа: <b>'+off.length+'</b></span></div>'+
+  box.innerHTML='<div class="sp-kpis"><span class="ok">в базе: <b>'+found.length+'</b></span>'+
+      '<span class="an">аналог: <b>'+analog.length+'</b></span><span class="st">заглушка: <b>'+stub.length+'</b></span>'+
+      '<span class="no">нет: <b>'+miss.length+'</b></span><span class="mut">вне листа: <b>'+off.length+'</b></span></div>'+
     rows.map(r=>{
-      const cls=r.key?(r.model?'ok':'no'):'mut';
+      const cls=r.key?(r.model?'ok':(r.analog?'an':(r.stub?'st':'no'))):'mut';
       const node=r.key?schNodeT(r.key):'—';
-      const model=r.model?('✓ '+esc((r.model.d.brand?r.model.d.brand+' ':'')+r.model.d.name)+(r.model.other?' <i>(другая категория — проверь)</i>':''))
-        :(r.key?'нет в базе 3D — загрузи STEP этой позиции':esc(r.note||''));
+      let model;
+      if(r.model)model='✓ '+esc((r.model.d.brand?r.model.d.brand+' ':'')+r.model.d.name)+(r.model.other?' <i>(другая категория — проверь)</i>':'');
+      else if(r.analog)model='⚠ аналог: '+esc((r.analog.brand?r.analog.brand+' ':'')+r.analog.name)+' — заменить, когда появится STEP';
+      else if(r.stub)model='▭ заглушка-габарит '+r.stub.st.dims.join('×')+(r.stub.st.zn.length?' с патрубками '+esc([...new Set(r.stub.st.zn.map(z=>(z.ctype==='thr'?'G'+z.conn:'Ø'+z.conn)))].join(', ')):'')+' — компоновка и обвязка идут, STEP подгрузишь позже';
+      else model=r.key?'нет в базе 3D и типового габарита — загрузи STEP этой позиции':esc(r.note||'');
       return '<div class="sp-row '+cls+'"><span class="q">'+r.qty+'</span><div><b>'+esc(r.name)+'</b><small>'+esc(node)+' · '+model+'</small></div></div>';
     }).join('')+
-    '<div class="sp-act"><div class="btn pri" id="spAssign">Назначить найденные ('+found.length+') на схему</div>'+
-      (miss.length?'<div class="btn" id="spCopyMiss">⧉ Список недостающих</div>':'')+'</div>';
-  document.getElementById('spAssign').onclick=()=>specAssign(found);
+    '<div class="sp-act"><div class="btn pri" id="spAssign">Назначить на схему: '+found.length+' из базы'+(analog.length?' + '+analog.length+' аналог.':'')+(stub.length?' + '+stub.length+' заглуш.':'')+'</div>'+
+      ((miss.length||analog.length||stub.length)?'<div class="btn" id="spCopyMiss">⧉ Список STEP к загрузке</div>':'')+'</div>';
+  const toAssign=rows.filter(r=>r.key&&(r.model||r.analog||r.stub));
+  document.getElementById('spAssign').onclick=()=>specAssign(toAssign);
   const cm=document.getElementById('spCopyMiss');
-  if(cm)cm.onclick=async()=>{const t=miss.map(r=>r.name).join('\n');try{await navigator.clipboard.writeText(t);toast('Список недостающих в буфере');}catch(e){prompt('Недостающие позиции:',t);}};
+  if(cm)cm.onclick=async()=>{const t=rows.filter(r=>r.key&&!r.model).map(r=>r.name).join('\n');try{await navigator.clipboard.writeText(t);toast('Список недостающих в буфере');}catch(e){prompt('Недостающие позиции:',t);}};
 }
 async function specAssign(found){
   if(!found.length){toast('Назначать нечего');return;}
   const h=histBegin('схему из спецификации');
   try{
-    found.forEach(r=>{schemaData[r.key]={id:r.model.d.id,name:(r.model.d.brand?r.model.d.brand+' ':'')+r.model.d.name};});
+    found.forEach(r=>{
+      const d=r.model?r.model.d:(r.analog||r.stub);
+      const e={id:d.id,name:(d.brand?d.brand+' ':'')+d.name};
+      if(r.analog){e.analog=true;e.want=r.name;e.name='Аналог · '+e.name;}
+      if(r.stub){e.stub=true;e.want=r.name;}
+      schemaData[r.key]=e;
+    });
     if(typeof renderSchema==='function')renderSchema();
     save();
   }finally{histEnd(h);}
@@ -8868,7 +8998,7 @@ function stressCandidates(){
   const per={};
   SCH_NODES.filter(n=>SCH_EDGE_KEYS.has(n.k)).forEach(nd=>{
     const rec=asgResolveCat(nd);
-    per[nd.k]=DATA.filter(d=>d.ready&&d.g&&roleOf(d)!=='frame'&&roleOf(d)!=='pipe'&&
+    per[nd.k]=DATA.filter(d=>d.ready&&d.g&&!d.st&&roleOf(d)!=='frame'&&roleOf(d)!=='pipe'&&
       (!rec.sec||d.section===rec.sec)&&(!rec.sub||d.sub===rec.sub));
   });
   const frames=DATA.filter(d=>d.ready&&d.g&&roleOf(d)==='frame');
@@ -9668,6 +9798,7 @@ function projPayload(){
                                              lp:Array.isArray(p.link.lp)?p.link.lp.slice():undefined,
                                              d:p.link.d}:null,
                                 tk:isTank(p.d)?p.d.tk:undefined,   // бак: размеры и исполнение
+                                st:p.d.st||undefined,              // v2.46.153: заглушка-габарит
                                 po:p.po&&Object.keys(p.po).length?JSON.parse(JSON.stringify(p.po)):undefined,
                                 pv:p.pv||undefined,                // v2.46.083: схема номеров врезок бака
                                 pl:isPipeSeg(p)?pipeLen(p):undefined,
@@ -9807,7 +9938,7 @@ async function loadProjectData(data){
   const arr=(data&&data.items)||[];
   const map={};                    // старый uid из проекта → новый в сцене
   for(const s of arr){
-    const d=s.tk?tkModel(s.tk):DATA.find(x=>x.id===s.id&&x.ready);
+    const d=s.tk?tkModel(s.tk):(s.st?stubEnsure(s.st):DATA.find(x=>x.id===s.id&&x.ready));
     if(!d)continue;
     // z, наклона и закрепления в старых проектах нет — там деталь просто стоит на полу
     const it=await addItem(d,{x:s.x,y:s.y,z:s.z,

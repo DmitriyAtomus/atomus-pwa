@@ -113,6 +113,6 @@ test('кнопка на вкладке «Схема» и модалка на м�
   assert.match(src, /id="slSpec"/);
   assert.match(src, /id="slSpecGo"/);
   assert.match(src, /function specOpen\(\)/);
-  assert.match(src, /Назначить найденные/);
+  assert.match(src, /Назначить на схему: /);
   assert.match(src, /загрузи STEP этой позиции/);
 });
