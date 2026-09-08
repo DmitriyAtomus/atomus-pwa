@@ -319,3 +319,45 @@ test('текст ТЗ прячется, когда есть полки, и от�
   assert.match(app4, /_ideaAddSpec\(th\.spec_text, th\.spec_card\)/);
   assert.match(app4, /ideaSpecCardHtml/);
 });
+
+// v2.46.160: общие темы — инженер и директор в одном треде с Клавой
+function slice(src, from, to) {
+  const i = src.indexOf(from);
+  assert.ok(i >= 0, 'не найдено: ' + from);
+  const j = src.indexOf(to, i);
+  assert.ok(j > i, 'не найден конец: ' + to);
+  return src.slice(i, j);
+}
+test('общая тема: директор заводит, список группирует, чужие реплики подписаны', () => {
+  const shell = slice(app4, 'function _ideasRenderShell()', 'function ideasToggleList');
+  assert.match(shell, /ideasNewShared\(\)/);
+  assert.match(shell, /state\._ideas\.isDir\s*\?/);          // кнопка только директору
+  const ns = slice(app4, 'async function ideasNewShared()', 'async function ideasLoadListSilent');
+  assert.match(ns, /apiPost\('\/api\/ideas\/shared', \{ title: title\.trim\(\), intro: intro\.trim\(\) \}\)/);
+  const lh = slice(app4, 'function _ideasListHtml(list)', 'async function ideasNewShared');
+  assert.match(lh, /Общие темы/);
+  assert.match(lh, /it\.shared/);
+  assert.match(lh, /в работе<\/span>/);                        // счётчик раундов
+  const am = slice(app4, 'function _ideaAddMsg(role, text, when, files, local, author)', 'function _ideaAttr');
+  assert.match(am, /is-other/);
+  assert.match(am, /state\._ideas\.me/);
+  assert.match(am, /ich-who/);
+  const op = slice(app4, 'async function ideasOpen(id)', 'async function ideasLoadListSilent');
+  assert.match(op, /th\.shared \? \{ chat_id: m\.author_chat_id, name: m\.author_name \} : null/);
+  assert.match(css, /\.ich-row\.is-other/);
+  assert.match(css, /\.ich-ava\.is-person/);
+});
+
+test('общая тема: ТЗ без макета, «Внедрить» директору прямо в теме, без «Отправить директору»', () => {
+  const ra = slice(app4, 'function _ideasRenderActions(th)', 'function _ideasSharedActions');
+  assert.match(ra, /if \(th\.shared\) \{ acts\.innerHTML = _ideasSharedActions\(th\); return; \}/);
+  const sa = slice(app4, 'function _ideasSharedActions(th)', 'function _ideaFormat');
+  assert.match(sa, /ideaCompile\(true\)/);                     // макет не обязателен
+  assert.match(sa, /ideaImplement\(' \+ th\.id \+ '\)/);
+  assert.match(sa, /state\._ideas\.isDir/);
+  assert.doesNotMatch(sa, /ideaSubmit/);
+  assert.match(sa, /ТЗ готово — внедряет директор/);
+  assert.match(sa, /раундов в работе/);
+  const im = slice(app4, 'async function ideaImplement(id, comment)', 'async function ideaRevision');
+  assert.match(im, /d\.round/);
+});

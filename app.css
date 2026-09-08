@@ -25070,6 +25070,17 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
   background: #F8FAFC; color: var(--text-mid); font-size: 13px; font-weight: 700; cursor: pointer; }
 .ich-new:hover { border-color: var(--brand); color: var(--brand); }
 .ich-items { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+/* v2.46.160: общие темы */
+.ich-new-shared { margin-top: 6px; border-style: solid; background: #EEF4FF; border-color: #C7D6F5; color: #1E4E8C; }
+.ich-group { font-size: 10.5px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: #7E93AC; padding: 8px 4px 2px; }
+.ich-item.is-shared .ich-it-title .ti { color: #1E4E8C; font-size: 13px; vertical-align: -2px; }
+.ich-row.is-other { justify-content: flex-start; }
+.ich-ava.is-person { background: #E0EAFB; color: #1E4E8C; font-size: 11px; font-weight: 800; letter-spacing: .3px; }
+.ich-row.is-other .ich-bubble { background: #F1F5F9; border: 1px solid #E2E8F0; }
+.ich-who { font-size: 11px; font-weight: 800; color: #1E4E8C; margin-bottom: 3px; }
+.ich-note-shared { color: #1E4E8C; }
+.ich-go { box-shadow: 0 0 0 3px rgba(45,95,139,.18); }
+
 .ich-item { display: block; width: 100%; text-align: left; cursor: pointer; padding: 9px 10px;
   border-radius: 11px; border: 1px solid transparent; background: transparent; }
 .ich-item:hover { background: #F5F7FA; }

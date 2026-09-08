@@ -1787,6 +1787,7 @@ async function loadIdeas() {
   }
   state._ideas.isDir = !!st.is_director;
   state._ideas.name = st.name || '';
+  state._ideas.me = st.chat_id || null;
   const keyBtn = document.getElementById('ideas-key-btn');
   if (keyBtn) keyBtn.style.display = st.is_director ? '' : 'none';
   if (!st.unlocked) { _ideasRenderLock(st); return; }
@@ -1838,6 +1839,11 @@ function _ideasRenderShell() {
     '<div class="ich" id="ideas-wrap">' +
       '<aside class="ich-list" id="ideas-list">' +
         '<button class="ich-new" onclick="ideasNew()"><i class="ti ti-plus"></i>Новая идея</button>' +
+        (state._ideas && state._ideas.isDir
+          ? '<button class="ich-new ich-new-shared" onclick="ideasNewShared()" ' +
+            'title="Тема, в которой пишут все: инженер обсуждает с Клавой, вы внедряете">' +
+            '<i class="ti ti-users"></i>Общая тема</button>'
+          : '') +
         '<div class="ich-items" id="ideas-items"><div class="loading-block">Загружаем…</div></div>' +
       '</aside>' +
       '<div class="ich-main" id="ideas-main">' +
@@ -1886,19 +1892,46 @@ async function ideasLoadList() {
     ideasNew();
     return;
   }
-  items.innerHTML = list.map(function (it) {
-    const st = _ideaChip(it);
-    const mine = !state._ideas.isDir || !it.author_name;
-    return '<button class="ich-item' + (it.id === state._ideas.current ? ' active' : '') +
-      '" onclick="ideasOpen(' + it.id + ')">' +
-      '<div class="ich-it-top"><span class="ich-it-title">' + escapeHtml(it.title || 'Идея') + '</span>' +
-        '<span class="ich-chip ' + st.cls + '">' + st.label + '</span></div>' +
-      '<div class="ich-it-sub">' + (mine ? '' : escapeHtml(it.author_name) + ' · ') +
-        escapeHtml(_ideasWhen(it.updated_at)) + '</div>' +
-      '</button>';
-  }).join('');
+  items.innerHTML = _ideasListHtml(list);
   if (state._ideas.current) ideasOpen(state._ideas.current);
   else ideasOpen(list[0].id);
+}
+
+// v2.46.160: общие темы — отдельной группой сверху. В них пишут все, кто
+// вошёл в чат; личные идеи — как раньше, только свои (директору — все).
+function _ideasListHtml(list) {
+  const item = function (it) {
+    const st = _ideaChip(it);
+    const shared = !!it.shared;
+    const who = (!shared && state._ideas.isDir && it.author_name) ? escapeHtml(it.author_name) + ' · ' : '';
+    const rounds = shared && it.rounds ? '<span class="ich-chip is-taken">' + it.rounds + ' в работе</span>' : '';
+    return '<button class="ich-item' + (it.id === state._ideas.current ? ' active' : '') +
+      (shared ? ' is-shared' : '') + '" onclick="ideasOpen(' + it.id + ')">' +
+      '<div class="ich-it-top"><span class="ich-it-title">' +
+        (shared ? '<i class="ti ti-users"></i> ' : '') + escapeHtml(it.title || 'Идея') + '</span>' +
+        (shared && it.status === 'ready' ? '<span class="ich-chip is-ready">ТЗ готово</span>' : '') +
+        (shared ? rounds : '<span class="ich-chip ' + st.cls + '">' + st.label + '</span>') + '</div>' +
+      '<div class="ich-it-sub">' + who + escapeHtml(_ideasWhen(it.updated_at)) + '</div>' +
+      '</button>';
+  };
+  const shared = list.filter(function (it) { return it.shared; });
+  const own = list.filter(function (it) { return !it.shared; });
+  let h = '';
+  if (shared.length) h += '<div class="ich-group">Общие темы</div>' + shared.map(item).join('');
+  if (own.length) h += (shared.length ? '<div class="ich-group">' + (state._ideas.isDir ? 'Идеи сотрудников' : 'Мои идеи') + '</div>' : '') + own.map(item).join('');
+  return h;
+}
+
+async function ideasNewShared() {
+  const title = prompt('Название общей темы (например, «Атом Чиллер»):', '');
+  if (title === null) return;
+  if (!title.trim()) { showToast('Назовите тему', 'error'); return; }
+  const intro = prompt('Что обсуждаем в теме? Клава покажет это первым сообщением (можно пусто):', '') || '';
+  const r = await apiPost('/api/ideas/shared', { title: title.trim(), intro: intro.trim() });
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не получилось', 'error'); return; }
+  state._ideas.current = d.thread_id;
+  await ideasLoadList();
 }
 
 function _ideasWhen(raw) {
@@ -1956,7 +1989,8 @@ async function ideasOpen(id) {
   state._ideas.thread = th;
   feed.innerHTML = '';
   (th.messages || []).forEach(function (m) {
-    _ideaAddMsg(m.role, m.text, m.created_at, m.files);
+    _ideaAddMsg(m.role, m.text, m.created_at, m.files, false,
+      th.shared ? { chat_id: m.author_chat_id, name: m.author_name } : null);
   });
   if (th.spec_text) _ideaAddSpec(th.spec_text, th.spec_card);
   _ideasRenderActions(th);
@@ -1971,21 +2005,13 @@ async function ideasLoadListSilent() {
   state._ideas.list = (d && d.ideas) || [];
   const items = document.getElementById('ideas-items');
   if (!items || !state._ideas.list.length) return;
-  items.innerHTML = state._ideas.list.map(function (it) {
-    const st = _ideaChip(it);
-    const who = (state._ideas.isDir && it.author_name) ? escapeHtml(it.author_name) + ' · ' : '';
-    return '<button class="ich-item' + (it.id === state._ideas.current ? ' active' : '') +
-      '" onclick="ideasOpen(' + it.id + ')">' +
-      '<div class="ich-it-top"><span class="ich-it-title">' + escapeHtml(it.title || 'Идея') + '</span>' +
-        '<span class="ich-chip ' + st.cls + '">' + st.label + '</span></div>' +
-      '<div class="ich-it-sub">' + who + escapeHtml(_ideasWhen(it.updated_at)) + '</div>' +
-      '</button>';
-  }).join('');
+  items.innerHTML = _ideasListHtml(state._ideas.list);
 }
 
 function _ideasRenderActions(th) {
   const acts = document.getElementById('ideas-actions');
   if (!acts) return;
+  if (th.shared) { acts.innerHTML = _ideasSharedActions(th); return; }
   const status = th.status || 'open';
   const mockup = th.mockup_status || 'none';
   const editable = status === 'open' || status === 'ready' || status === 'revision';
@@ -2050,27 +2076,69 @@ function _ideasRenderActions(th) {
   acts.innerHTML = h;
 }
 
+// v2.46.160: общая тема — макет по желанию, ТЗ собирается из обсуждения,
+// «Отправить директору» не нужно (он в теме), «Внедрить» — прямо здесь.
+// После внедрения тема остаётся открытой: следующий раунд — то же самое.
+function _ideasSharedActions(th) {
+  const status = th.status || 'open';
+  const mockup = th.mockup_status || 'none';
+  let h = '<span class="ich-note ich-note-shared"><i class="ti ti-users"></i> Общая тема' +
+    (th.rounds ? ' · раундов в работе: ' + th.rounds : '') + '</span>';
+  h += '<button class="btn btn-primary btn-small" onclick="ideaCompile(true)">' +
+       '<i class="ti ti-file-check"></i> ' + (th.spec_text ? 'Пересобрать ТЗ' : 'Сформировать ТЗ') + '</button>';
+  h += '<button class="btn btn-secondary btn-small" onclick="ideasMockup()"><i class="ti ti-layout-2"></i> ' +
+       (mockup === 'none' ? 'Показать макет' : 'Перерисовать макет') + '</button>';
+  if (mockup === 'draft') {
+    h += '<button class="btn btn-secondary btn-small" onclick="ideasApproveMockup()">' +
+         '<i class="ti ti-check"></i> Согласовать макет</button>';
+  }
+  if (th.spec_text && status === 'ready') {
+    if (state._ideas.isDir) {
+      h += '<button class="btn btn-primary btn-small ich-go" onclick="ideaImplement(' + th.id + ')">' +
+           '<i class="ti ti-rocket"></i> Внедрить</button>';
+    } else {
+      h += '<span class="ich-note"><i class="ti ti-clock"></i> ТЗ готово — внедряет директор</span>';
+    }
+  }
+  if (state._ideas.isDir && th.id) {
+    h += '<span class="ich-manage">' +
+      '<button class="btn btn-secondary btn-small" onclick="ideaRename(' + th.id + ')">' +
+      '<i class="ti ti-pencil"></i> Переименовать</button>' +
+      '<button class="btn btn-secondary btn-small danger" onclick="ideaDelete(' + th.id + ')">' +
+      '<i class="ti ti-trash"></i> Удалить</button></span>';
+  }
+  return h;
+}
+
 function _ideaFormat(text) {
   // разметку ответов уже умеет лента Клавы — не плодим второй форматтер
   if (typeof _devChatFormat === 'function') return _devChatFormat(text);
   return escapeHtml(String(text || '')).replace(/\n/g, '<br>');
 }
 
-function _ideaAddMsg(role, text, when, files, local) {
+function _ideaAddMsg(role, text, when, files, local, author) {
   const feed = document.getElementById('ideas-feed');
   if (!feed) return null;
-  const mine = role === 'user';
+  // v2.46.160: в общей теме чужие реплики — слева, с именем и инициалами;
+  // свои — справа, как раньше. Клава — со «звёздочкой».
+  const other = role === 'user' && author && author.chat_id &&
+    state._ideas && state._ideas.me && String(author.chat_id) !== String(state._ideas.me);
+  const mine = role === 'user' && !other;
   const row = document.createElement('div');
-  row.className = 'ich-row' + (mine ? ' is-mine' : '');
+  row.className = 'ich-row' + (mine ? ' is-mine' : '') + (other ? ' is-other' : '');
   if (!mine) {
     const ava = document.createElement('div');
-    ava.className = 'ich-ava';
-    ava.innerHTML = '<i class="ti ti-sparkles"></i>';
+    ava.className = 'ich-ava' + (other ? ' is-person' : '');
+    ava.innerHTML = other
+      ? escapeHtml(String(author.name || '?').split(/\s+/).map(function (w) { return w[0] || ''; }).join('').slice(0, 2).toUpperCase())
+      : '<i class="ti ti-sparkles"></i>';
+    if (other) ava.title = author.name || '';
     row.appendChild(ava);
   }
   const bubble = document.createElement('div');
   bubble.className = 'ich-bubble';
-  bubble.innerHTML = (text ? '<div class="ich-text">' + _ideaFormat(text) + '</div>' : '') +
+  bubble.innerHTML = (other ? '<div class="ich-who">' + escapeHtml(author.name || '') + '</div>' : '') +
+    (text ? '<div class="ich-text">' + _ideaFormat(text) + '</div>' : '') +
     _ideaFilesHtml(files, local) +
     (when ? '<div class="ich-time">' + escapeHtml(_ideasWhen(when)) + '</div>' : '');
   row.appendChild(bubble);
@@ -2364,7 +2432,7 @@ async function ideaSend() {
     _ideasScroll();
     const th = state._ideas.thread || {};
     _ideasRenderActions({ id: state._ideas.current, status: th.status || 'open',
-                          spec_text: th.spec_text,
+                          spec_text: th.spec_text, shared: th.shared, rounds: th.rounds,
                           mockup_status: th.mockup_status || 'none' });
     ideasLoadListSilent();
   } catch (e) {
@@ -2460,7 +2528,7 @@ async function ideaImplement(id, comment) {
   const r = await apiPost('/api/ideas/' + id + '/implement', { comment: note || '' });
   const d = (r && r.data) || {};
   if (!r.ok || !d.ok) { showToast(d.message || 'Не получилось', 'error'); return; }
-  showToast('Задача в ленте разработки', 'success');
+  showToast(d.round ? ('Раунд ' + d.round + ' ушёл в работу — тема открыта дальше') : 'Задача в ленте разработки', 'success');
   if (state._ideas && state._ideas.current === id) ideasOpen(id);
   const card = document.querySelector('[data-idea-card="' + id + '"]');
   if (card) card.innerHTML = '<span class="ich-note"><i class="ti ti-rocket"></i> Внедряем — задача в очереди</span>';
