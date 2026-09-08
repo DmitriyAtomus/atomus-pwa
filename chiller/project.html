@@ -437,6 +437,21 @@ svg g.sn.dim{opacity:.22}
 #bindRep .br-row b{display:block;font-size:12.5px}
 #bindRep .br-row small{color:var(--dim);line-height:1.45}
 #bindRep .br-f{padding:10px 16px 14px;font-size:11px;color:var(--faint);line-height:1.5}
+/* v2.46.152: схема из спецификации */
+#specModal{position:fixed;inset:0;z-index:80;background:rgba(4,10,20,.6);display:flex;align-items:center;justify-content:center;padding:20px}
+#specModal .sp-in{width:min(760px,96vw);max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+#specModal .br-h{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:1}
+#specModal .br-h b{font-size:14px}#specModal .br-h span{font-size:11px;color:var(--dim)}
+#specModal .br-h i{margin-left:auto;font-style:normal;cursor:pointer;color:var(--faint);padding:2px 8px}
+.sp-body{padding:12px 16px 14px}
+#spTxt{width:100%;min-height:150px;background:#0b1830;color:var(--txt);border:1px solid var(--line2);border-radius:10px;padding:10px;font:12px/1.4 'Cascadia Mono',Consolas,monospace;resize:vertical}
+.sp-act{display:flex;align-items:center;gap:10px;margin:10px 0}.sp-hint{font-size:11px;color:var(--faint)}
+.sp-kpis{display:flex;gap:14px;font-size:12px;margin:6px 0 8px}.sp-kpis .ok{color:var(--green)}.sp-kpis .no{color:#e8907f}.sp-kpis .mut{color:var(--dim)}
+.sp-row{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line);font-size:12px}
+.sp-row .q{min-width:22px;text-align:right;font-family:'Cascadia Mono',Consolas,monospace;color:var(--faint)}
+.sp-row b{display:block;font-size:12px}.sp-row small{color:var(--dim)}
+.sp-row.ok small{color:var(--green)}.sp-row.no small{color:#e8907f}.sp-row.mut small{color:var(--dim)}
+.sp-row i{font-style:normal;color:var(--gold)}
 /* v2.46.151: отчёт стенда вариаций */
 #stressRep{position:fixed;inset:0;z-index:80;background:rgba(4,10,20,.6);display:flex;align-items:center;justify-content:center;padding:20px}
 #stressRep .sr-in{width:min(860px,96vw);max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.6)}
@@ -1402,6 +1417,7 @@ body.mob .asg-card,body.mob .nom-cmpcard{width:calc(100vw - 12px);max-width:none
           placeholder="бирка, название, модель…" autocomplete="off"></div>
         <div class="sl-filt" id="slFilt"><span data-f="all" class="on">все</span><span data-f="wait">ждут</span><span data-f="out">вне комплекта</span><span data-f="none">нет в базе</span></div>
         <div class="sl-auto" id="slAuto"><b>◈ Подобрать по расчёту</b><span id="slAutoT"></span><u id="slAutoGo">Запустить →</u></div>
+        <div class="sl-auto" id="slSpec"><b>📋 Из спецификации</b><span>Вставь список позиций (как из счёта или 1С) — разложу по узлам листа и найду модели в базе</span><u id="slSpecGo">Вставить список →</u></div>
         <div id="slBody"></div>
       </div>
       <div class="note">Клик или «+» — деталь встаёт на своё место по функции: компрессор на пол,
@@ -8510,6 +8526,173 @@ function bindReport(rep){
   m.onclick=ev=>{if(ev.target===m)m.remove();};
   document.getElementById('brX').onclick=()=>m.remove();
 }
+
+/* ═══ v2.46.152: 📋 из спецификации — схема заполняется списком ═══
+   «Сначала надо принципиальную схему заполнить» — да. Дмитрий приносит
+   спецификацию машины (27 строк на 7 кВт: артикулы Danfoss/Ридан, наши
+   аппараты, автоматика). Вместо 27 проходов по конвейеру — вставил список:
+   каждая строка узнаётся по артикулу или названию и ложится на узел листа
+   АГ.ЧИЛ-104, а модель ищется в базе 3D по артикулу. Чего в базе нет —
+   честный список «загрузи STEP». Узлы, которых на листе нет (Rotalock,
+   второй запорный, клапанный узел ТРВ) — отдельной строкой, не теряются. */
+const SPEC_RULES=[
+  [/YH\d{2,3}T|компрессор/i,'KM1'],
+  [/BS-ACV|конденсатор/i,'AVO1'],
+  [/YWF|вентилятор в сборе|вентилятор/i,'M1'],
+  [/BPHE|RD-0\d\d|пластинчат|испарител/i,'I1'],
+  [/CS-LR|ресивер/i,'RS1'],
+  [/CS-AS|отделитель жидк/i,'OZH1'],
+  [/DFL|фильтр-осушител|фильтр/i,'F1'],
+  [/SGP|стекло смотров|смотровое/i,'SI1'],
+  [/EVR\s*3\b|соленоид[^\n]*1\/4|байпас/i,'UA2'],
+  [/EVR\s*(6|10|12|15)\b|соленоид/i,'UA1'],
+  [/клапанный узел|orifice/i,'TRV_ORIF'],
+  [/\bTE\s?2\b|\bTE2\b|TPB|\bТРВ\b|терморегул/i,'TRV1'],
+  [/\bNRD\b/i,'KD1'],
+  [/\bKVR\b/i,'KR1'],
+  [/\bGBC\b|запорный/i,'VN1'],
+  [/NRV\s*16|обратн[^\n]*5\/8/i,'KO1'],
+  [/NRV\s*10|обратн[^\n]*3\/8|обратн/i,'KO2'],
+  [/RMHI|насос/i,'N1'],
+  [/ДР-П|реле потока/i,'RP1'],
+  [/\bНК\s*\d|нагреватель картера|подогреватель картера/i,'EK1'],
+  [/LRC|низкое давление/i,'MN1'],
+  [/HRC|высокое давление/i,'MN2'],
+  [/BC-AV|штуцер сервисный|шрадер/i,['KSH2','KSH1']],
+  [/ACB-2UA|реле давления[^\n]*(ВД|высок)/i,'RD2'],
+  [/ACB-2UB|реле давления/i,['RD1','RD3']],
+  [/Rotalock|ротолок/i,'ROTALOCK'],
+  [/\bбак\b|аккумулирующ|буферн/i,'AB1'],
+];
+const SPEC_OFF={TRV_ORIF:'клапанный узел ТРВ — идёт в комплекте ТРВ1, отдельного узла на листе нет',
+                ROTALOCK:'вентиль Rotalock — сервисный вентиль компрессора, на листе не показан'};
+/* строки вида «название<TAB>кол-во» или «название 2» */
+function specParse(txt){
+  const out=[];
+  String(txt||'').split(/\r?\n/).forEach(raw=>{
+    let t=raw.replace(/\s+/g,' ').trim();if(!t)return;
+    let qty=1;
+    const m=t.match(/^(.*?)(?:\t|\s{2,}|\s)(\d{1,3})\s*(?:шт\.?)?$/);
+    if(m&&m[1].length>4){t=m[1].trim();qty=+m[2];}
+    out.push({name:t,qty:qty});
+  });
+  return out;
+}
+/* строка → узел листа; массив — несколько одинаковых узлов по порядку */
+function specMap(rows){
+  const taken=new Set();
+  return rows.map(r=>{
+    const rule=SPEC_RULES.find(x=>x[0].test(r.name));
+    if(!rule)return Object.assign({},r,{key:null,note:'не узнал — назначь узел вручную на схеме'});
+    const keys=Array.isArray(rule[1])?rule[1]:[rule[1]];
+    if(SPEC_OFF[keys[0]])return Object.assign({},r,{key:null,off:true,note:SPEC_OFF[keys[0]]});
+    const free=keys.find(k=>!taken.has(k));
+    if(!free)return Object.assign({},r,{key:null,note:'узел '+schNodeT(keys[0])+' уже занят другой строкой'});
+    taken.add(free);
+    return Object.assign({},r,{key:free,note:''});
+  });
+}
+const specNorm=s=>String(s||'').toLowerCase().replace(/[\s\-_.,/()«»"']/g,'');
+/* Токены артикула. Сильные — с цифрой и длиной от 4 (YH104T1-210, BS-ACV-G8,
+   ACB-2UB463W) и пары «код + номер» (SGP 12S, EVR 10, DFL 084s, TE 2): по ним
+   модель узнаётся однозначно. Слабые — латинские коды без цифр (RMHI, BPHE):
+   нужны два совпадения. Марки фреона (R407C, R134A…) — не артикул. */
+const SPEC_STOP=/^(R\d{2,3}[A-Z]?|RR\d+|PN\d*|D\d+мм|\d+(шт|мм|кВт|бар|л|мин|С))$/i;
+function specTokens(name){
+  const src=String(name||'').replace(/[«»"'_]/g,' ');
+  const out=[],push=x=>{x=x.replace(/[,.\-]+$/,'');if(x.length>=3&&!SPEC_STOP.test(x)&&!out.includes(x))out.push(x);};
+  /* коды с дефисами (CS-LR, BS-ACV-G8, CS-NG-LRC-80, ACB-2UB463W) — целиком и
+     префиксами от двух сегментов: в базе часто записан только корень */
+  (src.match(/[A-Za-z]{2,}(?:-[\w.,]+)+/g)||[]).forEach(code=>{
+    const seg=code.split('-');
+    for(let k=2;k<=seg.length;k++)push(seg.slice(0,k).join('-'));
+  });
+  (src.match(/[A-Za-z]+\d[\w\-.,/]*|\d[\w\-.,]*[A-Za-z]+[\w\-.,]*/g)||[]).forEach(push);   // YH104T1-210, 084s, 015P2352
+  (src.match(/[A-Za-z]{3,}/g)||[]).forEach(push);                                            // SGP, DFL, RMHI, BPHE
+  (src.match(/\b[A-Za-z]{2,5}\s+\d{1,4}[A-Za-z]{0,2}\b/g)||[]).forEach(push);                // EVR 10, SGP 12S, TE 2
+  return out;
+}
+/* сильный токен узнаёт модель сам: пара «код номер», код с дефисом от 5
+   знаков, буквенно-цифровой код с буквы (TE2, YH104T1-210) или длинный
+   артикул с цифры (015P2352, 2UB463W). «12S», «084s» — слабые. */
+function specStrong(tok){
+  if(/\s/.test(tok))return true;
+  if(/-/.test(tok)&&specNorm(tok).length>=4)return true;   // CS-LR, CS-AS
+  if(/^[A-Za-z]+\d/.test(tok)&&specNorm(tok).length>=3)return true;
+  if(/^\d/.test(tok)&&/[A-Za-z]/.test(tok)&&specNorm(tok).length>=5)return true;
+  return false;
+}
+function specFindModel(name,key){
+  const toks=specTokens(name);if(!toks.length)return null;
+  const nd=key&&SCH_NODES.find(n=>n.k===key),rec=nd?asgResolveCat(nd):{sec:null,sub:null};
+  const inCat=d=>(!rec.sec||d.section===rec.sec)&&(!rec.sub||d.sub===rec.sub);
+  const score=d=>{
+    const hay=specNorm(d.id+' '+(d.brand||'')+' '+(d.name||'')+' '+((d.tags||[]).join(' ')));
+    let sc=0,strong=0,weak=0;
+    toks.forEach(tk=>{const n=specNorm(tk);if(n.length<3||!hay.includes(n))return;
+      if(specStrong(tk)){strong++;sc+=3+n.length/4;}else{weak++;sc+=1;}});
+    return {sc:sc,ok:strong>0||weak>=2};
+  };
+  let best=null;
+  const pool=DATA.filter(d=>d.ready&&d.g&&roleOf(d)!=='frame');
+  [pool.filter(inCat),pool].forEach((list,pass)=>{
+    if(best)return;
+    list.forEach(d=>{const r=score(d);if(r.ok&&(!best||r.sc>best.sc))best={d:d,sc:r.sc,other:pass===1};});
+  });
+  return best;
+}
+let SPEC_LAST=null;
+function specOpen(){
+  let m=document.getElementById('specModal');if(m)m.remove();
+  m=document.createElement('div');m.id='specModal';
+  m.innerHTML='<div class="sp-in">'+
+    '<div class="br-h"><b>📋 Схема из спецификации</b><span>вставь список — строка = позиция, количество в конце</span><i id="spX">✕</i></div>'+
+    '<div class="sp-body">'+
+      '<textarea id="spTxt" placeholder="014L0183R SGP 12S N Стекло смотровое,1/2&quot;\t1\nКомпрессор спиральный YH104T1-210\t1\n…"></textarea>'+
+      '<div class="sp-act"><div class="btn pri" id="spParse">Разобрать</div><span class="sp-hint">Артикулы Danfoss/Ридан, наши аппараты и автоматика узнаются по кодам и названиям</span></div>'+
+      '<div id="spRes"></div>'+
+    '</div></div>';
+  document.body.appendChild(m);
+  m.onclick=ev=>{if(ev.target===m)m.remove();};
+  document.getElementById('spX').onclick=()=>m.remove();
+  document.getElementById('spParse').onclick=specRun;
+  setTimeout(()=>{const t=document.getElementById('spTxt');if(t)t.focus();},50);
+}
+function specRun(){
+  const txt=(document.getElementById('spTxt')||{}).value||'';
+  const rows=specMap(specParse(txt));
+  if(!rows.length){toast('Список пустой');return;}
+  rows.forEach(r=>{r.model=r.key?specFindModel(r.name,r.key):null;});
+  SPEC_LAST=rows;
+  const found=rows.filter(r=>r.key&&r.model),miss=rows.filter(r=>r.key&&!r.model),off=rows.filter(r=>!r.key);
+  const box=document.getElementById('spRes');
+  box.innerHTML='<div class="sp-kpis"><span class="ok">найдено в базе: <b>'+found.length+'</b></span>'+
+      '<span class="no">нет модели: <b>'+miss.length+'</b></span><span class="mut">вне листа: <b>'+off.length+'</b></span></div>'+
+    rows.map(r=>{
+      const cls=r.key?(r.model?'ok':'no'):'mut';
+      const node=r.key?schNodeT(r.key):'—';
+      const model=r.model?('✓ '+esc((r.model.d.brand?r.model.d.brand+' ':'')+r.model.d.name)+(r.model.other?' <i>(другая категория — проверь)</i>':''))
+        :(r.key?'нет в базе 3D — загрузи STEP этой позиции':esc(r.note||''));
+      return '<div class="sp-row '+cls+'"><span class="q">'+r.qty+'</span><div><b>'+esc(r.name)+'</b><small>'+esc(node)+' · '+model+'</small></div></div>';
+    }).join('')+
+    '<div class="sp-act"><div class="btn pri" id="spAssign">Назначить найденные ('+found.length+') на схему</div>'+
+      (miss.length?'<div class="btn" id="spCopyMiss">⧉ Список недостающих</div>':'')+'</div>';
+  document.getElementById('spAssign').onclick=()=>specAssign(found);
+  const cm=document.getElementById('spCopyMiss');
+  if(cm)cm.onclick=async()=>{const t=miss.map(r=>r.name).join('\n');try{await navigator.clipboard.writeText(t);toast('Список недостающих в буфере');}catch(e){prompt('Недостающие позиции:',t);}};
+}
+async function specAssign(found){
+  if(!found.length){toast('Назначать нечего');return;}
+  const h=histBegin('схему из спецификации');
+  try{
+    found.forEach(r=>{schemaData[r.key]={id:r.model.d.id,name:(r.model.d.brand?r.model.d.brand+' ':'')+r.model.d.name};});
+    if(typeof renderSchema==='function')renderSchema();
+    save();
+  }finally{histEnd(h);}
+  const m=document.getElementById('specModal');if(m)m.remove();
+  toast('Схема заполнена: '+found.length+' узлов · дальше «Собрать по схеме» → «Расставить по контуру» → «Обвязать»');
+}
+if(typeof document!=='undefined'){const g=$('#slSpecGo');if(g)g.onclick=specOpen;}
 
 /* ═══ v2.46.151: ⤳ расстановка по контуру ═══
    Стенд вариаций показал: «Расставить по функциям» кладёт узлы по ярусам,
