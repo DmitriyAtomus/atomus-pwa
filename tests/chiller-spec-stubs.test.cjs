@@ -42,7 +42,7 @@ test('заглушка компрессора: патрубки нагнетан
   const { stubPorts } = sandbox();
   const z = stubPorts('KM1', 'Компрессор спиральный YH104T1-210');
   assert.equal(z.length, 2);
-  assert.equal(z[0].name, 'НАГНЕТАНИЕ'); assert.deepEqual(z[0].dir, [1, 0, 0]); assert.equal(z[0].p0[0], 150);
+  assert.equal(z[0].name, 'НАГНЕТАНИЕ'); assert.deepEqual(z[0].dir, [1, 0, 0]); assert.equal(z[0].p0[0], 117.5);   // Ø235 по каталогу Invotech
   assert.equal(z[0].ctype, 'odf'); assert.equal(z[0].sex, 'f'); assert.equal(z[0].conn, '15.9');
   assert.equal(z[1].name, 'ВСАСЫВАНИЕ'); assert.equal(z[1].conn, '19');
   const w = stubPorts('N1', 'Насос Ридан RMHI 2-2R, G1-G1');
@@ -55,12 +55,15 @@ test('заглушка живёт в проекте как бак: st в payload
   assert.match(src, /if\(d\.st\)return stGeoOf\(d\);/);
 });
 
-test('разбор спецификации: нет модели → аналог → заглушка, и всё назначается', () => {
+test('разбор спецификации: нет модели → рисуем сами (аналог не подставляется)', () => {
   const run = slice('function specRun()', 'async function specAssign');
-  assert.match(run, /specAnalog\(r\.name,r\.key\)/);
+  assert.doesNotMatch(run, /r\.analog=an\.d/);           // v2.46.155: аналог выключен
   assert.match(run, /stubEnsure\(\{key:r\.key,want:r\.name\}\)/);
-  assert.match(run, /аналог: /);
-  assert.match(run, /заглушка-габарит/);
+  assert.match(run, /нарисую сама/);
+  // у каждого узла есть форма прорисовки
+  const dims = slice('const STUB_DIMS={', '/* размер присоединения');
+  ['scroll', 'cylv', 'cylh', 'ring', 'disc', 'box'].forEach(sh => assert.match(dims, new RegExp("shape:'" + sh + "'")));
+  assert.match(slice('function stBuild(shape', 'function stGeoOf'), /SphereGeometry|TorusGeometry/);
   const asg = slice('async function specAssign', 'if(typeof document');
   assert.match(asg, /e\.analog=true;e\.want=r\.name/);
   assert.match(asg, /e\.stub=true/);

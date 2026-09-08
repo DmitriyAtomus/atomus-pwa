@@ -8537,30 +8537,37 @@ function bindReport(rep){
    размерами узла и патрубками нужного размера из строки спецификации
    (1/2", 5/8"…), чтобы компоновка и обвязка шли, не дожидаясь модели.
    Заглушка живёт в проекте как бак (поле st) и переживает перезагрузку. */
-const STUB_DIMS={   // [Д, Ш, В] мм и патрубки: сторона, высота, среда, размер по умолчанию
-  KM1:{d:[300,300,420],ports:[['НАГНЕТАНИЕ','+x',350,'dis','5/8'],['ВСАСЫВАНИЕ','+y',300,'suc','3/4']],sec:'compressors',sub:'scroll'},
-  AVO1:{d:[700,300,700],ports:[['ВХОД ГАЗА','-x',450,'dis','5/8'],['ВЫХОД ЖИДКОСТИ','+x',200,'liq','1/2']],sec:'hx',sub:'cond'},
-  M1:{d:[450,450,150],ports:[],sec:'hx',sub:'fan'},
-  RS1:{d:[160,160,450],ports:[['ВХОД','-x',380,'liq','1/2'],['ВЫХОД','+x',80,'liq','1/2']],sec:'vessels',sub:'recv'},
-  F1:{d:[200,80,80],ports:[['ВХОД','-x',40,'liq','1/2'],['ВЫХОД','+x',40,'liq','1/2']],sec:'valves',sub:'filt'},
-  SI1:{d:[70,60,60],ports:[['ВХОД','-x',30,'liq','1/2'],['ВЫХОД','+x',30,'liq','1/2']],sec:'valves',sub:'sight'},
-  UA1:{d:[110,60,90],ports:[['ВХОД','-x',30,'liq','1/2'],['ВЫХОД','+x',30,'liq','1/2']],sec:'valves',sub:'sol'},
-  UA2:{d:[80,50,70],ports:[['ВХОД','-x',25,'liq','1/4'],['ВЫХОД','+x',25,'liq','1/4']],sec:'valves',sub:'sol'},
-  TRV1:{d:[110,80,130],ports:[['ВХОД','-x',40,'liq','1/2'],['ВЫХОД','+x',40,'liq','1/2']],sec:'valves',sub:'trv'},
-  I1:{d:[120,310,530],ports:[['ВХОД ФРЕОНА','-y',110,'liq','1/2'],['ВЫХОД ПАРА','-y',430,'suc','3/4'],['ВХОД ВОДЫ','+y',110,'eq','G1'],['ВЫХОД ВОДЫ','+y',430,'eq','G1']],sec:'hx',sub:'plate'},
-  OZH1:{d:[120,120,350],ports:[['ВХОД','-x',300,'suc','3/4'],['ВЫХОД','+y',280,'suc','3/4']],sec:'vessels',sub:'sep'},
-  N1:{d:[260,180,320],ports:[['ВХОД (ВСАС)','+y',150,'eq','G1'],['ВЫХОД НАПОР','-y',250,'eq','G1']],sec:'pumps',sub:''},
-  AB1:{d:[500,400,600],ports:[['ВЫХОД ПОДАЧА','-x',150,'eq','G1'],['ВХОД ОБРАТКА','-x',450,'eq','G1']],sec:'vessels',sub:'tank'},
-  KD1:{d:[110,60,90],ports:[['ВХОД','-x',30,'liq','1/2'],['ВЫХОД','+x',30,'liq','1/2']],sec:'valves',sub:''},
-  KR1:{d:[110,60,90],ports:[['ВХОД','-x',30,'liq','1/2'],['ВЫХОД','+x',30,'liq','1/2']],sec:'valves',sub:''},
-  VN1:{d:[90,60,80],ports:[['ВХОД','-x',30,'liq','1/2'],['ВЫХОД','+x',30,'liq','1/2']],sec:'valves',sub:''},
-  KO1:{d:[90,50,60],ports:[['ВХОД','-x',25,'dis','5/8'],['ВЫХОД','+x',25,'dis','5/8']],sec:'valves',sub:''},
-  KO2:{d:[80,45,55],ports:[['ВХОД','-x',22,'liq','3/8'],['ВЫХОД','+x',22,'liq','3/8']],sec:'valves',sub:''},
-  RP1:{d:[120,60,140],ports:[['ВХОД','-x',40,'eq','G3/4'],['ВЫХОД','+x',40,'eq','G3/4']],sec:'automation',sub:''},
-  RD1:{d:[100,60,120],ports:[],sec:'automation',sub:''},RD2:{d:[100,60,120],ports:[],sec:'automation',sub:''},RD3:{d:[100,60,120],ports:[],sec:'automation',sub:''},
-  MN1:{d:[80,40,80],ports:[],sec:'automation',sub:'gauge'},MN2:{d:[80,40,80],ports:[],sec:'automation',sub:'gauge'},
-  KSH1:{d:[30,30,60],ports:[],sec:'valves',sub:''},KSH2:{d:[30,30,60],ports:[],sec:'valves',sub:''},
-  EK1:{d:[200,200,40],ports:[],sec:'heat',sub:''},
+/* Габариты и форма по каталогам (Danfoss, Ридан, Cold Stream, Invotech,
+   Weiguang): shape — как рисуем; d — [Д, Ш, В] или [Ø, Ø, Д] у цилиндров.
+   cylh — баллон вдоль оси X (фильтр, стекло, клапаны, регуляторы): патрубки
+   на торцах по оси; cylv — вертикальный баллон (ресивер, отделитель);
+   scroll — спиральный компрессор (цилиндр с куполом); ring — вентилятор;
+   disc — манометр. Это не STEP завода, а прорисовка по размерам: для
+   компоновки и обвязки её достаточно, точную модель подгрузишь позже. */
+const STUB_DIMS={
+  KM1:{shape:'scroll',d:[235,235,470],ports:[['НАГНЕТАНИЕ','+x',330,'dis','5/8'],['ВСАСЫВАНИЕ','+y',300,'suc','3/4']],sec:'compressors',sub:'scroll'},
+  AVO1:{shape:'box',d:[900,300,700],ports:[['ВХОД ГАЗА','-x',450,'dis','5/8'],['ВЫХОД ЖИДКОСТИ','+x',200,'liq','1/2']],sec:'hx',sub:'cond'},
+  M1:{shape:'ring',d:[520,520,165],ports:[],sec:'hx',sub:'fan'},
+  RS1:{shape:'cylv',d:[133,133,640],ports:[['ВХОД','-x',560,'liq','1/2'],['ВЫХОД','+x',80,'liq','1/2']],sec:'vessels',sub:'recv'},
+  F1:{shape:'cylh',d:[170,76,76],ports:[['ВХОД','-x',38,'liq','1/2'],['ВЫХОД','+x',38,'liq','1/2']],sec:'valves',sub:'filt'},
+  SI1:{shape:'cylh',d:[85,40,40],ports:[['ВХОД','-x',20,'liq','1/2'],['ВЫХОД','+x',20,'liq','1/2']],sec:'valves',sub:'sight'},
+  UA1:{shape:'box',d:[100,50,95],ports:[['ВХОД','-x',30,'liq','1/2'],['ВЫХОД','+x',30,'liq','1/2']],sec:'valves',sub:'sol'},
+  UA2:{shape:'box',d:[80,45,85],ports:[['ВХОД','-x',25,'liq','1/4'],['ВЫХОД','+x',25,'liq','1/4']],sec:'valves',sub:'sol'},
+  TRV1:{shape:'box',d:[110,75,120],ports:[['ВХОД','-x',40,'liq','1/2'],['ВЫХОД','+x',40,'liq','1/2']],sec:'valves',sub:'trv'},
+  I1:{shape:'box',d:[112,310,526],ports:[['ВХОД ФРЕОНА','-y',110,'liq','1/2'],['ВЫХОД ПАРА','-y',430,'suc','3/4'],['ВХОД ВОДЫ','+y',110,'eq','G1'],['ВЫХОД ВОДЫ','+y',430,'eq','G1']],sec:'hx',sub:'plate'},
+  OZH1:{shape:'cylv',d:[89,89,380],ports:[['ВХОД','-x',320,'suc','3/4'],['ВЫХОД','+y',300,'suc','3/4']],sec:'vessels',sub:'sep'},
+  N1:{shape:'box',d:[250,180,330],ports:[['ВХОД (ВСАС)','+y',150,'eq','G1'],['ВЫХОД НАПОР','-y',250,'eq','G1']],sec:'pumps',sub:''},
+  AB1:{shape:'box',d:[500,400,600],ports:[['ВЫХОД ПОДАЧА','-x',150,'eq','G1'],['ВХОД ОБРАТКА','-x',450,'eq','G1']],sec:'vessels',sub:'tank'},
+  KD1:{shape:'cylh',d:[120,48,48],ports:[['ВХОД','-x',24,'liq','1/2'],['ВЫХОД','+x',24,'liq','1/2']],sec:'valves',sub:''},
+  KR1:{shape:'cylh',d:[160,62,62],ports:[['ВХОД','-x',31,'liq','1/2'],['ВЫХОД','+x',31,'liq','1/2']],sec:'valves',sub:''},
+  VN1:{shape:'cylh',d:[90,30,30],ports:[['ВХОД','-x',15,'liq','1/2'],['ВЫХОД','+x',15,'liq','1/2']],sec:'valves',sub:''},
+  KO1:{shape:'cylh',d:[110,42,42],ports:[['ВХОД','-x',21,'dis','5/8'],['ВЫХОД','+x',21,'dis','5/8']],sec:'valves',sub:''},
+  KO2:{shape:'cylh',d:[95,36,36],ports:[['ВХОД','-x',18,'liq','3/8'],['ВЫХОД','+x',18,'liq','3/8']],sec:'valves',sub:''},
+  RP1:{shape:'box',d:[120,60,140],ports:[['ВХОД','-x',40,'eq','G3/4'],['ВЫХОД','+x',40,'eq','G3/4']],sec:'automation',sub:''},
+  RD1:{shape:'box',d:[95,48,110],ports:[],sec:'automation',sub:''},RD2:{shape:'box',d:[95,48,110],ports:[],sec:'automation',sub:''},RD3:{shape:'box',d:[95,48,110],ports:[],sec:'automation',sub:''},
+  MN1:{shape:'disc',d:[80,40,80],ports:[],sec:'automation',sub:'gauge'},MN2:{shape:'disc',d:[80,40,80],ports:[],sec:'automation',sub:'gauge'},
+  KSH1:{shape:'cylv',d:[20,20,60],ports:[],sec:'valves',sub:''},KSH2:{shape:'cylv',d:[20,20,60],ports:[],sec:'valves',sub:''},
+  EK1:{shape:'ring',d:[240,240,40],ports:[],sec:'heat',sub:''},
 };
 /* размер присоединения из строки спецификации: «1/2"» → 12,7 мм пайка; «G1» — резьба */
 function stubConnFrom(name,def){
@@ -8589,11 +8596,12 @@ function stubModel(P){
   const T=STUB_DIMS[P.key]||{d:[200,200,200],ports:[],sec:'',sub:''};
   const nd=SCH_NODES.find(n=>n.k===P.key),rec=nd?asgResolveCat(nd):{sec:null,sub:null};
   const zn=P.zn||stubPorts(P.key,P.want);
-  return {id:stubId(P),name:'Заглушка · '+P.want,brand:'',kind:'габарит вместо модели',
-    section:rec.sec||T.sec,sub:rec.sub||T.sub,ready:true,st:{key:P.key,want:P.want,dims:P.dims||T.d,zn:zn},
-    tags:['габарит '+(P.dims||T.d).join('×'),'нет STEP — заглушка'],
-    specs:[['Что это','Габаритная заглушка: модели в базе 3D нет, размеры типовые для узла '+(nd?nd.t:P.key)],
-           ['Заменить на','STEP позиции «'+P.want+'» — после загрузки назначь её на узел, заглушка уйдёт']],
+  return {id:stubId(P),name:'Прорисовка · '+P.want,brand:'',kind:'модель по каталожным размерам',
+    section:rec.sec||T.sec,sub:rec.sub||T.sub,ready:true,
+    st:{key:P.key,want:P.want,dims:P.dims||T.d,shape:P.shape||T.shape||'box',zn:zn},
+    tags:['габарит '+(P.dims||T.d).join('×'),'прорисовка по размерам'],
+    specs:[['Что это','Модель нарисована программой по каталожным габаритам узла '+(nd?nd.t:P.key)+': форма и патрубки типовые, размеры — из каталога'],
+           ['Точная модель','STEP позиции «'+P.want+'» — после загрузки назначь её на узел, прорисовка уйдёт']],
     _zn:zn};
 }
 function stubEnsure(P){
@@ -8603,10 +8611,62 @@ function stubEnsure(P){
   return d;
 }
 const ST_CACHE=new Map();
+/* склейка простых тел в одну индексированную геометрию */
+function stMerge(list){
+  const pos=[],idx=[];let off=0;
+  list.forEach(g=>{
+    const P=g.attributes.position.array,I=g.index?g.index.array:null;
+    if(I){for(let k=0;k<I.length;k++)idx.push(I[k]+off);}
+    else{for(let k=0;k<P.length/3;k++)idx.push(k+off);}
+    for(let k=0;k<P.length;k++)pos.push(P[k]);
+    off+=P.length/3;
+  });
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setIndex(idx);geo.computeVertexNormals();geo.computeBoundingBox();
+  return geo;
+}
+const stCylZ=(r,h,z0)=>{const g=new THREE.CylinderGeometry(r,r,h,32);g.rotateX(Math.PI/2);g.translate(0,0,z0+h/2);return g;};
+const stCylX=(r,l,z)=>{const g=new THREE.CylinderGeometry(r,r,l,28);g.rotateZ(Math.PI/2);g.translate(0,0,z);return g;};
+function stBuild(shape,[L,B,H]){
+  switch(shape){
+    case 'scroll':{   // корпус, купол, юбка с лапами
+      const r=L/2;
+      return stMerge([stCylZ(r,H*0.78,H*0.06),
+        (()=>{const g=new THREE.SphereGeometry(r,32,12,0,Math.PI*2,0,Math.PI/2);g.translate(0,0,H*0.84);g.scale(1,1,(H*0.16)/r);return g;})(),
+        (()=>{const g=new THREE.BoxGeometry(L*1.25,B*1.25,H*0.06);g.translate(0,0,H*0.03);return g;})()]);
+    }
+    case 'cylv':{     // баллон с крышками
+      const r=L/2;
+      return stMerge([stCylZ(r,H-r*0.6,r*0.3),
+        (()=>{const g=new THREE.SphereGeometry(r,24,8,0,Math.PI*2,0,Math.PI/2);g.translate(0,0,H-r*0.3);g.scale(1,1,0.3);return g;})(),
+        (()=>{const g=new THREE.SphereGeometry(r,24,8,0,Math.PI*2,Math.PI/2,Math.PI/2);g.translate(0,0,r*0.3);g.scale(1,1,0.3);return g;})()]);
+    }
+    case 'cylh':{     // корпус вдоль оси X и две горловины под патрубки
+      const r=B/2,z=H/2;
+      return stMerge([stCylX(r,L*0.72,z),stCylX(r*0.45,L,z)]);
+    }
+    case 'ring':{     // вентилятор: кольцо, ступица, три лопасти-пластины
+      const R=L/2;
+      const parts=[(()=>{const g=new THREE.TorusGeometry(R-H*0.5,H*0.5,10,40);g.translate(0,0,H/2);return g;})(),
+        stCylZ(R*0.28,H*0.9,H*0.05)];
+      for(let k=0;k<3;k++){const g=new THREE.BoxGeometry(R*0.9,R*0.22,8);g.rotateZ(k*Math.PI*2/3);g.translate(Math.cos(k*Math.PI*2/3)*R*0.5,Math.sin(k*Math.PI*2/3)*R*0.5,H/2);parts.push(g);}
+      return stMerge(parts);
+    }
+    case 'disc':{     // манометр: диск + штуцер вниз
+      return stMerge([(()=>{const g=new THREE.CylinderGeometry(L/2,L/2,B*0.6,32);g.translate(0,0,H/2);return g;})(),
+        stCylZ(6,H/2-L/2,0)]);
+    }
+    default:{
+      const g=new THREE.BoxGeometry(L,B,H);g.translate(0,0,H/2);g.computeBoundingBox();return g;
+    }
+  }
+}
 function stGeoOf(d){
   if(!ST_CACHE.has(d.id)){
-    const [L,B,H]=d.st.dims;
-    const g=new THREE.BoxGeometry(L,B,H);g.translate(0,0,H/2);g.computeBoundingBox();
+    const T=STUB_DIMS[d.st.key]||{};
+    const g=stBuild(d.st.shape||T.shape||'box',d.st.dims);
+    g.computeBoundingBox();
     g.userData.parts=null;g.userData.zoneMats=false;g.userData.zones=d._zn||d.st.zn||[];
     ST_CACHE.set(d.id,g);
   }
@@ -8775,18 +8835,16 @@ function specRun(){
   rows.forEach(r=>{
     r.model=r.key?specFindModel(r.name,r.key):null;
     /* v2.46.153: модели нет — аналог из категории, а без него заглушка-габарит */
-    if(r.key&&!r.model){
-      const an=specAnalog(r.name,r.key);
-      if(an){r.analog=an.d;}
-      else if(STUB_DIMS[r.key]){r.stub=stubEnsure({key:r.key,want:r.name});}
-    }
+    /* v2.46.155: не аналог, а своя прорисовка — Дмитрий: «взять и нарисовать
+       модель самому». Аналог остаётся функцией (specAnalog) на будущее. */
+    if(r.key&&!r.model&&STUB_DIMS[r.key]){r.stub=stubEnsure({key:r.key,want:r.name});}
   });
   SPEC_LAST=rows;
   const found=rows.filter(r=>r.key&&r.model),analog=rows.filter(r=>r.analog),stub=rows.filter(r=>r.stub),
         miss=rows.filter(r=>r.key&&!r.model&&!r.analog&&!r.stub),off=rows.filter(r=>!r.key);
   const box=document.getElementById('spRes');
   box.innerHTML='<div class="sp-kpis"><span class="ok">в базе: <b>'+found.length+'</b></span>'+
-      '<span class="an">аналог: <b>'+analog.length+'</b></span><span class="st">заглушка: <b>'+stub.length+'</b></span>'+
+      '<span class="st">нарисую: <b>'+stub.length+'</b></span>'+(analog.length?'<span class="an">аналог: <b>'+analog.length+'</b></span>':'')+
       '<span class="no">нет: <b>'+miss.length+'</b></span><span class="mut">вне листа: <b>'+off.length+'</b></span></div>'+
     rows.map(r=>{
       const cls=r.key?(r.model?'ok':(r.analog?'an':(r.stub?'st':'no'))):'mut';
@@ -8794,11 +8852,11 @@ function specRun(){
       let model;
       if(r.model)model='✓ '+esc((r.model.d.brand?r.model.d.brand+' ':'')+r.model.d.name)+(r.model.other?' <i>(другая категория — проверь)</i>':'');
       else if(r.analog)model='⚠ аналог: '+esc((r.analog.brand?r.analog.brand+' ':'')+r.analog.name)+' — заменить, когда появится STEP';
-      else if(r.stub)model='▭ заглушка-габарит '+r.stub.st.dims.join('×')+(r.stub.st.zn.length?' с патрубками '+esc([...new Set(r.stub.st.zn.map(z=>(z.ctype==='thr'?'G'+z.conn:'Ø'+z.conn)))].join(', ')):'')+' — компоновка и обвязка идут, STEP подгрузишь позже';
+      else if(r.stub)model='✎ нарисую сама: '+r.stub.st.dims.join('×')+' мм'+(r.stub.st.zn.length?', патрубки '+esc([...new Set(r.stub.st.zn.map(z=>(z.ctype==='thr'?'G'+z.conn:'Ø'+z.conn)))].join(', ')):'')+' — по каталожным размерам; точный STEP подгрузишь позже';
       else model=r.key?'нет в базе 3D и типового габарита — загрузи STEP этой позиции':esc(r.note||'');
       return '<div class="sp-row '+cls+'"><span class="q">'+r.qty+'</span><div><b>'+esc(r.name)+'</b><small>'+esc(node)+' · '+model+'</small></div></div>';
     }).join('')+
-    '<div class="sp-act"><div class="btn pri" id="spAssign">Назначить на схему: '+found.length+' из базы'+(analog.length?' + '+analog.length+' аналог.':'')+(stub.length?' + '+stub.length+' заглуш.':'')+'</div>'+
+    '<div class="sp-act"><div class="btn pri" id="spAssign">Назначить на схему: '+found.length+' из базы'+(stub.length?' + '+stub.length+' нарисовать':'')+(analog.length?' + '+analog.length+' аналог.':'')+'</div>'+
       ((miss.length||analog.length||stub.length)?'<div class="btn" id="spCopyMiss">⧉ Список STEP к загрузке</div>':'')+'</div>';
   const toAssign=rows.filter(r=>r.key&&(r.model||r.analog||r.stub));
   document.getElementById('spAssign').onclick=()=>specAssign(toAssign);
