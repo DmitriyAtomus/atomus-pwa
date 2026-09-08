@@ -58,3 +58,35 @@ test('стили: колонка расширена, статус и строк�
   assert.match(css, /\.fp2-av\.av-res/);
   assert.match(css, /\.fp2-q\.zero \.fp2-l\.free \{ color: #B91C1C/);
 });
+
+// v2.46.159: зависший резерв — договор отгружен, сборка числится
+test('договор отгружен, а сборка на складе: красная строка + кнопка списания', () => {
+  const h = render()({ ...base, total_qty: 1, free_qty: 0, reserved_qty: 1, assemblies_count: 1,
+    stale_qty: 1, stale_assembly_ids: [77],
+    reservations: [{ contract_number: '№20ТД/08.26', contractor_name: 'ИП Алибеков', contract_status: 'shipped', stale: true, assembly_ids: [77] }] });
+  assert.match(h, /fp2-stale"/);
+  assert.match(h, /Договор №20ТД\/08\.26 уже отгружен, а 1 шт числится на складе — при отгрузке не отметили по QR/);
+  assert.match(h, /fpShipStale\(\[77\], 1\)/);
+  assert.match(h, /Списать как отгруженную/);
+});
+
+test('без зависшего резерва красной строки нет; баннер считает штуки по всем моделям', () => {
+  const h = render()({ ...base, total_qty: 1, free_qty: 0, reserved_qty: 1, stale_qty: 0,
+    reservations: [{ contract_number: '1', contract_status: 'production', stale: false }] });
+  assert.doesNotMatch(h, /fp2-stale/);
+  const i = app3.indexOf('function _renderFpStaleBanner(all) {');
+  const j = app3.indexOf('async function fpShipStale', i);
+  const banner = new Function('_plural', app3.slice(i, j) + 'return _renderFpStaleBanner;')((n, f) => f[1]);
+  assert.equal(banner([{ stale_qty: 0 }]), '');
+  const b = banner([{ stale_qty: 2, stale_assembly_ids: [1, 2] }, { stale_qty: 1, stale_assembly_ids: [9] }]);
+  assert.match(b, /3 штуки числятся на складе под уже отгруженными договорами/);
+  assert.match(b, /fpShipStale\(\[1,2,9\], 3\)/);
+});
+
+test('списание идёт через штатную «отметку вручную» — движение «Отгрузка» под договором', () => {
+  const i = app3.indexOf('async function fpShipStale(ids, qty) {');
+  const fn = app3.slice(i, app3.indexOf('function _renderFpRow', i));
+  assert.match(fn, /apiPost\('\/api\/shipments\/manual', \{ type: 'assembly', id: id \}\)/);
+  assert.match(fn, /confirm\(/);
+  assert.match(fn, /loadFinishedProductsDashboard\(\)/);
+});

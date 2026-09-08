@@ -3679,7 +3679,48 @@ function _renderFpList() {
     return;
   }
 
-  host.innerHTML = items.map(it => _renderFpRow(it)).join('');
+  host.innerHTML = _renderFpStaleBanner(state.fpData.items || []) + items.map(it => _renderFpRow(it)).join('');
+}
+
+// v2.46.159: «зависший резерв» — договор уже «Отгружен»/«Закрыт», а сборка под
+// ним всё ещё числится на складе. Так бывает, когда статус договора сменили
+// руками, а отгрузку по QR / «вручную» не отмечали: склад списывает сборку
+// только при отметке отгрузки. Баннер над списком + строка в карточке.
+function _renderFpStaleBanner(all) {
+  const bad = all.filter(it => (it.stale_qty || 0) > 0);
+  if (!bad.length) return '';
+  const qty = bad.reduce((s, it) => s + it.stale_qty, 0);
+  const ids = [];
+  bad.forEach(it => (it.stale_assembly_ids || []).forEach(id => ids.push(id)));
+  return '<div class="fp2-stale-banner">' +
+    '<i class="ti ti-alert-triangle"></i>' +
+    '<div class="fp2-stale-txt"><b>' + qty + ' ' + _plural(qty, ['штука числится', 'штуки числятся', 'штук числятся']) +
+      ' на складе под уже отгруженными договорами.</b> При отгрузке их не отметили по QR — ' +
+      'склад не узнал, что они уехали. Проверьте, что их действительно нет, и спишите.</div>' +
+    '<button class="fp2-stale-btn" onclick="event.stopPropagation(); fpShipStale(' + JSON.stringify(ids).replace(/"/g, '&quot;') + ', ' + qty + ')">' +
+      'Списать все как отгруженные</button>' +
+  '</div>';
+}
+
+async function fpShipStale(ids, qty) {
+  ids = (ids || []).filter(Boolean);
+  if (!ids.length) return;
+  const n = qty || ids.length;
+  if (!confirm('Отметить отгруженными ' + n + ' ' + _plural(n, ['штуку', 'штуки', 'штук']) +
+      ' (' + ids.length + ' ' + _plural(ids.length, ['сборка', 'сборки', 'сборок']) + ')?\n\n' +
+      'Сборки спишутся со склада движением «Отгрузка» под своим договором и уйдут в журнал. ' +
+      'Если на самом деле они на складе — не подтверждайте, а снимите резерв в карточке договора.')) return;
+  let ok = 0, bad = 0;
+  for (const id of ids) {
+    try {
+      const r = await apiPost('/api/shipments/manual', { type: 'assembly', id: id });
+      if (r && r.ok) ok++; else bad++;
+    } catch (e) { bad++; }
+  }
+  showToast(bad ? ('Списано ' + ok + ', не удалось ' + bad) : ('Списано как отгруженные: ' + ok),
+    bad ? 'error' : 'success');
+  loadFinishedProductsDashboard();
+  if (typeof loadContracts === 'function' && document.querySelector('[data-screen="contracts"].active')) loadContracts();
 }
 
 function _renderFpRow(it) {
@@ -3730,6 +3771,20 @@ function _renderFpRow(it) {
       '</div>';
     }
   }
+  // v2.46.159: договор уже отгружен, а сборка числится — красная строка с кнопкой
+  let staleLine = '';
+  if ((it.stale_qty || 0) > 0) {
+    const sr = (it.reservations || []).filter(r => r.stale);
+    const nums = sr.map(r => '№' + escapeHtml(String(r.contract_number || '—').replace(/^№\s*/, ''))).join(', ');
+    const st = sr.length && sr[0].contract_status === 'closed' ? 'закрыт' : 'отгружен';
+    staleLine = '<div class="fp2-stale">' +
+      '<i class="ti ti-alert-triangle"></i>' +
+      '<span class="fp2-res-txt">Договор ' + nums + ' уже ' + st + ', а ' + it.stale_qty + ' шт ' +
+        (it.stale_qty === 1 ? 'числится' : 'числятся') + ' на складе — при отгрузке не отметили по QR</span>' +
+      '<button class="fp2-stale-btn" onclick="event.stopPropagation(); fpShipStale(' +
+        JSON.stringify(it.stale_assembly_ids || []).replace(/"/g, '&quot;') + ', ' + it.stale_qty + ')">Списать как отгруженную</button>' +
+    '</div>';
+  }
   // Залежалось — своей строкой
   const deadLine = isDead
     ? '<div class="fp2-dead"><i class="ti ti-alert-triangle"></i>Лежит больше 90 дней — проверить актуальность</div>'
@@ -3746,7 +3801,7 @@ function _renderFpRow(it) {
     qtyHtml +
     '<div class="fp-row-age ' + it.age_category + '">' + it.oldest_age_days + ' дн</div>' +
     '<i class="ti ti-chevron-right fp2-chev"></i>' +
-    resLine + deadLine +
+    resLine + staleLine + deadLine +
     '</div>';
 }
 
@@ -3858,10 +3913,17 @@ async function openFpModelDetail(modelId) {
       const isRes = !!s.contract_id;
       const exec = [s.execution_label || s.execution, s.ip_class].filter(Boolean).join(' · ');
       const age = _ageD(s.assembly_date);
+      const isStale = isRes && ['shipped', 'closed', 'completed'].includes(s.contract_status || '');
       const chip = isRes
-        ? '<span class="fpm-chip res">🔒 №' + escapeHtml(String(s.contract_number || '—').replace(/^№\s*/, '')) + '</span>'
+        ? '<span class="fpm-chip res">🔒 №' + escapeHtml(String(s.contract_number || '—').replace(/^№\s*/, '')) + '</span>' +
+          (isStale ? '<span class="fpm-chip stale" title="Договор уже отгружен, а сборка числится на складе">договор уже ' +
+            (s.contract_status === 'closed' ? 'закрыт' : 'отгружен') + '</span>' : '')
         : '<span class="fpm-chip ok">свободна</span>';
-      const writeOff = !isRes
+      const writeOff = isStale
+        ? '<button class="fpm-off stale" title="Списать как отгруженную по договору (не отметили по QR при отгрузке)" ' +
+            'onclick="event.stopPropagation(); fpShipStale([' + s.id + '], ' + (s.stock_qty || 1) + ').then(function(){ var m=document.getElementById(\'fp-model-assemblies-modal\'); if(m) m.classList.remove(\'visible\'); });">' +
+            '<i class="ti ti-truck"></i></button>'
+        : !isRes
         ? '<button class="fpm-off" title="Списать эту сборку со склада (брак/использована/инвентаризация)" ' +
             'onclick="event.stopPropagation(); promptWriteOff(' + s.id + ',' + (s.stock_qty || 0) + ').then(function(ok){ if(ok){ var m=document.getElementById(\'fp-model-assemblies-modal\'); if(m) m.classList.remove(\'visible\'); } });">' +
             '<i class="ti ti-package-export"></i></button>'
@@ -18661,6 +18723,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.46.159',
+    date: '08.09.2026',
+    title: 'Склад: зависший резерв под отгруженным договором',
+    features: [
+      'Почему «уехавшее» висит на складе: сборка списывается со склада только при отметке отгрузки (QR или «Отметить вручную»); если статус договора поставили «Отгружен» руками, склад об этом не узнаёт',
+      'Теперь склад это видит сам: в карточке модели красная строка <b>«Договор №… уже отгружен, а 1 шт числится на складе»</b>, над списком — баннер со счётчиком',
+      'Кнопка <b>«Списать как отгруженную»</b> — та же штатная отметка отгрузки: движение «Отгрузка» под своим договором, резерв снимается, журнал пишется. Та же пометка и кнопка в списке сборок модели',
+    ],
+  },
   {
     version: 'v2.46.158',
     date: '08.09.2026',
