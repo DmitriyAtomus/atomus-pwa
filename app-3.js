@@ -3695,31 +3695,37 @@ function _renderFpRow(it) {
   if (it.direction_name) subParts.push(escapeHtml(it.direction_name));
   subParts.push(it.assemblies_count + ' ' + _plural(it.assemblies_count, ['сборка', 'сборки', 'сборок']));
 
-  // Количество: свободно крупно, «из N шт» + мини-бар доли свободного
+  // v2.46.158: количество — три подписанные строки вместо «0 св. из 2 шт»:
+  // Всего / В резерве / Свободно. Цифры без расшифровки читались как «0 из 2».
+  const avWord = isFullyReserved ? 'Всё в резерве' : (isMixed ? 'Часть в резерве' : 'Свободно');
+  const avBadge = '<span class="fp2-av ' + avCls + '">' + avWord + '</span>';
   let qtyHtml;
   if (it.reserved_qty > 0) {
-    const pct = it.total_qty > 0 ? Math.round(it.free_qty / it.total_qty * 100) : 0;
     qtyHtml = '<div class="fp2-q' + (it.free_qty === 0 ? ' zero' : '') + '">' +
-      '<div class="fp2-n">' + it.free_qty + ' <small>св.</small></div>' +
-      '<div class="fp2-of">из ' + it.total_qty + ' шт</div>' +
-      '<div class="fp2-bar"><i style="width:' + pct + '%;"></i></div>' +
+      '<div class="fp2-l"><span>Всего</span><b>' + it.total_qty + ' шт</b></div>' +
+      '<div class="fp2-l res"><span><i class="ti ti-lock"></i>В резерве</span><b>' + it.reserved_qty + '</b></div>' +
+      '<div class="fp2-l free"><span><i class="ti ti-check"></i>Свободно</span><b>' + it.free_qty + '</b></div>' +
     '</div>';
   } else {
     qtyHtml = '<div class="fp2-q free">' +
-      '<div class="fp2-n">' + it.total_qty + ' <small>шт</small></div>' +
-      '<div class="fp2-of">все свободны</div>' +
+      '<div class="fp2-l"><span>Всего</span><b>' + it.total_qty + ' шт</b></div>' +
+      '<div class="fp2-l free"><span><i class="ti ti-check"></i>Свободно</span><b>все ' + it.total_qty + '</b></div>' +
     '</div>';
   }
 
-  // Резерв — одной строкой с обрезкой
+  // Резерв — одной строкой: «все 2 шт заняты под договор …» / «2 из 3 шт заняты …»
   let resLine = '';
   if (it.reserved_qty > 0) {
     const r = (it.reservations || [])[0];
     if (r) {
       const _cleanN = String(r.contract_number || '—').replace(/^№\s*/, '');
+      const who = isFullyReserved
+        ? (it.reserved_qty === 1 ? 'Единственная штука занята' : 'Все ' + it.reserved_qty + ' шт заняты')
+        : it.reserved_qty + ' из ' + it.total_qty + ' шт ' + (it.reserved_qty === 1 ? 'занята' : 'заняты');
       resLine = '<div class="fp2-res"><i class="ti ti-lock"></i>' +
-        '<span class="fp2-res-txt">' + it.reserved_qty + ' в резерве: №' + escapeHtml(_cleanN) +
-        (r.contractor_name ? ' · ' + escapeHtml(r.contractor_name) : '') + '</span>' +
+        '<span class="fp2-res-txt">' + who + ' под договор №' + escapeHtml(_cleanN) +
+        (r.contractor_name ? ' · ' + escapeHtml(r.contractor_name) : '') +
+        (isFullyReserved ? ' — отгрузить другому клиенту нельзя' : ' — остальные можно отгружать') + '</span>' +
         ((it.reservations || []).length > 1 ? '<span class="fp2-res-more">+' + (it.reservations.length - 1) + ' дог.</span>' : '') +
       '</div>';
     }
@@ -3735,7 +3741,7 @@ function _renderFpRow(it) {
       '<div class="fp-row-name">' + escapeHtml(it.model_name) +
         (it.model_article ? '<span class="fp-row-article">' + escapeHtml(it.model_article) + '</span>' : '') +
       '</div>' +
-      '<div class="fp-row-sub">' + subParts.join(' · ') + '</div>' +
+      '<div class="fp-row-sub">' + avBadge + subParts.join(' · ') + '</div>' +
     '</div>' +
     qtyHtml +
     '<div class="fp-row-age ' + it.age_category + '">' + it.oldest_age_days + ' дн</div>' +
@@ -18655,6 +18661,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.46.158',
+    date: '08.09.2026',
+    title: 'Склад: остатки готовой продукции — понятными словами',
+    features: [
+      'В карточке модели вместо «0 св. из 2 шт» — три подписанные строки: <b>Всего</b>, <b>В резерве</b>, <b>Свободно</b>; «Свободно 0» красным, «Свободно 1» зелёным',
+      'Словесный статус рядом с названием: <b>«Всё в резерве»</b> (красный), <b>«Часть в резерве»</b> (жёлтый), <b>«Свободно»</b> (зелёный) — тот же цвет, что и полоска слева',
+      'Строка резерва объясняет, что это значит: «Все 2 шт заняты под договор №… · клиент — отгрузить другому клиенту нельзя» или «2 из 3 шт заняты … — остальные можно отгружать»',
+    ],
+  },
   {
     version: 'v2.46.157',
     date: '08.09.2026',
