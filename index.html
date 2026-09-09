@@ -355,6 +355,9 @@
         <button class="nav-item" data-nav="atom-chiller" onclick="selectSidebarItem('atom-chiller')">
           <i class="ti ti-snowflake"></i><span>Атом Чиллер</span>
         </button>
+        <button class="nav-item" data-nav="products-3d" onclick="selectSidebarItem('products-3d')">
+          <i class="ti ti-cube"></i><span>Изделия 3D</span>
+        </button>
         <div class="sub-nav">
           <div class="sub-nav-title">Экспериментальные</div>
           <button class="nav-item" data-nav="developments" onclick="selectSidebarItem('developments')">
@@ -1506,6 +1509,18 @@
                   title="Чат по чиллерам" style="display:none;"><i class="ti ti-message-2"></i></button>
         </div>
         <iframe id="chiller-frame" class="atomcad-frame" title="Атом Чиллер — база 3D и компоновка" allow="fullscreen" allowfullscreen data-src="/chiller/index.html"></iframe>
+      </div>
+
+      <!-- ============ ИЗДЕЛИЯ 3D (наша продукция из архива КД) ============ -->
+      <!-- Та же витрина базы 3D, открытая на разделе «Изделия Атомус»: только
+           наше производство, без покупных комплектующих и без конструктора
+           чиллера. Второй копии витрины не заводим — режим задаётся ?only= -->
+      <div class="screen atomcad-screen" data-screen="products-3d" data-section="production">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
+          <h2>Изделия 3D</h2>
+        </div>
+        <iframe id="products3d-frame" class="atomcad-frame" title="Изделия Атомус — 3D-модели и документация" allow="fullscreen" allowfullscreen data-src="/chiller/index.html?only=products"></iframe>
       </div>
 
       <!-- ============ МОДЕЛИ ============ -->

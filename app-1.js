@@ -1959,6 +1959,11 @@ function runScreenLoader(screenName) {
       _chb.style.display = isDir ? '' : 'none';
     }
   }
+  // «Изделия 3D» — витрина базы, открытая на разделе нашей продукции
+  if (screenName === 'products-3d') {
+    const _pf = document.getElementById('products3d-frame');
+    if (_pf && !_pf.getAttribute('src') && _pf.dataset.src) _pf.setAttribute('src', _pf.dataset.src);
+  }
   if (screenName === 'home-dashboard') loadHomeDashboard();  // ЭТАП 16Б
   if (screenName === 'dashboard') loadDashboard();
   if (screenName === 'planerka' && typeof loadPlanerka === 'function') loadPlanerka();  // v2.45.721
