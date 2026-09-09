@@ -23417,7 +23417,7 @@ async function pjOpen(id) {
     // три шага — по порядку, крупно
     '<div class="pj-steps">' +
       '<div class="pj-step' + (hasRevs ? ' done' : '') + '"><div class="pj-step-n">1</div><div class="pj-step-b">' +
-        '<b>Собрать пакет</b><div>' + (p.panel_dir ? 'Сервер соберёт все листы из генераторов и положит сюда ревизией' : 'Сначала нужны генераторы: обсудите щит с Клавой — она подскажет, с чего начать') + '</div>' +
+        '<b>Собрать пакет</b><div>' + (hasRevs || p.panel_dir ? 'Сервер соберёт все листы из генераторов и положит сюда ревизией. Если генераторов ещё нет — сначала шаг 3: опишите щит Клаве и нажмите «Внести правку», агент их заведёт' : 'Сначала шаг 3: опишите щит Клаве, «Внести правку» — агент заведёт генераторы') + '</div>' +
         (p.panel_dir ? '<button class="btn btn-primary btn-small" onclick="pjBuild(\'' + escapeHtml(p.panel_dir) + '\', ' + p.id + ')"><i class="ti ti-player-play"></i> Собрать пакет</button>' : '') +
       '</div></div>' +
       '<div class="pj-step' + (hasRevs ? '' : ' off') + '"><div class="pj-step-n">2</div><div class="pj-step-b">' +
@@ -23477,7 +23477,9 @@ async function pjBuild(dir, id) {
   clearInterval(timer);
   const d = (r && r.data) || {};
   if (!r.ok || !d.ok) {
-    const msg = d.message || ('сервер ответил ' + (r && r.status));
+    const msg = (r && r.status === 404)
+      ? 'Генераторов этого щита на сервере ещё нет. Опишите щит в теме с Клавой (шаг 3) и нажмите «Внести правку» — агент заведёт папку ' + dir + ', после выкатки сборка заработает'
+      : (d.message || ('сервер ответил ' + (r && r.status)));
     if (step) step.innerHTML = '<b>Не собралось</b><div class="pj-warn">' + escapeHtml(msg) + '</div>' +
       '<button class="btn btn-primary btn-small" onclick="pjBuild(\'' + escapeHtml(dir) + '\', ' + id + ')"><i class="ti ti-refresh"></i> Попробовать ещё раз</button>';
     return;
