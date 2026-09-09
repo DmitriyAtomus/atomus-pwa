@@ -109,7 +109,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.178";
+const APP_VERSION = "v2.46.179";
 const APP_VERSION_DATE = "09.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -825,6 +825,7 @@ async function loadUnreadNotifications(options) {
   try {
     const r = await apiGet('/api/notifications/unread?limit=50');
     const items = (r && r.items) || [];
+    renderSupplyInvoiceAuthorAlerts((r && r.invoice_alerts) || []);
     state.notif.unread = items;
     updateNotifBadge(items.length);
     // Автопоказ модалки: если есть новые id (которых раньше не показывали) — показать
@@ -6711,6 +6712,57 @@ async function payDueMarkPaid(orderId, btn) {
   }
 }
 
+// v2.46.179: незакрываемая плашка нового счёта автору заказа.
+// Она живёт поверх экранов и обновляется тем же 30-секундным poll, что колокольчик.
+let _supplyInvoiceAuthorAlerts = [];
+
+function renderSupplyInvoiceAuthorAlerts(alerts) {
+  _supplyInvoiceAuthorAlerts = Array.isArray(alerts) ? alerts.slice() : [];
+  let root = document.getElementById('supply-invoice-author-alerts');
+  if (!_supplyInvoiceAuthorAlerts.length) {
+    if (root) root.remove();
+    return;
+  }
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'supply-invoice-author-alerts';
+    root.className = 'supply-author-alerts';
+    root.setAttribute('aria-live', 'assertive');
+    document.body.appendChild(root);
+  }
+  root.innerHTML = _supplyInvoiceAuthorAlerts.map((alert) => {
+    const inboxId = Number(alert && alert.inbox_id) || 0;
+    const supplier = escapeHtml((alert && alert.supplier_name) || 'поставщика');
+    return '<button type="button" class="supply-author-alert" ' +
+      'onclick="openSupplyInvoiceAuthorAlert(' + inboxId + ')">' +
+        '<span class="supply-author-alert__icon"><i class="ti ti-file-invoice"></i></span>' +
+        '<span class="supply-author-alert__text"><b>Новый входящий счёт</b>' +
+          '<small>От ' + supplier + ' · открыть счёт</small></span>' +
+        '<i class="ti ti-chevron-right supply-author-alert__go"></i>' +
+      '</button>';
+  }).join('');
+}
+
+function removeSupplyInvoiceAuthorAlertByInbox(inboxId) {
+  const id = Number(inboxId) || 0;
+  renderSupplyInvoiceAuthorAlerts(
+    _supplyInvoiceAuthorAlerts.filter((alert) => Number(alert.inbox_id) !== id)
+  );
+}
+
+async function openSupplyInvoiceAuthorAlert(inboxId) {
+  const id = Number(inboxId) || 0;
+  if (!id) return;
+  selectSection('supply');
+  selectSidebarItem('supply-inbox');
+  try {
+    if (typeof loadSupplyInbox === 'function') await loadSupplyInbox();
+    if (typeof openInboxInvoice === 'function') await openInboxInvoice(id);
+  } catch (_) {
+    showToast('Не удалось открыть входящий счёт', 'error');
+  }
+}
+
 // v2.42.5: ГЛОБАЛЬНЫЕ УВЕДОМЛЕНИЯ ===================================
 
 let _notifRefreshTimer = null;
@@ -6742,6 +6794,7 @@ async function refreshNotifBadge() {
       apiGet('/api/contract-chats/unread').catch(() => ({ total_unread: 0, contracts: [] })),
       apiGet('/api/notifications/unread').catch(() => ({ items: [], count: 0 })),
     ]);
+    renderSupplyInvoiceAuthorAlerts((notifs && notifs.invoice_alerts) || []);
     const totalChats   = (chats && chats.total_unread) || 0;
     const totalNotifs  = (notifs && (notifs.count != null ? notifs.count : (notifs.items || []).length)) || 0;
     const total = totalChats + totalNotifs;
