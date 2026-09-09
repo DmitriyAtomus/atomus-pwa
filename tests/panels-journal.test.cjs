@@ -92,3 +92,15 @@ test('тема щита и кнопки в карточке', () => {
   assert.match(app4, /pj-step-n">1</);
   assert.match(app4, /Обсудить с Клавой/);
 });
+
+// v2.46.175: клик по листу = метка, не лупа
+test('листы: клик включает режим меток, лупа — отдельной кнопкой, панель на листах сразу ждёт метку', () => {
+  const ps = app4.slice(app4.indexOf('async function loadPanelSheets()'));
+  assert.match(ps, /img\.onclick = function \(\) \{ psStartMark\(\); \}/);
+  assert.match(ps, /Отметить на листе/);
+  assert.match(ps, /onclick="psZoom\(this\)"/);
+  assert.match(ps, /async function psStartMark\(\)[\s\S]*KlavaPick\.pick\(true\)/);
+  assert.match(html, /autoPick: function\(\)\{ return \(state\.currentScreen\|\|''\)==='panel-sheets'; \}/);
+  const mod = fs.readFileSync(path.join(root, 'klava-pick.js'), 'utf8');
+  assert.match(mod, /KP\.cfg\.autoPick && KP\.cfg\.autoPick\(\)/);
+});

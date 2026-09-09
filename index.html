@@ -3770,6 +3770,7 @@
       m.selector='panel '+(state._ps.designation||'')+' · rev '+(state._ps.rev||'')+' · page '+pg.dataset.page;
       if(!m.code) m.code='atomus/schematics/panels/'+(state._ps.dir||'?')+'/ — генератор листа '+pg.dataset.page;
     },
+    autoPick: function(){ return (state.currentScreen||'')==='panel-sheets'; },
     fabStyle: { right:'82px', bottom:'86px' }   // слева от кнопки шторки «Клод» (right 18 / bottom 78, 52px)
   });
 })();

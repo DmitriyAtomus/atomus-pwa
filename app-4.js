@@ -23442,7 +23442,10 @@ async function loadPanelSheets() {
   for (let n = 1; n <= Math.max(pages, 1) && n <= 20; n++) {
     const box = document.createElement('div');
     box.className = 'ps-page'; box.dataset.page = String(n);
-    box.innerHTML = '<div class="ps-page-h">Лист ' + n + ' <span class="ps-page-mm"></span></div><div class="ps-page-body"><div class="loading-block">рисую…</div></div>';
+    box.innerHTML = '<div class="ps-page-h">Лист ' + n + ' <span class="ps-page-mm"></span>' +
+      '<span class="ps-page-acts"><button class="btn btn-primary btn-small" onclick="psStartMark()"><i class="ti ti-pencil"></i> Отметить на листе</button>' +
+      '<button class="btn btn-secondary btn-small" data-zoom="' + n + '" onclick="psZoom(this)"><i class="ti ti-zoom-in"></i> Крупно</button></span></div>' +
+      '<div class="ps-page-body"><div class="loading-block">рисую…</div></div>';
     host.appendChild(box);
     try {
       const r = await fetch(API_BASE + '/api/panels/files/' + rev.id + '/page/' + n, { headers: { 'Authorization': 'Bearer ' + token } });
@@ -23452,10 +23455,23 @@ async function loadPanelSheets() {
       box.querySelector('.ps-page-mm').textContent = mm ? mm.replace('x', '×') + ' мм' : '';
       const img = document.createElement('img');
       img.src = URL.createObjectURL(await r.blob()); img.alt = 'Лист ' + n;
-      img.onclick = function () { window.open(img.src, '_blank'); };
+      // v2.46.175: клик по листу — не лупа, а сразу режим меток (лупа — кнопкой «Крупно»)
+      img.onclick = function () { psStartMark(); };
       box.querySelector('.ps-page-body').innerHTML = ''; box.querySelector('.ps-page-body').appendChild(img);
     } catch (e) { box.querySelector('.ps-page-body').textContent = 'Ошибка связи'; break; }
   }
+}
+
+// v2.46.175: включить метки одним нажатием — панель Клавы откроется сама
+async function psStartMark() {
+  if (!window.KlavaPick) return;
+  if (!KlavaPick.open) await KlavaPick.show();
+  if (!KlavaPick.picking) KlavaPick.pick(true);
+  showToast('Обведите место на листе мышью или кликните на элемент. Готово — кнопка сверху', 'info');
+}
+function psZoom(btn) {
+  const box = btn.closest('.ps-page'); const img = box && box.querySelector('img');
+  if (img) window.open(img.src, '_blank');
 }
 
 async function psBuild() {

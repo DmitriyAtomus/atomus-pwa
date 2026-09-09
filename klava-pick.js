@@ -119,7 +119,9 @@
     catch (e) { KP.els.feed.innerHTML = '<div class="kp-lock">Нет связи с CRM — метки поставить можно, отправка не пройдёт</div>'; }
     const th = KP.feedThread;
     const fresh = !KP.tid || !th || !(th.messages || []).some(m => m.role === 'user');
-    if (!KP.marks.length && fresh) KP.pick(true);
+    let auto = false;
+    try { auto = !!(KP.cfg.autoPick && KP.cfg.autoPick()); } catch (e) { auto = false; }   // v2.46.175: на листах щита — сразу метки
+    if (!KP.marks.length && (fresh || auto)) KP.pick(true);
   };
   KP._memKey = function () { return 'kp.topic.' + ((KP.cfg && KP.cfg.page) || 'crm'); };
   KP._remember = function () { try { localStorage.setItem(KP._memKey(), KP.tid ? String(KP.tid) : ''); } catch (e) {} };
