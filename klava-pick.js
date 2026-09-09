@@ -25,6 +25,7 @@
 #kp-bar i{width:8px;height:8px;border-radius:50%;background:#FBBF24;display:inline-block;flex:none}
 #kp-bar .k{background:rgba(255,255,255,.14);border-radius:6px;padding:2px 7px;font-weight:600}
 .kp-done{border:0;background:#FBBF24;color:#1F2937;border-radius:8px;padding:4px 10px;font:800 12px Inter,system-ui,sans-serif;cursor:pointer}
+.kp-reset{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:8px;padding:3px 9px;font:700 12px Inter,system-ui,sans-serif;cursor:pointer}
 #kp-hover{position:fixed;z-index:99991;pointer-events:none;border:2px dashed #FBBF24;border-radius:8px;background:rgba(251,191,36,.08);display:none}
 #kp-band{position:fixed;z-index:99991;pointer-events:none;border:2px solid #60A5FA;background:rgba(96,165,250,.14);border-radius:6px;display:none}
 #kp-marks{position:fixed;inset:0;z-index:99989;pointer-events:none}
@@ -34,7 +35,10 @@
 .kp-mark .tag{position:absolute;left:-2px;top:-24px;background:#FBBF24;color:#1F2937;font:800 11px Inter,system-ui,sans-serif;padding:3px 8px;border-radius:7px 7px 0 0;white-space:nowrap;max-width:420px;overflow:hidden;text-overflow:ellipsis}
 .kp-mark.region .tag{background:#60A5FA;color:#0F1E32}
 .kp-mark.part .tag{background:#F472B6;color:#3B0A2A}
-.kp-mark .pin{position:absolute;right:-12px;top:-12px;width:26px;height:26px;border-radius:50%;background:#DC2626;color:#fff;font:800 13px Inter,system-ui,sans-serif;display:grid;place-items:center;border:2px solid #fff}
+.kp-mark .pin{position:absolute;right:-12px;top:-12px;width:26px;height:26px;border-radius:50%;background:#DC2626;color:#fff;font:800 13px Inter,system-ui,sans-serif;display:grid;place-items:center;border:2px solid #fff;pointer-events:auto;cursor:pointer}
+.kp-mark .pin:hover{background:#7F1D1D}
+.kp-mark .pin:hover::after{content:'✕';font-size:12px}
+.kp-mark .pin:hover .n{display:none}
 #kp-panel{position:fixed;right:14px;top:14px;bottom:14px;width:420px;max-width:calc(100vw - 28px);z-index:99995;background:#fff;border-radius:16px;
   box-shadow:0 16px 48px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden}
 #kp-panel.hidden{display:none}
@@ -343,6 +347,7 @@
       const layer = el('div', 'kp-ui'); layer.id = 'kp-layer';
       const bar = el('div', 'kp-ui'); bar.id = 'kp-bar';
       bar.innerHTML = '<i></i> Кликните на элемент' + (KP.cfg.partAt ? ' или деталь в сцене' : '') + ', или обведите область мышью <span class="k" id="kp-cnt"></span>' +
+        '<button class="kp-reset" id="kp-reset" title="Убрать все метки">↺ Сбросить</button>' +
         '<button class="kp-done" id="kp-done">✓ Готово</button><span class="k">или Esc</span>';
       const hov = el('div', 'kp-ui'); hov.id = 'kp-hover';
       const band = el('div', 'kp-ui'); band.id = 'kp-band';
@@ -356,6 +361,7 @@
       // (листы щита лежат в своём контейнере, а не в body)
       layer.addEventListener('wheel', KP._onWheel, { passive: false });
       bar.querySelector('#kp-done').onclick = () => KP.pick(false);
+      bar.querySelector('#kp-reset').onclick = () => { KP.clear(); const c = document.getElementById('kp-cnt'); if (c) c.textContent = ''; };
     } else {
       ['layer', 'bar', 'hover', 'band'].forEach(k => { if (KP.els[k]) { KP.els[k].remove(); KP.els[k] = null; } });
       KP.drag = null; KP.hoverEl = null;
@@ -522,7 +528,11 @@
     const cnt = document.getElementById('kp-cnt');
     if (cnt) cnt.textContent = 'меток: ' + KP.marks.length;
   };
-  KP.remove = function (n) { KP.marks = KP.marks.filter(m => m.n !== n); KP.layout(); KP._renderCtx(); };
+  KP.remove = function (n) {
+    KP.marks = KP.marks.filter(m => m.n !== n); KP.layout(); KP._renderCtx();
+    const c = document.getElementById('kp-cnt'); if (c) c.textContent = KP.marks.length ? 'меток: ' + KP.marks.length : '';
+    if (KP.cfg && KP.cfg.remote && !KP.picking) KP._remoteDone();
+  };
   KP.clear = function () { KP.marks = []; KP.seq = 0; KP.layout(); KP._renderCtx(); };
 
   // v2.46.174: рамка области держится за элемент под ней (лист, карточка),
@@ -549,7 +559,8 @@
       const [x, y, w, h] = m.rect || [0, 0, 0, 0];
       const d = el('div', 'kp-mark ' + m.kind);
       d.style.left = (x - 4) + 'px'; d.style.top = (y - 4) + 'px'; d.style.width = (w + 8) + 'px'; d.style.height = (h + 8) + 'px';
-      d.innerHTML = '<div class="tag">' + esc(m.label || '') + '</div><div class="pin">' + m.n + '</div>';
+      d.innerHTML = '<div class="tag">' + esc(m.label || '') + '</div><div class="pin" title="Убрать метку ' + m.n + '"><span class="n">' + m.n + '</span></div>';
+      d.querySelector('.pin').onclick = (e) => { e.stopPropagation(); KP.remove(m.n); };
       host.appendChild(d);
     });
     // 3D-детали двигаются вместе с камерой — перекладываем, пока панель открыта

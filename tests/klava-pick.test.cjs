@@ -130,3 +130,10 @@ test('панель шлёт async и ждёт ответ опросом темы
   assert.match(app4, /form\.append\('async', '1'\)/);
   assert.match(app4, /\{ text, async: true \}/);
 });
+
+// v2.46.182: убрать метку
+test('метку убирает клик по номеру, «↺ Сбросить» убирает все', () => {
+  assert.match(mod, /d\.querySelector\('\.pin'\)\.onclick = \(e\) => \{ e\.stopPropagation\(\); KP\.remove\(m\.n\); \}/);
+  assert.match(mod, /id="kp-reset"[^>]*>↺ Сбросить/);
+  assert.match(mod, /if \(KP\.cfg && KP\.cfg\.remote && !KP\.picking\) KP\._remoteDone\(\)/);
+});

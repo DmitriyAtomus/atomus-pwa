@@ -109,7 +109,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.181";
+const APP_VERSION = "v2.46.182";
 const APP_VERSION_DATE = "09.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3059,7 +3059,13 @@ function _devChatArtifactMessage(event) {
     // v2.46.176: метки из предпросмотра — как в CRM: несколько, с рамками и скриншотом
     const ctx = (msg.data && msg.data.ctx) || {};
     const marks = Array.isArray(ctx.marks) ? ctx.marks.slice(0, 8) : [];
-    if (!marks.length) return;
+    if (!marks.length) {
+      // v2.46.182: убрали последнюю метку кликом по номеру — «Правка для» снова вся страница
+      if (state.marks && state.marks.length) { state.marks = []; state.shot = ''; state.box.classList.remove('has-selection');
+        const l0 = state.box.querySelector('[data-art-selection]'); if (l0) l0.textContent = 'Вся страница';
+        const d0 = state.box.querySelector('[data-art-selection-detail]'); if (d0) d0.textContent = 'Опишите общую правку или нажмите «Отметить на макете»: обведите место мышью, можно несколько, потом «Готово».'; }
+      return;
+    }
     state.marks = marks.map(function (m) { return _devChatArtifactSafeMark(m); });
     state.markPage = String(ctx.screen || '').slice(0, 120);
     state.shot = (typeof msg.data.shot === 'string' && /^data:image\/(png|jpeg);base64,/.test(msg.data.shot)) ? msg.data.shot : '';
@@ -3199,7 +3205,7 @@ async function devChatOpenArtifact(url, name) {
         '<div class="dchat-artedit-target"><span>Правка для</span>' +
           '<strong data-art-selection>Вся страница</strong>' +
           '<small data-art-selection-detail>Можно описать общую правку или сначала указать конкретный блок.</small>' +
-          '<button type="button" data-art-clear title="Снять выбор"><i class="ti ti-x"></i></button></div>' +
+          '<button type="button" data-art-clear title="Сбросить все метки"><i class="ti ti-x"></i></button></div>' +
         '<div class="dchat-artedit-compose">' +
           '<textarea rows="2" data-art-note placeholder="Например: сделай заголовок меньше и добавь воздуха сверху"></textarea>' +
           '<button type="button" data-art-send><i class="ti ti-send"></i><span>Отправить Клаве</span></button>' +
