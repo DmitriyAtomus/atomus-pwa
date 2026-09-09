@@ -2103,6 +2103,8 @@ function _ideasSharedActions(th) {
     }
   }
   if (th.rounds) h += '<button class="btn btn-secondary btn-small" onclick="ideaReport(' + th.id + ')"><i class="ti ti-clipboard-list"></i> Отчёт</button>';
+  h += '<div class="ich-live" id="ideas-live"></div>';
+  if (th.rounds) _ideasLiveStart(th.id);
   if (state._ideas.isDir && th.id) {
     h += '<span class="ich-manage">' +
       '<button class="btn btn-secondary btn-small" onclick="ideaRename(' + th.id + ')">' +
@@ -2111,6 +2113,34 @@ function _ideasSharedActions(th) {
       '<i class="ti ti-trash"></i> Удалить</button></span>';
   }
   return h;
+}
+
+// v2.46.183: живой ход правки в теме — опрос отчёта раз в 10 с, пока раунд у агента
+let _ideasLiveT = null;
+function _ideasLiveStart(tid) {
+  clearInterval(_ideasLiveT); _ideasLiveT = null;
+  const tick = async function () {
+    const el = document.getElementById('ideas-live');
+    if (!el || !state._ideas || state._ideas.current !== tid) { clearInterval(_ideasLiveT); _ideasLiveT = null; return; }
+    let d; try { d = await apiGet('/api/ideas/' + tid + '/report'); } catch (e) { return; }
+    if (!d || !d.ok) return;
+    const a = d.active;
+    if (!a) {
+      if (el.dataset.was === '1') { el.innerHTML = '<span class="ich-live-done"><i class="ti ti-check"></i> Агент закончил — отчёт в теме</span>'; el.dataset.was = '0'; ideasOpen(tid); }
+      else el.innerHTML = '';
+      clearInterval(_ideasLiveT); _ideasLiveT = null; return;
+    }
+    el.dataset.was = '1';
+    const t = a.run_at ? new Date(String(a.run_at).replace(' ', 'T') + (String(a.run_at).endsWith('Z') ? '' : 'Z')).getTime() : 0;
+    const mins = t ? Math.max(0, Math.round((Date.now() - t) / 60000)) : null;
+    const last = (a.progress || []).slice(-1)[0] || '';
+    el.innerHTML = (a.status === 'running' || a.status === 'stopping')
+      ? '<span class="ich-live-on"><i class="ti ti-tool"></i> Агент работает над раундом ' + a.round + (mins != null ? ' · ' + mins + ' мин' : '') + '</span>' +
+        (last ? '<div class="ich-live-line">' + escapeHtml(last).slice(0, 160) + '</div>' : '')
+      : '<span class="ich-live-wait"><i class="ti ti-hourglass"></i> Раунд ' + a.round + ' в очереди у агента</span>';
+  };
+  tick();
+  _ideasLiveT = setInterval(tick, 10000);
 }
 
 // v2.46.181: отчёт по теме — раунды: ушло в работу (кто, когда) → сделано (когда, что)

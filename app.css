@@ -25154,6 +25154,13 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
 .ich-ctx { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; font-size: 10.5px; font-weight: 700; background: #FEF3C7; color: #92400E; border-radius: 6px; padding: 2px 7px; }
 .ich-row.is-mine .ich-ctx { background: rgba(255,255,255,.18); color: #fff; }
 .ich-note-shared { color: #1E4E8C; }
+/* v2.46.183: живой ход правки */
+.ich-live { flex-basis: 100%; font-size: 12px; }
+.ich-live:empty { display: none; }
+.ich-live-on { color: #B45309; font-weight: 800; }
+.ich-live-wait { color: var(--text-light); font-weight: 700; }
+.ich-live-done { color: #047857; font-weight: 800; }
+.ich-live-line { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: #4B5563; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* v2.46.181: отчёт по теме */
 .ir-list { display: flex; flex-direction: column; gap: 8px; }
 .ir-row { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }

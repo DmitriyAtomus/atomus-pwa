@@ -81,6 +81,12 @@
 .kp-act:disabled{opacity:.5;cursor:default}
 .kp-spec{font-size:11.5px;line-height:1.4;max-height:220px;overflow:auto;background:#fff;border:1px solid #E5E9F0;border-radius:8px;padding:8px;margin-top:4px;white-space:pre-wrap}
 .kp-hint{font-size:11px;color:#7E93AC;margin-top:4px}
+.kp-live{flex-basis:100%;font-size:11.5px}
+.kp-live:empty{display:none}
+.kp-live-on{color:#B45309;font-weight:800}
+.kp-live-wait{color:#7E93AC;font-weight:700}
+.kp-live-done{color:#047857;font-weight:800}
+.kp-live-line{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#4B5563;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kp-lock{margin:14px;background:#FEF3C7;border-radius:12px;padding:12px;color:#92400E;font-weight:600}
 @media (max-width:640px){#kp-panel{right:0;left:0;top:auto;bottom:0;width:auto;max-width:none;height:72vh;border-radius:16px 16px 0 0}
   .kp-mark .tag{max-width:60vw}}
@@ -134,6 +140,7 @@
   KP._remember = function () { try { localStorage.setItem(KP._memKey(), KP.tid ? String(KP.tid) : ''); } catch (e) {} };
   KP.close = function () {
     KP.open = false; KP.pick(false);
+    clearInterval(KP._liveT); KP._liveT = null;
     if (KP.els.panel) KP.els.panel.classList.add('hidden');
     KP.els.fab.classList.remove('hidden');
   };
@@ -243,11 +250,40 @@
       if (th.rounds) h += '<span class="kp-note">раундов в работе: ' + th.rounds + '</span>';
     }
     if (th.rounds) h += '<button class="kp-act" id="kp-report">📋 Отчёт</button>';
+    h += '<div class="kp-live" id="kp-live"></div>';
     box.innerHTML = h;
+    KP._liveStart(th);
     const rb = box.querySelector('#kp-report'); if (rb) rb.onclick = KP.report;
     const sb = box.querySelector('#kp-spec'); if (sb) sb.onclick = KP.compile;
     const ib = box.querySelector('#kp-impl'); if (ib) ib.onclick = KP.implement;
     const ab = box.querySelector('#kp-apply'); if (ab) ab.onclick = KP.apply;
+  };
+
+  // v2.46.183: живой ход правки — агент взял? что делает сейчас? Опрос отчёта раз в 10 с
+  KP._liveStart = function (th) {
+    clearInterval(KP._liveT); KP._liveT = null;
+    if (!th || !th.rounds || !KP.tid) return;
+    const tid = KP.tid;
+    const tick = async () => {
+      const el = document.getElementById('kp-live');
+      if (!el || KP.tid !== tid || !KP.open) { clearInterval(KP._liveT); KP._liveT = null; return; }
+      let r; try { r = await KP._api('/api/ideas/' + tid + '/report'); } catch (e) { return; }
+      if (!r.ok) return;
+      const a = r.data.active;
+      if (!a) {
+        if (el.dataset.was === '1') { el.innerHTML = '<span class="kp-live-done">✅ Агент закончил — отчёт в теме</span>'; el.dataset.was = '0'; KP._loadFeed(); }
+        else el.innerHTML = '';
+        clearInterval(KP._liveT); KP._liveT = null; return;
+      }
+      el.dataset.was = '1';
+      const mins = a.run_at ? Math.max(0, Math.round((Date.now() - new Date(String(a.run_at).replace(' ', 'T') + (String(a.run_at).endsWith('Z') ? '' : 'Z')).getTime()) / 60000)) : null;
+      const last = (a.progress || []).slice(-1)[0] || '';
+      el.innerHTML = a.status === 'running' || a.status === 'stopping'
+        ? '<span class="kp-live-on">🔧 Агент работает над раундом ' + a.round + (mins != null ? ' · ' + mins + ' мин' : '') + '</span>' + (last ? '<div class="kp-live-line">' + esc(last).slice(0, 140) + '</div>' : '')
+        : '<span class="kp-live-wait">⏳ Раунд ' + a.round + ' в очереди у агента</span>';
+    };
+    tick();
+    KP._liveT = setInterval(tick, 10000);
   };
 
   // v2.46.181: отчёт по теме прямо в ленте — раунды с датами

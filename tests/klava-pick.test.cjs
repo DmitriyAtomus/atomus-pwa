@@ -137,3 +137,15 @@ test('метку убирает клик по номеру, «↺ Сбросит
   assert.match(mod, /id="kp-reset"[^>]*>↺ Сбросить/);
   assert.match(mod, /if \(KP\.cfg && KP\.cfg\.remote && !KP\.picking\) KP\._remoteDone\(\)/);
 });
+
+// v2.46.183: живой ход правки
+test('в теме с раундами идёт опрос отчёта: агент работает / в очереди / закончил', () => {
+  assert.match(mod, /KP\._liveStart = function \(th\)/);
+  assert.match(mod, /\/api\/ideas\/' \+ tid \+ '\/report'/);
+  assert.match(mod, /Агент работает над раундом/);
+  assert.match(mod, /в очереди у агента/);
+  assert.match(mod, /Агент закончил — отчёт в теме/);
+  assert.match(mod, /setInterval\(tick, 10000\)/);
+  assert.match(app4, /function _ideasLiveStart\(tid\)/);
+  assert.match(app4, /if \(th\.rounds\) _ideasLiveStart\(th\.id\);/);
+});
