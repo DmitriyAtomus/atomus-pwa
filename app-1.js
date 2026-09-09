@@ -109,7 +109,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.183";
+const APP_VERSION = "v2.46.184";
 const APP_VERSION_DATE = "09.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -9734,9 +9734,13 @@ async function showProductionWorkQr(workId) {
     if (!aid) {
       // Создаём связанную запись сборки на лету (status='in_progress' — на склад не пойдёт).
       const r = await apiPost('/api/production/works/' + workId + '/ensure-assembly', {});
-      aid = r && r.assembly_id;
-      if (!aid) throw new Error('ensure-assembly не вернул id');
-      if (r.created) showToast('Запись сборки создана — теперь у работы есть QR', 'info');
+      // v2.46.184: apiPost отдаёт {ok, status, data} — раньше id искали не там, и
+      // настоящая причина («нет исполнителей», «нет модели») терялась
+      const d = (r && r.data) || {};
+      if (!r.ok) throw new Error(d.message || ('сервер ответил ' + r.status));
+      aid = d.assembly_id;
+      if (!aid) throw new Error('сервер не вернул id сборки');
+      if (d.created) showToast('Запись сборки создана — теперь у работы есть QR', 'info');
     }
     showAssemblyQr(aid, w.model_name || '', w.model_article || '', w.linked_assembly_date || w.finished_at || w.started_at || '');
   } catch (e) {
