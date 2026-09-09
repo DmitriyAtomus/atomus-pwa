@@ -91,7 +91,7 @@ test('панель: «Сформировать ТЗ» и «Внедрить» п
   assert.match(mod, /localStorage\.getItem\(KP\._memKey\(\)/);
   const show = mod.slice(mod.indexOf('KP.show = async function'), mod.indexOf('KP._memKey'));
   assert.match(show, /await KP\._loadThreads\(\)/);
-  assert.match(show, /if \(!KP\.marks\.length && fresh\) KP\.pick\(true\)/);   // пустая тема — сразу метки, живая — переписка
+  assert.match(show, /if \(!KP\.marks\.length && \(fresh \|\| auto\)\) KP\.pick\(true\)/);   // пустая тема или листы щита — сразу метки
   assert.match(mod, /feed\.scrollTop = feed\.scrollHeight/);
 });
 
