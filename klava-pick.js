@@ -69,6 +69,13 @@
 .kp-cmp button{flex:none;width:32px;height:32px;border-radius:9px;background:#2D5F8B;color:#fff;border:0;cursor:pointer;font-size:15px}
 .kp-cmp button:disabled{opacity:.5;cursor:default}
 .kp-note{margin:6px 14px;font-size:11.5px;color:#7E93AC}
+.kp-acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 14px 4px}
+.kp-acts .kp-note{margin:0}
+.kp-act{border:1px solid #D9E1EC;background:#EEF4FF;color:#1E4E8C;border-radius:9px;padding:6px 10px;font:700 12px Inter,system-ui,sans-serif;cursor:pointer}
+.kp-act.go{background:#2D5F8B;color:#fff;border-color:#2D5F8B;box-shadow:0 0 0 3px rgba(45,95,139,.18)}
+.kp-act:disabled{opacity:.5;cursor:default}
+.kp-spec{font-size:11.5px;line-height:1.4;max-height:220px;overflow:auto;background:#fff;border:1px solid #E5E9F0;border-radius:8px;padding:8px;margin-top:4px;white-space:pre-wrap}
+.kp-hint{font-size:11px;color:#7E93AC;margin-top:4px}
 .kp-lock{margin:14px;background:#FEF3C7;border-radius:12px;padding:12px;color:#92400E;font-weight:600}
 @media (max-width:640px){#kp-panel{right:0;left:0;top:auto;bottom:0;width:auto;max-width:none;height:72vh;border-radius:16px 16px 0 0}
   .kp-mark .tag{max-width:60vw}}
@@ -105,10 +112,16 @@
     KP.els.panel.classList.remove('hidden');
     KP.els.fab.classList.add('hidden');
     KP._renderCtx();
-    if (!KP.marks.length) KP.pick(true);
+    // v2.46.164: открываемся сразу на последней переписке выбранной темы;
+    // режим меток — кнопкой «＋ Метка» (или сам, если тема пустая)
     try { await KP._loadThreads(); }
     catch (e) { KP.els.feed.innerHTML = '<div class="kp-lock">Нет связи с CRM — метки поставить можно, отправка не пройдёт</div>'; }
+    const th = KP.feedThread;
+    const fresh = !KP.tid || !th || !(th.messages || []).some(m => m.role === 'user');
+    if (!KP.marks.length && fresh) KP.pick(true);
   };
+  KP._memKey = function () { return 'kp.topic.' + ((KP.cfg && KP.cfg.page) || 'crm'); };
+  KP._remember = function () { try { localStorage.setItem(KP._memKey(), KP.tid ? String(KP.tid) : ''); } catch (e) {} };
   KP.close = function () {
     KP.open = false; KP.pick(false);
     if (KP.els.panel) KP.els.panel.classList.add('hidden');
@@ -121,6 +134,7 @@
       '<div class="kp-topic">В тему: <select id="kp-topic"><option value="">загружаю…</option></select></div>' +
       '<div class="kp-ctx" id="kp-ctx"></div>' +
       '<div class="kp-feed" id="kp-feed"></div>' +
+      '<div class="kp-acts" id="kp-acts"></div>' +
       '<div class="kp-note" id="kp-note"></div>' +
       '<div class="kp-cmp"><textarea id="kp-in" rows="1" placeholder="Что не так или чего не хватает?"></textarea>' +
       '<button id="kp-send" title="Отправить (Enter)">➤</button></div>';
@@ -128,7 +142,7 @@
     KP.els.panel = p;
     p.querySelector('.x').onclick = KP.close;
     KP.els.topic = p.querySelector('#kp-topic');
-    KP.els.topic.onchange = () => { KP.tid = KP.els.topic.value ? parseInt(KP.els.topic.value, 10) : null; KP._loadFeed(); };
+    KP.els.topic.onchange = () => { KP.tid = KP.els.topic.value ? parseInt(KP.els.topic.value, 10) : null; KP._remember(); KP._loadFeed(); };
     KP.els.in = p.querySelector('#kp-in');
     KP.els.in.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); KP.send(); } });
     KP.els.in.addEventListener('input', () => { KP.els.in.style.height = 'auto'; KP.els.in.style.height = Math.min(120, KP.els.in.scrollHeight) + 'px'; });
@@ -157,20 +171,23 @@
       return;
     }
     const list = (r.data.ideas || []);
-    KP.threads = list;
+    KP.threads = list; KP.isDir = !!r.data.is_director;
     const shared = list.filter(t => t.shared), own = list.filter(t => !t.shared && ['open', 'ready', 'revision'].includes(t.status || 'open'));
     let h = '';
     if (shared.length) h += '<optgroup label="Общие темы">' + shared.map(t => '<option value="' + t.id + '">' + esc(t.title) + (t.rounds ? ' · ' + t.rounds + ' в работе' : '') + '</option>').join('') + '</optgroup>';
     if (own.length) h += '<optgroup label="Мои идеи">' + own.map(t => '<option value="' + t.id + '">' + esc(t.title) + '</option>').join('') + '</optgroup>';
     h += '<option value="">＋ новая идея</option>';
     sel.innerHTML = h;
+    let mem = null; try { mem = parseInt(localStorage.getItem(KP._memKey()) || '', 10) || null; } catch (e) { mem = null; }
     if (KP.tid && list.some(t => t.id === KP.tid)) sel.value = String(KP.tid);
+    else if (mem && list.some(t => t.id === mem)) { KP.tid = mem; sel.value = String(mem); }   // где общались в прошлый раз
     else {
       const pref = KP.cfg.preferTopic ? shared.find(t => new RegExp(KP.cfg.preferTopic, 'i').test(t.title || '')) : null;
       KP.tid = pref ? pref.id : (shared[0] ? shared[0].id : null);
       sel.value = KP.tid ? String(KP.tid) : '';
     }
-    KP._loadFeed();
+    KP._remember();
+    await KP._loadFeed();
   };
 
   KP._loadFeed = async function () {
@@ -185,8 +202,58 @@
     const th = r.data.thread || {}; KP.feedThread = th;
     feed.innerHTML = '';
     (th.messages || []).slice(-40).forEach(m => KP._bubble(m.role, m.text, m.author_name, m.context, m.files));
-    if (th.spec_text && th.status === 'ready') KP._bubble('assistant', '📄 ТЗ готово — директор может нажать «Внедрить» в CRM → Идеи.', 'Клава');
+    if (th.spec_text && th.status === 'ready') KP._specBubble(th.spec_text);
+    KP._renderActs();
     feed.scrollTop = feed.scrollHeight;
+  };
+  KP._specBubble = function (spec) {
+    const b = KP._bubble('assistant', '', 'Клава');
+    b.innerHTML = '<div class="who">Клава · ТЗ готово</div><div class="kp-spec">' + esc(spec) + '</div>' +
+      (KP.isDir ? '<div class="kp-hint">Нажмите «Внедрить» ниже — задача уйдёт агенту, тема останется открытой.</div>'
+                : '<div class="kp-hint">ТЗ у директора: он нажмёт «Внедрить».</div>');
+    return b;
+  };
+
+  // v2.46.164: ТЗ и «Внедрить» прямо из панели — не ходить в раздел «Идеи»
+  KP._renderActs = function () {
+    const box = KP.els.panel && KP.els.panel.querySelector('#kp-acts'); if (!box) return;
+    const th = KP.feedThread || {};
+    if (!KP.tid || !th.id) { box.innerHTML = ''; return; }
+    const talked = (th.messages || []).some(m => m.role === 'user');
+    const ready = !!th.spec_text && th.status === 'ready';
+    let h = '';
+    if (talked) h += '<button class="kp-act" id="kp-spec">📄 ' + (th.spec_text ? 'Пересобрать ТЗ' : 'Сформировать ТЗ') + '</button>';
+    if (ready && KP.isDir) h += '<button class="kp-act go" id="kp-impl">🚀 Внедрить</button>';
+    if (ready && !KP.isDir) h += '<span class="kp-note">ТЗ готово — внедряет директор</span>';
+    if (th.rounds) h += '<span class="kp-note">раундов в работе: ' + th.rounds + '</span>';
+    box.innerHTML = h;
+    const sb = box.querySelector('#kp-spec'); if (sb) sb.onclick = KP.compile;
+    const ib = box.querySelector('#kp-impl'); if (ib) ib.onclick = KP.implement;
+  };
+  KP.compile = async function () {
+    if (KP.busy || !KP.tid) return;
+    KP.busy = true; KP.els.note.textContent = 'Клава собирает ТЗ из обсуждения…';
+    const btn = KP.els.panel.querySelector('#kp-spec'); if (btn) btn.disabled = true;
+    try {
+      const r = await KP._api('/api/ideas/' + KP.tid + '/compile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skip_mockup: true }) });
+      if (!r.ok || !r.data.ok) { KP.els.note.textContent = r.data.message || ('Не собралось (' + r.status + ')'); return; }
+      KP.els.note.textContent = 'ТЗ готово.';
+      await KP._loadFeed();
+    } catch (e) { KP.els.note.textContent = 'Ошибка связи'; }
+    finally { KP.busy = false; if (btn) btn.disabled = false; }
+  };
+  KP.implement = async function () {
+    if (KP.busy || !KP.tid) return;
+    const note = prompt('Правка к ТЗ перед внедрением (можно пусто):', '');
+    if (note === null) return;
+    KP.busy = true; KP.els.note.textContent = 'Отправляю в работу…';
+    try {
+      const r = await KP._api('/api/ideas/' + KP.tid + '/implement', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment: note || '' }) });
+      if (!r.ok || !r.data.ok) { KP.els.note.textContent = r.data.message || ('Не получилось (' + r.status + ')'); return; }
+      KP.els.note.textContent = r.data.round ? ('Раунд ' + r.data.round + ' ушёл в работу — тема открыта дальше') : 'Задача в ленте разработки';
+      await KP._loadThreads();
+    } catch (e) { KP.els.note.textContent = 'Ошибка связи'; }
+    finally { KP.busy = false; }
   };
 
   KP._bubble = function (role, text, who, ctx, files) {
@@ -382,7 +449,7 @@
     let h = '<div class="t">КЛАВА УВИДИТ САМА <button id="kp-pickbtn" class="' + (KP.picking ? 'on' : '') + '">' + (KP.picking ? '● отмечаю… (Esc)' : '＋ Метка') + '</button></div>' +
       '<div class="row"><span>Экран</span><b>' + esc(ctx.screen) + '</b></div>' +
       (ctx.project ? '<div class="row"><span>Проект</span><b>' + esc(ctx.project) + '</b></div>' : '');
-    if (!KP.marks.length) h += '<div class="empty">Меток пока нет — нажмите «＋ Метка» и кликните на то, что обсуждаем, или обведите область.</div>';
+    if (!KP.marks.length) h += '<div class="empty">Без меток — просто разговор. «＋ Метка»: кликнуть на элемент или обвести область.</div>';
     KP.marks.forEach(m => {
       h += '<div class="m"><span class="n ' + m.kind + '">' + m.n + '</span><span class="l">' + esc(m.label) +
         (m.detail || m.selector || m.code ? '<div class="d">' + esc([m.detail, m.code, m.selector].filter(Boolean).join(' · ')) + '</div>' : '') +
@@ -470,7 +537,8 @@
       ph.innerHTML = '<div class="who">Клава</div>' + esc(r.data.reply || 'Приняла.');
       KP.els.feed.scrollTop = KP.els.feed.scrollHeight;
       KP.clear();
-      KP.els.note.textContent = KP.tid ? 'Отправлено в тему. Директор увидит в CRM → Идеи.' : '';
+      KP.els.note.textContent = KP.tid ? 'Отправлено в тему.' : '';
+      if (KP.tid) { try { const t = await KP._api('/api/ideas/' + KP.tid); if (t.ok) { KP.feedThread = t.data.thread || KP.feedThread; KP._renderActs(); } } catch (e) {} }
     } catch (e) {
       KP.els.note.textContent = 'Ошибка связи: ' + (e && e.message || e);
     } finally {

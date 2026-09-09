@@ -78,3 +78,19 @@ test('в ленте Идей у сообщения с метками — чип'
   assert.match(app4, /_ideaCtxHtml\(ctx\) \+/);
   assert.match(app4, /m\.context\);/);
 });
+
+// v2.46.164: ТЗ и «Внедрить» из панели; открытие на последней переписке
+test('панель: «Сформировать ТЗ» и «Внедрить» прямо здесь, тема запоминается', () => {
+  assert.match(mod, /KP\.compile = async function/);
+  assert.match(mod, /\/api\/ideas\/' \+ KP\.tid \+ '\/compile'/);
+  assert.match(mod, /skip_mockup: true/);
+  assert.match(mod, /KP\.implement = async function/);
+  assert.match(mod, /\/api\/ideas\/' \+ KP\.tid \+ '\/implement'/);
+  assert.match(mod, /ready && KP\.isDir/);                       // «Внедрить» — только директору
+  assert.match(mod, /localStorage\.setItem\(KP\._memKey\(\)/);   // где общались в прошлый раз
+  assert.match(mod, /localStorage\.getItem\(KP\._memKey\(\)/);
+  const show = mod.slice(mod.indexOf('KP.show = async function'), mod.indexOf('KP._memKey'));
+  assert.match(show, /await KP\._loadThreads\(\)/);
+  assert.match(show, /if \(!KP\.marks\.length && fresh\) KP\.pick\(true\)/);   // пустая тема — сразу метки, живая — переписка
+  assert.match(mod, /feed\.scrollTop = feed\.scrollHeight/);
+});
