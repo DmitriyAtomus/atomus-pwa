@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.167";
+const APP_VERSION = "v2.46.168";
 const APP_VERSION_DATE = "08.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1926,6 +1926,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'developments') loadDevelopments();         // ЭТАП 48 (v2.44.46)
   if (screenName === 'paint-calc') loadPaintCalcs();              // v2.45.836
   if (screenName === 'units-journal') loadUnitsJournal();         // v2.46.054
+  if (screenName === 'panels-journal') loadPanelsJournal();       // v2.46.168
   if (screenName === 'mfg') loadMfg();                            // v2.45.844
   if (screenName === 'inventory') loadInventory();               // ЭТАП 49 (v2.44.56)
   // КП (14Б)
@@ -5904,6 +5905,7 @@ const AUTO_REFRESH_SKIP = [
   'devchat', 'codex', 'sitechat',
   'defects-detail', 'defects-chats', 'developments', 'inventory', 'paint-calc', 'mfg',
   'units-journal',   // правка прямо в ячейке — перерисовка стёрла бы недописанное
+  'panels-journal',  // v2.46.168: форма выдачи номера и заметки
   'mail-messenger',
 ];
 

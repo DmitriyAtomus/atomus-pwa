@@ -362,6 +362,9 @@
           <button class="nav-item" data-nav="atom-electrica" onclick="selectSidebarItem('atom-electrica')">
             <i class="ti ti-bolt"></i><span>Атом Электрика</span>
           </button>
+          <button class="nav-item" data-nav="panels-journal" onclick="selectSidebarItem('panels-journal')">
+            <i class="ti ti-notebook"></i><span>Журнал щитов</span>
+          </button>
         </div>
         <div class="sub-nav">
           <div class="sub-nav-title">Справочники</div>
@@ -1432,6 +1435,28 @@
               <div class="schema-3d-cta"><i class="ti ti-external-link"></i> Открыть</div>
             </a>
           </div>
+        </div>
+      </div>
+
+      <!-- ============ ЖУРНАЛ ЩИТОВ (v2.46.168) ============ -->
+      <div class="screen" data-screen="panels-journal" data-section="production">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('dashboard')"><i class="ti ti-arrow-left"></i></button>
+          <h2>Журнал щитов</h2>
+          <button class="icon-btn" onclick="loadPanelsJournal()"><i class="ti ti-refresh"></i></button>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>Журнал щитов управления</h1>
+            <div class="page-subtitle">Обозначения по порядку, стадии, ревизии пакетов — номер выдаёт сервер, дважды не даст</div>
+          </div>
+          <div class="page-actions">
+            <button class="icon-btn" onclick="loadPanelsJournal()" title="Обновить"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-primary" onclick="pjNewToggle()"><i class="ti ti-plus"></i> <span>Выдать номер</span></button>
+          </div>
+        </div>
+        <div class="content-inner">
+          <div id="panels-journal-content"><div class="loading-block">Загружаем журнал…</div></div>
         </div>
       </div>
 

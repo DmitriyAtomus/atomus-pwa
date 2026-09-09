@@ -18778,6 +18778,33 @@
 .schem-pages { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0 4px; }
 .schem-page { height: 120px; border: 1px solid var(--border); border-radius: 6px; cursor: zoom-in; background: #fff; flex: none; }
 .schem-loading { color: var(--text-light); font-style: italic; }
+/* v2.46.168: журнал щитов */
+.pj-new { background: #EEF4FF; border: 1px solid #C7D6F5; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+.pj-new-t { font-weight: 800; color: #1E4E8C; margin-bottom: 8px; display: flex; gap: 6px; align-items: center; }
+.pj-new-row { display: grid; grid-template-columns: 220px 1fr 1fr auto auto; gap: 8px; align-items: center; }
+.pj-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.pj-bar .search-box { flex: 1 1 260px; }
+.pj-secsel { width: 260px; }
+.pj-cnt { color: var(--text-light); font-size: 12px; }
+.pj-list { display: flex; flex-direction: column; gap: 6px; }
+.pj-row { display: grid; grid-template-columns: 190px 1fr 220px auto auto 16px; gap: 10px; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 9px 12px; cursor: pointer; }
+.pj-row:hover { background: #F8FAFC; }
+.pj-desig b { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.pj-gen { display: block; font-size: 10px; color: #7E93AC; font-weight: 700; }
+.pj-title { font-weight: 700; }
+.pj-meta { font-size: 11.5px; color: var(--text-light); }
+.pj-revs { font-size: 11.5px; color: var(--text-light); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.pj-modal-content { max-width: 760px; }
+.pj-m-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pj-m-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; font-weight: 700; color: var(--text-light); }
+.pj-m-grid .pj-wide { grid-column: 1 / -1; }
+.pj-m-acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+.pj-m-acts .pj-meta { margin-left: auto; }
+.pj-m-h { font-size: 11px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: #7E93AC; margin-bottom: 6px; }
+.pj-rev { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; margin-bottom: 6px; font-size: 12.5px; }
+.pj-rev-note { color: var(--text-light); font-size: 11.5px; margin-top: 3px; }
+.pj-empty { color: var(--text-light); font-style: italic; font-size: 12.5px; }
+@media (max-width: 900px) { .pj-row { grid-template-columns: 1fr auto 16px; } .pj-revs, .pj-row > a { display: none; } .pj-new-row { grid-template-columns: 1fr; } .pj-m-grid { grid-template-columns: 1fr; } }
 .app.mobile-layout .atomcad-screen .atomcad-frame { height: calc(100dvh - 224px); }
 .atomcad-frame { display: block; width: 100%; border: 0; background: #0E1217; height: calc(100vh - 60px); }
 .app.mobile-layout .atomcad-frame { height: calc(100vh - 224px); min-height: 360px; }

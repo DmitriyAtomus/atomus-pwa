@@ -23187,3 +23187,164 @@ async function schemBuild(dir, btn) {
     } catch (e) { break; }
   }
 }
+
+// ============ v2.46.168: ЖУРНАЛ ЩИТОВ ============
+// Обозначения по порядку (АГ.ЩУ-003.004/26), стадии, ревизии пакетов с PDF.
+// Номер выдаёт сервер в транзакции; сборки из «Атом Электрики» ложатся
+// ревизиями сами. Клава читает журнал инструментом crm_panels.
+const PJ_STAGE_CLS = { draft: 'is-open', issued: 'is-ready', production: 'is-taken', done: 'is-done', archive: 'is-declined' };
+
+async function loadPanelsJournal() {
+  const host = document.getElementById('panels-journal-content');
+  if (!host) return;
+  state._pj = state._pj || { q: '', section: '', showNew: false };
+  let d;
+  try { d = await apiGet('/api/panels' + _pjQuery()); } catch (e) { d = null; }
+  if (!d || !d.ok) {
+    host.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Журнал недоступен' + (d && d.message ? ': ' + escapeHtml(d.message) : '') + '</div>';
+    return;
+  }
+  state._pj.data = d;
+  host.innerHTML = _pjNewForm(d) + _pjToolbar(d) + _pjTable(d);
+}
+
+function _pjQuery() {
+  const p = [];
+  if (state._pj.q) p.push('q=' + encodeURIComponent(state._pj.q));
+  if (state._pj.section) p.push('section=' + encodeURIComponent(state._pj.section));
+  return p.length ? '?' + p.join('&') : '';
+}
+
+function _pjNewForm(d) {
+  if (!state._pj.showNew) return '';
+  const secs = (d.sections || []).map(function (s) {
+    const n = (d.next || {})[s.code];
+    return '<option value="' + escapeHtml(s.code) + '">' + escapeHtml(s.code + ' · ' + (s.name || '')) + (n ? ' → №' + n : '') + '</option>';
+  }).join('');
+  return '<div class="pj-new">' +
+    '<div class="pj-new-t"><i class="ti ti-hash"></i> Новый щит: номер выдаст сервер, следующий свободный в разделе</div>' +
+    '<div class="pj-new-row">' +
+      '<select id="pj-sec" class="form-input">' + secs + '</select>' +
+      '<input id="pj-title" class="form-input" placeholder="Наименование щита (например, Щит управления камерой созревания №3)">' +
+      '<input id="pj-object" class="form-input" placeholder="Объект / заказчик (необязательно)">' +
+      '<button class="btn btn-primary" onclick="pjCreate()"><i class="ti ti-check"></i> Выдать номер</button>' +
+      '<button class="btn btn-secondary" onclick="pjNewToggle()">Отмена</button>' +
+    '</div></div>';
+}
+
+function _pjToolbar(d) {
+  const secs = ['<option value="">Все разделы</option>'].concat((d.sections || []).map(function (s) {
+    return '<option value="' + escapeHtml(s.code) + '"' + (state._pj.section === s.code ? ' selected' : '') + '>' + escapeHtml(s.code + ' · ' + (s.name || '')) + '</option>';
+  })).join('');
+  return '<div class="pj-bar">' +
+    '<div class="search-box"><i class="ti ti-search"></i><input type="search" value="' + escapeHtml(state._pj.q) + '" placeholder="Обозначение, название, объект…" oninput="pjSearch(this.value)"></div>' +
+    '<select class="form-input pj-secsel" onchange="state._pj.section=this.value; loadPanelsJournal()">' + secs + '</select>' +
+    '<span class="pj-cnt">' + (d.panels || []).length + ' ' + _plural((d.panels || []).length, ['щит', 'щита', 'щитов']) + '</span>' +
+    '</div>';
+}
+
+function _pjTable(d) {
+  const list = d.panels || [];
+  if (!list.length) return '<div class="empty-block"><i class="ti ti-notebook-off"></i>В журнале пусто — нажмите «Выдать номер»</div>';
+  return '<div class="pj-list">' + list.map(function (p) {
+    const qa = p.last_rev_at ? '<span class="ich-chip ' + (p.last_qa_ok ? 'is-ready' : 'is-revision') + '">' + (p.last_qa_ok ? 'QA чисто' : 'QA с замечаниями') + '</span>' : '';
+    return '<div class="pj-row" onclick="pjOpen(' + p.id + ')">' +
+      '<div class="pj-desig"><b>' + escapeHtml(p.designation) + '</b>' + (p.panel_dir ? '<span class="pj-gen" title="Есть генераторы пакета">⚙ генераторы</span>' : '') + '</div>' +
+      '<div class="pj-main"><div class="pj-title">' + escapeHtml(p.title || '—') + '</div>' +
+        '<div class="pj-meta">' + escapeHtml(p.object || '') + (p.object ? ' · ' : '') + (p.author_name ? escapeHtml(p.author_name) + ' · ' : '') + escapeHtml(_ideasWhen(p.created_at)) + '</div></div>' +
+      '<div class="pj-revs">' + (p.revisions_count ? p.revisions_count + ' ' + _plural(p.revisions_count, ['ревизия', 'ревизии', 'ревизий']) + ' · ' + escapeHtml(_ideasWhen(p.last_rev_at)) : 'без пакета') + ' ' + qa + '</div>' +
+      '<span class="ich-chip ' + (PJ_STAGE_CLS[p.stage] || 'is-open') + '">' + escapeHtml(p.stage_label || p.stage) + '</span>' +
+      (p.last_rev_url ? '<a class="icon-btn" href="' + escapeHtml(API_BASE + p.last_rev_url) + '" target="_blank" title="Последний PDF" onclick="event.stopPropagation()"><i class="ti ti-file-type-pdf"></i></a>' : '') +
+      '<i class="ti ti-chevron-right fp2-chev"></i>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+
+let _pjSearchT = null;
+function pjSearch(v) { state._pj.q = v || ''; clearTimeout(_pjSearchT); _pjSearchT = setTimeout(loadPanelsJournal, 250); }
+function pjNewToggle() { state._pj = state._pj || {}; state._pj.showNew = !state._pj.showNew; loadPanelsJournal(); }
+
+async function pjCreate() {
+  const sec = document.getElementById('pj-sec'), t = document.getElementById('pj-title'), o = document.getElementById('pj-object');
+  if (!t || !t.value.trim()) { showToast('Напишите наименование щита', 'error'); return; }
+  const r = await apiPost('/api/panels', { section: sec.value, title: t.value.trim(), object: (o.value || '').trim() });
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не получилось', 'error'); return; }
+  showToast('Выдан номер ' + d.panel.designation, 'success');
+  state._pj.showNew = false;
+  await loadPanelsJournal();
+  pjOpen(d.panel.id);
+}
+
+async function pjOpen(id) {
+  let overlay = document.getElementById('pj-modal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'modal-overlay'; overlay.id = 'pj-modal';
+    overlay.innerHTML = '<div class="modal-content pj-modal-content"><div class="modal-header"><h3 id="pj-m-title">Щит</h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'pj-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body" id="pj-m-body"></div></div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('visible'); });
+  }
+  overlay.classList.add('visible');
+  const body = document.getElementById('pj-m-body');
+  body.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  let d; try { d = await apiGet('/api/panels/' + id); } catch (e) { d = null; }
+  if (!d || !d.ok) { body.innerHTML = '<div class="empty-block">Не удалось открыть</div>'; return; }
+  const p = d.panel; state._pj.current = p;
+  document.getElementById('pj-m-title').textContent = p.designation;
+  const stages = Object.keys((state._pj.data || {}).stages || {}).map(function (k) {
+    return '<option value="' + k + '"' + (p.stage === k ? ' selected' : '') + '>' + escapeHtml(state._pj.data.stages[k]) + '</option>';
+  }).join('');
+  const revs = (p.revisions || []).map(function (r) {
+    return '<div class="pj-rev"><b>рев. ' + r.rev + '</b> · ' + (r.kind === 'issue' ? '<span class="ich-chip is-ready">выпуск</span>' : (r.kind === 'file' ? 'файл' : 'сборка')) +
+      ' · ' + escapeHtml(_ideasWhen(r.created_at)) + (r.created_by_name ? ' · ' + escapeHtml(r.created_by_name) : '') +
+      (r.pages ? ' · ' + r.pages + ' стр.' : '') +
+      (r.qa_ok === null || r.qa_ok === undefined ? '' : ' · <span class="ich-chip ' + (r.qa_ok ? 'is-ready' : 'is-revision') + '">' + (r.qa_ok ? 'QA чисто' : 'QA: ' + escapeHtml(r.issues || 'замечания')) + '</span>') +
+      (r.note ? '<div class="pj-rev-note">' + escapeHtml(r.note) + '</div>' : '') +
+      (r.url ? ' <a class="btn btn-secondary btn-small" href="' + escapeHtml(API_BASE + r.url) + '" target="_blank"><i class="ti ti-file-type-pdf"></i> PDF</a>' : '') +
+      '</div>';
+  }).join('') || '<div class="pj-empty">Ревизий ещё нет' + (p.panel_dir ? ' — соберите пакет в Атом Электрике, сборка ляжет сюда сама' : '') + '</div>';
+  body.innerHTML =
+    '<div class="pj-m-grid">' +
+      '<label>Наименование<input class="form-input" id="pj-f-title" value="' + escapeHtml(p.title || '') + '"></label>' +
+      '<label>Объект / заказчик<input class="form-input" id="pj-f-object" value="' + escapeHtml(p.object || '') + '"></label>' +
+      '<label>Стадия<select class="form-input" id="pj-f-stage">' + stages + '</select></label>' +
+      '<label>Папка генераторов<input class="form-input" id="pj-f-dir" value="' + escapeHtml(p.panel_dir || '') + '" placeholder="например shu004"></label>' +
+      '<label class="pj-wide">Заметки (Клава их читает)<textarea class="form-input" id="pj-f-notes" rows="3">' + escapeHtml(p.notes || '') + '</textarea></label>' +
+    '</div>' +
+    '<div class="pj-m-acts">' +
+      '<button class="btn btn-primary" onclick="pjSave(' + p.id + ')"><i class="ti ti-device-floppy"></i> Сохранить</button>' +
+      (p.panel_dir ? '<button class="btn btn-secondary" onclick="pjBuild(\'' + escapeHtml(p.panel_dir) + '\', ' + p.id + ')"><i class="ti ti-player-play"></i> Собрать пакет</button>' : '') +
+      ((state._pj.data || {}).is_director && p.revisions && p.revisions.length && p.stage !== 'issued'
+        ? '<button class="btn btn-secondary" onclick="pjIssue(' + p.id + ')"><i class="ti ti-rosette-discount-check"></i> Отметить выпущенным</button>' : '') +
+      '<span class="pj-meta">' + escapeHtml((p.author_name ? p.author_name + ' · ' : '') + _ideasWhen(p.created_at)) + '</span>' +
+    '</div>' +
+    '<div class="pj-m-revs"><div class="pj-m-h">Ревизии пакета</div>' + revs + '</div>';
+}
+
+async function pjSave(id) {
+  const g = function (i) { const e = document.getElementById(i); return e ? e.value : ''; };
+  const r = await apiPatch('/api/panels/' + id, { title: g('pj-f-title').trim(), object: g('pj-f-object').trim(), stage: g('pj-f-stage'),
+    panel_dir: g('pj-f-dir').trim(), notes: g('pj-f-notes').trim() });
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не сохранилось', 'error'); return; }
+  showToast('Сохранено', 'success');
+  loadPanelsJournal();
+}
+
+async function pjIssue(id) {
+  const r = await apiPatch('/api/panels/' + id, { stage: 'issued' });
+  if (r && r.ok) { showToast('Отмечен выпущенным', 'success'); pjOpen(id); loadPanelsJournal(); }
+}
+
+async function pjBuild(dir, id) {
+  showToast('Собираю пакет на сервере…', 'info');
+  const r = await apiPost('/api/schematics/panels/' + encodeURIComponent(dir) + '/build', {});
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не собралось', 'error'); return; }
+  const b = d.build || {};
+  showToast(b.ok ? 'Пакет собран, QA чисто — ревизия записана' : 'Собрано с замечаниями: ' + (b.issues || []).join(', '), b.ok ? 'success' : 'error');
+  pjOpen(id); loadPanelsJournal();
+}
