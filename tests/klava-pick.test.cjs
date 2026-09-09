@@ -94,3 +94,17 @@ test('панель: «Сформировать ТЗ» и «Внедрить» п
   assert.match(show, /if \(!KP\.marks\.length && fresh\) KP\.pick\(true\)/);   // пустая тема — сразу метки, живая — переписка
   assert.match(mod, /feed\.scrollTop = feed\.scrollHeight/);
 });
+
+// v2.46.173: тема щита — «Внести правку» под личным кодом
+test('тема щита: «Внести правку» вместо ТЗ, код спрашивается, 428 → задать код', () => {
+  const acts = mod.slice(mod.indexOf('KP._renderActs = function'), mod.indexOf('KP._askPin'));
+  assert.match(acts, /if \(th\.panel\) \{/);
+  assert.match(acts, /id="kp-apply"[^>]*>⚡ Внести правку/);
+  assert.match(acts, /правок в работе/);
+  const ap = mod.slice(mod.indexOf('KP._askPin'), mod.indexOf('KP.compile = async function'));
+  assert.match(ap, /\/api\/me\/pin/);
+  assert.match(ap, /\\d\{4,6\}/);
+  assert.match(ap, /\/api\/ideas\/' \+ KP\.tid \+ '\/apply'/);
+  assert.match(ap, /r\.status === 428/);
+  assert.match(ap, /JSON\.stringify\(\{ pin: pin, note: note\.trim\(\) \}\)/);
+});

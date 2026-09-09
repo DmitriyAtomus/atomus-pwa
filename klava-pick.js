@@ -222,13 +222,54 @@
     const talked = (th.messages || []).some(m => m.role === 'user');
     const ready = !!th.spec_text && th.status === 'ready';
     let h = '';
-    if (talked) h += '<button class="kp-act" id="kp-spec">📄 ' + (th.spec_text ? 'Пересобрать ТЗ' : 'Сформировать ТЗ') + '</button>';
-    if (ready && KP.isDir) h += '<button class="kp-act go" id="kp-impl">🚀 Внедрить</button>';
-    if (ready && !KP.isDir) h += '<span class="kp-note">ТЗ готово — внедряет директор</span>';
-    if (th.rounds) h += '<span class="kp-note">раундов в работе: ' + th.rounds + '</span>';
+    // v2.46.173: тема щита — правка сразу в работу под личным кодом, без ТЗ
+    if (th.panel) {
+      if (talked) h += '<button class="kp-act go" id="kp-apply" title="Список Клавы и метки уйдут агенту; подпись — ваш личный код">⚡ Внести правку</button>';
+      h += '<span class="kp-note">щит ' + esc(th.panel.designation || '') + (th.rounds ? ' · правок в работе: ' + th.rounds : '') + '</span>';
+    } else {
+      if (talked) h += '<button class="kp-act" id="kp-spec">📄 ' + (th.spec_text ? 'Пересобрать ТЗ' : 'Сформировать ТЗ') + '</button>';
+      if (ready && KP.isDir) h += '<button class="kp-act go" id="kp-impl">🚀 Внедрить</button>';
+      if (ready && !KP.isDir) h += '<span class="kp-note">ТЗ готово — внедряет директор</span>';
+      if (th.rounds) h += '<span class="kp-note">раундов в работе: ' + th.rounds + '</span>';
+    }
     box.innerHTML = h;
     const sb = box.querySelector('#kp-spec'); if (sb) sb.onclick = KP.compile;
     const ib = box.querySelector('#kp-impl'); if (ib) ib.onclick = KP.implement;
+    const ab = box.querySelector('#kp-apply'); if (ab) ab.onclick = KP.apply;
+  };
+
+  // личный код: задать (если ещё нет) и подтвердить правку
+  KP._askPin = async function () {
+    const th = KP.feedThread || {};
+    if (!th.pin_set) {
+      const p1 = prompt('Личный код ещё не задан. Придумайте код из 4–6 цифр — им вы будете подписывать правки чертежей:', '');
+      if (p1 === null) return null;
+      if (!/^\d{4,6}$/.test(p1)) { alert('Код — от 4 до 6 цифр'); return null; }
+      const p2 = prompt('Повторите код:', '');
+      if (p2 !== p1) { alert('Коды не совпали'); return null; }
+      const r = await KP._api('/api/me/pin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: p1 }) });
+      if (!r.ok) { alert(r.data.message || 'Код не сохранился'); return null; }
+      th.pin_set = true;
+      return p1;
+    }
+    const p = prompt('Введите ваш личный код — подпись под правкой:', '');
+    return p === null ? null : p.trim();
+  };
+
+  KP.apply = async function () {
+    if (KP.busy || !KP.tid) return;
+    const pin = await KP._askPin();
+    if (!pin) return;
+    const note = prompt('Примечание агенту (можно пусто):', '') || '';
+    KP.busy = true; KP.els.note.textContent = 'Отправляю правку в работу…';
+    try {
+      const r = await KP._api('/api/ideas/' + KP.tid + '/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: pin, note: note.trim() }) });
+      if (r.status === 428) { KP.feedThread.pin_set = false; KP.els.note.textContent = r.data.message || 'Задайте личный код'; return; }
+      if (!r.ok || !r.data.ok) { KP.els.note.textContent = r.data.message || ('Не получилось (' + r.status + ')'); return; }
+      KP.els.note.textContent = 'Правка ушла в работу — раунд ' + r.data.round + '. Новая ревизия появится в журнале щита.';
+      await KP._loadFeed();
+    } catch (e) { KP.els.note.textContent = 'Ошибка связи'; }
+    finally { KP.busy = false; }
   };
   KP.compile = async function () {
     if (KP.busy || !KP.tid) return;
