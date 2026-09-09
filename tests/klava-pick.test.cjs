@@ -16,7 +16,7 @@ const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 
 function sandbox() {
   const mk = () => ({ id: '', className: '', style: {}, children: [], classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    appendChild(c) { this.children.push(c); return c; }, append() {}, remove() {}, querySelector() { return null; }, querySelectorAll() { return []; },
+    appendChild(c) { this.children.push(c); return c; }, append() {}, remove() {}, querySelector() { return mk(); }, querySelectorAll() { return []; },
     addEventListener() {}, setAttribute() {}, getBoundingClientRect() { return { left: 0, top: 0, width: 0, height: 0 }; }, set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h || ''; } });
   const document = { head: mk(), body: mk(), title: 'CRM', createElement: () => mk(), getElementById: () => null, querySelectorAll: () => [], addEventListener() {}, elementFromPoint: () => null };
   const ctx = { window: null, document, location: { pathname: '/x', hash: '' }, innerWidth: 1200, innerHeight: 800, scrollX: 0, scrollY: 0,
