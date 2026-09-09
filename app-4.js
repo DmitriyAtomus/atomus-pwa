@@ -23367,13 +23367,35 @@ async function pjIssue(id) {
 }
 
 async function pjBuild(dir, id) {
-  showToast('Собираю пакет на сервере…', 'info');
-  const r = await apiPost('/api/schematics/panels/' + encodeURIComponent(dir) + '/build', {});
+  // v2.46.172: ход и итог сборки — прямо в шаге 1 карточки, а не тостом,
+  // который исчезает; после удачной сборки сразу открываем листы
+  const step = document.querySelector('#pj-modal .pj-step .pj-step-b');
+  const started = Date.now();
+  let timer = null;
+  if (step) {
+    step.innerHTML = '<b>Собираю пакет…</b><div id="pj-build-st">генераторы работают на сервере, обычно 5–30 секунд · <span id="pj-build-t">0</span> с</div>';
+    timer = setInterval(function () { const t = document.getElementById('pj-build-t'); if (t) t.textContent = Math.round((Date.now() - started) / 1000); }, 500);
+  }
+  let r;
+  try { r = await apiPost('/api/schematics/panels/' + encodeURIComponent(dir) + '/build', {}); }
+  catch (e) { r = { ok: false, data: { message: 'нет связи с сервером: ' + (e && e.message || e) } }; }
+  clearInterval(timer);
   const d = (r && r.data) || {};
-  if (!r.ok || !d.ok) { showToast(d.message || 'Не собралось', 'error'); return; }
+  if (!r.ok || !d.ok) {
+    const msg = d.message || ('сервер ответил ' + (r && r.status));
+    if (step) step.innerHTML = '<b>Не собралось</b><div class="pj-warn">' + escapeHtml(msg) + '</div>' +
+      '<button class="btn btn-primary btn-small" onclick="pjBuild(\'' + escapeHtml(dir) + '\', ' + id + ')"><i class="ti ti-refresh"></i> Попробовать ещё раз</button>';
+    return;
+  }
   const b = d.build || {};
-  showToast(b.ok ? 'Пакет собран, QA чисто — ревизия записана' : 'Собрано с замечаниями: ' + (b.issues || []).join(', '), b.ok ? 'success' : 'error');
-  pjOpen(id); loadPanelsJournal();
+  const verdict = b.ok ? '✓ Собрано, QA чисто' : '⚠ Собрано с замечаниями: ' + (b.issues || []).join(', ');
+  showToast(verdict + ' — открываю листы', b.ok ? 'success' : 'error');
+  if (step) step.innerHTML = '<b>' + escapeHtml(verdict) + '</b><div>' + (b.pages || 0) + ' листов · ' + (b.seconds || 0) + ' с · ревизия записана в журнал' +
+    (b.qa_skipped ? ' · на сервере нет poppler, проверки bbox/text пропущены' : '') + '</div>';
+  loadPanelsJournal();
+  state._ps = { id: id, rev: null };
+  const m = document.getElementById('pj-modal'); if (m) m.classList.remove('visible');
+  selectSidebarItem('panel-sheets');
 }
 
 // ============ v2.46.169: ЛИСТЫ ЩИТА — правка метками ============
