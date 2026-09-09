@@ -6766,7 +6766,12 @@ async function _tlhRun(dryRun) {
   .cc-hist-row:hover { background: #F0F9FF; }
   .cc-hist-main { flex: 1; min-width: 0; }
   .cc-hist-title { font-weight: 600; color: var(--text-dark); font-size: 13.5px; }
-  .cc-hist-meta { font-size: 11.5px; color: var(--text-light); margin-top: 2px; }
+  .cc-hist-meta {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+    font-size: 11.5px; color: var(--text-light); margin-top: 3px;
+  }
+  .cc-hist-who { color: #075985; font-weight: 700; }
+  .cc-hist-who .ti { margin-right: 3px; }
   .cc-hist-kw {
     font-size: 16px; font-weight: 700; color: #0C4A6E;
     font-variant-numeric: tabular-nums;
@@ -6822,6 +6827,9 @@ async function _tlhRun(dryRun) {
     .cc-footer { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
     .cc-footer-total { width: 100%; text-align: center; order: -1; }
     .cc-footer-total b { font-size: 18px; }
+    .cc-hist-row { align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+    .cc-hist-main { flex-basis: calc(100% - 86px); }
+    .cc-hist-acts { margin-left: auto; }
   }
   @media (max-width: 480px) {
     .cc-grid { grid-template-columns: 1fr; }
@@ -6974,6 +6982,11 @@ const CC_R_OUTER = 1 / 23;
 
 let _ccState = null;       // вся форма
 let _ccLastResult = null;  // последний расчёт
+let _ccHistoryList = [];   // v2.46.170: общий список приходит с сервера
+let _ccHistoryLoaded = false;
+let _ccHistoryLoading = false;
+let _ccHistoryError = '';
+let _ccSavingResult = false;
 
 // v2.45.91: автосохранение черновика — данные не сбиваются при обновлении страницы
 const CC_DRAFT_KEY = 'atomus:cold-calc-draft-v1';
@@ -7083,6 +7096,7 @@ function openColdCalculator() {
   }
   _ccRenderModal();
   m.classList.add('visible');
+  if (_ccState.activeTab === 'history') _ccRefreshHistory(true);
   // v2.45.91: общий слушатель ввода — каждое изменение собираем и сохраняем
   const body = document.getElementById('cc-body');
   if (body && !body.dataset.ccAutosaveBound) {
@@ -7140,6 +7154,7 @@ function _ccSwitchTab(code) {
   });
   const body = document.getElementById('cc-body');
   if (body) body.innerHTML = _ccRenderTab(code);
+  if (code === 'history') _ccRefreshHistory(true);
 }
 
 function _ccFooterText() {
@@ -7189,37 +7204,57 @@ function _ccTabClient() {
   '</div>';
 }
 
-// v2.45.31: «История» — список сохранённых расчётов из localStorage
+// v2.46.170: «История» — общий серверный журнал всех сотрудников.
 function _ccTabHistory() {
-  const list = _ccLoadHistory();
+  const list = _ccHistoryList;
+  const head = '<h4 style="display:flex;align-items:center;gap:8px;">' +
+    '<span style="flex:1;"><i class="ti ti-history"></i> Общая история расчётов' +
+      (_ccHistoryLoaded ? ' (' + list.length + ')' : '') + '</span>' +
+    '<button class="btn btn-secondary btn-small" onclick="_ccRefreshHistory(true)" title="Обновить">' +
+      '<i class="ti ti-refresh"></i></button></h4>';
+  if (!_ccHistoryLoaded && !_ccHistoryError) {
+    return '<div class="cc-section">' + head +
+      '<div class="loading-block">Загружаем расчёты всех сотрудников…</div></div>';
+  }
+  if (_ccHistoryError && !_ccHistoryLoaded) {
+    return '<div class="cc-section">' + head +
+      '<div class="empty-block" style="padding:30px 0;color:var(--danger);">' +
+        '<i class="ti ti-alert-circle"></i>Не удалось загрузить общую историю.<br/>' +
+        '<button class="btn btn-secondary btn-small" style="margin-top:10px;" onclick="_ccRefreshHistory(true)">Повторить</button>' +
+      '</div></div>';
+  }
   if (!list.length) {
-    return '<div class="cc-section">' +
-      '<h4><i class="ti ti-history"></i> Сохранённые расчёты</h4>' +
+    return '<div class="cc-section">' + head +
       '<div class="empty-block" style="padding:30px 0;">' +
-        '<i class="ti ti-archive"></i>Сохранённых расчётов пока нет.<br/>' +
-        '<span style="font-size:12.5px;color:var(--text-light);">Заполни параметры, нажми «Рассчитать», затем «Сохранить расчёт» на вкладке «Результат».</span>' +
+        '<i class="ti ti-archive"></i>Общих расчётов пока нет.<br/>' +
+        '<span style="font-size:12.5px;color:var(--text-light);">Первый сохранённый расчёт появится здесь у всех сотрудников.</span>' +
       '</div></div>';
   }
   let rows = '';
   list.forEach(h => {
-    const dt = h.savedAt ? new Date(h.savedAt) : null;
-    const dtStr = dt ? (dt.toLocaleDateString("ru-RU") + " " + dt.toLocaleTimeString("ru-RU", {hour:"2-digit",minute:"2-digit"})) : "—";
-    const company = (h.client && h.client.company) || "—";
-    const kw = h.result ? (h.result.totalWithSafety / 1000).toFixed(2) : "—";
+    const dt = h.created_at ? new Date(h.created_at) : null;
+    const dtStr = dt && !isNaN(dt.getTime()) ?
+      (dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'})) : '—';
+    const company = h.company || 'Без компании';
+    const kw = Number.isFinite(Number(h.kw_total)) ? Number(h.kw_total).toFixed(2) : '—';
+    const entryId = Number(h.id) || 0;
     rows += '<div class="cc-hist-row">' +
       '<div class="cc-hist-main">' +
-        '<div class="cc-hist-title">' + escapeHtml(h.client && h.client.title || "Без названия") + '</div>' +
-        '<div class="cc-hist-meta">' + escapeHtml(company) + ' · ' + dtStr + '</div>' +
+        '<div class="cc-hist-title">' + escapeHtml(h.title || 'Без названия') + '</div>' +
+        '<div class="cc-hist-meta">' +
+          '<span class="cc-hist-who"><i class="ti ti-user"></i>' + escapeHtml(h.created_by_name || 'Неизвестно') + '</span>' +
+          '<span>' + escapeHtml(company) + '</span><span>' + dtStr + '</span>' +
+        '</div>' +
       '</div>' +
       '<div class="cc-hist-kw">' + kw + ' кВт</div>' +
       '<div class="cc-hist-acts">' +
-        '<button class="btn btn-secondary btn-small" onclick="_ccLoadFromHistory(\'' + h.id + '\')" title="Открыть"><i class="ti ti-folder-open"></i></button>' +
-        '<button class="btn btn-secondary btn-small" onclick="_ccDeleteHistory(\'' + h.id + '\')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' +
+        '<button class="btn btn-secondary btn-small" onclick="_ccLoadFromHistory(' + entryId + ')" title="Открыть"><i class="ti ti-folder-open"></i></button>' +
+        (h.can_delete ? '<button class="btn btn-secondary btn-small" onclick="_ccDeleteHistory(' + entryId + ')" title="Удалить" style="color:var(--danger);"><i class="ti ti-trash"></i></button>' : '') +
       '</div>' +
     '</div>';
   });
-  return '<div class="cc-section">' +
-    '<h4><i class="ti ti-history"></i> Сохранённые расчёты (' + list.length + ')</h4>' +
+  return '<div class="cc-section">' + head +
+    (_ccHistoryError ? '<div class="cc-hint" style="margin-bottom:8px;color:var(--danger);"><i class="ti ti-alert-circle"></i> Не удалось обновить список; показаны последние загруженные данные.</div>' : '') +
     '<div class="cc-hist-list">' + rows + '</div>' +
   '</div>';
 }
@@ -8820,10 +8855,11 @@ function _odbSetDelta(v)   {
 }
 // ============ /v2.45.101 ============
 
-// === v2.45.31: localStorage история ===
+// === v2.46.170: общая серверная история + разовый перенос localStorage ===
 const CC_HIST_KEY = 'atomus_cold_calc_history_v1';
+const CC_HIST_MIGRATED_KEY = 'atomus_cold_calc_history_server_migrated_v1';
 
-function _ccLoadHistory() {
+function _ccLoadLocalHistory() {
   try {
     const raw = localStorage.getItem(CC_HIST_KEY);
     if (!raw) return [];
@@ -8832,11 +8868,57 @@ function _ccLoadHistory() {
   } catch (e) { return []; }
 }
 
-function _ccWriteHistory(list) {
+function _ccWriteLocalHistory(list) {
   try { localStorage.setItem(CC_HIST_KEY, JSON.stringify(list)); } catch (e) {}
 }
 
-function _ccSaveResult() {
+function _ccRenderHistoryBody() {
+  if (!_ccState || _ccState.activeTab !== 'history') return;
+  const body = document.getElementById('cc-body');
+  if (body) body.innerHTML = _ccTabHistory();
+}
+
+async function _ccImportLocalHistory() {
+  try {
+    if (localStorage.getItem(CC_HIST_MIGRATED_KEY) === '1') return;
+  } catch (e) {}
+  const legacy = _ccLoadLocalHistory();
+  if (!legacy.length) {
+    try { localStorage.setItem(CC_HIST_MIGRATED_KEY, '1'); } catch (e) {}
+    return;
+  }
+  const items = legacy.slice(0, 50).map(h => ({
+    source_id: h.id || '',
+    saved_at: h.savedAt || '',
+    payload: h,
+  }));
+  const r = await apiPost('/api/cold-calc/history/import', {items});
+  if (!r.ok) throw new Error(formatApiErrorMessage(r.data, 'Не удалось перенести старые расчёты'));
+  // Старые записи оставляем локально как резервную копию. Маркер лишь не даёт
+  // гонять импорт при каждом открытии; сервер дополнительно защищён от дублей.
+  try { localStorage.setItem(CC_HIST_MIGRATED_KEY, '1'); } catch (e) {}
+}
+
+async function _ccRefreshHistory(force) {
+  if (_ccHistoryLoading) return;
+  if (_ccHistoryLoaded && !force) return;
+  _ccHistoryLoading = true;
+  _ccHistoryError = '';
+  _ccRenderHistoryBody();
+  try {
+    await _ccImportLocalHistory();
+    const data = await apiGet('/api/cold-calc/history');
+    _ccHistoryList = Array.isArray(data && data.items) ? data.items : [];
+    _ccHistoryLoaded = true;
+  } catch (e) {
+    _ccHistoryError = String(e && e.message || e || 'Ошибка загрузки');
+  } finally {
+    _ccHistoryLoading = false;
+    _ccRenderHistoryBody();
+  }
+}
+
+async function _ccSaveResult() {
   if (!_ccLastResult) {
     showToast('Сначала жми «Рассчитать»', 'error');
     return;
@@ -8849,7 +8931,7 @@ function _ccSaveResult() {
     _ccRenderModal();
     return;
   }
-  const list = _ccLoadHistory();
+  if (_ccSavingResult) return;
   const entry = {
     id: 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
     savedAt: new Date().toISOString(),
@@ -8865,42 +8947,76 @@ function _ccSaveResult() {
     workHours: _ccState.workHours,
     result:  _ccLastResult,
   };
-  list.unshift(entry);
-  // храним максимум 50 расчётов
-  while (list.length > 50) list.pop();
-  _ccWriteHistory(list);
-  showToast('Расчёт сохранён в «Историю»', 'success');
+  _ccSavingResult = true;
+  try {
+    const r = await apiPost('/api/cold-calc/history', {
+      source_id: entry.id,
+      payload: entry,
+    });
+    if (!r.ok) {
+      const err = new Error(formatApiErrorMessage(r.data, 'Не удалось сохранить расчёт'));
+      err.status = r.status;
+      throw err;
+    }
+    if (r.data && r.data.item) {
+      _ccHistoryList = [r.data.item].concat(_ccHistoryList.filter(x => x.id !== r.data.item.id));
+      _ccHistoryLoaded = true;
+    }
+    showToast('Расчёт сохранён — теперь он виден всем сотрудникам', 'success');
+  } catch (e) {
+    if (e && e.status && e.status < 500) {
+      showToast(e.message || 'Не удалось сохранить расчёт', 'error');
+      return;
+    }
+    // Если сеть оборвалась, не теряем работу: следующий вход перенесёт запись
+    // на сервер. source_id делает повторный POST идемпотентным.
+    const local = _ccLoadLocalHistory();
+    if (!local.some(x => x.id === entry.id)) local.unshift(entry);
+    while (local.length > 50) local.pop();
+    _ccWriteLocalHistory(local);
+    try { localStorage.removeItem(CC_HIST_MIGRATED_KEY); } catch (_) {}
+    showToast('Сеть недоступна: расчёт сохранён на устройстве и синхронизируется позже', 'error');
+  } finally {
+    _ccSavingResult = false;
+  }
 }
 
-function _ccLoadFromHistory(id) {
-  const list = _ccLoadHistory();
-  const h = list.find(x => x.id === id);
-  if (!h) { showToast('Расчёт не найден', 'error'); return; }
-  // Восстанавливаем state из сохранённой записи поверх дефолтов
-  _ccState = Object.assign(_ccDefaults(), {
-    activeTab: 'result',
-    client:    h.client || {},
-    geom:      h.geom   || _ccDefaults().geom,
-    mode:      h.mode   || 'storage_mid',
-    tInside:   typeof h.tInside === 'number' ? h.tInside : 0,
-    product:   h.product || _ccDefaults().product,
-    cond:      h.cond   || _ccDefaults().cond,
-    door:      h.door   || _ccDefaults().door,
-    safety:    typeof h.safety === 'number' ? h.safety : 15,
-    workHours: typeof h.workHours === 'number' ? h.workHours : 18,
-  });
-  _ccLastResult = h.result || null;
-  _ccRenderModal();
-  showToast('Расчёт загружен', 'success');
+async function _ccLoadFromHistory(id) {
+  try {
+    const data = await apiGet('/api/cold-calc/history/' + encodeURIComponent(id));
+    const h = data && data.item && data.item.payload;
+    if (!h || typeof h !== 'object') throw new Error('Расчёт не найден');
+    // Восстанавливаем state из сохранённой записи поверх дефолтов.
+    _ccState = Object.assign(_ccDefaults(), {
+      activeTab: 'result',
+      client:    h.client || {},
+      geom:      h.geom   || _ccDefaults().geom,
+      mode:      h.mode   || 'storage_mid',
+      tInside:   typeof h.tInside === 'number' ? h.tInside : 0,
+      product:   h.product || _ccDefaults().product,
+      cond:      h.cond   || _ccDefaults().cond,
+      door:      h.door   || _ccDefaults().door,
+      safety:    typeof h.safety === 'number' ? h.safety : 15,
+      workHours: typeof h.workHours === 'number' ? h.workHours : 18,
+    });
+    _ccLastResult = h.result || null;
+    _ccRenderModal();
+    showToast('Расчёт загружен', 'success');
+  } catch (e) {
+    showToast(String(e && e.message || 'Не удалось открыть расчёт'), 'error');
+  }
 }
 
-function _ccDeleteHistory(id) {
+async function _ccDeleteHistory(id) {
   if (!confirm('Удалить этот сохранённый расчёт?')) return;
-  const list = _ccLoadHistory().filter(x => x.id !== id);
-  _ccWriteHistory(list);
-  // Перерисуем вкладку «История»
-  _ccState.activeTab = 'history';
-  _ccRenderModal();
+  try {
+    await apiDelete('/api/cold-calc/history/' + encodeURIComponent(id));
+    _ccHistoryList = _ccHistoryList.filter(x => Number(x.id) !== Number(id));
+    _ccRenderHistoryBody();
+    showToast('Расчёт удалён из общей истории', 'success');
+  } catch (e) {
+    showToast(String(e && e.message || 'Не удалось удалить расчёт'), 'error');
+  }
 }
 
 // === Сбор значений из input/select в state — без потери при переключении табов ===
