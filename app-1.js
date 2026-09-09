@@ -43,8 +43,8 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.166";
-const APP_VERSION_DATE = "09.09.2026";
+const APP_VERSION = "v2.46.167";
+const APP_VERSION_DATE = "08.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -1879,6 +1879,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'atom-electrica') {
     const _acf = document.getElementById('atomcad-frame');
     if (_acf && !_acf.getAttribute('src') && _acf.dataset.src) _acf.setAttribute('src', _acf.dataset.src);
+    if (typeof loadSchematicsBar === 'function') loadSchematicsBar();   // v2.46.166: пакеты ЭСКД
   }
   // «Атом Чиллер» — та же ленивая загрузка: 3D-оболочку тянем при первом открытии
   if (screenName === 'atom-chiller') {

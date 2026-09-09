@@ -18759,6 +18759,26 @@
 
 /* v2.45.325: Атом Электрика (AtomCAD) — полноэкранный встроенный инструмент проектирования щитов */
 .atomcad-screen { padding: 0 !important; }
+/* v2.46.166: пакеты ЭСКД над Атом Электрикой */
+.schem-bar { background: #fff; border-bottom: 1px solid var(--border); padding: 8px 14px; font-size: 12.5px; }
+.schem-bar:empty { display: none; }
+.schem-head { font-weight: 800; display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.schem-sub { font-weight: 600; color: var(--text-light); font-size: 11px; margin-left: 6px; }
+.schem-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.schem-item { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; background: #F8FAFC; flex: 1 1 360px; min-width: 0; }
+.schem-main { flex: 1; min-width: 0; }
+.schem-meta { font-size: 11px; color: var(--text-light); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.schem-st { border-radius: 6px; padding: 1px 7px; font-weight: 700; font-size: 10.5px; }
+.schem-st.ok { background: #D1FAE5; color: #047857; } .schem-st.bad { background: #FEE2E2; color: #B91C1C; } .schem-st.warn { background: #FEF3C7; color: #92400E; }
+.schem-result { margin-top: 8px; }
+.schem-verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 700; padding: 8px 10px; border-radius: 10px; }
+.schem-verdict.ok { background: #ECFDF5; color: #065F46; } .schem-verdict.bad { background: #FEF2F2; color: #991B1B; }
+.schem-log { display: none; max-height: 260px; overflow: auto; background: #0F1E32; color: #C7D5E6; font-size: 11px; padding: 10px; border-radius: 10px; margin-top: 6px; white-space: pre-wrap; }
+.schem-log.open { display: block; }
+.schem-pages { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0 4px; }
+.schem-page { height: 120px; border: 1px solid var(--border); border-radius: 6px; cursor: zoom-in; background: #fff; flex: none; }
+.schem-loading { color: var(--text-light); font-style: italic; }
+.app.mobile-layout .atomcad-screen .atomcad-frame { height: calc(100dvh - 224px); }
 .atomcad-frame { display: block; width: 100%; border: 0; background: #0E1217; height: calc(100vh - 60px); }
 .app.mobile-layout .atomcad-frame { height: calc(100vh - 224px); min-height: 360px; }
 /* dvh — реальная высота окна телефона: с 100vh низ модуля уезжал под таб-бар */

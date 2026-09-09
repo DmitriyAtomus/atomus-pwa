@@ -23102,3 +23102,88 @@ function ujCardLog(d) {
              escapeHtml(l.author || '—') + '</td><td>' + what + '</td></tr>';
     }).join('') + '</tbody></table>';
 }
+
+// ============ v2.46.166: Щиты — пакеты ЭСКД из генераторов ============
+// Скиллы черчения переехали на бэкенд (atomus/schematics): движок, правила,
+// генераторы. Полоса над «Атом Электрикой» собирает пакет на сервере и
+// показывает итог QA, PDF и превью страниц.
+async function loadSchematicsBar() {
+  const bar = document.getElementById('schem-bar');
+  if (!bar) return;
+  if (!bar.dataset.loaded) bar.innerHTML = '<div class="schem-loading">Библиотека щитов…</div>';
+  let d;
+  try { d = await apiGet('/api/schematics/panels'); } catch (e) { d = null; }
+  if (!d || !d.ok) { bar.innerHTML = ''; return; }
+  bar.dataset.loaded = '1';
+  state._schem = state._schem || {};
+  bar.innerHTML =
+    '<div class="schem-head"><i class="ti ti-file-certificate"></i> Пакеты ЭСКД из генераторов ' +
+      '<span class="schem-sub">движок и правила — на сервере CRM</span></div>' +
+    '<div class="schem-list">' + (d.panels || []).map(function (p) {
+      const lb = p.last_build;
+      const st = !lb ? '' : (lb.ok
+        ? '<span class="schem-st ok">✓ собрано ' + escapeHtml(_ideasWhen(lb.at)) + '</span>'
+        : '<span class="schem-st bad">⚠ с замечаниями: ' + escapeHtml((lb.issues || []).join(', ')) + '</span>') +
+        (lb.qa_skipped ? '<span class="schem-st warn">QA bbox/text не прогнана</span>' : '');
+      return '<div class="schem-item" data-dir="' + escapeHtml(p.dir) + '">' +
+        '<div class="schem-main"><b>' + escapeHtml(p.doc || p.code) + '</b> · ' + escapeHtml(p.title || '') +
+          '<div class="schem-meta">' + escapeHtml(p.kind || '') + ' · листов: ' + (p.sheets || 0) + ' ' + st + '</div></div>' +
+        '<button class="btn btn-primary btn-small" onclick="schemBuild(\'' + escapeHtml(p.dir) + '\', this)"><i class="ti ti-player-play"></i> Собрать пакет</button>' +
+        (lb && lb.id ? '<button class="btn btn-secondary btn-small" onclick="schemOpen(\'' + escapeHtml(lb.id) + '\')"><i class="ti ti-file-type-pdf"></i> PDF</button>' : '') +
+      '</div>';
+    }).join('') + '</div>' +
+    '<div class="schem-result" id="schem-result"></div>';
+}
+
+async function _schemBlob(path) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const r = await fetch(API_BASE + path, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return await r.blob();
+}
+
+async function schemOpen(id) {
+  try {
+    const b = await _schemBlob('/api/schematics/builds/' + id + '/pdf');
+    window.open(URL.createObjectURL(b), '_blank');
+  } catch (e) { showToast('PDF недоступен: ' + e.message, 'error'); }
+}
+
+async function schemBuild(dir, btn) {
+  const res = document.getElementById('schem-result');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Собираю…'; }
+  if (res) res.innerHTML = '<div class="schem-loading">Генераторы работают на сервере — обычно 5–30 секунд…</div>';
+  let r;
+  try { r = await apiPost('/api/schematics/panels/' + encodeURIComponent(dir) + '/build', {}); }
+  catch (e) { r = { ok: false, data: { message: String(e) } }; }
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) {
+    if (res) res.innerHTML = '<div class="schem-st bad">Не собралось: ' + escapeHtml(d.message || ('HTTP ' + (r && r.status))) + '</div>';
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-player-play"></i> Собрать пакет'; }
+    return;
+  }
+  const b = d.build || {};
+  let h = '<div class="schem-verdict ' + (b.ok ? 'ok' : 'bad') + '">' +
+    (b.ok ? '✓ Пакет собран, QA чисто' : '⚠ Пакет собран с замечаниями: ' + escapeHtml((b.issues || []).join(', '))) +
+    ' · ' + (b.pages || 0) + ' стр. · ' + (b.seconds || 0) + ' с' +
+    (b.qa_skipped ? ' · <span class="schem-st warn">на сервере нет poppler: проверки bbox/text пропущены</span>' : '') +
+    (d.has_pdf ? ' <button class="btn btn-primary btn-small" onclick="schemOpen(\'' + escapeHtml(b.id) + '\')"><i class="ti ti-file-type-pdf"></i> Открыть PDF</button>' : '') +
+    ' <button class="btn btn-secondary btn-small" onclick="document.getElementById(\'schem-log\').classList.toggle(\'open\')"><i class="ti ti-terminal"></i> Лог QA</button>' +
+    '</div>' +
+    '<pre class="schem-log" id="schem-log">' + escapeHtml(d.log || '') + '</pre>' +
+    '<div class="schem-pages" id="schem-pages"></div>';
+  if (res) res.innerHTML = h;
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-player-play"></i> Собрать пакет'; }
+  loadSchematicsBar();
+  // превью страниц — по одной, чтобы не ждать всё сразу
+  const pages = document.getElementById('schem-pages');
+  for (let n = 1; pages && n <= (b.pages || 0) && n <= 16; n++) {
+    try {
+      const blob = await _schemBlob('/api/schematics/builds/' + b.id + '/page/' + n);
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(blob); img.title = 'Лист ' + n; img.className = 'schem-page';
+      img.onclick = function () { window.open(img.src, '_blank'); };
+      pages.appendChild(img);
+    } catch (e) { break; }
+  }
+}
