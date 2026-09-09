@@ -24,6 +24,7 @@
   padding:9px 16px;font-weight:700;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.3);white-space:nowrap;max-width:96vw;overflow:hidden}
 #kp-bar i{width:8px;height:8px;border-radius:50%;background:#FBBF24;display:inline-block;flex:none}
 #kp-bar .k{background:rgba(255,255,255,.14);border-radius:6px;padding:2px 7px;font-weight:600}
+.kp-done{border:0;background:#FBBF24;color:#1F2937;border-radius:8px;padding:4px 10px;font:800 12px Inter,system-ui,sans-serif;cursor:pointer}
 #kp-hover{position:fixed;z-index:99991;pointer-events:none;border:2px dashed #FBBF24;border-radius:8px;background:rgba(251,191,36,.08);display:none}
 #kp-band{position:fixed;z-index:99991;pointer-events:none;border:2px solid #60A5FA;background:rgba(96,165,250,.14);border-radius:6px;display:none}
 #kp-marks{position:fixed;inset:0;z-index:99989;pointer-events:none}
@@ -319,7 +320,8 @@
     if (on) {
       const layer = el('div', 'kp-ui'); layer.id = 'kp-layer';
       const bar = el('div', 'kp-ui'); bar.id = 'kp-bar';
-      bar.innerHTML = '<i></i> Кликните на элемент' + (KP.cfg.partAt ? ' или деталь в сцене' : '') + ', или обведите область мышью <span class="k" id="kp-cnt"></span><span class="k">Esc — готово</span>';
+      bar.innerHTML = '<i></i> Кликните на элемент' + (KP.cfg.partAt ? ' или деталь в сцене' : '') + ', или обведите область мышью <span class="k" id="kp-cnt"></span>' +
+        '<button class="kp-done" id="kp-done">✓ Готово</button><span class="k">или Esc</span>';
       const hov = el('div', 'kp-ui'); hov.id = 'kp-hover';
       const band = el('div', 'kp-ui'); band.id = 'kp-band';
       document.body.append(layer, bar, hov, band);
@@ -328,12 +330,33 @@
       layer.addEventListener('pointerdown', KP._onDown);
       layer.addEventListener('pointerup', KP._onUp);
       layer.addEventListener('contextmenu', e => e.preventDefault());
+      // v2.46.174: колесо под слоем крутит ту прокрутку, что под курсором
+      // (листы щита лежат в своём контейнере, а не в body)
+      layer.addEventListener('wheel', KP._onWheel, { passive: false });
+      bar.querySelector('#kp-done').onclick = () => KP.pick(false);
     } else {
       ['layer', 'bar', 'hover', 'band'].forEach(k => { if (KP.els[k]) { KP.els[k].remove(); KP.els[k] = null; } });
       KP.drag = null; KP.hoverEl = null;
       if (KP.open && KP.els.in) setTimeout(() => KP.els.in.focus(), 50);
     }
     KP._renderCtx();
+  };
+
+  KP._scrollerAt = function (x, y) {
+    let n = KP._under(x, y);
+    while (n && n !== document.body && n !== document.documentElement) {
+      const st = getComputedStyle(n);
+      if (/(auto|scroll)/.test(st.overflowY) && n.scrollHeight > n.clientHeight + 1) return n;
+      n = n.parentElement;
+    }
+    return null;
+  };
+  KP._onWheel = function (e) {
+    const sc = KP._scrollerAt(e.clientX, e.clientY);
+    e.preventDefault();
+    if (sc) sc.scrollBy({ top: e.deltaY, left: e.deltaX });
+    else window.scrollBy({ top: e.deltaY, left: e.deltaX });
+    KP.layout();
   };
 
   KP._under = function (x, y) {
@@ -379,8 +402,10 @@
       const rect = [Math.min(d.x0, e.clientX), Math.min(d.y0, e.clientY), Math.abs(e.clientX - d.x0), Math.abs(e.clientY - d.y0)];
       if (rect[2] < 6 || rect[3] < 6) return;
       const inside = KP._elsIn(rect);
-      KP.add({ kind: 'region', rect, label: 'область ' + Math.round(rect[2]) + '×' + Math.round(rect[3]),
-               text: inside.text, selector: inside.selectors });
+      const m = { kind: 'region', rect, label: 'область ' + Math.round(rect[2]) + '×' + Math.round(rect[3]),
+                  text: inside.text, selector: inside.selectors };
+      KP._anchor(m);
+      KP.add(m);
       return;
     }
     const node = KP._under(e.clientX, e.clientY);
@@ -392,7 +417,8 @@
         KP.add(Object.assign({ kind: 'part' }, part, { rect: part.rectFn ? part.rectFn() : [e.clientX - 40, e.clientY - 40, 80, 80] }));
         return;
       }
-      KP.add({ kind: 'region', rect: [e.clientX - 60, e.clientY - 60, 120, 120], label: 'точка в сцене', detail: 'мимо деталей — пустое место сцены' });
+      const m2 = { kind: 'region', rect: [e.clientX - 60, e.clientY - 60, 120, 120], label: 'точка в сцене', detail: 'мимо деталей — пустое место сцены' };
+      KP._anchor(m2); KP.add(m2);
       return;
     }
     KP.add(KP._describe(node));
@@ -463,12 +489,27 @@
   KP.remove = function (n) { KP.marks = KP.marks.filter(m => m.n !== n); KP.layout(); KP._renderCtx(); };
   KP.clear = function () { KP.marks = []; KP.seq = 0; KP.layout(); KP._renderCtx(); };
 
+  // v2.46.174: рамка области держится за элемент под ней (лист, карточка),
+  // а не за экран — прокрутка и ресайз её не сдвигают
+  KP._anchor = function (m) {
+    const r = m.rect || [0, 0, 0, 0];
+    let a = KP._under(r[0] + r[2] / 2, r[1] + r[3] / 2);
+    if (!a || a === document.body) return;
+    const ar = a.getBoundingClientRect();
+    if (!ar.width || !ar.height) return;
+    m.anchor = a;
+    m.anchorFr = [(r[0] - ar.left) / ar.width, (r[1] - ar.top) / ar.height, r[2] / ar.width, r[3] / ar.height];
+  };
   KP.layout = function () {
     const host = KP.els.marks; if (!host) return;
     host.innerHTML = '';
     KP.marks.forEach(m => {
       if (m.el && m.el.isConnected) { const r = m.el.getBoundingClientRect(); m.rect = [r.left, r.top, r.width, r.height]; }
       else if (m.rectFn) { try { const r = m.rectFn(); if (r) m.rect = r; } catch (_) {} }
+      else if (m.anchor && m.anchor.isConnected && m.anchorFr) {
+        const ar = m.anchor.getBoundingClientRect(), f = m.anchorFr;
+        m.rect = [ar.left + f[0] * ar.width, ar.top + f[1] * ar.height, f[2] * ar.width, f[3] * ar.height];
+      }
       const [x, y, w, h] = m.rect || [0, 0, 0, 0];
       const d = el('div', 'kp-mark ' + m.kind);
       d.style.left = (x - 4) + 'px'; d.style.top = (y - 4) + 'px'; d.style.width = (w + 8) + 'px'; d.style.height = (h + 8) + 'px';

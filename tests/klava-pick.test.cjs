@@ -108,3 +108,13 @@ test('тема щита: «Внести правку» вместо ТЗ, код
   assert.match(ap, /r\.status === 428/);
   assert.match(ap, /JSON\.stringify\(\{ pin: pin, note: note\.trim\(\) \}\)/);
 });
+
+// v2.46.174: длинные листы — колесо, привязка рамки, «Готово»
+test('в режиме меток колесо крутит прокрутку под курсором, рамка держится за элемент, есть «Готово»', () => {
+  assert.match(mod, /layer\.addEventListener\('wheel', KP\._onWheel, \{ passive: false \}\)/);
+  assert.match(mod, /KP\._scrollerAt = function/);
+  assert.match(mod, /KP\._anchor = function \(m\)/);
+  assert.match(mod, /m\.anchorFr = \[/);
+  assert.match(mod, /else if \(m\.anchor && m\.anchor\.isConnected && m\.anchorFr\)/);
+  assert.match(mod, /id="kp-done">✓ Готово/);
+});
