@@ -25154,6 +25154,13 @@ body.dchat-screen .app.mobile-layout .screen.active[data-screen="devchat"] {
 .ich-ctx { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; font-size: 10.5px; font-weight: 700; background: #FEF3C7; color: #92400E; border-radius: 6px; padding: 2px 7px; }
 .ich-row.is-mine .ich-ctx { background: rgba(255,255,255,.18); color: #fff; }
 .ich-note-shared { color: #1E4E8C; }
+/* v2.46.181: отчёт по теме */
+.ir-list { display: flex; flex-direction: column; gap: 8px; }
+.ir-row { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.ir-head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.ir-title { font-weight: 700; margin-top: 3px; }
+.ir-meta { font-size: 11.5px; color: var(--text-light); margin-top: 3px; }
+.ir-sum { margin-top: 6px; font-size: 12.5px; line-height: 1.45; background: #F8FAFC; border-radius: 8px; padding: 8px 10px; }
 .ich-go { box-shadow: 0 0 0 3px rgba(45,95,139,.18); }
 
 .ich-item { display: block; width: 100%; text-align: left; cursor: pointer; padding: 9px 10px;

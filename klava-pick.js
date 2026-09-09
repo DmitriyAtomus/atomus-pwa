@@ -238,10 +238,27 @@
       if (ready && !KP.isDir) h += '<span class="kp-note">ТЗ готово — внедряет директор</span>';
       if (th.rounds) h += '<span class="kp-note">раундов в работе: ' + th.rounds + '</span>';
     }
+    if (th.rounds) h += '<button class="kp-act" id="kp-report">📋 Отчёт</button>';
     box.innerHTML = h;
+    const rb = box.querySelector('#kp-report'); if (rb) rb.onclick = KP.report;
     const sb = box.querySelector('#kp-spec'); if (sb) sb.onclick = KP.compile;
     const ib = box.querySelector('#kp-impl'); if (ib) ib.onclick = KP.implement;
     const ab = box.querySelector('#kp-apply'); if (ab) ab.onclick = KP.apply;
+  };
+
+  // v2.46.181: отчёт по теме прямо в ленте — раунды с датами
+  KP.report = async function () {
+    if (!KP.tid) return;
+    const r = await KP._api('/api/ideas/' + KP.tid + '/report');
+    if (!r.ok) { KP.els.note.textContent = 'Отчёт недоступен'; return; }
+    const rounds = r.data.rounds || [];
+    const when = iso => { if (!iso) return '—'; const d = new Date(String(iso).replace(' ', 'T') + 'Z'); return isNaN(d) ? String(iso).slice(0, 16) : d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); };
+    const st = { done: '✅ сделано', error: '⚠ не получилось', stopped: '⏹ остановлено', new: '⏳ в очереди', running: '🔧 в работе' };
+    const lines = rounds.length ? rounds.map(x => 'Раунд ' + x.round + ' · ' + (st[x.status] || '🔧 в работе') + '\n' + (x.title || '') +
+      '\nв работу: ' + when(x.started_at) + (x.started_by ? ' (' + x.started_by + ')' : '') + (x.done_at ? ' → готово: ' + when(x.done_at) : '') +
+      (x.summary ? '\n' + x.summary.slice(0, 500) + (x.summary.length > 500 ? '…' : '') : '')).join('\n\n') : 'В работу ещё ничего не уходило.';
+    const b = KP._bubble('assistant', '', 'Клава');
+    b.innerHTML = '<div class="who">📋 Отчёт по теме</div>' + esc(lines);
   };
 
   // личный код: задать (если ещё нет) и подтвердить правку

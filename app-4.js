@@ -2064,6 +2064,7 @@ function _ideasRenderActions(th) {
     }
   }
   if (status === 'taken') h += '<span class="ich-note"><i class="ti ti-rocket"></i> Взято в работу</span>';
+  if (status === 'taken' || status === 'done') h += '<button class="btn btn-secondary btn-small" onclick="ideaReport(' + th.id + ')"><i class="ti ti-clipboard-list"></i> Отчёт</button>';
   if (status === 'declined') h += '<span class="ich-note"><i class="ti ti-clock-pause"></i> Отложено' +
     (th.note ? ': ' + escapeHtml(th.note) : '') + '</span>';
   if (status === 'done') h += '<span class="ich-note"><i class="ti ti-check"></i> Сделано</span>';
@@ -2101,6 +2102,7 @@ function _ideasSharedActions(th) {
       h += '<span class="ich-note"><i class="ti ti-clock"></i> ТЗ готово — внедряет директор</span>';
     }
   }
+  if (th.rounds) h += '<button class="btn btn-secondary btn-small" onclick="ideaReport(' + th.id + ')"><i class="ti ti-clipboard-list"></i> Отчёт</button>';
   if (state._ideas.isDir && th.id) {
     h += '<span class="ich-manage">' +
       '<button class="btn btn-secondary btn-small" onclick="ideaRename(' + th.id + ')">' +
@@ -2109,6 +2111,47 @@ function _ideasSharedActions(th) {
       '<i class="ti ti-trash"></i> Удалить</button></span>';
   }
   return h;
+}
+
+// v2.46.181: отчёт по теме — раунды: ушло в работу (кто, когда) → сделано (когда, что)
+async function ideaReport(id) {
+  let d; try { d = await apiGet('/api/ideas/' + id + '/report'); } catch (e) { d = null; }
+  if (!d || !d.ok) { showToast('Отчёт недоступен', 'error'); return; }
+  let overlay = document.getElementById('idea-report-modal');
+  if (!overlay) {
+    overlay = document.createElement('div'); overlay.className = 'modal-overlay'; overlay.id = 'idea-report-modal';
+    overlay.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:720px;"><div class="modal-header"><h3><i class="ti ti-clipboard-list"></i> <span id="idea-report-title">Отчёт</span></h3>' +
+      '<button class="icon-btn" onclick="document.getElementById(\'idea-report-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div><div class="modal-body" id="idea-report-body"></div></div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('visible'); });
+  }
+  document.getElementById('idea-report-title').textContent = 'Отчёт: ' + (d.thread.title || '');
+  document.getElementById('idea-report-body').innerHTML = _ideaReportHtml(d.rounds || []);
+  overlay.classList.add('visible');
+}
+
+function _ideaReportHtml(rounds) {
+  if (!rounds.length) return '<div class="empty-block"><i class="ti ti-clipboard-off"></i>В работу ещё ничего не уходило</div>';
+  const st = { done: ['✅ Сделано', 'is-done'], error: ['⚠ Не получилось', 'is-revision'], stopped: ['⏹ Остановлено', 'is-declined'],
+               new: ['⏳ В очереди', 'is-open'], running: ['🔧 В работе', 'is-taken'], uploading: ['⏳ В очереди', 'is-open'] };
+  return '<div class="ir-list">' + rounds.map(function (r) {
+    const s = st[r.status] || ['🔧 В работе', 'is-taken'];
+    return '<div class="ir-row">' +
+      '<div class="ir-head"><b>Раунд ' + r.round + '</b>' + (r.kind === 'fix' ? ' · правка под кодом' : ' · внедрение') +
+        ' <span class="ich-chip ' + s[1] + '">' + s[0] + '</span></div>' +
+      '<div class="ir-title">' + escapeHtml(r.title || '') + '</div>' +
+      '<div class="ir-meta">В работу: ' + escapeHtml(_ideaReportWhen(r.started_at)) + (r.started_by ? ' · ' + escapeHtml(r.started_by) : '') +
+        (r.done_at ? ' &nbsp;→&nbsp; Готово: ' + escapeHtml(_ideaReportWhen(r.done_at)) : '') + '</div>' +
+      (r.summary ? '<div class="ir-sum">' + _ideaFormat(r.summary.slice(0, 1200)) + (r.summary.length > 1200 ? '…' : '') + '</div>' : '') +
+    '</div>';
+  }).join('') + '</div>';
+}
+
+function _ideaReportWhen(iso) {
+  if (!iso) return '—';
+  const d = new Date(String(iso).replace(' ', 'T') + (String(iso).endsWith('Z') ? '' : 'Z'));
+  if (isNaN(d.getTime())) return String(iso).slice(0, 16);
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
 function _ideaFormat(text) {

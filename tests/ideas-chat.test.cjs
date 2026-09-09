@@ -361,3 +361,20 @@ test('общая тема: ТЗ без макета, «Внедрить» дир
   const im = slice(app4, 'async function ideaImplement(id, comment)', 'async function ideaRevision');
   assert.match(im, /d\.round/);
 });
+
+// v2.46.181: отчёт по теме
+test('в теме есть «Отчёт»: раунды с датами, статусами и отчётом агента', () => {
+  const sa = slice(app4, 'function _ideasSharedActions(th)', 'async function ideaReport');
+  assert.match(sa, /ideaReport\(' \+ th\.id \+ '\)/);
+  const rp = slice(app4, 'async function ideaReport(id)', 'function _ideaReportWhen');
+  assert.match(rp, /\/api\/ideas\/' \+ id \+ '\/report'/);
+  assert.match(rp, /✅ Сделано/);
+  assert.match(rp, /⚠ Не получилось/);
+  assert.match(rp, /В работу: /);
+  assert.match(rp, /Готово: /);
+  const ra = slice(app4, 'function _ideasRenderActions(th)', 'function _ideasSharedActions');
+  assert.match(ra, /status === 'taken' \|\| status === 'done'\) h \+= '<button[^>]*ideaReport/);
+  const mod = fs.readFileSync(path.join(root, 'klava-pick.js'), 'utf8');
+  assert.match(mod, /KP\.report = async function/);
+  assert.match(mod, /id="kp-report">📋 Отчёт/);
+});
