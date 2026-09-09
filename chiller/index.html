@@ -713,6 +713,11 @@ let DATA = [], GEOMS = {}, SECTIONS = [], VERSION = '';
 
 /* ===================== каталог ===================== */
 let f = {sec:null, sub:null, type:null, brand:null, st:null, q:""};
+/* v2.46.185: витрина умеет открываться на одном разделе — ?only=products.
+   Так сделан отдельный раздел CRM «Изделия 3D»: там только наша продукция,
+   без покупных комплектующих и без конструктора чиллера. Файл один и тот же,
+   вторую копию витрины не заводим. */
+const ONLY = (new URLSearchParams(location.search).get('only') || '').trim();
 const $ = s => document.querySelector(s);
 
 /* v2.46.128: пришли из расчёта — держим и требование по величине
@@ -784,6 +789,25 @@ const COLS=[['Основное',keyVal],
   ['Хладагент',refVal],
   ['Присоединение',connVal],
   ['Габарит',sizeVal]];
+
+/* Режим одного раздела. Режем DATA и SECTIONS сразу после загрузки индекса —
+   тогда и дерево, и поиск, и счётчики считают только по своему разделу, и
+   нигде не всплывёт чужая позиция. Заодно убираем из шапки то, что относится
+   к чиллеру: конструктор, загрузку корпуса и чат. */
+function applyOnly(){
+  if(!ONLY) return;
+  const sec = SECTIONS.find(s=>s[0]===ONLY);
+  DATA = DATA.filter(d=>d.section===ONLY);
+  SECTIONS = sec ? [sec] : [];
+  f.sec = ONLY;
+  const nm = sec ? sec[1] : ONLY;
+  document.title = 'Атомус · ' + nm;
+  const lg = document.querySelector('.logo span'); if(lg) lg.textContent = nm.toLowerCase();
+  const qi = document.getElementById('q');
+  if(qi) qi.placeholder = 'Поиск по обозначению и наименованию…';
+  ['chatBtn','upBtn'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
+  document.querySelectorAll('a.fsbtn[href="project.html"]').forEach(a=>a.style.display='none');
+}
 
 function drawTree(){
   const secs=SECTIONS.map(([id,nm,subs])=>({id,nm,subs:subs||[],n:cnt(id)})).filter(x=>x.n);
@@ -1467,20 +1491,34 @@ async function boot(){
   DATA = ix.items || []; GEOMS = ix.geoms || {}; SECTIONS = ix.sections || [];
   /* v2.46.157: насосы Pedrollo — из локального справочника, с характеристиками */
   try {
+    /* v2.46.185: сверяемся не только по id, но и по модели. С 09.09.2026 в базе
+       лежат настоящие насосы Pedrollo (141 позиция с заводской геометрией и
+       кривой Q–H), а у справочника свои идентификаторы вида PED-CP-100 — по id
+       они не совпадали, и каждый насос показывался дважды: моделью и карточкой
+       без модели. Подмешиваем только то, чего в базе нет вовсе. */
     const have = new Set(DATA.map(d => d.id));
-    window.PEDROLLO.items().forEach(d => { if (!have.has(d.id)) DATA.push(Object.assign({ ready: false, g: null }, d)); });
+    const haveM = new Set(DATA.filter(d => d.brand === 'Pedrollo')
+                              .map(d => String(d.name).replace(/^Насос Pedrollo\s+/i, '').trim().toUpperCase()));
+    const pedNew = d => !have.has(d.id) &&
+        !haveM.has(String(d.name).replace(/^Насос Pedrollo\s+/i, '').trim().toUpperCase());
+    window.PEDROLLO.items().forEach(d => { if (pedNew(d)) DATA.push(Object.assign({ ready: false, g: null }, d)); });
     const ps = SECTIONS.find(x => x[0] === 'pumps');
     if (ps) { ps[2] = ps[2] || []; window.PEDROLLO.SUBS.forEach(sb => { if (!ps[2].some(x => x[0] === sb[0])) ps[2].push(sb); }); }
   } catch (e) { console.warn('Pedrollo: не подмешались', e); }
   VERSION = ix.built || '';
+  applyOnly();          /* режим одного раздела (?only=…) — см. ONLY */
   VER = (ix.version || ix.built || '').replace(/[^0-9a-zA-Z]/g,'');
   Object.values(GEOMS).forEach(g=>{ if(g && g.f && g.v) RV[g.f]=g.v; });
   const nUser = await mergeUserModels();
   draw();
   const c=document.querySelector('.hcount');
   const cnt = ix.count || {ready:DATA.filter(d=>d.ready).length, items:DATA.length};
-  if(c) c.innerHTML = '<b>'+((cnt.ready||0)+nUser)+'</b> моделей выпущено<br>'+
-                      ((cnt.items||0)+nUser)+' позиций в базе<br>'+
+  /* в режиме одного раздела считаем по нему же, иначе в шапке висели бы
+     цифры всей базы — тысяча позиций там, где на экране три десятка */
+  const nReady = ONLY ? DATA.filter(d=>d.ready).length : (cnt.ready||0)+nUser;
+  const nAll   = ONLY ? DATA.length                    : (cnt.items||0)+nUser;
+  if(c) c.innerHTML = '<b>'+nReady+'</b> моделей выпущено<br>'+
+                      nAll+(ONLY?' позиций в разделе':' позиций в базе')+'<br>'+
                       '<span style="font-size:10px;opacity:.6">база от '+ix.built+'</span>';
   chatArm();     /* чат по чиллерам — если он этому пользователю доступен */
 }

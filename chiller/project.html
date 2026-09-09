@@ -8725,9 +8725,15 @@ function specAnalog(name,key){
    напор вверх. Подбор по расходу — теги «подача до N м³/ч». */
 function pedrolloMerge(){
   if(!window.PEDROLLO)return;
+  /* v2.46.185: сверка ещё и по модели — в базе с 09.09.2026 есть настоящие
+     Pedrollo с заводской геометрией, а id справочника (PED-CP-100) с ними не
+     совпадают, и насос двоился: модель плюс прорисовка по габаритам. */
   const have=new Set(DATA.map(d=>d.id));
+  const haveM=new Set(DATA.filter(d=>d.brand==='Pedrollo')
+                          .map(d=>String(d.name).replace(/^Насос Pedrollo\s+/i,'').trim().toUpperCase()));
   window.PEDROLLO.items().forEach(d=>{
     if(have.has(d.id))return;
+    if(haveM.has(String(d.name).replace(/^Насос Pedrollo\s+/i,'').trim().toUpperCase()))return;
     const P=d.ped,[L,B,H]=P.dims;
     const zn=[
       {kind:'eq',name:'ВСАС G'+P.dn[0],p0:[-L/2,0,H*0.42],dir:[-1,0,0],tip:[-L/2-40,0,H*0.42],ctype:'thr',conn:'G'+P.dn[0].replace('"',''),sex:'f',seat:0,od:P.dn1mm+8},
