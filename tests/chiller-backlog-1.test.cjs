@@ -28,7 +28,7 @@ test('1) расчёт: значения полей и вкладка живут 
 test('2) вкладка «Расход через испаритель»: формула и переходы в насос и трубы', () => {
   assert.match(idx, /data-t="flow">Расход через испаритель/);
   assert.match(idx, /function calcFlow\(\)/);
-  assert.match(idx, /const g = Q \* 3600 \/ \(h\[2\] \* h\[1\] \* dt\) \* 1000;\s+\/\/ м³\/ч\n  return \{ Q: Q, h: h, hcIdx/);
+  assert.match(idx, /const g = Q \* 3600 \/ \(h\[2\] \* h\[1\] \* dt\) \* 1000;\s+\/\/ м³\/ч\r?\n  return \{ Q: Q, h: h, hcIdx/);
   assert.match(idx, /function calcFlowToPump\(\)/);
   assert.match(idx, /function calcFlowToPipe\(\)/);
   assert.match(idx, /calcSave\(\{ flow: \{/);

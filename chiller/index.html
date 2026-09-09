@@ -207,6 +207,9 @@ footer b{color:var(--dim)}
 .crow input:focus,.crow select:focus{border-color:var(--cyan);
   box-shadow:0 0 0 3px rgba(27,159,216,.16);background:rgba(27,159,216,.07)}
 .crow .hint{font-size:11.5px;color:var(--dim2)}
+.csection{margin-top:5px;padding:8px 0 3px;border-bottom:1px solid var(--line);
+  color:#8FD3F4;font-size:11px;letter-spacing:.09em;text-transform:uppercase}
+.clink{border:0;background:none;color:#8FD3F4;padding:0 0 0 5px;font:inherit;cursor:pointer;text-decoration:underline}
 .cunit{font-size:12.5px;color:var(--dim)}
 /* карточка результата */
 .cout{background:rgba(8,22,42,.72);border:1px solid var(--line2);border-radius:13px;
@@ -234,6 +237,12 @@ footer b{color:var(--dim)}
   display:block;margin-bottom:4px}
 .ctube b{color:#fff;font-size:15px}
 .ctube .cpipe{color:#8FD3F4;font-family:Consolas,monospace}
+.closs{margin-top:13px;padding:12px;border:1px solid rgba(27,159,216,.28);
+  border-radius:10px;background:rgba(27,159,216,.06)}
+.closs .cl{display:block;margin-bottom:8px;color:var(--dim2);font-size:10.5px;
+  letter-spacing:.09em;text-transform:uppercase}
+.closs-total{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+.closs-total b{font:600 18px Consolas,monospace;color:#8FD3F4}
 .cok{color:var(--ok)}
 .cbad{color:var(--gold)}
 /* дорожка назад в расчёт и требование по величине — в строке разделов */
@@ -716,8 +725,15 @@ function needOk(d){
   const hay = [(d.tags||[]).join(' '), d.kind || '', d.name || '',
                ((d.specs||[]).map(r=>r.join(' ')).join(' '))].join(' ');
   const m = hay.match(re);
-  if(!m) return false;                       // величины не указано — не угадываем
-  return parseFloat(m[1].replace(',', '.')) >= f.need.value * 0.999;
+  if(!m || parseFloat(m[1].replace(',', '.')) < f.need.value * 0.999) return false;
+  if(!(f.need.head > 0)) return true;
+  /* Для Pedrollo проверяем не максимумы по отдельности, а реальную точку
+     Q–H. Для остальных насосов без кривой честно не угадываем напор. */
+  if(d.ped && window.PEDROLLO && typeof window.PEDROLLO.headAt === 'function'){
+    const head = window.PEDROLLO.headAt(d.ped, f.need.value);
+    return head != null && head >= f.need.head * 0.999;
+  }
+  return false;
 }
 function match(d){
   if(!needOk(d)) return false;
@@ -911,6 +927,7 @@ function drawCards(){
     esc(crumb) +
     (f.need ? '<span class="cneed">' + esc(f.need.label) + ' ≥ ' +
       esc(cFix(f.need.value, 2)) + ' ' + esc(f.need.unit) +
+      (f.need.head > 0 ? ' · напор ≥ ' + esc(cFix(f.need.head, 2)) + ' м' : '') +
       '<i onclick="needClear()" title="Показать все">✕</i></span>' : '');
   $('#title').firstChild.textContent = (subNm?subNm[1]:(secNm?secNm[1]:'База 3D-моделей'))+' ';
   $('#sub').textContent = 'позиций: '+list.length+' · с моделями: '+list.filter(d=>d.ready).length;
@@ -2217,22 +2234,24 @@ async function baseZoneSex(id,zi,sex){
    промежуточными величинами — расчёт можно проверить руками.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* хладоносители: плотность кг/м³ и теплоёмкость Дж/(кг·К) — листы 1 и 3 */
+/* хладоносители: [название, плотность кг/м³, теплоёмкость Дж/(кг·К),
+   кинематическая вязкость мм²/с при средней рабочей температуре около +10 °С]
+   — листы 1 и 3 */
 const HC = [
-  ['Вода',                                   1000,   4190],
-  ['Солевой раствор 10%',                    1070,   4180],
-  ['Пропиленгликоль, 30% конц. при −13 °С',  1023,   3884],
-  ['Пропиленгликоль, 35% конц. при −17 °С',  1028,   3819],
-  ['Пропиленгликоль, 40% конц. при −21 °С',  1032,   3732],
-  ['Пропиленгликоль, 45% конц. при −26 °С',  1034.5, 3652.5],
-  ['Пропиленгликоль, 50% конц. при −33 °С',  1039.9, 3548.7],
-  ['Пропиленгликоль, 55% конц. при −42 °С',  1041.6, 3456.2],
-  ['Этиленгликоль, 30% конц. при −15 °С',    1040.7, 3684.4],
-  ['Этиленгликоль, 35% конц. при −19 °С',    1044.8, 3616.3],
-  ['Этиленгликоль, 40% конц. при −24 °С',    1056.3, 3499.1],
-  ['Этиленгликоль, 45% конц. при −29 °С',    1057.3, 3443.3],
-  ['Этиленгликоль, 50% конц. при −35 °С',    1063.3, 3351.8],
-  ['Этиленгликоль, 55% конц. при −43 °С',    1072,   3236.9],
+  ['Вода',                                   1000,   4190,   1.31],
+  ['Солевой раствор 10%',                    1070,   4180,   1.60],
+  ['Пропиленгликоль, 30% конц. при −13 °С',  1023,   3884,   4.50],
+  ['Пропиленгликоль, 35% конц. при −17 °С',  1028,   3819,   5.50],
+  ['Пропиленгликоль, 40% конц. при −21 °С',  1032,   3732,   6.80],
+  ['Пропиленгликоль, 45% конц. при −26 °С',  1034.5, 3652.5, 8.60],
+  ['Пропиленгликоль, 50% конц. при −33 °С',  1039.9, 3548.7, 11.0],
+  ['Пропиленгликоль, 55% конц. при −42 °С',  1041.6, 3456.2, 14.5],
+  ['Этиленгликоль, 30% конц. при −15 °С',    1040.7, 3684.4, 3.00],
+  ['Этиленгликоль, 35% конц. при −19 °С',    1044.8, 3616.3, 3.50],
+  ['Этиленгликоль, 40% конц. при −24 °С',    1056.3, 3499.1, 4.20],
+  ['Этиленгликоль, 45% конц. при −29 °С',    1057.3, 3443.3, 5.10],
+  ['Этиленгликоль, 50% конц. при −35 °С',    1063.3, 3351.8, 6.30],
+  ['Этиленгликоль, 55% конц. при −43 °С',    1072,   3236.9, 8.00],
 ];
 
 /* свойства хладагентов по температуре насыщения — лист 2, строки 23…85:
@@ -2287,6 +2306,38 @@ const TUBES = [
   [53.98, '2 1/8"', 1.5], [66.68, '2 5/8"', 2.0], [79.38, '3 1/8"', 2.0],
 ];
 const tubeIn = t => t[0] - 2 * t[2];          // проход трубы, мм
+
+/* Контур хладоносителя. PP-R — наружный Ø и стенка по серии давления;
+   сталь — ряд ВГП ГОСТ 3262-75: [условный проход DN, наружный Ø,
+   лёгкая, обыкновенная, усиленная]. Медный TUBES выше не меняется. */
+const PPR_OD = [20, 25, 32, 40, 50, 63, 75, 90, 110, 125, 140, 160];
+const pprRows = (pn, walls) => PPR_OD.map((od, i) => [od, 'PP-R ' + pn, walls[i]]);
+const PPR_TUBES = {
+  PN10: pprRows('PN10', [1.9, 2.3, 2.9, 3.7, 4.6, 5.8, 6.8, 8.2, 10.0, 11.4, 12.7, 14.6]),
+  PN16: pprRows('PN16', [2.8, 3.5, 4.4, 5.5, 6.9, 8.6, 10.3, 12.3, 15.1, 17.1, 19.2, 21.9]),
+  PN20: pprRows('PN20', [3.4, 4.2, 5.4, 6.7, 8.3, 10.5, 12.5, 15.0, 18.3, 20.8, 23.3, 26.6]),
+  PN25: pprRows('PN25', [4.1, 5.1, 6.5, 8.1, 10.1, 12.7, 15.1, 18.1, 22.1, 25.1, 28.1, 32.1]),
+};
+const VGP_DIMS = [
+  [6, 10.2, 1.8, 2.0, 2.5], [8, 13.5, 2.0, 2.2, 2.8],
+  [10, 17.0, 2.0, 2.2, 2.8], [15, 21.3, 2.35, 2.8, 3.2],
+  [20, 26.8, 2.35, 2.8, 3.2], [25, 33.5, 2.8, 3.2, 4.0],
+  [32, 42.3, 2.8, 3.2, 4.0], [40, 48.0, 3.0, 3.5, 4.0],
+  [50, 60.0, 3.0, 3.5, 4.5], [65, 75.5, 3.2, 4.0, 4.5],
+  [80, 88.5, 3.5, 4.0, 4.5], [90, 101.3, 3.5, 4.0, 4.5],
+  [100, 114.0, 4.0, 4.5, 5.0], [125, 140.0, 4.0, 4.5, 5.5],
+  [150, 165.0, 4.0, 4.5, 5.5],
+];
+const vgpRows = wallCol => VGP_DIMS.map(r => [r[1], 'DN ' + r[0], r[wallCol]]);
+const VGP_TUBES = {
+  light: vgpRows(2), standard: vgpRows(3), reinforced: vgpRows(4),
+};
+const PIPE_MATERIALS = {
+  ppr: { label: 'PP-R', roughness: 0.007, series: PPR_TUBES,
+    seriesLabels: { PN10: 'PN10', PN16: 'PN16', PN20: 'PN20', PN25: 'PN25' }, defaultSeries: 'PN20' },
+  steel: { label: 'Сталь ВГП', roughness: 0.2, series: VGP_TUBES,
+    seriesLabels: { light: 'лёгкая', standard: 'обыкновенная', reinforced: 'усиленная' }, defaultSeries: 'standard' },
+};
 
 /* ═══ v2.46.157: расчёт помнит введённое ═══
    Пункт 1 из списка Дмитрия: значения не сбрасываются ни при переходе между
@@ -2348,8 +2399,8 @@ function calcPaint() {
   else if (calcTab === 'pipe') b.innerHTML = calcPipeForm();
   else b.innerHTML = calcPumpForm();
   b.querySelectorAll('input,select').forEach(el => {
-    el.oninput = () => { calcCapture(); calcRun(); };
-    el.onchange = () => { calcCapture(); calcRun(); };
+    el.oninput = () => { calcPipeFieldChange(el); calcCapture(); calcRun(); };
+    el.onchange = () => { calcPipeFieldChange(el); calcCapture(); calcRun(); };
   });
   calcApplyVals();
   calcRun();
@@ -2467,6 +2518,7 @@ function calcFlowPaint() {
     return;
   }
   calcSave({ flow: { Q: r.Q, hc: r.h[0], t1: r.t1, t2: r.t2, dt: r.dt, g: r.g } });
+  const pipeHead = calcPipeHeadForFlow(r);
   out.innerHTML =
     `<div class="cbig"><b>${cFix(r.g, 2)}</b><span>м³/ч — расход через испаритель</span></div>
      <div class="csteps">
@@ -2479,7 +2531,7 @@ function calcFlowPaint() {
        обычно 4…6 К (7/12 — классика). Маленький перепад — большой расход и насос; большой —
        риск заморозить испаритель.</div>` : ''}
      <div class="cpick">
-       <button onclick="calcFlowToPump()">→ Насос под ${cFix(r.g, 2)} м³/ч</button>
+       <button onclick="calcFlowToPump()">→ Насос: ${cFix(r.g, 2)} м³/ч${pipeHead == null ? '' : ` · ${cFix(pipeHead, 2)} м`}</button>
        <button onclick="calcFlowToPipe()">→ Диаметры труб под ${cFix(r.Q, 1)} кВт</button>
      </div>`;
 }
@@ -2533,10 +2585,16 @@ function calcCompPaint() {
      <div class="cpick"><button onclick="calcShowSection('compressors')">→ Компрессоры в базе</button></div>`;
 }
 
-/* ── 3. Диаметры жидкостной и газовой линий (лист 2, правый блок) ─────── */
+/* ── 3. Диаметры фреоновых линий и контура хладоносителя ─────────────── */
+function pipeSeriesOptions(material, selected) {
+  const m = PIPE_MATERIALS[material] || PIPE_MATERIALS.ppr;
+  return Object.keys(m.series).map(key =>
+    `<option value="${key}"${key === selected ? ' selected' : ''}>${m.seriesLabels[key]}</option>`).join('');
+}
 function calcPipeForm() {
   const refs = Object.keys(FR).map(r => `<option${r === '404А' ? ' selected' : ''}>${r}</option>`).join('');
   return `<div class="cgrid"><div class="cfields">
+    <div class="csection">Фреоновые линии</div>
     <div class="crow"><label>Холодопроизводительность</label>
       <div class="cinp"><input type="number" id="pQ" value="100" step="0.5" min="0">
         <span class="cunit">кВт</span></div></div>
@@ -2548,7 +2606,43 @@ function calcPipeForm() {
     <div class="crow"><label>Скорость в газовой</label>
       <div class="cinp"><input type="number" id="pWg" value="10" step="0.5" min="1">
         <span class="cunit">м/с</span><span class="hint">норма 5…10</span></div></div>
+    <div class="csection">Контур хладоносителя</div>
+    <div class="crow"><label>Жидкость</label><select id="pHc">${hcOpts(0)}</select></div>
+    <div class="crow"><label>Перепад температур Δt</label>
+      <div class="cinp"><input type="number" id="pDt" value="5" step="0.5" min="0.5">
+        <span class="cunit">К</span></div></div>
+    <div class="crow"><label>Материал трубы</label><select id="pMat">
+      <option value="ppr">PP-R</option><option value="steel">Сталь ВГП · ГОСТ 3262-75</option>
+    </select></div>
+    <div class="crow"><label>Серия / PN</label><select id="pSeries">${pipeSeriesOptions('ppr', 'PN20')}</select></div>
+    <div class="crow"><label>Скорость в гидравлике</label>
+      <div class="cinp"><input type="number" id="pWh" value="1.5" step="0.1" min="0.1">
+        <span class="cunit">м/с</span><span class="hint">норма 1,0…2,0</span></div></div>
+    <div class="crow"><label>Расстояние до потребителя</label>
+      <div class="cinp"><input type="number" id="pDistance" value="10" step="0.5" min="0">
+        <span class="cunit">м</span></div></div>
+    <div class="crow"><label>Полная длина контура</label>
+      <div class="cinp"><input type="number" id="pLength" value="20" step="0.5" min="0">
+        <span class="cunit">м</span><span class="hint">подача + обратка (×2)
+          <button class="clink" onclick="calcPipeLengthAuto()" type="button">вернуть ×2</button></span></div></div>
+    <div class="crow"><label>Местные сопротивления</label>
+      <div class="cinp"><input type="number" id="pLocal" value="25" step="5" min="0">
+        <span class="cunit">%</span></div></div>
   </div><div class="cout" id="pOut"></div></div>`;
+}
+function calcPipeFieldChange(el) {
+  if (calcTab !== 'pipe' || !el) return;
+  if (el.id === 'pLength') CALC_VALS.pLengthManual = '1';
+  if (el.id === 'pDistance' && CALC_VALS.pLengthManual !== '1') {
+    const d = cNum(el.value), length = $('#pLength');
+    if (length && isFinite(d)) length.value = String(Math.max(0, Math.round(d * 200) / 100));
+  }
+}
+function calcPipeLengthAuto() {
+  delete CALC_VALS.pLengthManual;
+  const d = cNum($('#pDistance').value);
+  if (isFinite(d)) $('#pLength').value = String(Math.max(0, Math.round(d * 200) / 100));
+  calcCapture(); calcRun();
 }
 /* строка подобранной трубы: расчётный проход, сама труба и фактическая
    скорость — если она вышла из нормы, число подсвечивается */
@@ -2563,14 +2657,42 @@ function tubeRow(title, need, t, rho, w, wMin, wMax) {
       скорость в трубе <i class="${ok ? 'cok' : 'cbad'}">${cFix(wFact, 2)} м/с</i>
       ${ok ? '' : `<span class="cbad">— вне нормы ${cFix(wMin, 1)}…${cFix(wMax, 1)}</span>`}</div></div>`;
 }
+function calcPipeHydraulic(Q, h, dt, targetW, rows, roughnessMm, length, localPct) {
+  if (!(Q > 0) || !h || !(dt > 0) || !(targetW > 0) || !(length >= 0) || !(localPct >= 0)) return null;
+  const flow = Q * 3600 / (h[2] * h[1] * dt) * 1000;       // м³/ч
+  const need = Math.sqrt(4 * (flow / 3600) / (Math.PI * targetW)) * 1000;
+  const tube = rows.find(t => tubeIn(t) >= need) || rows[rows.length - 1];
+  const dinMm = tubeIn(tube), din = dinMm / 1000;
+  const speed = (flow / 3600) / (Math.PI * din * din / 4);
+  const nu = h[3] * 1e-6;                                  // мм²/с → м²/с
+  const re = speed * din / nu;
+  const eps = roughnessMm / 1000;
+  let lambda, zone;
+  if (re <= 2300) { lambda = 64 / re; zone = 'ламинарная зона'; }
+  else if (re < 10 * din / eps) { lambda = 0.3164 / Math.pow(re, 0.25); zone = 'Блазиус'; }
+  else { lambda = 0.11 * Math.pow(eps / din + 68 / re, 0.25); zone = 'Альтшуль'; }
+  const paM = lambda * h[1] * speed * speed / (2 * din);
+  const pa = paM * length * (1 + localPct / 100);
+  return { flow, need, tube, dinMm, speed, nu: h[3], re, lambda, zone,
+    paM, pa, kpa: pa / 1000, head: pa / 9806.65, length, localPct };
+}
 function calcPipePaint() {
   const ref = $('#pRef').value, ts = frTemps(ref), el = $('#pT0');
   const cur = el.value ? +el.value : 0;
   el.innerHTML = ts.map(t => `<option value="${t}"${t === cur ? ' selected' : ''}>${t}</option>`).join('');
   const Q = cNum($('#pQ').value), t0 = +el.value;
   const wl = cNum($('#pWl').value), wg = cNum($('#pWg').value);
+  const hcIdx = +$('#pHc').value, h = HC[hcIdx], dt = cNum($('#pDt').value);
+  const material = $('#pMat').value, mat = PIPE_MATERIALS[material] || PIPE_MATERIALS.ppr;
+  const seriesEl = $('#pSeries'), seriesKeys = Object.keys(mat.series);
+  let series = seriesEl.value;
+  if (!seriesKeys.includes(series)) series = seriesKeys.includes(CALC_VALS.pSeries) ? CALC_VALS.pSeries : mat.defaultSeries;
+  seriesEl.innerHTML = pipeSeriesOptions(material, series); seriesEl.value = series;
+  const wh = cNum($('#pWh').value), length = cNum($('#pLength').value), localPct = cNum($('#pLocal').value);
   const a = frAt(ref, t0), out = $('#pOut');
-  if (!isFinite(Q) || !a) { out.innerHTML = '<div class="csteps">Заполните поля</div>'; return; }
+  if (!(Q > 0) || !a || !(wl > 0) || !(wg > 0) || !h || !(dt > 0) || !(wh > 0) || !(length >= 0) || !(localPct >= 0)) {
+    out.innerHTML = '<div class="csteps">Заполните поля положительными значениями</div>'; return;
+  }
   const r = a[3] - a[1], rhoL = a[4], rhoV = a[2];
   const mass = Q / r;                                     // кг/с
   const dia = (rho, w) => Math.sqrt(4 * (mass / rho) / (Math.PI * w)) * 1000;
@@ -2579,7 +2701,11 @@ function calcPipePaint() {
      наружного на две стенки */
   const pick = d => TUBES.find(t => tubeIn(t) >= d) || TUBES[TUBES.length - 1];
   const tl = pick(dl), tg = pick(dg);
-  calcSave({ pipe: { ref: ref, t0: t0, Q: Q, dl: dl, dg: dg, odl: tl[0], odg: tg[0] } });
+  const hyd = calcPipeHydraulic(Q, h, dt, wh, mat.series[series], mat.roughness, length, localPct);
+  calcSave({ pipe: { ref: ref, t0: t0, Q: Q, dl: dl, dg: dg, odl: tl[0], odg: tg[0],
+    hc: h[0], hcIdx: hcIdx, dt: dt, g: hyd.flow, material: material, series: series,
+    dh: hyd.need, odh: hyd.tube[0], wallh: hyd.tube[2], wh: hyd.speed,
+    length: length, localPct: localPct, paM: hyd.paM, kpa: hyd.kpa, head: hyd.head } });
   out.innerHTML =
     `<div class="csteps" style="margin-bottom:10px">
        теплота парообразования при ${t0} °С: <i>${cFix(r, 1)} кДж/кг</i> ·
@@ -2587,7 +2713,21 @@ function calcPipePaint() {
      </div>
      ${tubeRow('Жидкостная линия', dl, tl, rhoL, wl, 0.3, 1.0)}
      ${tubeRow('Газовая линия', dg, tg, rhoV, wg, 5, 10)}
-     <div class="cpick"><button onclick="calcShowSection('pipe')">→ Трубопроводы в базе</button></div>`;
+     ${tubeRow('Контур хладоносителя · ' + mat.label + ' ' + mat.seriesLabels[series], hyd.need, hyd.tube, h[1], wh, 1.0, 2.0)}
+     <div class="closs">
+       <span class="cl">Потери давления</span>
+       <div class="closs-total"><b>${cFix(hyd.kpa, 2)} кПа</b><b>${cFix(hyd.head, 2)} м вод. ст.</b></div>
+       <div class="csteps">
+         число Re <i>${cFix(hyd.re, 0)}</i> · λ <i>${cFix(hyd.lambda, 4)}</i> (${hyd.zone}) ·
+         шероховатость <i>${cFix(mat.roughness, 3)} мм</i><br>
+         удельные потери <i>${cFix(hyd.paM, 1)} Па/м</i> × <i>${cFix(hyd.length, 1)} м</i> ·
+         местные <i>+${cFix(hyd.localPct, 0)}%</i> = <i>${cFix(hyd.pa, 0)} Па</i>
+       </div>
+     </div>
+     <div class="cpick">
+       <button onclick="calcPipeToPump(${Q},${hcIdx},${dt},${hyd.head})">→ Насос: ${cFix(hyd.flow, 2)} м³/ч · ${cFix(hyd.head, 2)} м</button>
+       <button onclick="calcShowSection('pipe')">→ Трубопроводы в базе</button>
+     </div>`;
 }
 
 /* ── 4. Производительность насоса (лист 3) ────────────────────────────── */
@@ -2612,17 +2752,21 @@ function calcPumpForm() {
     <div class="crow"><label>Перепад температур Δt</label>
       <div class="cinp"><input type="number" id="uDt" value="3" step="0.5" min="0.5">
         <span class="cunit">К</span></div></div>
+    <div class="crow"><label>Требуемый напор</label>
+      <div class="cinp"><input type="number" id="uHead" value="0" step="0.1" min="0">
+        <span class="cunit">м вод. ст.</span><span class="hint">из потерь контура</span></div></div>
     ${kindRow}
   </div><div class="cout" id="uOut"></div></div>`;
 }
 function calcPumpPaint() {
   const Q = cNum($('#uQ').value), h = HC[+$('#uHc').value], dt = cNum($('#uDt').value);
+  const head = cNum($('#uHead').value);
   const out = $('#uOut');
-  if (!isFinite(Q) || !isFinite(dt) || dt <= 0) {
+  if (!(Q > 0) || !(dt > 0) || !(head >= 0)) {
     out.innerHTML = '<div class="csteps">Заполните поля</div>'; return;
   }
   const g = Q * 3600 / (h[2] * h[1] * dt) * 1000;    // м³/ч, с плотностью
-  calcSave({ pump: { Q: Q, hc: h[0], dt: dt, g: g } });
+  calcSave({ pump: { Q: Q, hc: h[0], dt: dt, g: g, head: head } });
   let flowNote = '';
   try {
     const fl = (JSON.parse(localStorage.getItem('chiller.calc') || '{}') || {}).flow;
@@ -2639,6 +2783,7 @@ function calcPumpPaint() {
        G = Q × 3600 ÷ (c × ρ × Δt): <i>${Q} кВт</i> ·
        c <i>${cFix(h[2], 0)} Дж/(кг·К)</i> · ρ <i>${cFix(h[1], 1)} кг/м³</i> ·
        Δt <i>${cFix(dt, 1)} К</i>
+       ${head > 0 ? `<br>рабочая точка: <i>${cFix(g, 2)} м³/ч</i> при напоре не меньше <i>${cFix(head, 2)} м вод. ст.</i>` : ''}
      </div>
      ${flowNote}
      ${diff > 0.5 ? `<div class="cwarn">В файле плотность не участвует — там всегда делится
@@ -2646,15 +2791,15 @@ function calcPumpPaint() {
        ${cFix(diff, 1)} %). Для гликолей это заметно: их плотность ${h[1]} кг/м³.
        Здесь считается с плотностью выбранного хладоносителя.</div>` : ''}
      <div class="cpick">
-       <button onclick="calcPickPump(${g.toFixed(2)})">→ Насосы от ${cFix(g, 2)} м³/ч</button>
+       <button onclick="calcPickPump(${g.toFixed(2)},${head.toFixed(2)})">→ Насосы от ${cFix(g, 2)} м³/ч${head > 0 ? ` · ${cFix(head, 2)} м` : ''}</button>
        <button onclick="calcShowSection('pumps')">→ Все насосы</button>
      </div>`;
 }
 
 /* насос: уходим в нужный подраздел и сразу отсекаем то, что не тянет подачу */
-function calcPickPump(g) {
+function calcPickPump(g, head) {
   const sel = document.getElementById('uKind');
-  calcShowSection('pumps', sel ? sel.value : '', { label: 'подача', value: g, unit: 'м³/ч' });
+  calcShowSection('pumps', sel ? sel.value : '', { label: head > 0 ? 'рабочая точка' : 'подача', value: g, unit: 'м³/ч', head: head || 0 });
 }
 /* ═══ v2.46.133: расчёт помнится для схемы ═══
    Диаметры, подача насоса и режим уезжают в конструктор: на листе схемы
@@ -2681,11 +2826,27 @@ function calcToFlow(q) { CALC_VALS.fQ = String(q); calcTab = 'flow'; calcPaint()
 function calcFlowToPump() {
   const r = calcFlow(); if (!r) return;
   CALC_VALS.uQ = String(r.Q); CALC_VALS.uHc = String(r.hcIdx); CALC_VALS.uDt = String(r.dt);
+  const head = calcPipeHeadForFlow(r); CALC_VALS.uHead = String(head == null ? 0 : head);
   calcTab = 'pump'; calcPaint();
 }
 function calcFlowToPipe() {
   const r = calcFlow(); if (!r) return;
-  CALC_VALS.pQ = String(r.Q); calcTab = 'pipe'; calcPaint();
+  CALC_VALS.pQ = String(r.Q); CALC_VALS.pHc = String(r.hcIdx); CALC_VALS.pDt = String(r.dt);
+  calcTab = 'pipe'; calcPaint();
+}
+function calcPipeHeadForFlow(r) {
+  try {
+    const p = (JSON.parse(localStorage.getItem('chiller.calc') || '{}') || {}).pipe;
+    if (!p || !(p.head >= 0) || !(p.g > 0)) return null;
+    const sameQ = Math.abs(p.Q - r.Q) <= Math.max(0.01, r.Q * 0.005);
+    const sameFluid = p.hcIdx === r.hcIdx || p.hc === r.h[0];
+    const sameDt = Math.abs(p.dt - r.dt) <= 0.01;
+    return sameQ && sameFluid && sameDt ? p.head : null;
+  } catch (e) { return null; }
+}
+function calcPipeToPump(Q, hcIdx, dt, head) {
+  CALC_VALS.uQ = String(Q); CALC_VALS.uHc = String(hcIdx); CALC_VALS.uDt = String(dt);
+  CALC_VALS.uHead = String(head); calcTab = 'pump'; calcPaint();
 }
 /* ═══ v2.46.128: расчёт → каталог → обратно ═══
    Из результата уходим в раздел базы, но с дорожкой назад: запоминаем, на
