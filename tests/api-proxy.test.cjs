@@ -29,11 +29,15 @@ test('CRM распознаёт HTML 403 от Vercel VPN-защиты', () => {
 });
 
 function loadFetchProxy(nativeFetch) {
-  const app = read('app-1.js');
+  const app = read('app-1.js')
+    .replace('const API_GET_HEDGE_DELAY_MS = 450;', 'const API_GET_HEDGE_DELAY_MS = 5;')
+    .replace('const API_GET_TIMEOUT_MS = 12000;', 'const API_GET_TIMEOUT_MS = 1000;');
   const end = app.indexOf('const TOKEN_KEY');
   assert.notEqual(end, -1);
   const context = {
     URL,
+    setTimeout,
+    clearTimeout,
     window: {
       location: { origin: 'https://atomus-pwa.vercel.app' },
       fetch: nativeFetch,
@@ -85,6 +89,39 @@ test('обычный неправильный пароль не отправля
 
   assert.equal(response, denied);
   assert.deepEqual(calls, ['/api/auth/password']);
+});
+
+test('медленный GET страхуется прямым запросом и не ждёт Vercel', async () => {
+  const calls = [];
+  const ok = fakeResponse(200, 'application/json', { ok: true });
+  const never = new Promise(() => {});
+  const fetch = loadFetchProxy(async (url) => {
+    calls.push(String(url));
+    return calls.length === 1 ? never : ok;
+  });
+
+  const response = await fetch('/api/contracts?limit=200', { cache: 'no-store' });
+
+  assert.equal(response, ok);
+  assert.deepEqual(calls, [
+    '/api/contracts?limit=200',
+    'https://worker-production-9b70.up.railway.app/api/contracts?limit=200',
+  ]);
+});
+
+test('быстрый GET остаётся на same-origin и не создаёт дубль', async () => {
+  const calls = [];
+  const ok = fakeResponse(200, 'application/json', { ok: true });
+  const fetch = loadFetchProxy(async (url) => {
+    calls.push(String(url));
+    return ok;
+  });
+
+  const response = await fetch('/api/dashboard');
+  await new Promise(resolve => setTimeout(resolve, 15));
+
+  assert.equal(response, ok);
+  assert.deepEqual(calls, ['/api/dashboard']);
 });
 
 test('Vercel проксирует API и серверные файлы в Railway', () => {
