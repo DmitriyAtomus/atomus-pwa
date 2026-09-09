@@ -7072,6 +7072,9 @@ async function chatFileToPay(inboxId, idx) {
     // 2) отправить в оплату
     const r2 = await apiPost('/api/supply-inbox/' + inboxId + '/to-pay', {});
     if (r2 && r2.ok && r2.data && r2.data.ok) {
+      if (typeof removeSupplyInvoiceAuthorAlertByInbox === 'function') {
+        removeSupplyInvoiceAuthorAlertByInbox(inboxId);
+      }
       showToast('Отправлено на оплату', 'success');
     } else {
       showToast((r2 && r2.data && (r2.data.message || r2.data.error)) ||
@@ -15041,6 +15044,9 @@ async function sendInboxToPay(inboxId, overlayId, currentPurpose) {
       showToast(j.message || ('Ошибка (HTTP ' + r.status + ')'), 'error');
       return;
     }
+    if (typeof removeSupplyInvoiceAuthorAlertByInbox === 'function') {
+      removeSupplyInvoiceAuthorAlertByInbox(inboxId);
+    }
     if (overlayId) { const ov = document.getElementById(overlayId); if (ov) ov.remove(); }
     showToast('Счёт отправлен на оплату' + (j.order_label ? ' · ' + j.order_label : ''), 'success');
     await loadSupplyInbox();
@@ -15079,6 +15085,9 @@ async function unmatchInboxAndPay(inboxId, overlayId) {
       await loadSupplyInbox();
       return;
     }
+    if (typeof removeSupplyInvoiceAuthorAlertByInbox === 'function') {
+      removeSupplyInvoiceAuthorAlertByInbox(inboxId);
+    }
     showToast('Счёт отвязан и отправлен на оплату' + (pj.order_label ? ' · ' + pj.order_label : ''), 'success');
     await loadSupplyInbox();
     if (pj.order_id && confirm('Открыть заказ в разделе «На оплату»?')) openSupplyOrder(pj.order_id);
@@ -15106,6 +15115,9 @@ async function payInboxOrderToPay(orderId, orderLabel, inboxId, currentPurpose) 
     if (!res.ok) {
       showToast(res.message || ('Не удалось (HTTP ' + res.status + ')'), 'error');
       return;
+    }
+    if (typeof removeSupplyInvoiceAuthorAlertByInbox === 'function') {
+      removeSupplyInvoiceAuthorAlertByInbox(inboxId);
     }
     showToast('Счёт передан на оплату · ' + (orderLabel || ('#' + orderId)), 'success');
     cache.supplyOrders = null;
