@@ -3,6 +3,12 @@
 const API_BASE = window.location.origin;
 const API_DIRECT_FALLBACK = 'https://worker-production-9b70.up.railway.app';
 const _atomusNativeFetch = window.fetch.bind(window);
+// Через VPN/защитный экран Vercel обычный GET иногда уже дошёл до backend,
+// но ответ держится на прокси много секунд. Для чтения это безопасно: если
+// same-origin не ответил быстро, параллельно пробуем Railway и берём первый
+// нормальный ответ. Изменяющие запросы (POST/PATCH/DELETE) не дублируем.
+const API_GET_HEDGE_DELAY_MS = 450;
+const API_GET_TIMEOUT_MS = 12000;
 
 async function _isVercelSecurityResponse(response) {
   const contentType = response.headers.get('content-type') || '';
@@ -22,6 +28,50 @@ async function _isVercelSecurityResponse(response) {
 // API-запросы, когда компьютер работает через VPN. В этом случае повторяем
 // запрос напрямую в Railway. Без VPN основной same-origin прокси остаётся
 // приоритетным, поэтому офисные сети с недоступным Railway продолжают работать.
+function _firstApiResponse(primary, fallbackFactory) {
+  return new Promise(function (resolve, reject) {
+    let settled = false;
+    let fallbackStarted = false;
+    let failures = 0;
+    let lastError = null;
+
+    const timeout = setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      reject(lastError || new Error('Сервер не ответил вовремя'));
+    }, API_GET_TIMEOUT_MS);
+
+    function finish(response) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve(response);
+    }
+
+    function fail(error) {
+      lastError = error || lastError;
+      failures += 1;
+      if (failures >= 2 && fallbackStarted && !settled) {
+        settled = true;
+        clearTimeout(timeout);
+        reject(lastError || new Error('Нет связи с сервером'));
+      }
+    }
+
+    function startFallback() {
+      if (fallbackStarted || settled) return;
+      fallbackStarted = true;
+      fallbackFactory().then(finish, fail);
+    }
+
+    primary.then(finish, function (error) {
+      fail(error);
+      startFallback();
+    });
+    setTimeout(startFallback, API_GET_HEDGE_DELAY_MS);
+  });
+}
+
 window.fetch = async function atomusApiFetch(input, init) {
   const requestUrl = new URL(
     typeof input === 'string' ? input : input.url,
@@ -31,19 +81,35 @@ window.fetch = async function atomusApiFetch(input, init) {
     requestUrl.origin === window.location.origin &&
     requestUrl.pathname.startsWith('/api/');
 
+  const method = String((init && init.method) ||
+    (input && typeof input === 'object' && input.method) || 'GET').toUpperCase();
+  const fallbackUrl =
+    API_DIRECT_FALLBACK + requestUrl.pathname + requestUrl.search;
+
+  if (isProxiedApi && method === 'GET') {
+    const primary = _atomusNativeFetch(input, init).then(async function (response) {
+      // HTML/служебный JSON от защиты Vercel — не ответ нашего API.
+      if (response.status === 403 && await _isVercelSecurityResponse(response)) {
+        throw new Error('Vercel security checkpoint');
+      }
+      return response;
+    });
+    return _firstApiResponse(primary, function () {
+      return _atomusNativeFetch(fallbackUrl, init);
+    });
+  }
+
   const response = await _atomusNativeFetch(input, init);
   if (!isProxiedApi || response.status !== 403 ||
       !(await _isVercelSecurityResponse(response))) {
     return response;
   }
 
-  const fallbackUrl =
-    API_DIRECT_FALLBACK + requestUrl.pathname + requestUrl.search;
   return _atomusNativeFetch(fallbackUrl, init);
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.177";
+const APP_VERSION = "v2.46.178";
 const APP_VERSION_DATE = "09.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3688,6 +3754,7 @@ function _devChatEmptyHtml() {
 }
 
 async function _devChatTick() {
+  if (document.hidden) return;
   const feed = _devChatEl('feed');
   if (!feed) { stopDevChat(); return; }
   // Тик приходит и по таймеру, и сразу после отправки. Без замка оба запроса
@@ -5668,9 +5735,13 @@ function loadDevChat(host) {
   // v2.45.976: черновик подставляем ПОСЛЕ того, как известен чат — иначе поле
   // пришлось бы наполнять наугад, а пустое затёрло бы недописанное.
   devChatLoadThreads(true).then(function () { _devChatDraftApply(); _devChatTick(); });
-  _devChatTimer = setInterval(_devChatTick, 3000);
+  _devChatTimer = setInterval(function () {
+    if (!document.hidden) _devChatTick();
+  }, 3000);
   // список обновляем реже — там меняются только превью и значок «работает»
-  _devChatListTimer = setInterval(function () { devChatLoadThreads(false); }, 15000);
+  _devChatListTimer = setInterval(function () {
+    if (!document.hidden) devChatLoadThreads(false);
+  }, 15000);
   _devChatApplyFull();
   _devChatSkinApply();
 }
@@ -6087,6 +6158,7 @@ function refreshCurrentScreenCachesOnly(s) {
 }
 
 async function checkForChanges() {
+  if (document.hidden) return;
   if (!localStorage.getItem(TOKEN_KEY)) return;
   try {
     const qs = (_changeCursor === null) ? '' : ('?since=' + encodeURIComponent(_changeCursor));
@@ -6124,7 +6196,20 @@ document.addEventListener('visibilitychange', () => {
     _devChatSpeechStop();
     return;
   }
-  if (document.visibilityState === 'visible') checkForChanges();
+  if (document.visibilityState === 'visible') {
+    checkForChanges();
+    // Фоновые вкладки не опрашивают сервер. Вернувшаяся вкладка сразу
+    // догоняет только нужные ей счётчики и открытую переписку.
+    try { if (typeof refreshNotifBadge === 'function') refreshNotifBadge(); } catch (_) {}
+    try { if (typeof refreshTeamChatsBadge === 'function') refreshTeamChatsBadge(); } catch (_) {}
+    try { if (typeof refreshTvScreenCastState === 'function') refreshTvScreenCastState(); } catch (_) {}
+    if (state.currentScreen === 'devchat' || state.currentScreen === 'codex' ||
+        state.currentScreen === 'sitechat') {
+      try {
+        devChatLoadThreads(false).then(function () { _devChatTick(); });
+      } catch (_) {}
+    }
+  }
 });
 window.addEventListener('focus', () => { checkForChanges(); });
 
@@ -6631,11 +6716,14 @@ async function payDueMarkPaid(orderId, btn) {
 let _notifRefreshTimer = null;
 
 function startNotifPolling() {
-  refreshNotifBadge();
+  if (!document.hidden) refreshNotifBadge();
   // v2.45.544: бейдж непрочитанных в чатах (Сервис + Монтаж)
-  try { if (typeof refreshTeamChatsBadge === 'function') refreshTeamChatsBadge(); } catch (_) {}
+  try {
+    if (!document.hidden && typeof refreshTeamChatsBadge === 'function') refreshTeamChatsBadge();
+  } catch (_) {}
   if (_notifRefreshTimer) clearInterval(_notifRefreshTimer);
   _notifRefreshTimer = setInterval(() => {
+    if (document.hidden) return;
     refreshNotifBadge();
     try { if (typeof refreshTeamChatsBadge === 'function') refreshTeamChatsBadge(); } catch (_) {}
   }, 30000);
@@ -6645,6 +6733,7 @@ function startNotifPolling() {
 }
 
 async function refreshNotifBadge() {
+  if (document.hidden) return;
   const badge = document.getElementById('notif-badge');
   if (!badge) return;
   try {
@@ -6930,6 +7019,7 @@ async function openContractChat() {
   // Автообновление каждые 7 сек
   if (_cchatRefreshTimer) clearInterval(_cchatRefreshTimer);
   _cchatRefreshTimer = setInterval(() => {
+    if (document.hidden) return;
     if (document.getElementById('contract-chat-modal').classList.contains('visible')) {
       loadContractChat(cid, /*silent*/true);
     } else {

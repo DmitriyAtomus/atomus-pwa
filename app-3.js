@@ -6903,6 +6903,7 @@ function _mailApplyUnreadTotal(n) {
   try { if (typeof renderSectionRail === 'function') renderSectionRail(); } catch (e) {}
 }
 async function refreshMailUnread() {
+  if (document.hidden) return;
   try {
     const d = await apiGet('/api/mail/unread-count');
     _mailApplyUnreadTotal(d.count || 0);
@@ -18738,6 +18739,16 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.46.178',
+    date: '09.09.2026',
+    title: 'CRM открывается быстрее',
+    features: [
+      'Внешние иконки и QR-библиотека больше не держат белый экран при медленном CDN или VPN',
+      'Фоновые вкладки CRM перестали постоянно опрашивать сервер; при возвращении данные сразу догоняются',
+      'Медленный GET через Vercel страхуется параллельным чтением из Railway, а зависший запрос завершается по таймауту',
+    ],
+  },
   {
     version: 'v2.46.177',
     date: '09.09.2026',

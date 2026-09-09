@@ -1138,6 +1138,7 @@ async function applyInventorySession(sessionId) {
 function _startDevChatPolling() {
   _stopDevChatPolling();
   _devState._chatPollTimer = setInterval(async () => {
+    if (document.hidden) return;
     if (!_devState.currentId) return;
     if (!document.querySelector('.screen[data-screen="developments"].active')) {
       _stopDevChatPolling();
@@ -17666,6 +17667,7 @@ async function loadTeamChats() {
   }
   _stopTeamChatsPolling();
   _teamChatsPollTimer = setInterval(() => {
+    if (document.hidden) return;
     const modal = document.getElementById('team-chat-modal');
     if (state.currentScreen === 'defects-chats' && !(modal && modal.classList.contains('visible'))) {
       _silentRefreshTeamChats();
@@ -17936,6 +17938,7 @@ function _updateTeamChatsBadge(chats) {
 }
 
 async function refreshTeamChatsBadge() {
+  if (document.hidden) return;
   try {
     const r = await apiGet('/api/team-chats/unread');
     _setTeamChatsBadge(r.total_unread || 0);
@@ -17960,6 +17963,7 @@ async function openTeamChat(cid) {
   await loadTeamChat(cid);
   if (_tchatRefreshTimer) clearInterval(_tchatRefreshTimer);
   _tchatRefreshTimer = setInterval(() => {
+    if (document.hidden) return;
     const modal = document.getElementById('team-chat-modal');
     if (modal && modal.classList.contains('visible')) loadTeamChat(cid, true);
     else { clearInterval(_tchatRefreshTimer); _tchatRefreshTimer = null; }
@@ -22409,6 +22413,7 @@ function _renderTvScreenCastButton() {
 }
 
 async function refreshTvScreenCastState() {
+  if (document.hidden) return;
   if (!_canControlTvScreenCast()) return;
   try {
     _tvScreenCastState = await apiGet('/api/tv/screen');

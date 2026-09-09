@@ -16,7 +16,11 @@
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 
 <title>Atomus group — платформа</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.34.0/tabler-icons.min.css">
+<!-- Иконки не должны держать первый экран: CDN иногда медленно открывается
+     через VPN. Интерфейс рисуется сразу, иконки догружаются следом. -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.34.0/tabler-icons.min.css"
+      media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.34.0/tabler-icons.min.css"></noscript>
 <link rel="stylesheet" href="/app.css">
 
 <!-- Three.js грузится только при открытии STEP-модели. Import map нужен
@@ -31,7 +35,7 @@
 </script>
 
 <!-- QRCode generation library (small, ~9KB) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <!-- html5-qrcode (~150KB) грузится лениво, только при первом нажатии «Скан». -->
 </head>
 <body>
