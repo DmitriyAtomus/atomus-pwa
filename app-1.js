@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.175";
+const APP_VERSION = "v2.46.176";
 const APP_VERSION_DATE = "09.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2605,13 +2605,34 @@ function _devChatArtifactToken() {
   return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
 }
 
-function _devChatArtifactBridge(token) {
-  function visualBridge(bridgeToken) {
+function _devChatArtifactBridge(token, kpSrc) {
+  function visualBridge(bridgeToken, klavaSrc) {
     const TYPE = 'atomus-site-visual-editor';
     let enabled = false;
     let selected = null;
     let pageHint = '';
     const docs = [];
+
+    // v2.46.176: метки как в CRM — модуль klava-pick.js подкладывается в каждую
+    // страницу предпросмотра и работает в remote-режиме: рамка мышью, клик по
+    // элементу, несколько меток, «Готово»/Esc; итог уходит наружу postMessage.
+    function ensureKlava() {
+      try {
+        if (!window.KlavaPick && klavaSrc) {
+          const s = document.createElement('script');
+          s.textContent = klavaSrc;
+          (document.head || document.documentElement).appendChild(s);
+        }
+        if (window.KlavaPick && !window.KlavaPick.cfg) {
+          window.KlavaPick.init({
+            remote: true, page: 'site', apiBase: '', token: function () { return ''; },
+            screen: function () { return currentPage(); },
+            onDone: function (ctx, shot) { post('marks', { ctx: ctx, shot: shot || '' }); },
+          });
+        }
+      } catch (e) { /* модуль не подложился — работает старый выбор блока */ }
+      return !!window.KlavaPick;
+    }
 
     function trim(value, max) {
       const clean = String(value || '').replace(/\s+/g, ' ').trim();
@@ -2699,7 +2720,7 @@ function _devChatArtifactBridge(token) {
 
     function bridgeMarkup() {
       return '<script data-atomus-visual-bridge>(' + visualBridge.toString() + ')(' +
-        JSON.stringify(bridgeToken) + ');<' + '/script>';
+        JSON.stringify(bridgeToken) + ',' + JSON.stringify(klavaSrc || '').replace(/<\//g, '<\\/') + ');<' + '/script>';
     }
 
     function injectFrame(frame) {
@@ -2777,7 +2798,7 @@ function _devChatArtifactBridge(token) {
       docs.push(doc);
       addStyle(doc);
       doc.addEventListener('mouseover', function (event) {
-        if (!enabled) return;
+        if (!enabled || window.KlavaPick) return;
         const el = meaningfulTarget(event.target);
         if (el && el.classList) el.classList.add('atomus-ve-hover');
       }, true);
@@ -2786,7 +2807,7 @@ function _devChatArtifactBridge(token) {
         if (el && el.classList) el.classList.remove('atomus-ve-hover');
       }, true);
       doc.addEventListener('click', function (event) {
-        if (!enabled) return;
+        if (!enabled || window.KlavaPick) return;
         const el = meaningfulTarget(event.target);
         // У многостраничного автономного предпросмотра верхние кнопки должны
         // продолжать переключать страницы даже в режиме выбора.
@@ -2800,11 +2821,22 @@ function _devChatArtifactBridge(token) {
       if (doc.body) doc.body.classList.toggle('atomus-ve-picking', enabled);
     }
 
+    function isLeaf() {
+      // оболочка многостраничного предпросмотра держит страницу во вложенном
+      // srcdoc-iframe — метки ставятся в ней, оболочка только ретранслирует
+      return !document.querySelector('iframe[srcdoc]');
+    }
+
     function setEnabled(value) {
       enabled = !!value;
-      docs.forEach(function (doc) {
-        if (doc.body) doc.body.classList.toggle('atomus-ve-picking', enabled);
-      });
+      if (isLeaf() && ensureKlava()) {
+        try { window.KlavaPick.pick(enabled); } catch (e) { /* нет документа */ }
+      } else {
+        if (window.KlavaPick && window.KlavaPick.picking) { try { window.KlavaPick.pick(false); } catch (e) { /* пусто */ } }
+        docs.forEach(function (doc) {
+          if (doc.body) doc.body.classList.toggle('atomus-ve-picking', enabled);
+        });
+      }
       post('mode', { enabled: enabled });
     }
 
@@ -2821,10 +2853,12 @@ function _devChatArtifactBridge(token) {
       }
       if (msg.action === 'clear') {
         clearSelection();
+        if (window.KlavaPick) { try { window.KlavaPick.clear(); } catch (e) { /* пусто */ } }
         relay({ type: TYPE + '-control', token: bridgeToken, action: 'clear' });
       }
     });
     attach(document);
+    if (isLeaf()) ensureKlava();
     // Внутренние srcdoc-страницы могут появиться после запуска оболочки.
     let scans = 0;
     const timer = setInterval(function () {
@@ -2837,11 +2871,22 @@ function _devChatArtifactBridge(token) {
     }, 500);
     post('ready');
   }
-  return '<script>(' + visualBridge.toString() + ')(' + JSON.stringify(token) + ');<' + '/script>';
+  return '<script>(' + visualBridge.toString() + ')(' + JSON.stringify(token) + ',' + JSON.stringify(kpSrc || '').replace(/<\//g, '<\\/') + ');<' + '/script>';
 }
 
-function _devChatArtifactInject(html, token) {
-  const bridge = _devChatArtifactBridge(token);
+// исходник модуля меток — один раз за сессию, подкладывается в предпросмотр
+let _kpSrcCache = null;
+async function _klavaPickSource() {
+  if (_kpSrcCache) return _kpSrcCache;
+  try {
+    const r = await fetch('/klava-pick.js', { cache: 'force-cache' });
+    if (r.ok) _kpSrcCache = await r.text();
+  } catch (e) { _kpSrcCache = null; }
+  return _kpSrcCache || '';
+}
+
+function _devChatArtifactInject(html, token, kpSrc) {
+  const bridge = _devChatArtifactBridge(token, kpSrc);
   const source = String(html || '');
   const lower = source.toLowerCase();
   const at = lower.lastIndexOf('</body>');
@@ -2866,8 +2911,8 @@ function _devChatArtifactPick(force) {
     button.classList.toggle('active', state.picking);
     button.setAttribute('aria-pressed', state.picking ? 'true' : 'false');
     button.innerHTML = state.picking
-      ? '<i class="ti ti-pointer-check"></i>Выберите блок на сайте'
-      : '<i class="ti ti-focus-2"></i>Указать блок';
+      ? '<i class="ti ti-pointer-check"></i>Обведите или кликните на макете · «Готово» сверху'
+      : '<i class="ti ti-focus-2"></i>Отметить на макете';
   }
   _devChatArtifactControl('pick', { enabled: state.picking });
 }
@@ -2888,12 +2933,12 @@ function _devChatArtifactViewport(size) {
 function _devChatArtifactClear() {
   const state = _devChatArtifactState;
   if (!state) return;
-  state.selection = null;
+  state.selection = null; state.marks = []; state.shot = '';
   state.box.classList.remove('has-selection');
   const label = state.box.querySelector('[data-art-selection]');
   if (label) label.textContent = 'Вся страница';
   const detail = state.box.querySelector('[data-art-selection-detail]');
-  if (detail) detail.textContent = 'Можно описать общую правку или сначала указать конкретный блок.';
+  if (detail) detail.textContent = 'Опишите общую правку или нажмите «Отметить на макете»: обведите место мышью, можно несколько, потом «Готово».';
   _devChatArtifactControl('clear');
 }
 
@@ -2926,11 +2971,49 @@ function _devChatArtifactMessage(event) {
     const note = state.box.querySelector('[data-art-note]');
     if (note) note.focus();
     _devChatArtifactPick(false);
+  } else if (msg.kind === 'marks') {
+    // v2.46.176: метки из предпросмотра — как в CRM: несколько, с рамками и скриншотом
+    const ctx = (msg.data && msg.data.ctx) || {};
+    const marks = Array.isArray(ctx.marks) ? ctx.marks.slice(0, 8) : [];
+    if (!marks.length) return;
+    state.marks = marks.map(function (m) { return _devChatArtifactSafeMark(m); });
+    state.markPage = String(ctx.screen || '').slice(0, 120);
+    state.shot = (typeof msg.data.shot === 'string' && /^data:image\/(png|jpeg);base64,/.test(msg.data.shot)) ? msg.data.shot : '';
+    state.selection = null;
+    state.box.classList.add('has-selection');
+    const label = state.box.querySelector('[data-art-selection]');
+    const detail = state.box.querySelector('[data-art-selection-detail]');
+    if (label) label.textContent = state.marks.length + ' ' + _plural(state.marks.length, ['метка', 'метки', 'меток']) + ' на макете';
+    if (detail) detail.textContent = state.marks.map(function (m) { return '①②③④⑤⑥⑦⑧'[m.n - 1] || m.n; }).join(' ') + ' ' +
+      state.marks.map(function (m) { return m.label; }).join(' · ').slice(0, 160) + (state.markPage ? ' · ' + state.markPage : '');
+    const note = state.box.querySelector('[data-art-note]');
+    if (note) note.focus();
+    if (state.picking) _devChatArtifactPick(false);
   } else if (msg.kind === 'cleared') {
     state.selection = null;
   } else if (msg.kind === 'ready' && state.picking) {
     _devChatArtifactControl('pick', { enabled: true });
   }
+}
+
+function _devChatArtifactSafeMark(m) {
+  const out = { n: parseInt(m && m.n, 10) || 0, kind: String(m && m.kind || '').slice(0, 10) };
+  ['label', 'text', 'selector', 'detail'].forEach(function (k) {
+    out[k] = String(m && m[k] || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+  });
+  out.rect = Array.isArray(m && m.rect) ? m.rect.slice(0, 4).map(function (v) { return Math.round(Number(v) || 0); }) : null;
+  return out;
+}
+
+function _devChatArtifactShotFile(dataUrl) {
+  try {
+    const m = /^data:(image\/(?:png|jpeg));base64,(.+)$/.exec(dataUrl || '');
+    if (!m) return null;
+    const bin = atob(m[2]);
+    const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return new File([buf], 'макет с метками.' + (m[1] === 'image/png' ? 'png' : 'jpg'), { type: m[1] });
+  } catch (e) { return null; }
 }
 
 async function _devChatArtifactSend() {
@@ -2945,7 +3028,20 @@ async function _devChatArtifactSend() {
   }
   const selection = state.selection;
   const lines = ['ВИЗУАЛЬНАЯ ПРАВКА САЙТА', 'Предпросмотр: ' + state.name];
-  if (selection) {
+  if (state.marks && state.marks.length) {
+    lines.push('Страница: ' + (state.markPage || 'текущая'));
+    lines.push('Метки на макете (скриншот с рамками приложен):');
+    state.marks.forEach(function (m) {
+      const num = '①②③④⑤⑥⑦⑧'[m.n - 1] || ('#' + m.n);
+      let l = num + ' ' + (m.label || (m.kind === 'region' ? 'область' : 'элемент'));
+      if (m.selector) l += ' · селектор: ' + m.selector;
+      if (m.text) l += ' · текст: «' + m.text + '»';
+      if (m.rect) l += ' · на экране x=' + m.rect[0] + ' y=' + m.rect[1] + ' ' + m.rect[2] + '×' + m.rect[3] + ' px';
+      lines.push(l);
+    });
+    const shot = _devChatArtifactShotFile(state.shot);
+    if (shot && Array.isArray(_devChatFiles) && !_devChatFiles.some(function (f) { return f.name === shot.name; })) _devChatFiles.push(shot);
+  } else if (selection) {
     lines.push('Страница: ' + (selection.page || 'текущая'));
     if (selection.selector) lines.push('Элемент: ' + selection.selector);
     if (selection.section) lines.push('Раздел: ' + selection.section);
@@ -2965,11 +3061,15 @@ async function _devChatArtifactSend() {
   if (button) button.disabled = true;
   await devChatSend({
     screen: 'site_visual_editor', artifact: state.name,
-    page: selection && selection.page || '', selector: selection && selection.selector || '',
+    page: (state.marks && state.marks.length) ? state.markPage : (selection && selection.page || ''),
+    selector: selection && selection.selector || '',
+    marks: state.marks || [],
   });
   if (!(input.value || '').trim()) {
     if (note) note.value = '';
     if (typeof showToast === 'function') showToast('Правка отправлена Клаве', 'success');
+    state.marks = []; state.shot = '';
+    _devChatArtifactClear();
   }
   if (button) button.disabled = false;
 }
@@ -3051,7 +3151,7 @@ async function devChatOpenArtifact(url, name) {
         _devChatArtifactControl('pick', { enabled: true });
       }
     });
-    html = _devChatArtifactInject(html, token);
+    html = _devChatArtifactInject(html, token, await _klavaPickSource());
   }
   // srcdoc свойством, а не атрибутом: макет бывает длинным, и кавычки внутри
   // не должны рвать разметку

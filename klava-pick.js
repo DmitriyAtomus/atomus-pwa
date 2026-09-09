@@ -98,6 +98,9 @@
     const fab = el('button', 'kp-ui', esc(KP.cfg.fabText)); fab.id = 'kp-fab'; fab.title = 'Отметить на экране, что обсудить с Клавой';
     if (KP.cfg.fabStyle) Object.assign(fab.style, KP.cfg.fabStyle);
     fab.onclick = () => KP.toggle();
+    // v2.46.176: remote — модуль живёт внутри чужой страницы (предпросмотр сайта в
+    // iframe): без кнопки и панели, метки отдаются наружу через cfg.onDone
+    if (KP.cfg.remote) fab.classList.add('hidden');
     document.body.appendChild(fab);
     const marks = el('div', 'kp-ui'); marks.id = 'kp-marks'; document.body.appendChild(marks);
     KP.els.fab = fab; KP.els.marks = marks;
@@ -340,6 +343,7 @@
       ['layer', 'bar', 'hover', 'band'].forEach(k => { if (KP.els[k]) { KP.els[k].remove(); KP.els[k] = null; } });
       KP.drag = null; KP.hoverEl = null;
       if (KP.open && KP.els.in) setTimeout(() => KP.els.in.focus(), 50);
+      if (KP.cfg && KP.cfg.remote) KP._remoteDone();
     }
     KP._renderCtx();
   };
@@ -359,6 +363,19 @@
     if (sc) sc.scrollBy({ top: e.deltaY, left: e.deltaX });
     else window.scrollBy({ top: e.deltaY, left: e.deltaX });
     KP.layout();
+  };
+
+  KP._remoteDone = async function () {
+    if (!KP.cfg || typeof KP.cfg.onDone !== 'function') return;
+    const ctx = KP.context();
+    let shot = null;
+    if (KP.marks.length) {
+      try {
+        const f = await KP.shot();
+        if (f) shot = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(null); r.readAsDataURL(f); });
+      } catch (e) { shot = null; }
+    }
+    try { KP.cfg.onDone(ctx, shot); } catch (e) {}
   };
 
   KP._under = function (x, y) {

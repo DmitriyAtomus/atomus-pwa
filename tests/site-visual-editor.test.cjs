@@ -23,7 +23,10 @@ test('выбранный блок передаётся Клаве с точны�
 });
 
 test('мост выбора не получает origin и токен CRM', () => {
-  assert.match(app, /function _devChatArtifactBridge\(token\)/);
+  assert.match(app, /function _devChatArtifactBridge\(token, kpSrc\)/);   // v2.46.176: + исходник модуля меток
+  assert.match(app, /kind === 'marks'/);
+  assert.match(app, /function _devChatArtifactSafeMark/);
+  assert.match(app, /_devChatArtifactShotFile/);
   assert.match(app, /top\.postMessage/);
   assert.match(app, /sandbox="allow-scripts allow-popups allow-forms allow-modals"/);
   assert.doesNotMatch(app, /sandbox="[^"]*allow-same-origin/);
@@ -43,4 +46,25 @@ test('предпросмотр переключается между компь�
 test('версия содержит визуальные правки сайта', () => {
   assert.ok(Number(version.version.split('.').pop()) >= 119);
   assert.match(app, /function _devChatArtifactPick/);
+});
+
+// v2.46.176: метки на макете как в CRM (klava-pick в remote-режиме)
+test('метки на макете: модуль подкладывается в страницу, оболочка только ретранслирует', () => {
+  const bridge = app.slice(app.indexOf('function _devChatArtifactBridge(token, kpSrc)'), app.indexOf('let _kpSrcCache'));
+  assert.match(bridge, /function ensureKlava\(\)/);
+  assert.match(bridge, /remote: true/);
+  assert.match(bridge, /onDone: function \(ctx, shot\) \{ post\('marks'/);
+  assert.match(bridge, /function isLeaf\(\)/);                          // вложенная страница — метки, оболочка — нет
+  assert.match(bridge, /if \(isLeaf\(\) && ensureKlava\(\)\)/);
+  assert.match(bridge, /if \(!enabled \|\| window\.KlavaPick\) return;/);  // старый одиночный выбор уступает модулю
+  assert.match(bridge, /replace\(\/<\\\/\/g, '<\\\\\/'\)/);                 // </ в исходнике не рвёт script
+  assert.match(app, /fetch\('\/klava-pick\.js'/);
+  const send = app.slice(app.indexOf('async function _devChatArtifactSend()'), app.indexOf('async function devChatOpenArtifact'));
+  assert.match(send, /Метки на макете \(скриншот с рамками приложен\)/);
+  assert.match(send, /_devChatFiles\.push\(shot\)/);
+  assert.match(send, /marks: state\.marks \|\| \[\]/);
+  assert.match(app, /Отметить на макете/);
+  const mod = fs.readFileSync(path.join(__dirname, '..', 'klava-pick.js'), 'utf8');
+  assert.match(mod, /if \(KP\.cfg\.remote\) fab\.classList\.add\('hidden'\)/);
+  assert.match(mod, /KP\._remoteDone = async function/);
 });
