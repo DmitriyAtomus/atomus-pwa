@@ -1460,6 +1460,28 @@
         </div>
       </div>
 
+      <!-- ============ ЛИСТЫ ЩИТА (v2.46.169): правка метками ============ -->
+      <div class="screen" data-screen="panel-sheets" data-section="production">
+        <div class="screen-header">
+          <button class="back-btn" onclick="selectSidebarItem('panels-journal')"><i class="ti ti-arrow-left"></i></button>
+          <h2 id="ps-h2">Листы щита</h2>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1 id="ps-title">Листы щита</h1>
+            <div class="page-subtitle">Нажмите «✦ Показать Клаве», обведите место на листе и напишите, что поправить — Клава увидит лист и координаты в мм</div>
+          </div>
+          <div class="page-actions">
+            <select class="form-input" id="ps-rev" onchange="state._ps.rev = parseInt(this.value, 10); loadPanelSheets()"></select>
+            <button class="btn btn-secondary" id="ps-build" onclick="psBuild()"><i class="ti ti-player-play"></i> <span>Собрать пакет</span></button>
+            <button class="btn btn-primary" onclick="pjTopic(state._ps && state._ps.id)"><i class="ti ti-sparkles"></i> <span>Обсудить с Клавой</span></button>
+          </div>
+        </div>
+        <div class="content-inner">
+          <div id="ps-pages"><div class="loading-block">Загружаем листы…</div></div>
+        </div>
+      </div>
+
       <!-- ============ АТОМ ЭЛЕКТРИКА (AtomCAD) ============ -->
       <div class="screen atomcad-screen" data-screen="atom-electrica" data-section="production">
         <div class="screen-header">
@@ -3722,13 +3744,31 @@
     role: function(){ return ((state.user&&state.user.roles)||[]).join(','); },
     screen: function(){
       var s=state.currentScreen||''; var nav=document.querySelector('.nav-item.active');
+      if(s==='panel-sheets'&&state._ps) return 'Журнал щитов → '+(state._ps.designation||'')+' → листы, ревизия '+(state._ps.rev||'');
       var scr=s?document.querySelector('[data-screen="'+s+'"]'):null;
       var h=scr?scr.querySelector('h1,h2,.page-title'):null;
       return ['Atom CRM', nav?nav.textContent.trim().replace(/\s+/g,' '):'', h?h.textContent.trim().replace(/\s+/g,' ').slice(0,60):'', s?'('+s+')':''].filter(Boolean).join(' → ');
     },
     codeHint: function(el){
-      var s=state.currentScreen||''; var m={ 'warehouse':'loadFinishedProductsDashboard / _renderFpRow (app-3.js)', 'contracts':'loadContracts (app-2.js)', 'tasks':'loadTasks (app-2.js)', 'help-training':'loadHelpTraining / TRAINING_COURSES (app-4.js)', 'ideas':'loadIdeas (app-4.js)' };
+      var s=state.currentScreen||'';
+      if(s==='panel-sheets'&&state._ps&&state._ps.dir){ var pg=el&&el.closest?el.closest('.ps-page'):null; return 'atomus/schematics/panels/'+state._ps.dir+'/ — генератор листа'+(pg?' '+pg.dataset.page:'')+' (см. panel.json)'; }
+      var m={ 'warehouse':'loadFinishedProductsDashboard / _renderFpRow (app-3.js)', 'contracts':'loadContracts (app-2.js)', 'tasks':'loadTasks (app-2.js)', 'help-training':'loadHelpTraining / TRAINING_COURSES (app-4.js)', 'ideas':'loadIdeas (app-4.js)' };
       return m[s]||'';
+    },
+    // v2.46.169: метка на листе чертежа — номер листа и координаты в мм (от левого верхнего угла)
+    markExtra: function(m){
+      if((state.currentScreen||'')!=='panel-sheets'||!state._ps) return;
+      var r=m.rect||[0,0,0,0]; var el=KlavaPick.under(r[0]+r[2]/2, r[1]+r[3]/2);
+      var pg=el&&el.closest?el.closest('.ps-page'):null; if(!pg) return;
+      var img=pg.querySelector('img'); if(!img) return;
+      var ir=img.getBoundingClientRect(); var mm=(pg.dataset.mm||'').split('x'); var W=parseFloat(mm[0])||0, H=parseFloat(mm[1])||0;
+      if(!ir.width||!W) return;
+      var x1=(r[0]-ir.left)/ir.width*W, x2=(r[0]+r[2]-ir.left)/ir.width*W, y1=(r[1]-ir.top)/ir.height*H, y2=(r[1]+r[3]-ir.top)/ir.height*H;
+      var f=function(v){return Math.max(0,Math.round(v));};
+      m.label='лист '+pg.dataset.page+(pg.dataset.title?' ('+pg.dataset.title+')':'')+': '+(m.kind==='region'?'область':'место')+' x '+f(x1)+'–'+f(x2)+' мм, y '+f(y1)+'–'+f(y2)+' мм';
+      m.detail='лист '+pg.dataset.page+' формата '+W+'×'+H+' мм · x '+f(x1)+'–'+f(x2)+' · y '+f(y1)+'–'+f(y2)+' (мм от левого верхнего угла, как в atomus_pdf)';
+      m.selector='panel '+(state._ps.designation||'')+' · rev '+(state._ps.rev||'')+' · page '+pg.dataset.page;
+      if(!m.code) m.code='atomus/schematics/panels/'+(state._ps.dir||'?')+'/ — генератор листа '+pg.dataset.page;
     },
     fabStyle: { right:'82px', bottom:'86px' }   // слева от кнопки шторки «Клод» (right 18 / bottom 78, 52px)
   });

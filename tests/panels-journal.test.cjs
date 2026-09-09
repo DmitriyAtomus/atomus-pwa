@@ -64,3 +64,30 @@ test('номер выдаёт сервер, сохранение — PATCH, сб
   assert.doesNotMatch(fn, /nextNum|Math\.max\(.*num/);   // никакого счёта номера в браузере
   assert.match(css, /\.pj-row \{ display: grid/);
 });
+
+// v2.46.169: листы щита и правка метками
+test('листы щита: экран, страницы с размером в мм, метки переводятся в лист и мм', () => {
+  assert.match(html, /data-screen="panel-sheets"/);
+  assert.match(html, /id="ps-pages"/);
+  assert.match(app1, /if \(screenName === 'panel-sheets'\) loadPanelSheets\(\);/);
+  const ps = app4.slice(app4.indexOf('async function loadPanelSheets()'));
+  assert.match(ps, /\/api\/panels\/files\/' \+ rev\.id \+ '\/page\/' \+ n/);
+  assert.match(ps, /X-Page-Size-Mm/);
+  assert.match(ps, /box\.dataset\.mm = mm/);
+  assert.match(ps, /box\.dataset\.page = String\(n\)/);
+  // хук метки в index.html: лист + мм от левого верхнего угла
+  assert.match(html, /markExtra: function\(m\)\{/);
+  assert.match(html, /closest\('\.ps-page'\)/);
+  assert.match(html, /мм от левого верхнего угла, как в atomus_pdf/);
+  assert.match(html, /Журнал щитов → '\+\(state\._ps\.designation/);
+  const mod = fs.readFileSync(path.join(root, 'klava-pick.js'), 'utf8');
+  assert.match(mod, /KP\.openTopic = async function \(tid\)/);
+  assert.match(mod, /KP\.cfg\.markExtra\(m\)/);
+});
+
+test('тема щита и кнопки в карточке', () => {
+  assert.match(app4, /apiPost\('\/api\/panels\/' \+ id \+ '\/topic', \{\}\)/);
+  assert.match(app4, /KlavaPick\.openTopic\(d\.thread_id\)/);
+  assert.match(app4, /Листы и правка/);
+  assert.match(app4, /Обсудить с Клавой/);
+});

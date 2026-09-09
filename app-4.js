@@ -23316,6 +23316,8 @@ async function pjOpen(id) {
     '</div>' +
     '<div class="pj-m-acts">' +
       '<button class="btn btn-primary" onclick="pjSave(' + p.id + ')"><i class="ti ti-device-floppy"></i> Сохранить</button>' +
+      (p.revisions && p.revisions.length ? '<button class="btn btn-secondary" onclick="psOpen(' + p.id + ')"><i class="ti ti-file-search"></i> Листы и правка</button>' : '') +
+      '<button class="btn btn-secondary" onclick="pjTopic(' + p.id + ')"><i class="ti ti-sparkles"></i> Обсудить с Клавой</button>' +
       (p.panel_dir ? '<button class="btn btn-secondary" onclick="pjBuild(\'' + escapeHtml(p.panel_dir) + '\', ' + p.id + ')"><i class="ti ti-player-play"></i> Собрать пакет</button>' : '') +
       ((state._pj.data || {}).is_director && p.revisions && p.revisions.length && p.stage !== 'issued'
         ? '<button class="btn btn-secondary" onclick="pjIssue(' + p.id + ')"><i class="ti ti-rosette-discount-check"></i> Отметить выпущенным</button>' : '') +
@@ -23347,4 +23349,75 @@ async function pjBuild(dir, id) {
   const b = d.build || {};
   showToast(b.ok ? 'Пакет собран, QA чисто — ревизия записана' : 'Собрано с замечаниями: ' + (b.issues || []).join(', '), b.ok ? 'success' : 'error');
   pjOpen(id); loadPanelsJournal();
+}
+
+// ============ v2.46.169: ЛИСТЫ ЩИТА — правка метками ============
+// Страницы последней (или выбранной) ревизии крупно; «Показать Клаве» ставит
+// метки прямо на листе, index.html переводит их в номер листа и мм.
+async function pjTopic(id) {
+  if (!id) return;
+  const r = await apiPost('/api/panels/' + id + '/topic', {});
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не удалось открыть тему', 'error'); return; }
+  const m = document.getElementById('pj-modal'); if (m) m.classList.remove('visible');
+  if (window.KlavaPick) KlavaPick.openTopic(d.thread_id);
+}
+
+function psOpen(id, rev) {
+  state._ps = { id: id, rev: rev || null };
+  const m = document.getElementById('pj-modal'); if (m) m.classList.remove('visible');
+  selectSidebarItem('panel-sheets');
+}
+
+async function loadPanelSheets() {
+  const host = document.getElementById('ps-pages');
+  if (!host || !state._ps || !state._ps.id) { if (host) host.innerHTML = '<div class="empty-block">Откройте щит из журнала</div>'; return; }
+  host.innerHTML = '<div class="loading-block">Загружаем листы…</div>';
+  let d; try { d = await apiGet('/api/panels/' + state._ps.id); } catch (e) { d = null; }
+  if (!d || !d.ok) { host.innerHTML = '<div class="empty-block">Щит не найден</div>'; return; }
+  const p = d.panel;
+  const revs = (p.revisions || []).filter(function (r) { return r.url; });
+  state._ps.designation = p.designation; state._ps.dir = p.panel_dir || '';
+  document.getElementById('ps-title').textContent = p.designation + ' · ' + (p.title || '');
+  document.getElementById('ps-h2').textContent = p.designation;
+  const bb = document.getElementById('ps-build'); if (bb) bb.style.display = p.panel_dir ? '' : 'none';
+  const sel = document.getElementById('ps-rev');
+  if (!revs.length) { sel.innerHTML = '<option>нет ревизий</option>'; host.innerHTML = '<div class="empty-block"><i class="ti ti-file-off"></i>Пакета ещё нет — нажмите «Собрать пакет»</div>'; return; }
+  if (!state._ps.rev || !revs.some(function (r) { return r.rev === state._ps.rev; })) state._ps.rev = revs[0].rev;
+  sel.innerHTML = revs.map(function (r) {
+    return '<option value="' + r.rev + '"' + (r.rev === state._ps.rev ? ' selected' : '') + '>рев. ' + r.rev + ' · ' + escapeHtml(_ideasWhen(r.created_at)) +
+      (r.qa_ok === null || r.qa_ok === undefined ? '' : (r.qa_ok ? ' · QA чисто' : ' · QA замечания')) + '</option>';
+  }).join('');
+  const rev = revs.find(function (r) { return r.rev === state._ps.rev; });
+  const pages = rev.pages || 0;
+  host.innerHTML = '';
+  const token = localStorage.getItem(TOKEN_KEY);
+  for (let n = 1; n <= Math.max(pages, 1) && n <= 20; n++) {
+    const box = document.createElement('div');
+    box.className = 'ps-page'; box.dataset.page = String(n);
+    box.innerHTML = '<div class="ps-page-h">Лист ' + n + ' <span class="ps-page-mm"></span></div><div class="ps-page-body"><div class="loading-block">рисую…</div></div>';
+    host.appendChild(box);
+    try {
+      const r = await fetch(API_BASE + '/api/panels/files/' + rev.id + '/page/' + n, { headers: { 'Authorization': 'Bearer ' + token } });
+      if (!r.ok) { if (n === 1) box.querySelector('.ps-page-body').textContent = 'Лист не отрисовался (' + r.status + ')'; else box.remove(); if (n > 1) break; continue; }
+      const mm = r.headers.get('X-Page-Size-Mm') || '';
+      box.dataset.mm = mm;
+      box.querySelector('.ps-page-mm').textContent = mm ? mm.replace('x', '×') + ' мм' : '';
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(await r.blob()); img.alt = 'Лист ' + n;
+      img.onclick = function () { window.open(img.src, '_blank'); };
+      box.querySelector('.ps-page-body').innerHTML = ''; box.querySelector('.ps-page-body').appendChild(img);
+    } catch (e) { box.querySelector('.ps-page-body').textContent = 'Ошибка связи'; break; }
+  }
+}
+
+async function psBuild() {
+  if (!state._ps || !state._ps.dir) return;
+  showToast('Собираю пакет на сервере…', 'info');
+  const r = await apiPost('/api/schematics/panels/' + encodeURIComponent(state._ps.dir) + '/build', {});
+  const d = (r && r.data) || {};
+  if (!r.ok || !d.ok) { showToast(d.message || 'Не собралось', 'error'); return; }
+  const b = d.build || {};
+  showToast(b.ok ? 'Собрано, QA чисто — новая ревизия' : 'Собрано с замечаниями: ' + (b.issues || []).join(', '), b.ok ? 'success' : 'error');
+  state._ps.rev = null; loadPanelSheets();
 }

@@ -401,8 +401,18 @@
              text, selector: chain.join(' ← '), code };
   };
 
+  // v2.46.169: страница может дополнить метку (лист чертежа, координаты в мм)
+  KP.under = function (x, y) { return KP._under(x, y); };
+  KP.openTopic = async function (tid) {
+    KP.tid = tid ? parseInt(tid, 10) : null;
+    KP._remember();
+    await KP.show();
+  };
   KP.add = function (m) {
     m.n = ++KP.seq;
+    if (KP.cfg && typeof KP.cfg.markExtra === 'function') {
+      try { KP.cfg.markExtra(m); } catch (e) {}
+    }
     KP.marks.push(m);
     if (KP.marks.length > 8) KP.marks.shift();
     KP.layout(); KP._renderCtx();
