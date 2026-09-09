@@ -43,7 +43,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.176";
+const APP_VERSION = "v2.46.177";
 const APP_VERSION_DATE = "09.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2821,6 +2821,21 @@ function _devChatArtifactBridge(token, kpSrc) {
       if (doc.body) doc.body.classList.toggle('atomus-ve-picking', enabled);
     }
 
+    // v2.46.177: у оболочки предпросмотра бывает свой «Выделить область» /
+    // «Указать блок» с копированием описания в буфер — при наших метках он
+    // только путает, прячем
+    function hideOwnPicker(doc) {
+      try {
+        Array.from(doc.querySelectorAll('button, a, [role="button"]')).forEach(function (el) {
+          const t = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+          if (/^(выделить область|указать блок|отменить выделение|снять выделение)$/.test(t)) {
+            el.style.display = 'none';
+            el.setAttribute('data-atomus-hidden-picker', '1');
+          }
+        });
+      } catch (e) { /* чужой документ */ }
+    }
+
     function isLeaf() {
       // оболочка многостраничного предпросмотра держит страницу во вложенном
       // srcdoc-iframe — метки ставятся в ней, оболочка только ретранслирует
@@ -2859,10 +2874,12 @@ function _devChatArtifactBridge(token, kpSrc) {
     });
     attach(document);
     if (isLeaf()) ensureKlava();
+    if (klavaSrc) hideOwnPicker(document);
     // Внутренние srcdoc-страницы могут появиться после запуска оболочки.
     let scans = 0;
     const timer = setInterval(function () {
       attach(document);
+      if (klavaSrc) hideOwnPicker(document);
       Array.from(document.querySelectorAll('iframe')).forEach(function (frame) {
         prepareFrame(frame);
       });
