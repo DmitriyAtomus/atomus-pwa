@@ -18795,6 +18795,24 @@
 .pj-meta { font-size: 11.5px; color: var(--text-light); }
 .pj-revs { font-size: 11.5px; color: var(--text-light); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .pj-modal-content { max-width: 760px; }
+.pj-hero { background: #F5F7FA; border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
+.pj-hero-t { font-weight: 800; font-size: 15px; color: var(--text-dark); }
+.pj-hero-m { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 11.5px; color: var(--text-light); margin-top: 6px; }
+.pj-warn { color: #B45309; font-weight: 700; }
+.pj-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.pj-step { display: flex; gap: 8px; border: 1px solid var(--border); border-radius: 12px; padding: 10px; background: #fff; }
+.pj-step.done { border-color: #A7F3D0; background: #F0FDF4; }
+.pj-step.off { opacity: .55; }
+.pj-step-n { flex: none; width: 24px; height: 24px; border-radius: 50%; background: #2D5F8B; color: #fff; font-weight: 800; font-size: 12px; display: grid; place-items: center; }
+.pj-step.done .pj-step-n { background: #059669; }
+.pj-step-b { display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; color: var(--text-light); min-width: 0; }
+.pj-step-b b { font-size: 13px; color: var(--text-dark); }
+.pj-step-b .btn { align-self: flex-start; margin-top: 2px; }
+.pj-req { border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; margin-bottom: 12px; }
+.pj-req summary { cursor: pointer; font-weight: 700; font-size: 12.5px; color: var(--text-dark); display: flex; align-items: center; gap: 6px; }
+.pj-req[open] summary { margin-bottom: 8px; }
+.pj-m-grid label { color: #4B5563; }
+@media (max-width: 700px) { .pj-steps { grid-template-columns: 1fr; } }
 .pj-m-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .pj-m-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; font-weight: 700; color: var(--text-light); }
 .pj-m-grid .pj-wide { grid-column: 1 / -1; }

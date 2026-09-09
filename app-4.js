@@ -23281,7 +23281,7 @@ async function pjOpen(id) {
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.className = 'modal-overlay'; overlay.id = 'pj-modal';
-    overlay.innerHTML = '<div class="modal-content pj-modal-content"><div class="modal-header"><h3 id="pj-m-title">Щит</h3>' +
+    overlay.innerHTML = '<div class="modal pj-modal-content" onclick="event.stopPropagation()"><div class="modal-header"><h3 id="pj-m-title">Щит</h3>' +
       '<button class="icon-btn" onclick="document.getElementById(\'pj-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div>' +
       '<div class="modal-body" id="pj-m-body"></div></div>';
     document.body.appendChild(overlay);
@@ -23306,7 +23306,36 @@ async function pjOpen(id) {
       (r.url ? ' <a class="btn btn-secondary btn-small" href="' + escapeHtml(API_BASE + r.url) + '" target="_blank"><i class="ti ti-file-type-pdf"></i> PDF</a>' : '') +
       '</div>';
   }).join('') || '<div class="pj-empty">Ревизий ещё нет' + (p.panel_dir ? ' — соберите пакет в Атом Электрике, сборка ляжет сюда сама' : '') + '</div>';
+  const hasRevs = !!(p.revisions && p.revisions.length);
+  const isDir = !!((state._pj.data || {}).is_director);
   body.innerHTML =
+    // шапка: что это за щит
+    '<div class="pj-hero">' +
+      '<div class="pj-hero-t">' + escapeHtml(p.title || 'Без названия') + '</div>' +
+      '<div class="pj-hero-m">' +
+        '<span class="ich-chip ' + (PJ_STAGE_CLS[p.stage] || 'is-open') + '">' + escapeHtml(p.stage_label || p.stage) + '</span>' +
+        (p.object ? '<span>объект: ' + escapeHtml(p.object) + '</span>' : '') +
+        (p.panel_dir ? '<span>⚙ генераторы: ' + escapeHtml(p.panel_dir) + '</span>' : '<span class="pj-warn">генераторов пакета нет</span>') +
+        '<span>' + escapeHtml((p.author_name ? p.author_name + ' · ' : '') + _ideasWhen(p.created_at)) + '</span>' +
+      '</div>' +
+    '</div>' +
+    // три шага — по порядку, крупно
+    '<div class="pj-steps">' +
+      '<div class="pj-step' + (hasRevs ? ' done' : '') + '"><div class="pj-step-n">1</div><div class="pj-step-b">' +
+        '<b>Собрать пакет</b><div>' + (p.panel_dir ? 'Сервер соберёт все листы из генераторов и положит сюда ревизией' : 'Сначала нужны генераторы: обсудите щит с Клавой — она подскажет, с чего начать') + '</div>' +
+        (p.panel_dir ? '<button class="btn btn-primary btn-small" onclick="pjBuild(\'' + escapeHtml(p.panel_dir) + '\', ' + p.id + ')"><i class="ti ti-player-play"></i> Собрать пакет</button>' : '') +
+      '</div></div>' +
+      '<div class="pj-step' + (hasRevs ? '' : ' off') + '"><div class="pj-step-n">2</div><div class="pj-step-b">' +
+        '<b>Открыть листы</b><div>' + (hasRevs ? 'Листы крупно, на них можно ставить метки «Показать Клаве»' : 'Появится после первой сборки') + '</div>' +
+        '<button class="btn btn-primary btn-small" ' + (hasRevs ? '' : 'disabled ') + 'onclick="psOpen(' + p.id + ')"><i class="ti ti-file-search"></i> Открыть листы</button>' +
+      '</div></div>' +
+      '<div class="pj-step"><div class="pj-step-n">3</div><div class="pj-step-b">' +
+        '<b>Обсудить с Клавой</b><div>Тема этого щита: метки с листов, список правок, ТЗ' + (isDir ? ', «Внедрить»' : '') + '</div>' +
+        '<button class="btn btn-secondary btn-small" onclick="pjTopic(' + p.id + ')"><i class="ti ti-sparkles"></i> Открыть тему</button>' +
+      '</div></div>' +
+    '</div>' +
+    // реквизиты — свёрнуты, чтобы не мешали
+    '<details class="pj-req"><summary><i class="ti ti-pencil"></i> Реквизиты и заметки</summary>' +
     '<div class="pj-m-grid">' +
       '<label>Наименование<input class="form-input" id="pj-f-title" value="' + escapeHtml(p.title || '') + '"></label>' +
       '<label>Объект / заказчик<input class="form-input" id="pj-f-object" value="' + escapeHtml(p.object || '') + '"></label>' +
@@ -23315,14 +23344,10 @@ async function pjOpen(id) {
       '<label class="pj-wide">Заметки (Клава их читает)<textarea class="form-input" id="pj-f-notes" rows="3">' + escapeHtml(p.notes || '') + '</textarea></label>' +
     '</div>' +
     '<div class="pj-m-acts">' +
-      '<button class="btn btn-primary" onclick="pjSave(' + p.id + ')"><i class="ti ti-device-floppy"></i> Сохранить</button>' +
-      (p.revisions && p.revisions.length ? '<button class="btn btn-secondary" onclick="psOpen(' + p.id + ')"><i class="ti ti-file-search"></i> Листы и правка</button>' : '') +
-      '<button class="btn btn-secondary" onclick="pjTopic(' + p.id + ')"><i class="ti ti-sparkles"></i> Обсудить с Клавой</button>' +
-      (p.panel_dir ? '<button class="btn btn-secondary" onclick="pjBuild(\'' + escapeHtml(p.panel_dir) + '\', ' + p.id + ')"><i class="ti ti-player-play"></i> Собрать пакет</button>' : '') +
-      ((state._pj.data || {}).is_director && p.revisions && p.revisions.length && p.stage !== 'issued'
-        ? '<button class="btn btn-secondary" onclick="pjIssue(' + p.id + ')"><i class="ti ti-rosette-discount-check"></i> Отметить выпущенным</button>' : '') +
-      '<span class="pj-meta">' + escapeHtml((p.author_name ? p.author_name + ' · ' : '') + _ideasWhen(p.created_at)) + '</span>' +
-    '</div>' +
+      '<button class="btn btn-primary btn-small" onclick="pjSave(' + p.id + ')"><i class="ti ti-device-floppy"></i> Сохранить</button>' +
+      (isDir && hasRevs && p.stage !== 'issued'
+        ? '<button class="btn btn-secondary btn-small" onclick="pjIssue(' + p.id + ')"><i class="ti ti-rosette-discount-check"></i> Отметить выпущенным</button>' : '') +
+    '</div></details>' +
     '<div class="pj-m-revs"><div class="pj-m-h">Ревизии пакета</div>' + revs + '</div>';
 }
 

@@ -88,6 +88,7 @@ test('листы щита: экран, страницы с размером в �
 test('тема щита и кнопки в карточке', () => {
   assert.match(app4, /apiPost\('\/api\/panels\/' \+ id \+ '\/topic', \{\}\)/);
   assert.match(app4, /KlavaPick\.openTopic\(d\.thread_id\)/);
-  assert.match(app4, /Листы и правка/);
+  assert.match(app4, /Открыть листы/);
+  assert.match(app4, /pj-step-n">1</);
   assert.match(app4, /Обсудить с Клавой/);
 });
