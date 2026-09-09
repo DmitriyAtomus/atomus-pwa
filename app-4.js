@@ -2404,6 +2404,21 @@ function _ideaSendProgress(pct) {
   btn.textContent = pct + '%';
 }
 
+// v2.46.178: ответ Клавы приходит опросом темы (каждые 3 с, до 15 минут)
+async function _ideaWaitReply(tid, msgId, ph) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < 15 * 60 * 1000) {
+    await new Promise(function (res) { setTimeout(res, 3000); });
+    if (ph) ph.textContent = 'Клава думает… ' + Math.round((Date.now() - t0) / 1000) + ' с';
+    let d; try { d = await apiGet('/api/ideas/' + tid); } catch (e) { continue; }
+    const th = (d && d.thread) || {};
+    const after = (th.messages || []).filter(function (m) { return m.role === 'assistant' && m.id > msgId; });
+    if (after.length) { state._ideas.thread = th; return after[after.length - 1].text; }
+    if (!th.pending) return 'Ответ не дошёл (сервер перезапустился). Напишите ещё раз.';
+  }
+  return 'Клава думает слишком долго — откройте тему чуть позже.';
+}
+
 async function ideaSend() {
   const inp = document.getElementById('idea-input');
   if (!inp) return;
@@ -2429,16 +2444,18 @@ async function ideaSend() {
     if (picked.length) {
       const form = new FormData();
       form.append('text', text);
+      if (!isNew) form.append('async', '1');   // v2.46.178: долгий ответ — опросом, не держим запрос
       picked.forEach(function (f, i) { form.append('file_' + (i + 1), f, f.name); });
       _ideaSendProgress(0);
       r = await _ideaUpload(url, form, _ideaSendProgress);
       _ideaSendProgress(null);
     } else {
-      r = await apiPost(url, { text });
+      r = await apiPost(url, isNew ? { text } : { text, async: true });
     }
     d = (r && r.data) || {};
     if (!r.ok) { if (ph) ph.textContent = d.message || 'Не отправилось'; return; }
     if (isNew && d.thread_id) state._ideas.current = d.thread_id;
+    if (d.pending) d.reply = await _ideaWaitReply(state._ideas.current, d.msg_id, ph);
     if (ph) ph.innerHTML = _ideaFormat(d.reply || 'Принял.');
     _ideasScroll();
     const th = state._ideas.thread || {};

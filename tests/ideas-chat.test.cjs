@@ -226,7 +226,7 @@ test('отправка с файлами идёт multipart с прогресс�
   assert.match(fn, /new FormData\(\)/);
   assert.match(fn, /form\.append\('file_' \+ \(i \+ 1\), f, f\.name\)/);
   assert.match(fn, /_ideaUpload\(url, form, _ideaSendProgress\)/);
-  assert.match(fn, /apiPost\(url, \{ text \}\)/);
+  assert.match(fn, /apiPost\(url, isNew \? \{ text \} : \{ text, async: true \}\)/);   // v2.46.178: ответ опросом
   // XHR нужен ради процентов: fetch их не отдаёт
   assert.match(app4, /xhr\.upload\.onprogress/);
 });

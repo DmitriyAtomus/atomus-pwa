@@ -118,3 +118,15 @@ test('в режиме меток колесо крутит прокрутку п
   assert.match(mod, /else if \(m\.anchor && m\.anchor\.isConnected && m\.anchorFr\)/);
   assert.match(mod, /id="kp-done">✓ Готово/);
 });
+
+// v2.46.178: ответ Клавы опросом
+test('панель шлёт async и ждёт ответ опросом темы', () => {
+  assert.match(mod, /fd\.append\('async', '1'\)/);
+  assert.match(mod, /KP\._waitReply = async function \(tid, msgId, ph\)/);
+  assert.match(mod, /m\.role === 'assistant' && m\.id > msgId/);
+  assert.match(mod, /if \(!th\.pending\)/);
+  assert.match(mod, /if \(r\.data\.pending\) reply = await KP\._waitReply/);
+  assert.match(app4, /async function _ideaWaitReply\(tid, msgId, ph\)/);
+  assert.match(app4, /form\.append\('async', '1'\)/);
+  assert.match(app4, /\{ text, async: true \}/);
+});

@@ -622,6 +622,27 @@
   };
 
   // ---------- отправка ----------
+  // ждём ответ Клавы опросом темы: каждые 3 с, до 15 минут
+  KP._waitReply = async function (tid, msgId, ph) {
+    const t0 = Date.now();
+    const phrases = ['Смотрю метки и код…', 'Читаю генератор листа…', 'Сверяю с правилами…', 'Думаю над ответом…'];
+    let i = 0;
+    while (Date.now() - t0 < 15 * 60 * 1000) {
+      await new Promise(res => setTimeout(res, 3000));
+      if (ph) { ph.innerHTML = '<div class="who">Клава</div>' + esc(phrases[i++ % phrases.length]) + ' <span class="kp-hint">' + Math.round((Date.now() - t0) / 1000) + ' с</span>'; }
+      let r; try { r = await KP._api('/api/ideas/' + tid); } catch (e) { continue; }
+      if (!r.ok) continue;
+      const th = r.data.thread || {};
+      const after = (th.messages || []).filter(m => m.role === 'assistant' && m.id > msgId);
+      if (after.length) { KP.feedThread = th; KP._renderActs(); return after[after.length - 1].text; }
+      if (!th.pending) {
+        // сервер перезапустился, ответ потерялся — не висим вечно
+        return 'Ответ не дошёл (сервер перезапустился). Напишите ещё раз.';
+      }
+    }
+    return 'Клава думает слишком долго — обновите тему чуть позже.';
+  };
+
   KP.send = async function () {
     if (KP.busy) return;
     const text = (KP.els.in.value || '').trim();
@@ -640,12 +661,15 @@
       const fd = new FormData();
       fd.append('text', text || 'Смотри метки на экране.');
       fd.append('context', JSON.stringify(ctx));
+      if (KP.tid) fd.append('async', '1');   // v2.46.178: ответ приходит опросом — прокси не оборвёт долгий ответ
       if (shot) fd.append('file_1', shot, shot.name);
       const url = KP.tid ? '/api/ideas/' + KP.tid + '/message' : '/api/ideas';
       const r = await KP._api(url, { method: 'POST', body: fd });
       if (!r.ok) { ph.innerHTML = '<div class="who">Клава</div>' + esc(r.data.message || ('Не отправилось (' + r.status + ')')); return; }
       if (!KP.tid && r.data.thread_id) { KP.tid = r.data.thread_id; await KP._loadThreads(); }
-      ph.innerHTML = '<div class="who">Клава</div>' + esc(r.data.reply || 'Приняла.');
+      let reply = r.data.reply;
+      if (r.data.pending) reply = await KP._waitReply(KP.tid, r.data.msg_id, ph);
+      ph.innerHTML = '<div class="who">Клава</div>' + esc(reply || 'Приняла.');
       KP.els.feed.scrollTop = KP.els.feed.scrollHeight;
       KP.clear();
       KP.els.note.textContent = KP.tid ? 'Отправлено в тему.' : '';
