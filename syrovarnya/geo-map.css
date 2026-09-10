@@ -1,0 +1,59 @@
+/* География проектов Atomus Group — живая карта. Подключается вместе с geo-map.js.
+   Цвета берутся из переменных сайта (--black, --panel, --gold, --cyan, --tx, --tx-mute, --line),
+   fallback — палитра сайта, поэтому виджет работает и на чужой странице. */
+.gm{--gm-ground:var(--black,#071A2F);--gm-ground-2:var(--panel,#0E2A45);--gm-land:#123659;--gm-land-edge:#2d6f9c;--gm-nb:#0b2340;--gm-nb-edge:#15385b;
+    --gm-ink:var(--tx,#EAF3FA);--gm-ink-2:var(--tx-mute,#9DB6CC);--gm-ink-3:var(--tx-dim,#6A859E);--gm-gold:var(--gold,#FFC400);--gm-gold-2:#FFE27A;--gm-cyan:var(--cyan,#17B6DA);
+    --gm-line:var(--line,rgba(255,255,255,.09));--gm-font:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    position:relative;z-index:1;display:grid;grid-template-columns:1fr 280px;gap:18px;align-items:stretch;font-family:var(--gm-font);color:var(--gm-ink)}
+.gm *{box-sizing:border-box}
+.gm-mapbox{position:relative;background:radial-gradient(120% 90% at 50% 40%,#0f2f4f 0%,var(--gm-ground-2) 55%,var(--gm-ground) 100%);border:1px solid var(--gm-line);border-radius:14px;overflow:hidden;min-height:520px}
+.gm-mapbox::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,#1a416a 1px,transparent 1.4px);background-size:22px 22px;opacity:.5;pointer-events:none}
+.gm-scroll{position:absolute;inset:0;overflow:hidden}
+.gm-map{width:100%;height:100%;display:block;position:relative}
+.gm-nb{fill:var(--gm-nb);stroke:var(--gm-nb-edge);stroke-width:.7;stroke-linejoin:round}
+.gm-land{fill:var(--gm-land);stroke:var(--gm-land-edge);stroke-width:.9;stroke-linejoin:round;filter:url(#gm-landglow)}
+.gm-arc{fill:none;stroke:var(--gm-gold);stroke-opacity:.28;stroke-width:1}
+.gm-arc.off{stroke-opacity:.04}
+.gm-runner{fill:var(--gm-gold-2);opacity:.9}
+.gm-runner.off{opacity:0}
+.gm-home-core{fill:var(--gm-gold-2)} .gm-home-ring{fill:none;stroke:var(--gm-gold);stroke-width:1.2}
+.gm-pt{cursor:pointer;transition:opacity .35s}
+.gm-pt.off{opacity:.12;pointer-events:none}
+.gm-pt circle.gm-halo{fill:none;stroke-width:1;opacity:.55}
+.gm-pt circle.gm-core{stroke:#071A2F;stroke-width:1.5}
+.gm-pt.active circle.gm-halo{opacity:1;stroke-width:2}
+.gm-pt:focus{outline:none} .gm-pt:focus-visible circle.gm-halo{opacity:1;stroke:#fff}
+.gm-pt text{font-family:var(--gm-font);font-size:11px;font-weight:600;fill:#cfe3f5;letter-spacing:.02em;paint-order:stroke;stroke:#071A2F;stroke-width:3px;stroke-linejoin:round;pointer-events:none}
+.gm-home-label{font-family:var(--gm-font);font-size:11.5px;font-weight:800;fill:var(--gm-gold);letter-spacing:.1em;paint-order:stroke;stroke:#071A2F;stroke-width:3px}
+.gm-regionlbl{font-family:var(--gm-font);font-size:9.5px;font-weight:700;fill:var(--gm-ink-3);letter-spacing:.22em;text-transform:uppercase}
+.gm-card{position:absolute;pointer-events:none;background:rgba(10,33,56,.94);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:10px 12px;min-width:210px;max-width:260px;box-shadow:0 12px 30px rgba(0,0,0,.5);transform:translate(-50%,-115%);opacity:0;transition:opacity .25s;z-index:2}
+.gm-card.on{opacity:1}
+.gm-card .t{font-size:13px;font-weight:800;line-height:1.25;color:#fff}
+.gm-card .k{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-top:4px}
+.gm-card .d{color:var(--gm-ink-2);font-size:12.5px;margin-top:6px;line-height:1.4}
+.gm-card .d b{color:var(--gm-ink)}
+.gm-rail{display:flex;flex-direction:column;gap:14px;min-width:0}
+.gm-far{border-top:1px solid var(--gm-line);padding-top:10px}
+.gm-far .n{font-weight:800;font-size:30px;line-height:1;color:var(--gm-gold);font-variant-numeric:tabular-nums}
+.gm-far .l{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gm-ink-3);margin-top:6px}
+.gm-filters{display:flex;flex-wrap:wrap;gap:8px}
+.gm-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--gm-line);background:transparent;color:var(--gm-ink);border-radius:999px;padding:7px 12px;font:600 12.5px var(--gm-font);cursor:pointer;transition:.2s}
+.gm-chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.gm-chip span{color:var(--gm-ink-3)}
+.gm-chip:hover{border-color:var(--gm-gold)}
+.gm-chip[aria-pressed="false"]{opacity:.45}
+.gm-chip:focus-visible{outline:2px solid var(--gm-gold);outline-offset:2px}
+.gm-list{border-top:1px solid var(--gm-line);padding-top:10px;display:flex;flex-direction:column;gap:4px;max-height:300px;overflow:auto;scrollbar-width:thin}
+.gm-row{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center;font-size:13px;padding:5px 6px;border-radius:6px;cursor:pointer;background:none;border:0;color:inherit;text-align:left;font-family:inherit;width:100%}
+.gm-row:hover,.gm-row.active{background:rgba(255,255,255,.06)}
+.gm-row i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.gm-row .c{color:var(--gm-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .gm-row .y{font-size:11px;color:var(--gm-ink-3);white-space:nowrap}
+.gm-note{font-size:12px;color:var(--gm-ink-3);line-height:1.4}
+.gm-foot{grid-column:1/-1;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--gm-ink-3);font-size:12px}
+.gm-foot b{color:var(--gm-ink-2);font-weight:700}
+@media (max-width:900px){.gm{grid-template-columns:1fr}.gm-mapbox{min-height:380px;height:62vw}.gm-list{max-height:220px}}
+@media (max-width:640px){.gm-mapbox{height:auto;min-height:0;display:flex;flex-direction:column}.gm-scroll{position:relative;height:340px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}.gm-scroll::-webkit-scrollbar{display:none}.gm-map{width:820px;max-width:none;height:100%}
+  .gm-card{position:relative;left:auto!important;top:auto!important;transform:none!important;opacity:1;max-width:none;min-height:96px;border-radius:0;border-width:1px 0 0;box-shadow:none;background:rgba(7,26,47,.6)}
+  .gm-hint{position:absolute;right:10px;top:8px;font-size:11px;color:var(--gm-ink-3);pointer-events:none;background:rgba(7,26,47,.6);padding:3px 8px;border-radius:999px}}
+@media (min-width:641px){.gm-hint{display:none}}
+@media (prefers-reduced-motion:reduce){.gm-runner{display:none}.gm-home-ring animate{display:none}}
