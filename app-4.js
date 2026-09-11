@@ -7003,7 +7003,9 @@ async function showPublicContract(token, itemId) {
   }
 }
 
-// v2.45.208: карточка конкретного изделия (QR позиции спецификации)
+// v2.46.194: QR наклеен на одну физическую единицу; количество по договору
+// и фактический резерв показываем отдельно, чтобы скан не выглядел как QR
+// сразу двух изделий.
 function renderPublicItemCard(it, c, token) {
   let rows = '';
   const addRow = (label, value) => {
@@ -7013,7 +7015,13 @@ function renderPublicItemCard(it, c, token) {
   };
   if (it.type) addRow('Вид', '<b>' + escapeHtml(it.type) + '</b>');
   if (it.article) addRow('Артикул', escapeHtml(it.article));
-  addRow('Количество', escapeHtml(String(it.qty || 0)) + ' ' + escapeHtml(it.unit || 'шт.'));
+  const unit = escapeHtml(it.unit || 'шт.');
+  addRow('Это изделие', '1 ' + unit);
+  addRow('По договору', escapeHtml(String(it.qty || 0)) + ' ' + unit);
+  const qtyReserved = Number(it.qty_reserved || 0);
+  if (qtyReserved > 0) {
+    addRow('В резерве под объект', escapeHtml(String(qtyReserved)) + ' ' + unit);
+  }
   if (it.execution_type === 'stainless') addRow('Исполнение', 'Нержавейка');
   else if (it.execution_type === 'standard') addRow('Исполнение', 'Обычное');
   if (it.ip_rating) addRow('Влагозащита', escapeHtml(it.ip_rating));
@@ -7028,10 +7036,15 @@ function renderPublicItemCard(it, c, token) {
   }
   addRow('Договор', escapeHtml(c.number || '') + (c.contractor_name ? ' · ' + escapeHtml(c.contractor_name) : ''));
 
+  const contractNumber = String(c.number || '')
+    .replace(/^Договор\s*№?\s*/i, '')
+    .replace(/^[№#]\s*/, '')
+    .trim();
   return '<div class="public-header">' +
     '<div class="public-brand">Atom <span class="brand-name-accent">CRM</span></div>' +
     '<h1 class="public-header-title">' + escapeHtml(it.name || 'Позиция') + '</h1>' +
-    '<div class="public-header-sub"><i class="ti ti-qrcode"></i> Изделие по договору № ' + escapeHtml((c.number || '').replace(/^№#\s*/, '')) + '</div>' +
+    '<div class="public-header-sub"><i class="ti ti-qrcode"></i> QR-код изделия' +
+      (contractNumber ? ' · Договор № ' + escapeHtml(contractNumber) : '') + '</div>' +
   '</div>' +
   '<div class="public-body" style="padding: 18px;">' + rows +
     '<div style="margin-top:14px;"><a href="/c/' + encodeURIComponent(token) + '" style="color:var(--brand);font-size:13px;"><i class="ti ti-arrow-right"></i> Весь договор</a></div>' +
