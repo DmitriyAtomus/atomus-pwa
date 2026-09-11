@@ -182,7 +182,7 @@ footer b{color:var(--dim)}
   display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.65)}
 .ctabs{display:flex;gap:4px;padding:12px 16px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .ctab{padding:9px 16px;border-radius:10px 10px 0 0;font-size:13px;color:var(--dim);
-  cursor:pointer;border:1px solid transparent;border-bottom:none;white-space:nowrap;
+  cursor:pointer;border:1px solid transparent;border-bottom:none;white-space:nowrap;flex:0 0 auto;
   transition:.12s}
 .ctab:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .ctab.on{color:#8FD3F4;background:rgba(27,159,216,.13);border-color:var(--line2);
@@ -587,7 +587,7 @@ body.only-mode #calc, body.only-mode #pick { display: none !important; }
   <div class="ctabs" id="cTabs">
     <div class="ctab on" data-t="q">Холодильная мощность</div>
     <div class="ctab" data-t="flow">Расход через испаритель</div>
-    <div class="ctab" data-t="comp">Компрессор</div>
+    <div class="ctab" data-t="comp">Требуемый объём компрессора</div>
     <div class="ctab" data-t="pipe">Диаметры труб</div>
     <div class="ctab" data-t="pump">Насос</div>
   </div>
