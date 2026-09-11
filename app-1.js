@@ -109,7 +109,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.206";
+const APP_VERSION = "v2.46.207";
 const APP_VERSION_DATE = "11.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -5796,6 +5796,130 @@ function devChatToggleFull() {
 function devChatExitFull() {
   document.body.classList.remove('dchat-fullscreen');
 }
+
+// v2.46.207: жёлтый кругляшок — быстрый выбор личного чата на телефоне.
+// Короткий тап открывает список, долгое нажатие переносит кнопку.
+let _devChatFabDrag = null;
+let _devChatFabSkipClick = false;
+function _devChatFabMobile() {
+  return window.matchMedia ? window.matchMedia('(max-width: 760px)').matches : window.innerWidth <= 760;
+}
+function devChatFabClick(e) {
+  if (_devChatFabSkipClick) { if (e) e.preventDefault(); return; }
+  if (_devChatFabMobile()) devChatFabPickerOpen();
+  else devChatToggleDrawer();
+}
+function devChatFabPickerClose() {
+  const picker = document.getElementById('devchat-fab-picker');
+  if (picker) { picker.classList.remove('show'); picker.setAttribute('aria-hidden', 'true'); }
+  document.body.classList.remove('dchat-fab-picker-open');
+}
+function _devChatFabPickerRender() {
+  const box = document.getElementById('devchat-fab-picker-list');
+  if (!box) return;
+  if (!_devChatThreads.length) {
+    box.innerHTML = '<div class="dchat-fab-empty"><i class="ti ti-message-off"></i><br>Чатов пока нет</div>';
+    return;
+  }
+  box.innerHTML = _devChatThreads.map(function (t) {
+    const project = t.project_id ? _devChatProject(t.project_id) : null;
+    const active = t.id === _devChatThreadId ? ' active' : '';
+    const meta = [t.busy ? 'Клава работает' : '', project ? project.name : '', t.preview || 'пока пусто'].filter(Boolean).join(' · ');
+    return '<button type="button" class="dchat-fab-chat' + active + '" onclick="devChatFabChoose(' + t.id + ')">' +
+      '<span class="ico"><i class="ti ti-' + (t.busy ? 'loader-2' : 'message') + '"></i></span>' +
+      '<span class="txt"><b>' + escapeHtml(t.title || 'Без названия') + '</b><small>' + escapeHtml(meta) + '</small></span>' +
+      '<span class="ok">✓</span></button>';
+  }).join('');
+}
+async function devChatFabPickerOpen() {
+  _devChatUseAgent('claude');
+  const picker = document.getElementById('devchat-fab-picker');
+  const box = document.getElementById('devchat-fab-picker-list');
+  if (!picker || !box) return;
+  picker.classList.add('show'); picker.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('dchat-fab-picker-open');
+  box.innerHTML = '<div class="dchat-fab-empty"><span class="spinner"></span><br>Загружаю чаты…</div>';
+  await devChatLoadThreads(true);
+  _devChatFabPickerRender();
+}
+function devChatFabChoose(id) {
+  id = Number(id || 0); if (!id) return;
+  _devChatThreadId = id;
+  try { localStorage.setItem(_devChatStorageKey(), String(id)); } catch (e) {}
+  devChatFabPickerClose();
+  const drawer = document.getElementById('devchat-drawer');
+  if (drawer && drawer.style.display === 'flex') devChatOpenThread(id);
+  else devChatToggleDrawer();
+}
+function _devChatFabPlace(left, top) {
+  const fab = document.getElementById('devchat-fab');
+  if (!fab || !fab.style || !fab.style.setProperty) return;
+  const r = fab.getBoundingClientRect();
+  const w = r.width || 46, h = r.height || 46, pad = 8;
+  left = Math.max(pad, Math.min(window.innerWidth - w - pad, left));
+  top = Math.max(pad, Math.min(window.innerHeight - h - pad, top));
+  fab.style.setProperty('--dchat-fab-left', Math.round(left) + 'px');
+  fab.style.setProperty('--dchat-fab-top', Math.round(top) + 'px');
+  fab.style.setProperty('--dchat-fab-right', 'auto');
+  fab.style.setProperty('--dchat-fab-bottom', 'auto');
+}
+function _devChatFabSave() {
+  const fab = document.getElementById('devchat-fab'); if (!fab) return;
+  const r = fab.getBoundingClientRect();
+  const freeX = Math.max(1, window.innerWidth - r.width), freeY = Math.max(1, window.innerHeight - r.height);
+  try { localStorage.setItem('atomus_devchat_fab_position', JSON.stringify({ x: r.left / freeX, y: r.top / freeY })); } catch (e) {}
+}
+function _devChatFabRestore() {
+  if (!_devChatFabMobile()) return;
+  let pos = null;
+  try { pos = JSON.parse(localStorage.getItem('atomus_devchat_fab_position') || 'null'); } catch (e) { pos = null; }
+  if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return;
+  const fab = document.getElementById('devchat-fab'); if (!fab) return;
+  const r = fab.getBoundingClientRect(), w = r.width || 46, h = r.height || 46;
+  _devChatFabPlace(pos.x * Math.max(1, window.innerWidth - w), pos.y * Math.max(1, window.innerHeight - h));
+}
+function devChatFabInit() {
+  const fab = document.getElementById('devchat-fab');
+  if (!fab || fab.dataset.dragBound === '1') return;
+  fab.dataset.dragBound = '1';
+  fab.addEventListener('pointerdown', function (e) {
+    if (!_devChatFabMobile() || (e.button != null && e.button !== 0)) return;
+    const r = fab.getBoundingClientRect();
+    const d = _devChatFabDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY,
+      left: r.left, top: r.top, dragging: false, timer: null };
+    try { fab.setPointerCapture(e.pointerId); } catch (_) {}
+    d.timer = setTimeout(function () {
+      if (_devChatFabDrag !== d) return;
+      d.dragging = true; fab.classList.add('dragging');
+      try { if (navigator.vibrate) navigator.vibrate(18); } catch (_) {}
+    }, 320);
+  });
+  fab.addEventListener('pointermove', function (e) {
+    const d = _devChatFabDrag; if (!d || e.pointerId !== d.id) return;
+    d.lastX = e.clientX; d.lastY = e.clientY;
+    if (!d.dragging) return;
+    e.preventDefault();
+    _devChatFabPlace(d.left + e.clientX - d.x, d.top + e.clientY - d.y);
+  });
+  const finish = function (e) {
+    const d = _devChatFabDrag; if (!d || (e.pointerId != null && e.pointerId !== d.id)) return;
+    clearTimeout(d.timer);
+    if (d.dragging) {
+      _devChatFabPlace(d.left + d.lastX - d.x, d.top + d.lastY - d.y);
+      _devChatFabSave(); _devChatFabSkipClick = true;
+      setTimeout(function () { _devChatFabSkipClick = false; }, 400);
+    }
+    fab.classList.remove('dragging'); _devChatFabDrag = null;
+  };
+  fab.addEventListener('pointerup', finish);
+  fab.addEventListener('pointercancel', finish);
+  fab.addEventListener('contextmenu', function (e) { if (_devChatFabMobile()) e.preventDefault(); });
+  window.addEventListener('resize', _devChatFabRestore);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') devChatFabPickerClose(); });
+  _devChatFabRestore();
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', devChatFabInit);
+else setTimeout(devChatFabInit, 0);
 
 // Шторка поверх текущего раздела — то же самое, но не уходя с экрана.
 function devChatToggleDrawer() {
