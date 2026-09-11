@@ -23822,11 +23822,13 @@ async function memoryExport() {
 async function _memGraph() {
   const body = document.getElementById('memory-body'); if (!body) return;
   ['list', 'graph'].forEach(function (v) { const b = document.getElementById('mem-tab-' + v); if (b) b.classList.toggle('active', _mem.view === v); });
-  let d; try { d = await apiGet('/api/knowledge/graph'); } catch (e) { body.innerHTML = '<div class="empty-block">Граф недоступен</div>'; return; }
   var mode = _mem.gmode || 'all';
+  let d; try { d = await apiGet(mode === 'company' ? '/api/knowledge/company' : '/api/knowledge/graph'); } catch (e) { body.innerHTML = '<div class="empty-block">Граф недоступен</div>'; return; }
+  // v2.46.201: «Компания» — изделия и из чего состоят: направления → модели → комплектующие по техкартам, щиты
+  if (mode === 'company') d.nodes = d.nodes.map(function (n) { return { id: n.id, title: n.title, folder: _memCompanyFolder(n.kind), source: 'crm', kind: n.kind, built: n.built, used: n.used, sku: n.sku, links: 0 }; });
   body.innerHTML = '<div class="mem-graph-wrap"><canvas id="mem-canvas"></canvas>' +
-    '<div class="mem-graph-modes">' + [['all', 'Всё'], ['know', 'Знания'], ['sys', 'Как устроено']].map(function (m) { return '<button type="button" class="mem-chip' + (mode === m[0] ? ' active' : '') + '" onclick="_mem.gmode=\'' + m[0] + '\';_memGraph()">' + m[1] + '</button>'; }).join('') + '</div>' +
-    '<div class="mem-graph-legend">' + ['Хабы', 'Решения', 'Правила', 'Объекты', 'Оборудование', 'Журнал', 'Теги', 'Регионы', 'Система'].map(function (f) { return '<span><i style="background:' + _memColor(f) + '"></i>' + f + '</span>'; }).join('') +
+    '<div class="mem-graph-modes">' + [['all', 'Всё'], ['know', 'Знания'], ['sys', 'Как устроено'], ['company', 'Компания']].map(function (m) { return '<button type="button" class="mem-chip' + (mode === m[0] ? ' active' : '') + '" onclick="_mem.gmode=\'' + m[0] + '\';_memGraph()">' + m[1] + '</button>'; }).join('') + '</div>' +
+    '<div class="mem-graph-legend">' + (mode === 'company' ? ['Направления', 'Категории', 'Модели', 'Комплектующие', 'Группы комплектующих', 'Щиты'] : ['Хабы', 'Решения', 'Правила', 'Объекты', 'Оборудование', 'Журнал', 'Теги', 'Регионы', 'Система']).map(function (f) { return '<span><i style="background:' + _memColor(f) + '"></i>' + f + '</span>'; }).join('') +
     '<span class="mem-graph-hint">Колесо — масштаб, тянуть — двигать, клик — открыть</span></div></div>';
   const canvas = document.getElementById('mem-canvas'); const ctx = canvas.getContext('2d');
   const W = canvas.clientWidth || 800, H = canvas.clientHeight || 520, dpr = window.devicePixelRatio || 1;
@@ -23840,14 +23842,30 @@ async function _memGraph() {
   });
   const edges = d.edges.map(function (e) { return [idx[e.from], idx[e.to]]; }).filter(function (e) { return e[0] != null && e[1] != null; });
   edges.forEach(function (e) { nodes[e[0]].deg++; nodes[e[1]].deg++; });
+  if (mode === 'company') { // дети встают рядом с родителем — раскладка сходится за секунды даже на тысячах узлов
+    const parent = {}; edges.forEach(function (e) { if (parent[e[1]] == null) parent[e[1]] = e[0]; });
+    nodes.forEach(function (n, i) { const p = parent[i]; if (p != null) { const a = (i * 2.399963); const r = 12 + (n.k === 'component' ? 40 : 90); n.x = nodes[p].x + Math.cos(a) * r; n.y = nodes[p].y + Math.sin(a) * r; } });
+  }
   let scale = 1, ox = 0, oy = 0, drag = null, hover = -1, moved = false, temp = 1, frames = 0, autoFit = true;
   // маленький граф (схема системы) раскладываем просторнее: отталкивание и длина связи растут, когда узлов мало
-  const REP = 650 * Math.max(1, Math.min(3, 110 / Math.max(1, nodes.length))), REST = nodes.length < 70 ? 62 : 34;
+  const REP = mode === 'company' ? 1500 : 650 * Math.max(1, Math.min(3, 110 / Math.max(1, nodes.length))), REST = mode === 'company' ? 58 : (nodes.length < 70 ? 62 : 34), SPRING = mode === 'company' ? 0.0035 : 0.006;
   function fit() { if (!nodes.length) return; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; nodes.forEach(function (n) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); }); const pad = 70; const s = Math.min((W - pad * 2) / Math.max(40, x1 - x0), (H - pad * 2) / Math.max(40, y1 - y0), 2.2); scale = s; ox = (W - (x0 + x1) * s) / 2; oy = (H - (y0 + y1) * s) / 2; }
-  function radius(n) { return (n.k === 'note' ? 1.8 : 3) + Math.min(10, Math.sqrt(n.deg) * 1.5); }
+  function radius(n) { if (n.k === 'component') return n.used ? 2.8 : 1.9; if (n.k === 'model') return 4 + Math.min(9, Math.sqrt(n.built || 0) * 2); return (n.k === 'note' ? 1.8 : 3) + Math.min(10, Math.sqrt(n.deg) * 1.5); }
   function step() {
     const k = 0.02 * temp;
-    for (let i = 0; i < nodes.length; i++) {
+    if (nodes.length > 400) { // пространственная сетка: тысячи узлов, смотрим только соседние ячейки
+      const cell = 64, grid = {};
+      nodes.forEach(function (n, i) { const key = ((n.x / cell) | 0) + ':' + ((n.y / cell) | 0); (grid[key] = grid[key] || []).push(i); });
+      const rep = REP * 0.55;
+      nodes.forEach(function (a, i) {
+        const cx = (a.x / cell) | 0, cy = (a.y / cell) | 0;
+        for (let gx = cx - 1; gx <= cx + 1; gx++) for (let gy = cy - 1; gy <= cy + 1; gy++) {
+          const cellNodes = grid[gx + ':' + gy]; if (!cellNodes) continue;
+          for (let t = 0; t < cellNodes.length; t++) { const j = cellNodes[t]; if (j <= i) continue; const b = nodes[j]; let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy + 0.01; if (d2 > 8100) continue; const f = rep / d2 * temp; dx *= f; dy *= f; a.vx += dx; a.vy += dy; b.vx -= dx; b.vy -= dy; }
+        }
+        a.vx += (W / 2 - a.x) * k * 0.6; a.vy += (H / 2 - a.y) * k * 0.6;
+      });
+    } else for (let i = 0; i < nodes.length; i++) {
       const a = nodes[i];
       for (let j = i + 1; j < nodes.length; j++) {
         const b = nodes[j]; let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy + 0.01;
@@ -23856,7 +23874,7 @@ async function _memGraph() {
       }
       a.vx += (W / 2 - a.x) * k * 0.6; a.vy += (H / 2 - a.y) * k * 0.6;
     }
-    edges.forEach(function (e) { const a = nodes[e[0]], b = nodes[e[1]]; const dx = b.x - a.x, dy = b.y - a.y, dist = Math.sqrt(dx * dx + dy * dy) || 1; const f = (dist - REST) * 0.006 * temp; a.vx += dx / dist * f * dist; a.vy += dy / dist * f * dist; b.vx -= dx / dist * f * dist; b.vy -= dy / dist * f * dist; });
+    edges.forEach(function (e) { const a = nodes[e[0]], b = nodes[e[1]]; const dx = b.x - a.x, dy = b.y - a.y, dist = Math.sqrt(dx * dx + dy * dy) || 1; const f = (dist - REST) * SPRING * temp; a.vx += dx / dist * f * dist; a.vy += dy / dist * f * dist; b.vx -= dx / dist * f * dist; b.vy -= dy / dist * f * dist; });
     nodes.forEach(function (n, i) { if (drag && drag.i === i) { n.vx = n.vy = 0; return; } n.vx *= 0.75; n.vy *= 0.75; var cap = 8 * temp + 0.2; n.x += Math.max(-cap, Math.min(cap, n.vx * temp)); n.y += Math.max(-cap, Math.min(cap, n.vy * temp)); });
     // v2.46.200: раскладка остывает до нуля и замирает — раньше точки тряслись бесконечно
     temp = temp * 0.985; frames++;
@@ -23869,7 +23887,7 @@ async function _memGraph() {
     // v2.46.198: как в Obsidian — тёмное поле, точки светятся, теги и регионы стягивают облака
     nodes.forEach(function (n, i) { const r = radius(n), c = _memColor(n.f); ctx.save(); ctx.shadowColor = c; ctx.shadowBlur = (i === hover ? 26 : 12) / scale; ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fillStyle = c; ctx.globalAlpha = n.k === 'note' ? .92 : 1; ctx.fill(); ctx.restore(); if (i === hover) { ctx.lineWidth = 1.6 / scale; ctx.strokeStyle = '#fff'; ctx.stroke(); } });
     ctx.font = (11 / scale) + 'px system-ui, sans-serif'; ctx.textBaseline = 'middle';
-    nodes.forEach(function (n, i) { if (mode === 'sys' || (n.k !== 'note' && n.deg >= 3) || n.deg >= 9 || scale > 1.9 || i === hover) { ctx.fillStyle = i === hover ? '#fff' : (n.k === 'note' ? 'rgba(203,213,225,.85)' : _memColor(n.f)); ctx.fillText(n.t, n.x + radius(n) + 3 / scale, n.y); } });
+    nodes.forEach(function (n, i) { if (mode === 'company' ? (i === hover || n.k === 'direction' || n.k === 'root' || n.k === 'hub' || n.k === 'category' || n.k === 'ccat' || (n.k === 'model' && (scale > 2.2 || (n.built || 0) >= 3)) || (scale > 3 && n.k !== 'component') || scale > 5) : (mode === 'sys' || (n.k !== 'note' && n.deg >= 3) || n.deg >= 9 || scale > 1.9 || i === hover)) { ctx.fillStyle = i === hover ? '#fff' : (n.k === 'note' ? 'rgba(203,213,225,.85)' : _memColor(n.f)); ctx.fillText(n.t, n.x + radius(n) + 3 / scale, n.y); } });
     ctx.restore();
   }
   function loop() { if (temp > 0.004) step(); draw(); _mem.anim = requestAnimationFrame(loop); }
@@ -23878,7 +23896,7 @@ async function _memGraph() {
   function pos(e) { const b = canvas.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return [t.clientX - b.left, t.clientY - b.top]; }
   canvas.addEventListener('mousemove', function (e) { const p = pos(e); if (drag) { moved = true; if (drag.i >= 0) { nodes[drag.i].x = (p[0] - ox) / scale; nodes[drag.i].y = (p[1] - oy) / scale; reheat(0.25); } else { ox = drag.ox + p[0] - drag.x; oy = drag.oy + p[1] - drag.y; } return; } hover = pick(p[0], p[1]); canvas.style.cursor = hover >= 0 ? 'pointer' : 'grab'; });
   canvas.addEventListener('mousedown', function (e) { const p = pos(e); moved = false; drag = { i: pick(p[0], p[1]), x: p[0], y: p[1], ox: ox, oy: oy }; if (drag.i < 0) autoFit = false; });
-  function openNode(n) { if (n.k === 'note') return memoryOpenNote(n.id); _mem.q = n.t.replace(/^#/, ''); _mem.folder = ''; memoryView('list'); memoryReload(); }
+  function openNode(n) { if (mode === 'company') { const kinds = { direction: 'направление', category: 'категория', model: 'модель', component: 'комплектующее', ccat: 'группа комплектующих', panel: 'щит', hub: 'раздел', root: 'компания' }; showToast((kinds[n.k] || n.k) + ': ' + n.t + (n.k === 'model' ? ' · собирали ' + (n.built || 0) + ' раз · связей ' + n.deg : '') + (n.k === 'component' ? (n.sku ? ' · ' + n.sku : '') + (n.used ? ' · есть в техкартах' : ' · не в техкартах') : ''), 'info'); return; } if (n.k === 'note') return memoryOpenNote(n.id); _mem.q = n.t.replace(/^#/, ''); _mem.folder = ''; memoryView('list'); memoryReload(); }
   window.addEventListener('mouseup', function () { if (drag && !moved && drag.i >= 0) openNode(nodes[drag.i]); drag = null; });
   canvas.addEventListener('wheel', function (e) { e.preventDefault(); autoFit = false; const p = pos(e); const f = e.deltaY < 0 ? 1.12 : 1 / 1.12; ox = p[0] - (p[0] - ox) * f; oy = p[1] - (p[1] - oy) * f; scale *= f; }, { passive: false });
   canvas.addEventListener('touchstart', function (e) { const p = pos(e); moved = false; drag = { i: pick(p[0], p[1]), x: p[0], y: p[1], ox: ox, oy: oy }; }, { passive: true });
@@ -23888,6 +23906,8 @@ async function _memGraph() {
   loop();
 }
 
+function _memCompanyFolder(kind) { return { root: 'Хабы', hub: 'Хабы', direction: 'Направления', category: 'Категории', model: 'Модели', component: 'Комплектующие', ccat: 'Группы комплектующих', panel: 'Щиты' }[kind] || 'Хабы'; }
 function _memColor(f) {
-  return { 'Хабы': '#F8FAFC', 'Решения': '#FBBF24', 'Правила': '#A78BFA', 'Объекты': '#60A5FA', 'Оборудование': '#34D399', 'Журнал': '#F472B6', 'Теги': '#C084FC', 'Регионы': '#22D3EE', 'Система': '#FB923C' }[f] || '#94A3B8';
+  return { 'Хабы': '#F8FAFC', 'Решения': '#FBBF24', 'Правила': '#A78BFA', 'Объекты': '#60A5FA', 'Оборудование': '#34D399', 'Журнал': '#F472B6', 'Теги': '#C084FC', 'Регионы': '#22D3EE', 'Система': '#FB923C',
+    'Направления': '#FBBF24', 'Категории': '#F59E0B', 'Модели': '#34D399', 'Комплектующие': '#60A5FA', 'Группы комплектующих': '#A78BFA', 'Щиты': '#F472B6' }[f] || '#94A3B8';
 }
