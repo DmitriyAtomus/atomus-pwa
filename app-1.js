@@ -109,7 +109,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.192";
+const APP_VERSION = "v2.46.193";
 const APP_VERSION_DATE = "11.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -716,6 +716,7 @@ function logout() {
   // v2.45.117: при выходе сбрасываем кеш пароля
   if (typeof _clearCachedPassword === 'function') _clearCachedPassword();
   state.user = null;
+  if (window.KlavaPick && typeof window.KlavaPick.syncVisibility === 'function') window.KlavaPick.syncVisibility();
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   const input = document.getElementById('code-input');
@@ -1295,10 +1296,12 @@ function manuallyOpenNotifModal() {
 function showApp() {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+  if (window.KlavaPick && typeof window.KlavaPick.syncVisibility === 'function') window.KlavaPick.syncVisibility();
   applyLayout();
   if (!state.user) {
     apiGet('/api/me').then(me => {
       state.user = me;
+      if (window.KlavaPick && typeof window.KlavaPick.syncVisibility === 'function') window.KlavaPick.syncVisibility();
       renderProfile();
       applyPermissionsToUI();
       _restoreLastView();
