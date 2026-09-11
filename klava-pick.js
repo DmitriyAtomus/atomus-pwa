@@ -102,7 +102,7 @@
   const isOurs = node => !!(node && node.closest && node.closest('.kp-ui'));
 
   KP.init = function (cfg) {
-    KP.cfg = Object.assign({ page: 'crm', apiBase: '', fabStyle: null, fabText: '✦ Показать Клаве' }, cfg || {});
+    KP.cfg = Object.assign({ page: 'crm', apiBase: '', fabStyle: null, fabText: '✦ Показать Клаве', enabled: true }, cfg || {});
     if (document.getElementById('kp-style')) return;
     const st = el('style'); st.id = 'kp-style'; st.textContent = CSS; document.head.appendChild(st);
     const fab = el('button', 'kp-ui', esc(KP.cfg.fabText)); fab.id = 'kp-fab'; fab.title = 'Отметить на экране, что обсудить с Клавой';
@@ -114,13 +114,33 @@
     document.body.appendChild(fab);
     const marks = el('div', 'kp-ui'); marks.id = 'kp-marks'; document.body.appendChild(marks);
     KP.els.fab = fab; KP.els.marks = marks;
+    KP.syncVisibility();
     addEventListener('resize', KP.layout); addEventListener('scroll', KP.layout, true);
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && KP.picking) { e.stopPropagation(); KP.pick(false); } }, true);
+  };
+
+  // v2.46.193: на странице входа кнопки Клавы быть не должно. В CRM enabled
+  // зависит от state.user; после входа и выхода оболочка вызывает этот метод.
+  KP._isEnabled = function () {
+    try { return typeof KP.cfg.enabled === 'function' ? !!KP.cfg.enabled() : KP.cfg.enabled !== false; }
+    catch (e) { return false; }
+  };
+  KP.syncVisibility = function () {
+    if (!KP.els.fab) return;
+    const enabled = KP._isEnabled();
+    if (!enabled) {
+      if (KP.picking) KP.pick(false);
+      KP.open = false;
+      clearInterval(KP._liveT); KP._liveT = null;
+      if (KP.els.panel) KP.els.panel.classList.add('hidden');
+    }
+    KP.els.fab.classList.toggle('hidden', !enabled || !!KP.cfg.remote || KP.open || KP.picking);
   };
 
   // ---------- панель ----------
   KP.toggle = function () { KP.open ? KP.close() : KP.show(); };
   KP.show = async function () {
+    if (!KP._isEnabled()) { KP.syncVisibility(); return; }
     KP.open = true;
     if (!KP.els.panel) KP._buildPanel();
     KP.els.panel.classList.remove('hidden');
@@ -142,7 +162,7 @@
     KP.open = false; KP.pick(false);
     clearInterval(KP._liveT); KP._liveT = null;
     if (KP.els.panel) KP.els.panel.classList.add('hidden');
-    KP.els.fab.classList.remove('hidden');
+    KP.syncVisibility();
   };
   KP._buildPanel = function () {
     const p = el('div', 'kp-ui'); p.id = 'kp-panel';

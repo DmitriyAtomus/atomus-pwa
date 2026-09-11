@@ -15,12 +15,15 @@ const app4 = fs.readFileSync(path.join(root, 'app-4.js'), 'utf8');
 const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 
 function sandbox() {
-  const mk = () => ({ id: '', className: '', style: {}, children: [], classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+  const mk = () => {
+    const classes = new Set();
+    return { id: '', className: '', style: {}, children: [], classList: { add(...names) { names.forEach(n => classes.add(n)); }, remove(...names) { names.forEach(n => classes.delete(n)); }, toggle(name, force) { const on = force === undefined ? !classes.has(name) : !!force; if (on) classes.add(name); else classes.delete(name); return on; }, contains(name) { return classes.has(name); } },
     appendChild(c) { this.children.push(c); return c; }, append() {}, remove() {}, querySelector() { return mk(); }, querySelectorAll() { return []; },
-    addEventListener() {}, setAttribute() {}, getBoundingClientRect() { return { left: 0, top: 0, width: 0, height: 0 }; }, set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h || ''; } });
+    addEventListener() {}, setAttribute() {}, getBoundingClientRect() { return { left: 0, top: 0, width: 0, height: 0 }; }, set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h || ''; } };
+  };
   const document = { head: mk(), body: mk(), title: 'CRM', createElement: () => mk(), getElementById: () => null, querySelectorAll: () => [], addEventListener() {}, elementFromPoint: () => null };
   const ctx = { window: null, document, location: { pathname: '/x', hash: '' }, innerWidth: 1200, innerHeight: 800, scrollX: 0, scrollY: 0,
-    addEventListener() {}, requestAnimationFrame: f => 0, cancelAnimationFrame() {}, setTimeout, fetch: async () => { throw new Error('no net'); } };
+    addEventListener() {}, requestAnimationFrame: f => 0, cancelAnimationFrame() {}, setTimeout, clearInterval, fetch: async () => { throw new Error('no net'); } };
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(mod, ctx);
@@ -37,6 +40,21 @@ test('модуль подключён в CRM и в конструкторе, л�
   assert.match(proj, /sceneShot:\(\)=>/);
   assert.match(proj, /preferTopic:'чиллер'/);
   assert.match(sw, /'\/klava-pick\.js'/);
+});
+
+test('кнопка скрыта без авторизации, появляется после входа и снова скрывается после выхода', () => {
+  const w = sandbox();
+  let signedIn = false;
+  w.KlavaPick.init({ enabled: () => signedIn });
+  assert.equal(w.KlavaPick.els.fab.classList.contains('hidden'), true);
+  signedIn = true;
+  w.KlavaPick.syncVisibility();
+  assert.equal(w.KlavaPick.els.fab.classList.contains('hidden'), false);
+  signedIn = false;
+  w.KlavaPick.syncVisibility();
+  assert.equal(w.KlavaPick.els.fab.classList.contains('hidden'), true);
+  assert.match(html, /enabled: function\(\)\{ return !!state\.user; \}/);
+  assert.match(fs.readFileSync(path.join(root, 'app-1.js'), 'utf8'), /state\.user = null;[\s\S]{0,160}KlavaPick\.syncVisibility\(\)/);
 });
 
 test('контекст: экран, версия, метки трёх видов, проверки', () => {

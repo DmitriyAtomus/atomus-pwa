@@ -3760,6 +3760,7 @@
   if(!window.KlavaPick)return;
   KlavaPick.init({
     apiBase: API_BASE, token: function(){ try{return localStorage.getItem(TOKEN_KEY);}catch(e){return null;} },
+    enabled: function(){ return !!state.user; },
     page: 'crm', version: function(){ return APP_VERSION; },
     role: function(){ return ((state.user&&state.user.roles)||[]).join(','); },
     screen: function(){
