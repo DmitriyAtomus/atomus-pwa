@@ -20,3 +20,8 @@ test('повторные открытия используют один запр
   assert.match(loader, /onclick="loadPlanerka\(\)"[^>]*>Повторить</);
   assert.match(loader, /escapeHtml\(reason\)/);
 });
+
+test('описание текущей версии сообщает об ускорении Планёрки', () => {
+  assert.match(source, /const HELP_CHANGELOG = \[\s*\{\s*version: 'v2\.46\.195'/);
+  assert.match(source, /title: 'Планёрка открывается быстро'/);
+});
