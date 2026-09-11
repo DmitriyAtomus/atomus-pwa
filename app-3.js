@@ -18775,7 +18775,7 @@ const HELP_FAQ = [
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
   {
-    version: 'v2.46.195',
+    version: 'v2.46.196',
     date: '11.09.2026',
     title: 'Планёрка открывается быстро',
     features: [

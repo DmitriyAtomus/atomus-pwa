@@ -22,6 +22,6 @@ test('повторные открытия используют один запр
 });
 
 test('описание текущей версии сообщает об ускорении Планёрки', () => {
-  assert.match(source, /const HELP_CHANGELOG = \[\s*\{\s*version: 'v2\.46\.195'/);
+  assert.match(source, /const HELP_CHANGELOG = \[\s*\{\s*version: 'v2\.46\.196'/);
   assert.match(source, /title: 'Планёрка открывается быстро'/);
 });
