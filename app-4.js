@@ -10948,17 +10948,35 @@ async function chooseContractForDefect(contractId) {
 // ===== v2.45.638: динамические блоки шторки — лента разделов, поиск, «Сегодня» =====
 const DRW_SECTIONS = [
   { code: 'home',         icon: 'ti-smart-home',         label: 'Главная' },
-  { code: 'production',   icon: 'ti-building-factory-2', label: 'Производ.' },
+  { code: 'production',   icon: 'ti-building-factory-2', label: 'Производ.', full: 'Производство' },
   { code: 'sales',        icon: 'ti-report-money',       label: 'Продажи' },
   { code: 'tasks',        icon: 'ti-list-check',         label: 'Задачи' },
   { code: 'warehouse',    icon: 'ti-packages',           label: 'Склад' },
-  { code: 'supply',       icon: 'ti-basket',             label: 'Снабжен.' },
+  { code: 'logistics',    icon: 'ti-truck-delivery',     label: 'Логистика' },
+  { code: 'supply',       icon: 'ti-basket',             label: 'Снабжен.', full: 'Снабжение' },
   { code: 'mail',         icon: 'ti-messages',           label: 'Почта/MAX' },
   { code: 'defects',      icon: 'ti-lifebuoy',           label: 'Сервис' },
   { code: 'installation', icon: 'ti-crane',              label: 'Монтаж' },
   { code: 'hr',           icon: 'ti-users-group',        label: 'Кадры' },
   { code: 'help',         icon: 'ti-help-circle',        label: 'Помощь' },
 ];
+
+function _mobileAvailableSections() {
+  let sections = DRW_SECTIONS;
+  if (typeof _isPureInstaller === 'function' && _isPureInstaller()) {
+    sections = DRW_SECTIONS.filter(x => x.code === 'installation' || x.code === 'help');
+  } else if (typeof _isShevelevMaster === 'function' && state.user && _isShevelevMaster()) {
+    sections = DRW_SECTIONS.filter(x => ['home', 'production', 'help'].includes(x.code));
+  }
+  return sections.filter(s => {
+    if (s.code === 'hr') {
+      return hasAnyPermission('hr.view_vacations', 'hr.create_vacations',
+        'hr.manage_employees', 'hr.manage_positions', 'hr.manage_access');
+    }
+    if (s.code === 'installation') return hasPermission('installation.view');
+    return true;
+  });
+}
 
 function _drwGoSection(code) {
   const cur = document.querySelector('.sidebar.drawer-mode');
@@ -11064,13 +11082,8 @@ function _drwInjectExtras(sidebar) {
   const top = document.createElement('div');
   top.className = 'drw-x drw-top';
   // v2.45.766: лента разделов фильтруется по роли — как рельса на десктопе
-  let drwSecs = DRW_SECTIONS;
+  let drwSecs = _mobileAvailableSections();
   const _pureInst = (typeof _isPureInstaller === 'function' && _isPureInstaller());
-  if (_pureInst) {
-    drwSecs = DRW_SECTIONS.filter(x => x.code === 'installation' || x.code === 'help');
-  } else if (typeof _isShevelevMaster === 'function' && state.user && _isShevelevMaster()) {
-    drwSecs = DRW_SECTIONS.filter(x => ['home', 'production', 'help'].includes(x.code));
-  }
   let strip = '<div class="drw-secs">';
   drwSecs.forEach(s => {
     strip += '<div class="drw-sec' + (s.code === sec ? ' on' : '') + '" onclick="_drwGoSection(\'' + s.code + '\')">' +
@@ -11151,12 +11164,62 @@ document.addEventListener('click', function(e) {
 // ============ ЭТАП 25.0: НОВАЯ МОБИЛЬНАЯ НАВИГАЦИЯ ===========
 // ============================================================
 
-// Главный мобильный таб (home/search/notifications/account)
-state.currentMainTab = 'home';
+// Главный мобильный таб (sections/search/notifications/account)
+state.currentMainTab = 'sections';
+
+function showMobileContent() {
+  state.currentMainTab = 'sections';
+  const app = document.getElementById('app');
+  if (app) app.dataset.mainTab = 'sections';
+  document.querySelectorAll('#tab-bar-main .tab25[data-main-tab]').forEach(b => b.classList.remove('active'));
+  const tab = document.querySelector('#tab-bar-main .tab25[data-main-tab="sections"]');
+  if (tab) tab.classList.add('active');
+  const so = document.getElementById('search25-screen');
+  const no = document.getElementById('notif25-screen');
+  if (so) so.style.display = 'none';
+  if (no) no.style.display = 'none';
+}
+
+function openMobileSections() {
+  const overlay = document.getElementById('mobile-sections-overlay');
+  const grid = document.getElementById('mobile-sections-grid');
+  if (!overlay || !grid) return;
+  showMobileContent();
+  grid.innerHTML = _mobileAvailableSections().map(s =>
+    '<button type="button" class="mobile-section-tile' + (s.code === state.currentSection ? ' active' : '') + '" ' +
+      'onclick="mobileGoSection(\'' + s.code + '\')"' + (s.code === state.currentSection ? ' aria-current="page"' : '') + '>' +
+      '<i class="ti ' + s.icon + '"></i><span>' + escapeHtml(s.full || s.label) + '</span>' +
+      (s.code === state.currentSection ? '<b>Открыт</b>' : '') + '</button>'
+  ).join('');
+  overlay.classList.add('visible');
+  overlay.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMobileSections(e) {
+  const overlay = document.getElementById('mobile-sections-overlay');
+  if (!overlay || !overlay.classList.contains('visible')) return;
+  if (e && e.target !== overlay) return;
+  if (overlay) {
+    overlay.classList.remove('visible');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+  document.body.style.overflow = '';
+}
+
+function mobileGoSection(code) {
+  closeMobileSections();
+  selectSection(code);
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeMobileSections();
+});
 
 /**
  * Переключение в нижнем единном tab-bar (мобилка).
- * home/account — переходят на соответствующие existing screens.
+ * sections/account — переходят на соответствующие existing screens.
  * search/notifications — открывают overlay поверх контента.
  */
 function switchMainTab(name) {
@@ -11175,8 +11238,8 @@ function switchMainTab(name) {
   if (so) so.style.display = 'none';
   if (no) no.style.display = 'none';
 
-  if (name === 'home') {
-    selectSection('home');
+  if (name === 'sections') {
+    openMobileSections();
   } else if (name === 'account') {
     // Аккаунт — это экран внутри Производства в текущей архитектуре
     selectSection('production');
@@ -11197,13 +11260,12 @@ function switchMainTab(name) {
 
 /**
  * Когда пользователь переключает раздел через ВЕРХНИЕ табы — сбрасываем подсветку
- * нижнего tab-bar (кроме home/account которые имеют соответствие).
+ * нижнего tab-bar (кроме sections/account которые имеют соответствие).
  */
 function syncMainTabFromSection(sectionName, screenName) {
-  let mainTab = null;
-  if (sectionName === 'home') mainTab = 'home';
-  else if (screenName === 'account') mainTab = 'account';
-  // иначе — никакой не подсвечен
+  // Любой рабочий экран относится к общей кнопке «Разделы»; поиск,
+  // уведомления и аккаунт по-прежнему имеют собственные кнопки.
+  let mainTab = screenName === 'account' ? 'account' : 'sections';
 
   state.currentMainTab = mainTab;
   const app = document.getElementById('app');
@@ -11519,7 +11581,7 @@ async function runSearch25() {
           type: 'contract', cls: 'c-sales', icon: 'ti-file-text',
           title: (x.number || '—') + (x.contractor_name ? ' · ' + x.contractor_name : ''),
           sub: 'Договор · ' + (x.status_label || x.status || '—') + subRole,
-          click: () => { switchMainTab('home'); selectSection('sales'); setTimeout(() => openContractDetail(x.id), 50); },
+          click: () => { showMobileContent(); selectSection('sales'); setTimeout(() => openContractDetail(x.id), 50); },
         });
       }
     });
@@ -11554,7 +11616,7 @@ async function runSearch25() {
           type: 'assembly', cls: 'c-prod', icon: 'ti-tool',
           title: title,
           sub: 'Сборка · ' + (w.status_label || w.status || '—') + subRole + hoursPart,
-          click: () => { switchMainTab('home'); openProductionWorkDetail(w.id); },
+          click: () => { showMobileContent(); openProductionWorkDetail(w.id); },
         });
       }
     });
@@ -11617,7 +11679,7 @@ async function runSearch25() {
           type: 'task', cls: 'c-tasks', icon: 'ti-checklist',
           title: x.title || '—',
           sub: 'Задача · ' + (x.status_label || x.status || '—') + subRole,
-          click: () => { switchMainTab('home'); state.currentTaskId = x.id; selectSection('tasks'); setTimeout(() => selectSidebarItem('task-detail'), 50); },
+          click: () => { showMobileContent(); state.currentTaskId = x.id; selectSection('tasks'); setTimeout(() => selectSidebarItem('task-detail'), 50); },
         });
       }
     });
@@ -11631,7 +11693,7 @@ async function runSearch25() {
           type: 'defect', cls: 'c-defect', icon: 'ti-alert-triangle',
           title: (x.description || '—').slice(0, 60),
           sub: 'Доработка · ' + (x.status_label || x.status || '—'),
-          click: () => { switchMainTab('home'); state.currentDefectId = x.id; selectSection('defects'); setTimeout(() => selectSidebarItem('defect-detail'), 50); },
+          click: () => { showMobileContent(); state.currentDefectId = x.id; selectSection('defects'); setTimeout(() => selectSidebarItem('defect-detail'), 50); },
         });
       }
     });
@@ -11645,7 +11707,7 @@ async function runSearch25() {
           type: 'contractor', cls: 'c-sales', icon: 'ti-briefcase',
           title: x.name || '—',
           sub: 'Контрагент' + (x.inn ? ' · ИНН ' + x.inn : ''),
-          click: () => { switchMainTab('home'); state.currentContractorId = x.id; selectSection('sales'); setTimeout(() => selectSidebarItem('sales-contractor-form'), 50); },
+          click: () => { showMobileContent(); state.currentContractorId = x.id; selectSection('sales'); setTimeout(() => selectSidebarItem('sales-contractor-form'), 50); },
         });
       }
     });
@@ -11809,12 +11871,12 @@ async function onNotif25GlobalClick(notifId, entityType, entityId) {
   if (entityType === 'defect' && entityId) {
     if (typeof openDefectDetail === 'function') openDefectDetail(entityId);
     else if (typeof selectSidebarItem === 'function') {
-      switchMainTab('home');
+      showMobileContent();
       setTimeout(() => selectSidebarItem('defects'), 50);
     }
   } else if (entityType === 'contract' && entityId) {
     if (typeof openContractDetail === 'function') {
-      switchMainTab('home');
+      showMobileContent();
       setTimeout(() => openContractDetail(entityId), 50);
     }
   }
@@ -11834,7 +11896,7 @@ async function ackOneNotif25(notifId) {
 
 function onNotif25ItemClick(contractId) {
   state.currentContractId = contractId;
-  switchMainTab('home');
+  showMobileContent();
   if (typeof selectSection === 'function') selectSection('sales');
   if (typeof selectSidebarItem === 'function') selectSidebarItem('sales-contract-detail');
   setTimeout(() => {

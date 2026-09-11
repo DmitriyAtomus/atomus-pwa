@@ -229,6 +229,9 @@
       <button data-section="hr"><i class="ti ti-users-group"></i>Кадры</button>
       <button data-section="help"><i class="ti ti-help-circle"></i>Помощь</button>
     </nav>
+    <button class="m-section-tabs-all" id="m-section-tabs-all" onclick="openMobileSections()" aria-label="Показать все разделы">
+      <i class="ti ti-layout-grid"></i><span>Все</span>
+    </button>
     <button class="m-section-tabs-next" id="m-section-tabs-next" onclick="scrollMobileTabs(1)" aria-label="Прокрутить">
       <i class="ti ti-chevron-right"></i>
     </button>
@@ -3332,9 +3335,9 @@
 
   <!-- ============ ЭТАП 25.0: ЕДИНЫЙ TAB-BAR (мобильный) ============ -->
   <nav class="tab-bar" id="tab-bar-main">
-    <button class="tab25 active" data-main-tab="home" onclick="switchMainTab('home')">
-      <i class="ti ti-home"></i>
-      <span>Главная</span>
+    <button class="tab25 active" data-main-tab="sections" onclick="switchMainTab('sections')">
+      <i class="ti ti-layout-grid"></i>
+      <span>Разделы</span>
     </button>
     <button class="tab25" data-main-tab="search" onclick="switchMainTab('search')">
       <i class="ti ti-search"></i>
@@ -3356,6 +3359,18 @@
 
 </div>
 <!-- /app -->
+
+<!-- v2.46.204: все разделы CRM одним тапом на телефоне -->
+<div class="mobile-sections-overlay" id="mobile-sections-overlay" aria-hidden="true" onclick="closeMobileSections(event)">
+  <section class="mobile-sections-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-sections-title" onclick="event.stopPropagation()">
+    <div class="mobile-sections-handle"></div>
+    <div class="mobile-sections-head">
+      <div><span>Навигация</span><h2 id="mobile-sections-title">Разделы CRM</h2></div>
+      <button type="button" onclick="closeMobileSections()" aria-label="Закрыть"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="mobile-sections-grid" id="mobile-sections-grid"></div>
+  </section>
+</div>
 
 <!-- v2.42.5: Панель уведомлений -->
 <div class="notif-panel" id="notif-panel" onclick="event.stopPropagation()">
