@@ -1845,6 +1845,9 @@ function _ideasRenderShell() {
             'title="Тема, в которой пишут все: инженер обсуждает с Клавой, вы внедряете">' +
             '<i class="ti ti-users"></i>Общая тема</button>'
           : '') +
+        '<button class="ich-new ich-new-memory" onclick="memoryOpen()" ' +
+          'title="Общая память: решения, правила, объекты, оборудование, журнал. Клава читает её перед задачей и записывает итог">' +
+          '<i class="ti ti-brain"></i>Память</button>' +
         '<div class="ich-items" id="ideas-items"><div class="loading-block">Загружаем…</div></div>' +
       '</aside>' +
       '<div class="ich-main" id="ideas-main">' +
@@ -23580,4 +23583,228 @@ async function psBuild() {
   const b = d.build || {};
   showToast(b.ok ? 'Собрано, QA чисто — новая ревизия' : 'Собрано с замечаниями: ' + (b.issues || []).join(', '), b.ok ? 'success' : 'error');
   state._ps.rev = null; loadPanelSheets();
+}
+
+// ============ v2.46.189: ПАМЯТЬ КЛАВЫ (заметки со ссылками, как в Obsidian) ============
+// Решения, правила, объекты, оборудование и журнал работ — одна папка заметок.
+// Клава ищет в ней перед задачей и записывает итог; сервер пишет журнал по
+// закрытым задачам; люди добавляют заметки здесь или в Obsidian (экспорт zip).
+
+var _mem = { notes: [], folder: '', q: '', open: null, view: 'list', graph: null, anim: null };
+
+async function memoryOpen() {
+  let overlay = document.getElementById('memory-modal');
+  if (!overlay) {
+    overlay = document.createElement('div'); overlay.className = 'modal-overlay'; overlay.id = 'memory-modal';
+    overlay.innerHTML = '<div class="modal modal-wide mem-modal" onclick="event.stopPropagation()">' +
+      '<div class="modal-header"><h3><i class="ti ti-brain"></i> Память</h3>' +
+        '<div class="mem-head-actions">' +
+          '<button class="btn btn-secondary btn-sm" onclick="memoryView(\'list\')" id="mem-tab-list"><i class="ti ti-list"></i> Заметки</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="memoryView(\'graph\')" id="mem-tab-graph"><i class="ti ti-topology-star-3"></i> Граф</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="memoryExport()" title="Zip с папкой «Память Атомус»: распаковать и открыть в Obsidian как хранилище"><i class="ti ti-download"></i> Для Obsidian</button>' +
+        '</div>' +
+        '<button class="icon-btn" onclick="memoryClose()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body mem-body" id="memory-body"></div></div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) memoryClose(); });
+  }
+  overlay.classList.add('visible');
+  _mem.view = 'list';
+  await memoryReload();
+}
+
+function memoryClose() {
+  const o = document.getElementById('memory-modal');
+  if (o) o.classList.remove('visible');
+  if (_mem.anim) { cancelAnimationFrame(_mem.anim); _mem.anim = null; }
+}
+
+async function memoryReload() {
+  const body = document.getElementById('memory-body');
+  if (!body) return;
+  let d;
+  try { d = await apiGet('/api/knowledge?q=' + encodeURIComponent(_mem.q) + '&folder=' + encodeURIComponent(_mem.folder)); }
+  catch (e) { body.innerHTML = '<div class="empty-block"><i class="ti ti-cloud-off"></i>Память недоступна: ' + escapeHtml(e.message || '') + '</div>'; return; }
+  _mem.notes = d.notes || []; _mem.stats = d.stats || {}; _mem.folders = d.folders || [];
+  _memRender();
+}
+
+function memoryView(v) { _mem.view = v; if (v === 'graph') _memGraph(); else { if (_mem.anim) { cancelAnimationFrame(_mem.anim); _mem.anim = null; } _memRender(); } }
+
+function _memFolderIcon(f) {
+  return { 'Решения': 'ti-bulb', 'Правила': 'ti-ruler-2', 'Объекты': 'ti-map-pin', 'Оборудование': 'ti-engine', 'Журнал': 'ti-notebook', 'Система': 'ti-settings' }[f] || 'ti-file-text';
+}
+
+function _memRender() {
+  const body = document.getElementById('memory-body');
+  if (!body) return;
+  ['list', 'graph'].forEach(function (v) { const b = document.getElementById('mem-tab-' + v); if (b) b.classList.toggle('active', _mem.view === v); });
+  const st = _mem.stats || {}; const by = st.by_folder || {};
+  const chips = ['', 'Решения', 'Правила', 'Объекты', 'Оборудование', 'Журнал'].map(function (f) {
+    return '<button class="mem-chip' + (_mem.folder === f ? ' active' : '') + '" onclick="memoryFolder(\'' + f + '\')">' +
+      (f ? '<i class="ti ' + _memFolderIcon(f) + '"></i>' + f + ' <span>' + (by[f] || 0) + '</span>' : 'Все <span>' + (st.total || 0) + '</span>') + '</button>';
+  }).join('');
+  let h = '<div class="mem-top">' +
+    '<div class="mem-search"><i class="ti ti-search"></i><input type="text" id="mem-q" placeholder="Найти: щит, Казань, чиллер, сайт…" value="' + escapeHtml(_mem.q) + '" oninput="memorySearchDebounced(this.value)"></div>' +
+    '<button class="btn btn-primary btn-sm" onclick="memoryAddForm()"><i class="ti ti-plus"></i> Добавить заметку</button></div>' +
+    '<div class="mem-chips">' + chips + '</div>' +
+    '<div class="mem-split"><div class="mem-list" id="mem-list">' + _memListHtml() + '</div>' +
+    '<div class="mem-note" id="mem-note">' + (_mem.open ? _memNoteHtml(_mem.open) : _memIntroHtml()) + '</div></div>';
+  body.innerHTML = h;
+}
+
+function _memIntroHtml() {
+  const st = _mem.stats || {};
+  return '<div class="mem-intro"><i class="ti ti-brain"></i><b>Общая память компании и Клавы</b>' +
+    '<p>' + (st.total || 0) + ' заметок, из них ' + (st.db || 0) + ' записаны на сервере. Клава ищет здесь перед задачей и записывает принятые решения. ' +
+    'Сервер сам ведёт «Журнал» по закрытым задачам агента.</p>' +
+    '<p>Откройте заметку слева, найдите по слову или добавьте свою. Скачать для Obsidian — кнопка сверху.</p></div>';
+}
+
+function _memListHtml() {
+  if (!_mem.notes.length) return '<div class="empty-block"><i class="ti ti-search-off"></i>Ничего не нашлось</div>';
+  let lastFolder = null, h = '';
+  _mem.notes.forEach(function (n) {
+    if (!_mem.q && n.folder !== lastFolder) { lastFolder = n.folder; h += '<div class="mem-group">' + escapeHtml(n.folder) + '</div>'; }
+    h += '<button class="mem-row' + (_mem.open && _mem.open.path === n.path ? ' active' : '') + '" onclick="memoryOpenNote(' + JSON.stringify(n.path).replace(/"/g, '&quot;') + ')">' +
+      '<i class="ti ' + _memFolderIcon(n.folder) + '"></i><span class="mem-row-t">' + escapeHtml(n.title) + '</span>' +
+      (n.source === 'db' ? '<span class="mem-row-db" title="Записано на сервере' + (n.author ? ': ' + escapeHtml(n.author) : '') + '">●</span>' : '') +
+      (_mem.q && n.snippet ? '<span class="mem-row-s">' + escapeHtml(n.snippet) + '</span>' : '') + '</button>';
+  });
+  return h;
+}
+
+var _memSearchT = null;
+function memorySearchDebounced(v) { _mem.q = v; clearTimeout(_memSearchT); _memSearchT = setTimeout(async function () { await memoryReload(); const i = document.getElementById('mem-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 250); }
+async function memoryFolder(f) { _mem.folder = f; await memoryReload(); }
+
+async function memoryOpenNote(path) {
+  let d; try { d = await apiGet('/api/knowledge/note?path=' + encodeURIComponent(path)); } catch (e) { showToast('Заметка не открылась', 'error'); return; }
+  if (!d || !d.ok) { showToast('Такой заметки нет', 'error'); return; }
+  _mem.open = d.note;
+  if (_mem.view !== 'list') { _mem.view = 'list'; if (_mem.anim) { cancelAnimationFrame(_mem.anim); _mem.anim = null; } _memRender(); return; }
+  const el = document.getElementById('mem-note'); if (el) el.innerHTML = _memNoteHtml(d.note);
+  document.querySelectorAll('.mem-row').forEach(function (r) { r.classList.remove('active'); });
+  const list = document.getElementById('mem-list');
+  if (list && window.innerWidth < 760) list.scrollIntoView && document.getElementById('mem-note').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function _memMd(text) {
+  // markdown → html: заголовки, списки, жирный, [[ссылки]] — кликабельные, `код`
+  let html = escapeHtml(String(text || ''));
+  html = html.replace(/^# (.*)$/gm, '').replace(/^## (.*)$/gm, '<h4>$1</h4>').replace(/^### (.*)$/gm, '<h5>$1</h5>');
+  html = html.replace(/^---\s*$/gm, '\n<hr>\n');
+  html = html.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>').replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  html = html.replace(/\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/g, function (m, name) {
+    return '<a class="mem-link" href="#" onclick="memoryOpenNote(' + JSON.stringify(name.trim()).replace(/"/g, '&quot;') + ');return false;">' + name.trim() + '</a>';
+  });
+  html = html.replace(/^(?:- .*(?:\n|$))+/gm, function (block) { return '<ul>' + block.trim().split('\n').map(function (l) { return '<li>' + l.replace(/^- /, '') + '</li>'; }).join('') + '</ul>'; });
+  html = html.replace(/^(?:\d+\. .*(?:\n|$))+/gm, function (block) { return '<ol>' + block.trim().split('\n').map(function (l) { return '<li>' + l.replace(/^\d+\. /, '') + '</li>'; }).join('') + '</ol>'; });
+  return html.split(/\n{2,}/).map(function (p) { p = p.trim(); if (!p) return ''; if (/^<(h4|h5|ul|ol|hr)/.test(p)) return p; return '<p>' + p.replace(/\n/g, '<br>') + '</p>'; }).join('');
+}
+
+function _memNoteHtml(n) {
+  const meta = [n.folder, n.author ? 'записал: ' + n.author : '', n.updated_at ? _ideaReportWhen(n.updated_at) : '', n.source === 'file' ? 'из репозитория' : 'на сервере'].filter(Boolean);
+  return '<div class="mem-note-head"><h3>' + escapeHtml(n.title) + '</h3><div class="mem-note-meta">' + meta.map(escapeHtml).join(' · ') + '</div>' +
+    '<div class="mem-note-actions"><button class="btn btn-secondary btn-sm" onclick="memoryAddForm(' + JSON.stringify(n.title).replace(/"/g, '&quot;') + ',' + JSON.stringify(n.folder).replace(/"/g, '&quot;') + ')"><i class="ti ti-pencil-plus"></i> Дописать</button></div></div>' +
+    '<div class="mem-note-body">' + _memMd(n.body) + '</div>' +
+    (n.links && n.links.length ? '<div class="mem-note-links">Ссылки: ' + n.links.map(function (l) { return '<a class="mem-link" href="#" onclick="memoryOpenNote(' + JSON.stringify(l).replace(/"/g, '&quot;') + ');return false;">' + escapeHtml(l) + '</a>'; }).join(' · ') + '</div>' : '');
+}
+
+function memoryAddForm(title, folder) {
+  const el = document.getElementById('mem-note'); if (!el) return;
+  const append = !!title;
+  const folders = ['Решения', 'Правила', 'Объекты', 'Оборудование'];
+  el.innerHTML = '<div class="mem-form"><h3>' + (append ? 'Дописать в «' + escapeHtml(title) + '»' : 'Новая заметка') + '</h3>' +
+    '<label>Заголовок — суть одной строкой, без даты<input type="text" id="mem-f-title" value="' + escapeHtml(title || '') + '"' + (append ? ' readonly' : '') + ' maxlength="80" placeholder="Например: Зимний режим чиллера на гликоле"></label>' +
+    '<label>Папка<select id="mem-f-folder"' + (append ? ' disabled' : '') + '>' + folders.map(function (f) { return '<option' + ((folder || 'Решения') === f ? ' selected' : '') + '>' + f + '</option>'; }).join('') + '</select></label>' +
+    '<label>Текст — что решили, почему, что открыто. Ссылки на другие заметки: [[Название]]<textarea id="mem-f-body" rows="9" placeholder="Что решили…&#10;&#10;Почему…&#10;&#10;Связано: [[Чиллеры Atom-BBAS]]"></textarea></label>' +
+    '<div class="mem-form-hint">Без заказчиков, сумм и договоров: заметки читает Клава, у которой коммерция закрыта.</div>' +
+    '<div class="modal-actions"><button class="btn btn-primary" onclick="memorySave(' + (append ? 'true' : 'false') + ')"><i class="ti ti-check"></i> Сохранить</button>' +
+    '<button class="btn btn-secondary" onclick="' + (append ? 'memoryOpenNote(' + JSON.stringify(title).replace(/"/g, '&quot;') + ')' : '_memRender()') + '">Отмена</button></div></div>';
+  document.getElementById(append ? 'mem-f-body' : 'mem-f-title').focus();
+}
+
+async function memorySave(append) {
+  const title = (document.getElementById('mem-f-title') || {}).value || '';
+  const folder = (document.getElementById('mem-f-folder') || {}).value || 'Решения';
+  const body = (document.getElementById('mem-f-body') || {}).value || '';
+  if (!title.trim() || !body.trim()) { showToast('Нужны заголовок и текст', 'error'); return; }
+  const r = await apiPost('/api/knowledge/note', { title: title.trim(), folder: folder, body: body.trim(), append: !!append });
+  if (!r.ok || !r.data || !r.data.ok) { showToast((r.data && r.data.message) || 'Не сохранилось', 'error'); return; }
+  showToast('Записано в память', 'success');
+  _mem.open = r.data.note; _mem.q = '';
+  await memoryReload();
+}
+
+async function memoryExport() {
+  try {
+    const r = await fetch(API_BASE + '/api/knowledge/export', { headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') }, cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const blob = await r.blob(); const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'atomus-memory.zip'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    showToast('Скачано. Распакуйте и откройте папку «Память Атомус» в Obsidian как хранилище', 'success');
+  } catch (e) { showToast('Экспорт не удался: ' + (e.message || ''), 'error'); }
+}
+
+// ---- граф связей: простая пружинная раскладка на canvas, узлы — заметки, рёбра — [[ссылки]]
+async function _memGraph() {
+  const body = document.getElementById('memory-body'); if (!body) return;
+  ['list', 'graph'].forEach(function (v) { const b = document.getElementById('mem-tab-' + v); if (b) b.classList.toggle('active', _mem.view === v); });
+  let d; try { d = await apiGet('/api/knowledge/graph'); } catch (e) { body.innerHTML = '<div class="empty-block">Граф недоступен</div>'; return; }
+  body.innerHTML = '<div class="mem-graph-wrap"><canvas id="mem-canvas"></canvas>' +
+    '<div class="mem-graph-legend">' + ['Решения', 'Правила', 'Объекты', 'Оборудование', 'Журнал', 'Система'].map(function (f) { return '<span><i style="background:' + _memColor(f) + '"></i>' + f + '</span>'; }).join('') +
+    '<span class="mem-graph-hint">Колесо — масштаб, тянуть — двигать, клик — открыть</span></div></div>';
+  const canvas = document.getElementById('mem-canvas'); const ctx = canvas.getContext('2d');
+  const W = canvas.clientWidth || 800, H = canvas.clientHeight || 520, dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr; canvas.height = H * dpr; ctx.scale(dpr, dpr);
+  const idx = {}; const nodes = d.nodes.map(function (n, i) {
+    const a = i / d.nodes.length * Math.PI * 2, r = Math.min(W, H) * 0.35 * (n.folder === 'Объекты' ? 1 : 0.6);
+    idx[n.id] = i; return { id: n.id, t: n.title, f: n.folder, x: W / 2 + Math.cos(a) * r, y: H / 2 + Math.sin(a) * r, vx: 0, vy: 0, deg: 0 };
+  });
+  const edges = d.edges.map(function (e) { return [idx[e.from], idx[e.to]]; }).filter(function (e) { return e[0] != null && e[1] != null; });
+  edges.forEach(function (e) { nodes[e[0]].deg++; nodes[e[1]].deg++; });
+  let scale = 1, ox = 0, oy = 0, drag = null, hover = -1, moved = false, temp = 1;
+  function radius(n) { return 3 + Math.min(12, Math.sqrt(n.deg) * 2.2); }
+  function step() {
+    const k = 0.02 * temp;
+    for (let i = 0; i < nodes.length; i++) {
+      const a = nodes[i];
+      for (let j = i + 1; j < nodes.length; j++) {
+        const b = nodes[j]; let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy + 0.01;
+        if (d2 > 90000) continue;
+        const f = 900 / d2 * temp; dx *= f; dy *= f; a.vx += dx; a.vy += dy; b.vx -= dx; b.vy -= dy;
+      }
+      a.vx += (W / 2 - a.x) * k * 0.6; a.vy += (H / 2 - a.y) * k * 0.6;
+    }
+    edges.forEach(function (e) { const a = nodes[e[0]], b = nodes[e[1]]; const dx = b.x - a.x, dy = b.y - a.y, dist = Math.sqrt(dx * dx + dy * dy) || 1; const f = (dist - 60) * 0.004 * temp; a.vx += dx / dist * f * dist; a.vy += dy / dist * f * dist; b.vx -= dx / dist * f * dist; b.vy -= dy / dist * f * dist; });
+    nodes.forEach(function (n, i) { if (drag && drag.i === i) { n.vx = n.vy = 0; return; } n.vx *= 0.82; n.vy *= 0.82; n.x += Math.max(-8, Math.min(8, n.vx)); n.y += Math.max(-8, Math.min(8, n.vy)); });
+    temp = Math.max(0.05, temp * 0.995);
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H); ctx.save(); ctx.translate(ox, oy); ctx.scale(scale, scale);
+    ctx.lineWidth = 0.8 / scale; ctx.strokeStyle = 'rgba(100,116,139,.35)';
+    edges.forEach(function (e) { const a = nodes[e[0]], b = nodes[e[1]]; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); });
+    nodes.forEach(function (n, i) { const r = radius(n); ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fillStyle = _memColor(n.f); ctx.fill(); if (i === hover) { ctx.lineWidth = 2 / scale; ctx.strokeStyle = '#111'; ctx.stroke(); } });
+    ctx.fillStyle = '#334155'; ctx.font = (11 / scale) + 'px system-ui, sans-serif'; ctx.textBaseline = 'middle';
+    nodes.forEach(function (n, i) { if (n.deg >= 4 || scale > 1.6 || i === hover) ctx.fillText(n.t, n.x + radius(n) + 3 / scale, n.y); });
+    ctx.restore();
+  }
+  function loop() { step(); draw(); _mem.anim = requestAnimationFrame(loop); }
+  function pick(px, py) { const x = (px - ox) / scale, y = (py - oy) / scale; let best = -1, bd = 1e9; nodes.forEach(function (n, i) { const d2 = (n.x - x) * (n.x - x) + (n.y - y) * (n.y - y); const r = radius(n) + 4 / scale; if (d2 < r * r && d2 < bd) { bd = d2; best = i; } }); return best; }
+  function pos(e) { const b = canvas.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return [t.clientX - b.left, t.clientY - b.top]; }
+  canvas.addEventListener('mousemove', function (e) { const p = pos(e); if (drag) { moved = true; if (drag.i >= 0) { nodes[drag.i].x = (p[0] - ox) / scale; nodes[drag.i].y = (p[1] - oy) / scale; temp = Math.max(temp, 0.3); } else { ox = drag.ox + p[0] - drag.x; oy = drag.oy + p[1] - drag.y; } return; } hover = pick(p[0], p[1]); canvas.style.cursor = hover >= 0 ? 'pointer' : 'grab'; });
+  canvas.addEventListener('mousedown', function (e) { const p = pos(e); moved = false; drag = { i: pick(p[0], p[1]), x: p[0], y: p[1], ox: ox, oy: oy }; });
+  window.addEventListener('mouseup', function () { if (drag && !moved && drag.i >= 0) memoryOpenNote(nodes[drag.i].id); drag = null; });
+  canvas.addEventListener('wheel', function (e) { e.preventDefault(); const p = pos(e); const f = e.deltaY < 0 ? 1.12 : 1 / 1.12; ox = p[0] - (p[0] - ox) * f; oy = p[1] - (p[1] - oy) * f; scale *= f; }, { passive: false });
+  canvas.addEventListener('touchstart', function (e) { const p = pos(e); moved = false; drag = { i: pick(p[0], p[1]), x: p[0], y: p[1], ox: ox, oy: oy }; }, { passive: true });
+  canvas.addEventListener('touchmove', function (e) { const p = pos(e); if (!drag) return; moved = true; if (drag.i >= 0) { nodes[drag.i].x = (p[0] - ox) / scale; nodes[drag.i].y = (p[1] - oy) / scale; } else { ox = drag.ox + p[0] - drag.x; oy = drag.oy + p[1] - drag.y; } }, { passive: true });
+  canvas.addEventListener('touchend', function () { if (drag && !moved && drag.i >= 0) memoryOpenNote(nodes[drag.i].id); drag = null; });
+  if (_mem.anim) cancelAnimationFrame(_mem.anim);
+  loop();
+}
+
+function _memColor(f) {
+  return { 'Решения': '#F59E0B', 'Правила': '#7C3AED', 'Объекты': '#2563EB', 'Оборудование': '#10B981', 'Журнал': '#EC4899', 'Система': '#64748B' }[f] || '#94A3B8';
 }
