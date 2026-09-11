@@ -7751,16 +7751,39 @@ async function calcToOffer(id) {
 
 // ============ ПЛАНЁРКА — ежедневная встреча с настраиваемым временем ============
 var _pl = null;
-async function loadPlanerka() {
+var _plLoadPromise = null;
+function loadPlanerka() {
   const box = document.getElementById('planerka-content');
-  if (!box) return;
-  try {
-    if (typeof ensureEmployeesLoaded === 'function') { try { await ensureEmployeesLoaded(); } catch (e) {} }
-    _pl = await apiGet('/api/planerka');
-    renderPlanerka();
-  } catch (e) {
-    box.innerHTML = '<div class="logi-empty"><i class="ti ti-alert-triangle"></i> Не удалось загрузить планёрку</div>';
+  if (!box) return Promise.resolve(null);
+  if (_plLoadPromise) return _plLoadPromise;
+  if (!_pl) {
+    box.innerHTML = '<div class="loading-block">Загружаем планёрку…</div>';
   }
+
+  // Список сотрудников нужен только для чипов посещаемости и не должен
+  // задерживать саму повестку. Загружаем оба запроса одновременно.
+  const employeesLoad = typeof ensureEmployeesLoaded === 'function'
+    ? ensureEmployeesLoaded().catch(function () {})
+    : Promise.resolve();
+
+  const request = apiGet('/api/planerka').then(function (data) {
+    _pl = data;
+    renderPlanerka();
+    employeesLoad.then(function () {
+      if (_pl === data && state.currentScreen === 'planerka') renderPlanerka();
+    });
+    return data;
+  }).catch(function (e) {
+    const reason = String(e && e.message || e || 'Сервер не ответил');
+    box.innerHTML = '<div class="logi-empty"><i class="ti ti-alert-triangle"></i>' +
+      '<div>Не удалось загрузить планёрку<br><small>' + escapeHtml(reason) + '</small></div>' +
+      '<button type="button" class="pl-btn pri" onclick="loadPlanerka()">Повторить</button></div>';
+    return null;
+  }).finally(function () {
+    if (_plLoadPromise === request) _plLoadPromise = null;
+  });
+  _plLoadPromise = request;
+  return request;
 }
 function _plFmtDay(iso) {
   const days = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
