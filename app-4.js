@@ -23632,7 +23632,7 @@ async function memoryReload() {
 function memoryView(v) { _mem.view = v; if (v === 'graph') _memGraph(); else { if (_mem.anim) { cancelAnimationFrame(_mem.anim); _mem.anim = null; } _memRender(); } }
 
 function _memFolderIcon(f) {
-  return { 'Решения': 'ti-bulb', 'Правила': 'ti-ruler-2', 'Объекты': 'ti-map-pin', 'Оборудование': 'ti-engine', 'Журнал': 'ti-notebook', 'Система': 'ti-settings' }[f] || 'ti-file-text';
+  return { 'Хабы': 'ti-hierarchy-2', 'Решения': 'ti-bulb', 'Правила': 'ti-ruler-2', 'Объекты': 'ti-map-pin', 'Оборудование': 'ti-engine', 'Журнал': 'ti-notebook', 'Система': 'ti-settings' }[f] || 'ti-file-text';
 }
 
 function _memRender() {
@@ -23754,7 +23754,7 @@ async function _memGraph() {
   ['list', 'graph'].forEach(function (v) { const b = document.getElementById('mem-tab-' + v); if (b) b.classList.toggle('active', _mem.view === v); });
   let d; try { d = await apiGet('/api/knowledge/graph'); } catch (e) { body.innerHTML = '<div class="empty-block">Граф недоступен</div>'; return; }
   body.innerHTML = '<div class="mem-graph-wrap"><canvas id="mem-canvas"></canvas>' +
-    '<div class="mem-graph-legend">' + ['Решения', 'Правила', 'Объекты', 'Оборудование', 'Журнал', 'Система'].map(function (f) { return '<span><i style="background:' + _memColor(f) + '"></i>' + f + '</span>'; }).join('') +
+    '<div class="mem-graph-legend">' + ['Хабы', 'Решения', 'Правила', 'Объекты', 'Оборудование', 'Журнал', 'Система'].map(function (f) { return '<span><i style="background:' + _memColor(f) + '"></i>' + f + '</span>'; }).join('') +
     '<span class="mem-graph-hint">Колесо — масштаб, тянуть — двигать, клик — открыть</span></div></div>';
   const canvas = document.getElementById('mem-canvas'); const ctx = canvas.getContext('2d');
   const W = canvas.clientWidth || 800, H = canvas.clientHeight || 520, dpr = window.devicePixelRatio || 1;
@@ -23806,5 +23806,5 @@ async function _memGraph() {
 }
 
 function _memColor(f) {
-  return { 'Решения': '#F59E0B', 'Правила': '#7C3AED', 'Объекты': '#2563EB', 'Оборудование': '#10B981', 'Журнал': '#EC4899', 'Система': '#64748B' }[f] || '#94A3B8';
+  return { 'Хабы': '#111827', 'Решения': '#F59E0B', 'Правила': '#7C3AED', 'Объекты': '#2563EB', 'Оборудование': '#10B981', 'Журнал': '#EC4899', 'Система': '#64748B' }[f] || '#94A3B8';
 }
