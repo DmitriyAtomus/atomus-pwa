@@ -89,7 +89,12 @@
 .kp-live-line{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#4B5563;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kp-lock{margin:14px;background:#FEF3C7;border-radius:12px;padding:12px;color:#92400E;font-weight:600}
 @media (max-width:640px){#kp-panel{right:0;left:0;top:auto;bottom:0;width:auto;max-width:none;height:72vh;border-radius:16px 16px 0 0}
-  .kp-mark .tag{max-width:60vw}}
+  .kp-mark .tag{max-width:60vw}
+  #kp-fab.kp-fab-crm{right:78px!important;bottom:86px!important;width:46px!important;height:46px!important;min-width:46px;padding:0!important;
+    display:grid;place-items:center;font-size:0!important;line-height:1;box-shadow:0 5px 15px rgba(120,82,0,.24)}
+  #kp-fab.kp-fab-crm::before{content:'✦';font-size:22px;line-height:1}
+  body.dchat-ag .dchat-input{padding-right:52px}
+}
 `;
 
   const KP = window.KlavaPick = {
@@ -106,6 +111,8 @@
     if (document.getElementById('kp-style')) return;
     const st = el('style'); st.id = 'kp-style'; st.textContent = CSS; document.head.appendChild(st);
     const fab = el('button', 'kp-ui', esc(KP.cfg.fabText)); fab.id = 'kp-fab'; fab.title = 'Отметить на экране, что обсудить с Клавой';
+    fab.setAttribute('aria-label', 'Показать Клаве');
+    if (KP.cfg.page === 'crm') fab.classList.add('kp-fab-crm');
     if (KP.cfg.fabStyle) Object.assign(fab.style, KP.cfg.fabStyle);
     fab.onclick = () => KP.toggle();
     // v2.46.176: remote — модуль живёт внутри чужой страницы (предпросмотр сайта в
