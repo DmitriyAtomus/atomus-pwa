@@ -1,7 +1,10 @@
-/* География проектов Atomus Group — живая карта России и СНГ.
+/* География проектов Atomus Group — живая карта России и СНГ (виджет geo-map, v2).
    Использование: <div id="atomusGeo"></div> + geo-map.css + <script src="geo-map.js" defer>.
    Виджет сам находит #atomusGeo (или data-atomus-geo) и рисует карту. Заказчики не указываются:
-   каждая точка — город, тип объекта, объём/мощность и что сделано. Данные — по референс-листу. */
+   каждая точка — город, тип объекта, объём/мощность и что сделано. Данные — по референс-листу.
+   v2: масштаб колесом и кнопками, перетаскивание, быстрые «Европа / Урал / Сибирь и Восток»,
+   поиск города, подписи появляются при увеличении — европейская часть читается.
+   Палитра: data-theme="green" (тёмно-зелёный сайт) | "navy" (по умолчанию читает переменные страницы). */
 (function () {
   'use strict';
   var TYPES = {
@@ -97,20 +100,40 @@
     return Math.round(Re * Math.acos(Math.min(1, Math.sin(a) * Math.sin(b) + Math.cos(a) * Math.cos(b) * Math.cos(dl))) / 10) * 10;
   }
   function plural(k) { return k === 1 ? 'объект' : (k < 5 ? 'объекта' : 'объектов'); }
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  // Быстрые виды: центр (lon, lat) и масштаб
+  var VIEWS = [
+    { key: 'all', name: 'Вся карта', lon: 0, lat: 0, z: 1 },
+    { key: 'eu', name: 'Европейская часть', lon: 40.5, lat: 54.5, z: 3.1 },
+    { key: 'ural', name: 'Урал и Поволжье', lon: 55.5, lat: 55, z: 3.1 },
+    { key: 'sib', name: 'Сибирь и Восток', lon: 110, lat: 56, z: 1.7 },
+  ];
 
   function mount(root) {
     if (!root || root.dataset.gmMounted) return;
     root.dataset.gmMounted = '1';
     root.classList.add('gm');
+    if (root.dataset.theme) root.classList.add('gm-theme-' + root.dataset.theme);
     root.innerHTML =
-      '<div class="gm-mapbox"><div class="gm-scroll"><svg class="gm-map" viewBox="0 0 1000 560" role="img" aria-label="Карта проектов: Россия и СНГ, объекты Atomus Group"></svg></div>' +
-      '<div class="gm-card" aria-live="polite"><div class="t"></div><div class="k"></div><div class="d"></div></div><div class="gm-hint">← проведите по карте →</div></div>' +
-      '<aside class="gm-rail"><div class="gm-far"><div class="n" data-gm-km>0</div><div class="l">км до самого дальнего объекта · Камчатка</div></div>' +
-      '<div class="gm-filters" role="group" aria-label="Тип объектов"></div><div class="gm-list"></div>' +
-      '<div class="gm-note">Точки поставлены по городам. Названия заказчиков не публикуем — только что стоит и какого объёма.</div></aside>' +
+      '<div class="gm-mapbox">' +
+        '<svg class="gm-map" viewBox="0 0 1000 560" role="img" aria-label="Карта проектов: Россия и СНГ, объекты Atomus Group"></svg>' +
+        '<div class="gm-views" role="group" aria-label="Быстрый вид">' + VIEWS.map(function (v) { return '<button type="button" class="gm-view" data-view="' + v.key + '">' + v.name + '</button>'; }).join('') + '</div>' +
+        '<div class="gm-zoom"><button type="button" class="gm-zbtn" data-z="in" aria-label="Крупнее">+</button><button type="button" class="gm-zbtn" data-z="out" aria-label="Мельче">−</button></div>' +
+        '<div class="gm-card" aria-live="polite"><div class="t"></div><div class="k"></div><div class="d"></div></div>' +
+        '<div class="gm-hint">Колесо или кнопки — масштаб, тянуть — двигать, наведите на точку</div>' +
+      '</div>' +
+      '<aside class="gm-rail">' +
+        '<div class="gm-stats"><div class="gm-stat"><div class="n" data-gm-pts>0</div><div class="l">городов</div></div><div class="gm-stat"><div class="n" data-gm-obj>0</div><div class="l">объектов</div></div>' +
+        '<div class="gm-stat gm-stat-wide"><div class="n"><span data-gm-km>0</span> км</div><div class="l">до самой дальней точки · Камчатка</div></div></div>' +
+        '<div class="gm-search"><input type="search" placeholder="Найти город…" aria-label="Найти город"></div>' +
+        '<div class="gm-filters" role="group" aria-label="Тип объектов"></div>' +
+        '<div class="gm-list"></div>' +
+        '<div class="gm-note">Точки поставлены по городам. Названия заказчиков не публикуем — только что стоит и какого объёма.</div>' +
+      '</aside>' +
       '<div class="gm-foot"><span><b>Дом</b> — Миасс: производство и сборка</span><span>Дуги — маршруты поставок, искры — текущие отгрузки</span></div>';
 
-    var svg = root.querySelector('.gm-map'), mapbox = root.querySelector('.gm-mapbox'), card = root.querySelector('.gm-card'), scroll = root.querySelector('.gm-scroll');
+    var svg = root.querySelector('.gm-map'), mapbox = root.querySelector('.gm-mapbox'), card = root.querySelector('.gm-card');
     var NS = 'http://www.w3.org/2000/svg';
     function el(t, a, parent) { var e = document.createElementNS(NS, t); for (var k in a) e.setAttribute(k, a[k]); (parent || svg).appendChild(e); return e; }
 
@@ -119,85 +142,146 @@
     function bump(lo, la) { var p = proj(lo, la); minx = Math.min(minx, p[0]); maxx = Math.max(maxx, p[0]); miny = Math.min(miny, p[1]); maxy = Math.max(maxy, p[1]); }
     GEO.forEach(function (poly) { poly.forEach(function (ring) { ring.forEach(function (c) { if (c[0] >= 0 && c[0] <= 168 && c[1] <= 73.5) bump(c[0], c[1]); }); }); });
     OBJ.forEach(function (o) { bump(o.lon, o.lat); }); bump(HOME.lon, HOME.lat);
-    var W = 1000, H = 560, pad = 24, padL = 86;
+    var W = 1000, H = 560, pad = 24, padL = 60;
     var k = Math.min((W - pad - padL) / (maxx - minx), (H - 2 * pad) / (maxy - miny));
     var ox = padL + ((W - pad - padL) - (maxx - minx) * k) / 2, oy = pad + ((H - 2 * pad) - (maxy - miny) * k) / 2;
     function P(lon, lat) { var p = proj(lon, lat); return [ox + (p[0] - minx) * k, oy + (p[1] - miny) * k]; }
+
+    el('defs', {}).innerHTML =
+      '<filter id="gm-landglow" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#3f8b70" flood-opacity=".45"/></filter>' +
+      '<filter id="gm-glow"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+    var view = el('g', { 'class': 'gm-view-g' });
     function pathOf(polys, cls) {
       polys.forEach(function (poly) {
         var d = poly.map(function (ring) { return 'M' + ring.map(function (c) { var p = P(c[0], c[1]); return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join('L') + 'Z'; }).join('');
-        el('path', { d: d, 'class': cls });
+        el('path', { d: d, 'class': cls }, view);
       });
     }
-
-    el('defs', {}).innerHTML =
-      '<filter id="gm-landglow" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#2d6f9c" flood-opacity=".45"/></filter>' +
-      '<filter id="gm-glow"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
     pathOf(NB, 'gm-nb');
-    pathOf([].concat.apply([], GEO.map(function (poly) { return [poly]; })), 'gm-land');
-    [['УРАЛ', 60.5, 63], ['ЗАПАДНАЯ СИБИРЬ', 61, 78], ['ВОСТОЧНАЯ СИБИРЬ', 64, 104], ['ДАЛЬНИЙ ВОСТОК', 60, 140], ['ЕВРОПЕЙСКАЯ ЧАСТЬ', 64, 38]].forEach(function (r) {
-      var p = P(r[2], r[1]); el('text', { x: p[0], y: p[1], 'class': 'gm-regionlbl', 'text-anchor': 'middle' }).textContent = r[0];
+    pathOf(GEO.map(function (poly) { return poly; }), 'gm-land');
+    var gRegions = el('g', { 'class': 'gm-regions' }, view);
+    [['УРАЛ', 60.5, 63], ['ЗАПАДНАЯ СИБИРЬ', 63.5, 80], ['ВОСТОЧНАЯ СИБИРЬ', 64, 104], ['ДАЛЬНИЙ ВОСТОК', 60, 140], ['ЕВРОПЕЙСКАЯ ЧАСТЬ', 64, 38]].forEach(function (r) {
+      var p = P(r[2], r[1]); el('text', { x: p[0], y: p[1], 'class': 'gm-regionlbl', 'text-anchor': 'middle' }, gRegions).textContent = r[0];
     });
 
-    var gArcs = el('g', {}), gRun = el('g', {}), gPts = el('g', {});
+    var gArcs = el('g', {}, view), gRun = el('g', {}, view), gPts = el('g', {}, view);
     var home = P(HOME.lon, HOME.lat), hx = home[0], hy = home[1];
     var arcs = OBJ.map(function (o, i) {
       var p = P(o.lon, o.lat), x = p[0], y = p[1];
       var mx = (hx + x) / 2, my = (hy + y) / 2, dx = x - hx, dy = y - hy, L = Math.hypot(dx, dy) || 1;
       var lift = Math.min(90, L * 0.28), cx = mx - dy / L * lift, cy = my + dx / L * lift;
       var path = 'M' + hx.toFixed(1) + ' ' + hy.toFixed(1) + ' Q' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ' ' + x.toFixed(1) + ' ' + y.toFixed(1);
-      var a = el('path', { d: path, 'class': 'gm-arc' }, gArcs);
+      var a = el('path', { d: path, 'class': 'gm-arc', 'vector-effect': 'non-scaling-stroke' }, gArcs);
       var r = el('circle', { r: 2.2, 'class': 'gm-runner', filter: 'url(#gm-glow)' }, gRun);
       el('animateMotion', { dur: (7 + (i % 5) * 1.6) + 's', repeatCount: 'indefinite', begin: (-(i * 1.3)) + 's', path: path }, r);
       return { a: a, r: r, x: x, y: y };
     });
+    var gHome = el('g', { 'class': 'gm-home' }, view);
     [0, 1.2].forEach(function (b) {
-      el('circle', { cx: hx, cy: hy, r: 16, 'class': 'gm-home-ring', opacity: .35 }).innerHTML =
+      el('circle', { cx: hx, cy: hy, r: 16, 'class': 'gm-home-ring', opacity: .35 }, gHome).innerHTML =
         '<animate attributeName="r" values="8;22" dur="2.4s" begin="' + b + 's" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;0" dur="2.4s" begin="' + b + 's" repeatCount="indefinite"/>';
     });
-    el('circle', { cx: hx, cy: hy, r: 5.5, 'class': 'gm-home-core', filter: 'url(#gm-glow)' });
-    el('text', { x: hx - 12, y: hy - 10, 'class': 'gm-home-label', 'text-anchor': 'end' }).textContent = 'МИАСС · ПРОИЗВОДСТВО';
+    el('circle', { cx: hx, cy: hy, r: 5.5, 'class': 'gm-home-core', filter: 'url(#gm-glow)' }, gHome);
+    var homeLbl = el('text', { x: hx - 12, y: hy - 10, 'class': 'gm-home-label', 'text-anchor': 'end' }, gHome); homeLbl.textContent = 'МИАСС · ПРОИЗВОДСТВО';
 
+    // точки: у каждой есть подпись; «второстепенные» показываются только при увеличении
     var pts = OBJ.map(function (o, i) {
       var x = arcs[i].x, y = arcs[i].y;
-      var g = el('g', { 'class': 'gm-pt', tabindex: 0, role: 'button', 'aria-label': o.city + ', ' + TYPES[o.t].name }, gPts);
+      var g = el('g', { 'class': 'gm-pt' + (o.label ? ' gm-major' : ' gm-minor'), tabindex: 0, role: 'button', 'aria-label': o.city + ', ' + TYPES[o.t].name }, gPts);
       var rr = 3 + Math.min(4, o.n) * 0.9;
       el('circle', { cx: x, cy: y, r: rr + 5, 'class': 'gm-halo', stroke: TYPES[o.t].color }, g);
       el('circle', { cx: x, cy: y, r: rr, 'class': 'gm-core', fill: TYPES[o.t].color }, g);
-      if (o.label) { var left = o.lp === 'l'; var t = el('text', { x: left ? x - rr - 5 : x + rr + 5, y: y + 4, 'text-anchor': left ? 'end' : 'start' }, g); t.textContent = o.label === 1 ? o.city : o.label; }
+      var left = o.lp === 'l';
+      var t = el('text', { x: left ? x - rr - 5 : x + rr + 5, y: y + 4, 'text-anchor': left ? 'end' : 'start', 'class': 'gm-lbl' }, g);
+      t.textContent = o.label && o.label !== 1 ? o.label : o.city.split(' · ')[0];
+      g._rr = rr; g._x = x; g._y = y; g._left = left;
       return g;
     });
 
+    // ---- масштаб и панорама
+    var Z = { s: 1, tx: 0, ty: 0 };
+    // U — «единица экрана»: на узком экране SVG ужат, и 11 единиц viewBox превращаются в 4 px;
+    // размеры подписей и точек умножаем на U, чтобы они были одинаковыми в пикселях
+    var U = 1;
+    function unit() { var w = svg.getBoundingClientRect().width || W; U = Math.max(1, Math.min(2.8, W / w)); }
+    function applyZoom() {
+      unit();
+      view.setAttribute('transform', 'translate(' + Z.tx.toFixed(2) + ' ' + Z.ty.toFixed(2) + ') scale(' + Z.s.toFixed(3) + ')');
+      var inv = U / Z.s;
+      pts.forEach(function (g) {
+        var c = g.querySelectorAll('circle'); c[0].setAttribute('r', (g._rr + 5) * inv); c[1].setAttribute('r', g._rr * inv);
+        c[1].setAttribute('stroke-width', 1.5 * inv); c[0].setAttribute('stroke-width', (g.classList.contains('active') ? 2 : 1) * inv);
+        var t = g.querySelector('text'); t.setAttribute('font-size', (11 * inv).toFixed(2)); t.setAttribute('stroke-width', 3 * inv);
+        t.setAttribute('x', g._left ? g._x - (g._rr + 5) * inv : g._x + (g._rr + 5) * inv); t.setAttribute('y', g._y + 4 * inv);
+      });
+      gHome.querySelectorAll('circle').forEach(function (c) { c.setAttribute('transform', 'translate(' + hx + ' ' + hy + ') scale(' + inv + ') translate(' + (-hx) + ' ' + (-hy) + ')'); });
+      homeLbl.setAttribute('font-size', (11.5 * inv).toFixed(2)); homeLbl.setAttribute('x', hx - 12 * inv); homeLbl.setAttribute('y', hy - 10 * inv); homeLbl.setAttribute('stroke-width', 3 * inv);
+      gRegions.querySelectorAll('text').forEach(function (t) { t.setAttribute('font-size', (9.5 * inv).toFixed(2)); t.setAttribute('opacity', Z.s > 2.2 ? .35 : 1); });
+      gRun.querySelectorAll('circle').forEach(function (c) { c.setAttribute('r', 2.2 * inv); });
+      gArcs.querySelectorAll('path').forEach(function (a) { a.setAttribute('stroke-width', U > 1.5 ? 0.8 : 1); });
+      mapbox.classList.toggle('gm-zoomed', Z.s >= 1.9);
+      root.querySelectorAll('.gm-view').forEach(function (b) { b.classList.toggle('active', b.dataset.view === (Z.key || 'all')); });
+      if (active >= 0) placeCard(active);
+    }
+    function clamp() {
+      Z.s = Math.max(1, Math.min(6, Z.s));
+      var minTx = W - W * Z.s, minTy = H - H * Z.s;
+      Z.tx = Math.max(minTx, Math.min(0, Z.tx)); Z.ty = Math.max(minTy, Math.min(0, Z.ty));
+    }
+    function zoomAt(vx, vy, factor) { Z.key = ''; var ns = Math.max(1, Math.min(6, Z.s * factor)); factor = ns / Z.s; Z.tx = vx - (vx - Z.tx) * factor; Z.ty = vy - (vy - Z.ty) * factor; Z.s = ns; clamp(); applyZoom(); }
+    function centerOn(x, y, s, key) { Z.s = s; Z.tx = W / 2 - x * s; Z.ty = H / 2 - y * s; clamp(); Z.key = key || ''; applyZoom(); }
+    function setView(key) { var v = VIEWS.filter(function (v) { return v.key === key; })[0] || VIEWS[0]; if (v.z === 1) { Z.s = 1; Z.tx = 0; Z.ty = 0; Z.key = 'all'; applyZoom(); return; } var p = P(v.lon, v.lat); centerOn(p[0], p[1], v.z, key); }
+    function toView(ev) { var b = svg.getBoundingClientRect(); var t = ev.touches ? ev.touches[0] : ev; return [(t.clientX - b.left) * W / b.width, (t.clientY - b.top) * H / b.height]; }
+    root.querySelectorAll('.gm-view').forEach(function (b) { b.addEventListener('click', function () { paused = true; setView(b.dataset.view); setTimeout(function () { paused = false; }, 8000); }); });
+    root.querySelectorAll('.gm-zbtn').forEach(function (b) { b.addEventListener('click', function () { zoomAt(W / 2, H / 2, b.dataset.z === 'in' ? 1.5 : 1 / 1.5); }); });
+    svg.addEventListener('wheel', function (e) { e.preventDefault(); var p = toView(e); zoomAt(p[0], p[1], e.deltaY < 0 ? 1.25 : 1 / 1.25); }, { passive: false });
+    var drag = null, dragged = false;
+    svg.addEventListener('mousedown', function (e) { if (e.button !== 0) return; var p = toView(e); drag = { x: p[0], y: p[1], tx: Z.tx, ty: Z.ty }; dragged = false; svg.classList.add('gm-dragging'); });
+    window.addEventListener('mousemove', function (e) { if (!drag) return; var p = toView(e); if (Math.abs(p[0] - drag.x) + Math.abs(p[1] - drag.y) > 3) dragged = true; Z.tx = drag.tx + (p[0] - drag.x); Z.ty = drag.ty + (p[1] - drag.y); Z.key = ''; clamp(); applyZoom(); });
+    window.addEventListener('mouseup', function () { drag = null; svg.classList.remove('gm-dragging'); });
+    var pinch = null;
+    svg.addEventListener('touchstart', function (e) { paused = true; if (e.touches.length === 2) { pinch = { d: Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY), s: Z.s }; drag = null; } else { var p = toView(e); drag = { x: p[0], y: p[1], tx: Z.tx, ty: Z.ty }; } }, { passive: true });
+    svg.addEventListener('touchmove', function (e) {
+      if (pinch && e.touches.length === 2) { e.preventDefault(); var d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); var b = svg.getBoundingClientRect(); var cx = ((e.touches[0].clientX + e.touches[1].clientX) / 2 - b.left) * W / b.width, cy = ((e.touches[0].clientY + e.touches[1].clientY) / 2 - b.top) * H / b.height; zoomAt(cx, cy, (pinch.s * d / pinch.d) / Z.s); return; }
+      if (!drag || e.touches.length !== 1) return; if (Z.s > 1.01) e.preventDefault(); var p = toView(e); Z.tx = drag.tx + (p[0] - drag.x); Z.ty = drag.ty + (p[1] - drag.y); Z.key = ''; clamp(); applyZoom();
+    }, { passive: false });
+    svg.addEventListener('touchend', function () { drag = null; pinch = null; setTimeout(function () { paused = false; }, 8000); }, { passive: true });
+
+    // ---- карточка, автопоказ, фильтры, список
     var active = -1, paused = false, rows = [];
-    function show(i) {
-      active = i; var o = OBJ[i], x = arcs[i].x, y = arcs[i].y;
+    function placeCard(i) {
+      if (mapbox.classList.contains('gm-static-card') || getComputedStyle(card).position === 'relative') return;
+      var pt = svg.createSVGPoint(); pt.x = arcs[i].x; pt.y = arcs[i].y;
+      var sp = pt.matrixTransform(view.getScreenCTM()); var bb = mapbox.getBoundingClientRect();
+      var left = Math.max(130, Math.min(bb.width - 130, sp.x - bb.left)), top = sp.y - bb.top - 10;
+      card.style.left = left + 'px'; card.style.top = top + 'px';
+      card.style.transform = top < 120 ? 'translate(-50%,22px)' : 'translate(-50%,-115%)';
+    }
+    function show(i, quiet) {
+      active = i; var o = OBJ[i];
       pts.forEach(function (g, j) { g.classList.toggle('active', j === i); });
       rows.forEach(function (r, j) { r.classList.toggle('active', j === i); });
-      var bb = mapbox.getBoundingClientRect(), vb = svg.getBoundingClientRect();
-      var sx = vb.width / W, sy = vb.height / H;
-      var left = vb.left - bb.left + x * sx, top = vb.top - bb.top + y * sy - 8;
-      left = Math.max(120, Math.min(bb.width - 120, left));
-      card.style.left = left + 'px'; card.style.top = top + 'px';
-      card.style.transform = top < 110 ? 'translate(-50%,18px)' : 'translate(-50%,-115%)';
-      // узкий экран: карта шире окна — подъезжаем к точке, пока листает автопоказ
-      if (!paused && scroll.scrollWidth > scroll.clientWidth + 4) scroll.scrollTo({ left: Math.max(0, x * sx - scroll.clientWidth / 2), behavior: 'smooth' });
+      placeCard(i);
       card.querySelector('.t').textContent = o.city + ' · ' + o.reg;
       var kk = card.querySelector('.k'); kk.textContent = TYPES[o.t].name + (o.vol ? ' · ' + o.vol : ''); kk.style.color = TYPES[o.t].color;
-      card.querySelector('.d').innerHTML = '<b>' + o.n + ' ' + plural(o.n) + '</b> · ' + o.note + ' · ' + km(o).toLocaleString('ru-RU') + ' км от Миасса';
+      card.querySelector('.d').innerHTML = '<b>' + o.n + ' ' + plural(o.n) + '</b> · ' + esc(o.note) + ' · ' + km(o).toLocaleString('ru-RU') + ' км от Миасса';
       card.classList.add('on');
+      applyZoom();
     }
-    function hide() { card.classList.remove('on'); pts.forEach(function (g) { g.classList.remove('active'); }); rows.forEach(function (r) { r.classList.remove('active'); }); }
+    function hide() { card.classList.remove('on'); active = -1; pts.forEach(function (g) { g.classList.remove('active'); }); rows.forEach(function (r) { r.classList.remove('active'); }); }
     pts.forEach(function (g, i) {
       g.addEventListener('mouseenter', function () { paused = true; show(i); });
       g.addEventListener('mouseleave', function () { paused = false; });
       g.addEventListener('focus', function () { paused = true; show(i); });
       g.addEventListener('blur', function () { paused = false; });
-      g.addEventListener('click', function () { paused = true; show(i); });
+      g.addEventListener('click', function (e) { if (dragged) return; e.stopPropagation(); paused = true; show(i); });
     });
 
     var on = {}; Object.keys(TYPES).forEach(function (t) { on[t] = true; });
-    function visible() { return OBJ.map(function (o, i) { return i; }).filter(function (i) { return on[OBJ[i].t]; }); }
-    function rotate() { if (paused || document.hidden) return; var v = visible(); if (!v.length) return hide(); show(v[(v.indexOf(active) + 1) % v.length]); }
+    var q = '';
+    function match(o) { return on[o.t] && (!q || (o.city + ' ' + o.reg).toLowerCase().indexOf(q) >= 0); }
+    function visible() { return OBJ.map(function (o, i) { return i; }).filter(function (i) { return match(OBJ[i]); }); }
+    function rotate() { if (paused || document.hidden || q) return; var v = visible(); if (!v.length) return hide(); show(v[(v.indexOf(active) + 1) % v.length]); }
     var filters = root.querySelector('.gm-filters');
     Object.keys(TYPES).forEach(function (key) {
       var t = TYPES[key], b = document.createElement('button'); b.className = 'gm-chip'; b.type = 'button'; b.setAttribute('aria-pressed', 'true');
@@ -206,29 +290,31 @@
       filters.appendChild(b);
     });
     function apply() {
-      OBJ.forEach(function (o, i) { var off = !on[o.t]; pts[i].classList.toggle('off', off); arcs[i].a.classList.toggle('off', off); arcs[i].r.classList.toggle('off', off); rows[i].hidden = off; });
-      if (active >= 0 && !on[OBJ[active].t]) hide();
+      var shown = 0, objs = 0;
+      OBJ.forEach(function (o, i) { var off = !match(o); pts[i].classList.toggle('off', off); arcs[i].a.classList.toggle('off', off); arcs[i].r.classList.toggle('off', off); rows[i].hidden = off; if (!off) { shown++; objs += o.n; } });
+      root.querySelector('[data-gm-pts]').textContent = shown; root.querySelector('[data-gm-obj]').textContent = objs;
+      if (active >= 0 && !match(OBJ[active])) hide();
     }
     var list = root.querySelector('.gm-list');
     var order = OBJ.map(function (o, i) { return i; }).sort(function (a, b) { return OBJ[b].n - OBJ[a].n || OBJ[a].city.localeCompare(OBJ[b].city, 'ru'); });
     order.forEach(function (i) {
       var o = OBJ[i], r = document.createElement('button'); r.type = 'button'; r.className = 'gm-row';
-      r.innerHTML = '<i style="background:' + TYPES[o.t].color + '"></i><span class="c">' + o.city + '</span><span class="y">' + (o.vol || '') + '</span>';
+      r.innerHTML = '<i style="background:' + TYPES[o.t].color + '"></i><span class="c">' + esc(o.city) + '</span><span class="y">' + esc(o.vol || '') + '</span>';
       r.addEventListener('mouseenter', function () { paused = true; show(i); });
       r.addEventListener('mouseleave', function () { paused = false; });
-      r.addEventListener('click', function () { paused = true; show(i); });
+      r.addEventListener('click', function () { paused = true; centerOn(arcs[i].x, arcs[i].y, Math.max(Z.s, 2.6)); show(i); setTimeout(function () { paused = false; }, 10000); });
       rows[i] = r; list.appendChild(r);
     });
+    var search = root.querySelector('.gm-search input');
+    var st;
+    search.addEventListener('input', function () { clearTimeout(st); st = setTimeout(function () { q = search.value.trim().toLowerCase(); apply(); var v = visible(); if (q && v.length) { paused = true; if (v.length === 1) centerOn(arcs[v[0]].x, arcs[v[0]].y, 3); show(v[0]); } else if (!q) { paused = false; } }, 200); });
     root.querySelector('[data-gm-km]').textContent = Math.max.apply(null, OBJ.map(km)).toLocaleString('ru-RU');
-
+    apply(); applyZoom();
+    window.addEventListener('resize', function () { clearTimeout(root._gmRt); root._gmRt = setTimeout(applyZoom, 150); });
+    // узкий экран: вся карта в 340 px не читается — стартуем с европейской части
+    if (mapbox.getBoundingClientRect().width < 640) setView('eu');
     var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!reduced) {
-      mapbox.addEventListener('mousemove', function (e) { var b = mapbox.getBoundingClientRect(); var dx = (e.clientX - b.left) / b.width - .5, dy = (e.clientY - b.top) / b.height - .5; svg.style.transform = 'translate(' + (-dx * 6).toFixed(1) + 'px,' + (-dy * 4).toFixed(1) + 'px)'; });
-      mapbox.addEventListener('mouseleave', function () { svg.style.transform = ''; });
-    }
-    if (scroll.scrollWidth > scroll.clientWidth + 4) scroll.scrollLeft = hx * (svg.getBoundingClientRect().width / W) - scroll.clientWidth / 2;
-    scroll.addEventListener('touchstart', function () { paused = true; }, { passive: true });
-    scroll.addEventListener('touchend', function () { setTimeout(function () { paused = false; }, 6000); }, { passive: true });
+    if (reduced) root.classList.add('gm-still');
     setInterval(rotate, 4000);
     setTimeout(function () { show(OBJ.findIndex(function (o) { return o.city === 'Владивосток'; })); }, 800);
   }
