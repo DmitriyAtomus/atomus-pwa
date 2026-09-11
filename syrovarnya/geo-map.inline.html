@@ -37,8 +37,20 @@
 .gm-pt.gm-minor text{opacity:0}
 .gm-zoomed .gm-pt.gm-minor text,.gm-pt.active text{opacity:1}
 .gm-home-label{font-family:var(--gm-font);font-weight:800;fill:var(--gm-gold);letter-spacing:.1em;paint-order:stroke;stroke:var(--gm-ground)}
-.gm-regionlbl{font-family:var(--gm-font);font-weight:700;fill:var(--gm-ink-3);letter-spacing:.22em;text-transform:uppercase;pointer-events:none}
-.gm-views{position:absolute;left:12px;top:12px;display:flex;gap:6px;flex-wrap:wrap;max-width:70%}
+.gm-regionlbl{font-family:var(--gm-font);font-weight:800;fill:var(--gm-ink-2);letter-spacing:.2em;text-transform:uppercase;paint-order:stroke;stroke:var(--gm-ground);stroke-width:3px;stroke-linejoin:round}
+.gm-regioncnt{font-family:var(--gm-font);font-weight:600;fill:var(--gm-gold);paint-order:stroke;stroke:var(--gm-ground);stroke-width:3px;stroke-linejoin:round}
+.gm-zonelbl{cursor:pointer} .gm-zonelbl:hover .gm-regionlbl{fill:#fff}
+.gm-zone{stroke:none} .gm-zone-0{fill:rgba(227,182,86,.09)} .gm-zone-1{fill:rgba(127,216,196,.09)}
+.gm-zone-line{fill:none;stroke:rgba(255,255,255,.28);stroke-width:1;stroke-dasharray:4 5}
+.gm-pt.gm-hidden{display:none}
+.gm-cluster{cursor:pointer}
+.gm-cl-halo{fill:var(--gm-gold);opacity:.18}
+.gm-cl-core{fill:var(--gm-ground-2);stroke:var(--gm-gold);stroke-width:1.6;vector-effect:non-scaling-stroke}
+.gm-cluster:hover .gm-cl-core,.gm-cluster:focus-visible .gm-cl-core{fill:var(--gm-gold)}
+.gm-cluster:hover .gm-cl-num,.gm-cluster:focus-visible .gm-cl-num{fill:#1a1405}
+.gm-cluster:focus{outline:none}
+.gm-cl-num{font-family:var(--gm-font);font-weight:800;fill:var(--gm-gold);pointer-events:none}
+.gm-views{position:absolute;left:12px;top:12px;display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 70px)}
 .gm-view{border:1px solid var(--gm-line);background:var(--gm-panel);color:var(--gm-ink-2);border-radius:999px;padding:6px 12px;font:600 12.5px var(--gm-font);cursor:pointer;transition:.2s}
 .gm-view:hover{color:var(--gm-ink);border-color:var(--gm-gold)}
 .gm-view.active{background:var(--gm-gold);color:#1a1405;border-color:var(--gm-gold)}
@@ -79,7 +91,7 @@
 @media (max-width:900px){.gm{grid-template-columns:1fr}.gm-mapbox{min-height:380px;height:64vw}.gm-list{max-height:220px}.gm-views{max-width:60%}}
 @media (max-width:640px){.gm-mapbox{height:auto;min-height:0;display:flex;flex-direction:column}.gm-map{height:360px;flex:none}.gm-hint{display:none}.gm-view{padding:5px 9px;font-size:11.5px}
   .gm-card{position:relative;left:auto!important;top:auto!important;transform:none!important;opacity:1;max-width:none;min-width:0;min-height:92px;border-radius:0;border-width:1px 0 0;box-shadow:none}
-  .gm-views{top:auto;bottom:calc(100% - 352px);left:8px}.gm-views{position:absolute;top:8px;bottom:auto;max-width:calc(100% - 60px)}.gm-zoom{top:8px;right:8px}}
+  .gm-views{position:absolute;top:8px;left:8px;max-width:calc(100% - 60px);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.gm-views::-webkit-scrollbar{display:none}.gm-view{white-space:nowrap;flex:none}.gm-zoom{top:8px;right:8px}}
 
 </style>
 <div id="atomusGeo" data-theme="green"></div>
@@ -189,12 +201,17 @@
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
   // Быстрые виды: центр (lon, lat) и масштаб
-  var VIEWS = [
-    { key: 'all', name: 'Вся карта', lon: 0, lat: 0, z: 1 },
-    { key: 'eu', name: 'Европейская часть', lon: 40.5, lat: 54.5, z: 3.1 },
-    { key: 'ural', name: 'Урал и Поволжье', lon: 55.5, lat: 55, z: 3.1 },
-    { key: 'sib', name: 'Сибирь и Восток', lon: 110, lat: 56, z: 1.7 },
+  // Зоны территории — полосы между меридианами (в конической проекции границы — прямые лучи).
+  // У каждой: диапазон долгот, центр и масштаб быстрого вида, точка подписи.
+  var ZONES = [
+    { key: 'eu', name: 'Европейская часть', lon: [-10, 57.5], c: [40.5, 54.5], z: 3.1, lbl: [37, 64.5] },
+    { key: 'ural', name: 'Урал', lon: [57.5, 68], c: [61.5, 57.5], z: 3.4, lbl: [62.5, 62] },
+    { key: 'wsib', name: 'Западная Сибирь', lon: [68, 90], c: [79, 59], z: 2.3, lbl: [79, 64] },
+    { key: 'esib', name: 'Восточная Сибирь', lon: [90, 122], c: [106, 60], z: 1.9, lbl: [106, 65.5] },
+    { key: 'fe', name: 'Дальний Восток', lon: [122, 200], c: [140, 56], z: 1.6, lbl: [141, 62] },
   ];
+  var VIEWS = [{ key: 'all', name: 'Вся карта', z: 1 }].concat(ZONES.map(function (z) { return { key: z.key, name: z.name, lon: z.c[0], lat: z.c[1], z: z.z }; }));
+  function zoneOf(o) { for (var i = 0; i < ZONES.length; i++) if (o.lon < ZONES[i].lon[1]) return ZONES[i]; return ZONES[ZONES.length - 1]; }
 
   function mount(root) {
     if (!root || root.dataset.gmMounted) return;
@@ -245,12 +262,29 @@
     }
     pathOf(NB, 'gm-nb');
     pathOf(GEO.map(function (poly) { return poly; }), 'gm-land');
+    // зоны: подкраска полос по суше (через clipPath), пунктирные границы по меридианам, подписи с числом городов
+    var clip = el('clipPath', { id: 'gm-landclip' }, svg.querySelector('defs'));
+    GEO.forEach(function (poly) { var d = poly.map(function (ring) { return 'M' + ring.map(function (c) { var p = P(c[0], c[1]); return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join('L') + 'Z'; }).join(''); el('path', { d: d }, clip); });
+    var gZones = el('g', { 'class': 'gm-zones', 'clip-path': 'url(#gm-landclip)' }, view);
+    function meridian(lon, from, to) { var pts = []; for (var la = from; la <= to; la += 2) pts.push(P(lon, la)); return pts; }
+    ZONES.forEach(function (z, i) {
+      var a = Math.max(z.lon[0], 15), b = Math.min(z.lon[1], 185);
+      var up = meridian(a, 38, 84), down = meridian(b, 38, 84).reverse();
+      var d = 'M' + up.concat(down).map(function (p) { return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join('L') + 'Z';
+      el('path', { d: d, 'class': 'gm-zone gm-zone-' + (i % 2) }, gZones);
+      if (i) el('path', { d: 'M' + meridian(a, 38, 84).map(function (p) { return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join('L'), 'class': 'gm-zone-line', 'vector-effect': 'non-scaling-stroke' }, gZones);
+    });
     var gRegions = el('g', { 'class': 'gm-regions' }, view);
-    [['УРАЛ', 60.5, 63], ['ЗАПАДНАЯ СИБИРЬ', 63.5, 80], ['ВОСТОЧНАЯ СИБИРЬ', 64, 104], ['ДАЛЬНИЙ ВОСТОК', 60, 140], ['ЕВРОПЕЙСКАЯ ЧАСТЬ', 64, 38]].forEach(function (r) {
-      var p = P(r[2], r[1]); el('text', { x: p[0], y: p[1], 'class': 'gm-regionlbl', 'text-anchor': 'middle' }, gRegions).textContent = r[0];
+    ZONES.forEach(function (z) {
+      var p = P(z.lbl[0], z.lbl[1]); var cnt = OBJ.filter(function (o) { return zoneOf(o) === z; }).length;
+      var g = el('g', { 'class': 'gm-zonelbl', 'data-view': z.key }, gRegions);
+      var t = el('text', { x: p[0], y: p[1], 'text-anchor': 'middle', 'class': 'gm-regionlbl' }, g); t.textContent = z.name.toUpperCase();
+      var c = el('text', { x: p[0], y: p[1], 'text-anchor': 'middle', 'class': 'gm-regioncnt' }, g); c.textContent = cnt + ' ' + (cnt === 1 ? 'город' : (cnt < 5 ? 'города' : 'городов'));
+      g._x = p[0]; g._y = p[1];
+      g.addEventListener('click', function () { paused = true; setView(z.key); setTimeout(function () { paused = false; }, 8000); });
     });
 
-    var gArcs = el('g', {}, view), gRun = el('g', {}, view), gPts = el('g', {}, view);
+    var gArcs = el('g', {}, view), gRun = el('g', {}, view), gPts = el('g', {}, view), gClusters = el('g', { 'class': 'gm-clusters' }, view);
     var home = P(HOME.lon, HOME.lat), hx = home[0], hy = home[1];
     var arcs = OBJ.map(function (o, i) {
       var p = P(o.lon, o.lat), x = p[0], y = p[1];
@@ -286,6 +320,46 @@
 
     // ---- масштаб и панорама
     var Z = { s: 1, tx: 0, ty: 0 };
+    var clusterOf = [];   // индекс точки → кластер (или null)
+    function recluster(inv) {
+      // жадно: точки ближе 24 px на экране собираем в один кружок с числом; при увеличении распадаются
+      var Rc = 24 * inv, used = [], groups = [];
+      clusterOf = [];
+      var idx = OBJ.map(function (o, i) { return i; }).filter(function (i) { return !pts[i].classList.contains('off'); });
+      idx.forEach(function (i) {
+        if (used[i]) return;
+        var m = [i]; used[i] = true;
+        idx.forEach(function (j) { if (!used[j] && Math.hypot(arcs[i].x - arcs[j].x, arcs[i].y - arcs[j].y) < Rc) { m.push(j); used[j] = true; } });
+        if (m.length > 1) groups.push(m);
+      });
+      // второй проход: сливаем группы, чьи центры ближе Rc
+      var merged = true;
+      while (merged) { merged = false; for (var a = 0; a < groups.length && !merged; a++) for (var b = a + 1; b < groups.length; b++) { var ca = centroid(groups[a]), cb = centroid(groups[b]); if (Math.hypot(ca[0] - cb[0], ca[1] - cb[1]) < Rc * 1.1) { groups[a] = groups[a].concat(groups[b]); groups.splice(b, 1); merged = true; break; } } }
+      function centroid(m) { var x = 0, y = 0; m.forEach(function (i) { x += arcs[i].x; y += arcs[i].y; }); return [x / m.length, y / m.length]; }
+      pts.forEach(function (g) { g.classList.remove('gm-hidden'); });
+      gClusters.innerHTML = '';
+      groups.forEach(function (m) {
+        var c = centroid(m), objs = 0; m.forEach(function (i) { pts[i].classList.add('gm-hidden'); clusterOf[i] = m; objs += OBJ[i].n; });
+        var r = (10 + Math.min(9, m.length * 1.1)) * inv;
+        var g = el('g', { 'class': 'gm-cluster', tabindex: 0, role: 'button', 'aria-label': m.length + ' городов рядом' }, gClusters);
+        el('circle', { cx: c[0], cy: c[1], r: r + 4 * inv, 'class': 'gm-cl-halo' }, g);
+        el('circle', { cx: c[0], cy: c[1], r: r, 'class': 'gm-cl-core' }, g);
+        var t = el('text', { x: c[0], y: c[1] + 4 * inv, 'text-anchor': 'middle', 'font-size': (11.5 * inv).toFixed(2), 'class': 'gm-cl-num' }, g); t.textContent = m.length;
+        var names = m.map(function (i) { return OBJ[i].city.split(' · ')[0]; });
+        function showCluster() {
+          paused = true; active = -1; pts.forEach(function (p) { p.classList.remove('active'); }); rows.forEach(function (r) { r.classList.remove('active'); });
+          var pt = svg.createSVGPoint(); pt.x = c[0]; pt.y = c[1]; var sp = pt.matrixTransform(view.getScreenCTM()); var bb = mapbox.getBoundingClientRect();
+          if (getComputedStyle(card).position !== 'relative') { var left = Math.max(130, Math.min(bb.width - 130, sp.x - bb.left)), top = sp.y - bb.top - r * (bb.width / W) - 6; card.style.left = left + 'px'; card.style.top = top + 'px'; card.style.transform = top < 120 ? 'translate(-50%,' + (2 * r * (bb.width / W) + 16) + 'px)' : 'translate(-50%,-115%)'; }
+          card.querySelector('.t').textContent = m.length + ' ' + (m.length < 5 ? 'города' : 'городов') + ' рядом · ' + objs + ' ' + plural(objs);
+          var kk = card.querySelector('.k'); kk.textContent = zoneOf(OBJ[m[0]]).name; kk.style.color = '';
+          card.querySelector('.d').innerHTML = esc(names.slice(0, 12).join(' · ')) + (names.length > 12 ? ' и ещё ' + (names.length - 12) : '') + '<br><b>Нажмите — приблизить</b>';
+          card.classList.add('on');
+        }
+        g.addEventListener('mouseenter', showCluster); g.addEventListener('focus', showCluster);
+        g.addEventListener('mouseleave', function () { paused = false; }); g.addEventListener('blur', function () { paused = false; });
+        g.addEventListener('click', function (e) { if (dragged) return; e.stopPropagation(); centerOn(c[0], c[1], Math.min(6, Z.s * 2.4)); });
+      });
+    }
     // U — «единица экрана»: на узком экране SVG ужат, и 11 единиц viewBox превращаются в 4 px;
     // размеры подписей и точек умножаем на U, чтобы они были одинаковыми в пикселях
     var U = 1;
@@ -302,7 +376,8 @@
       });
       gHome.querySelectorAll('circle').forEach(function (c) { c.setAttribute('transform', 'translate(' + hx + ' ' + hy + ') scale(' + inv + ') translate(' + (-hx) + ' ' + (-hy) + ')'); });
       homeLbl.setAttribute('font-size', (11.5 * inv).toFixed(2)); homeLbl.setAttribute('x', hx - 12 * inv); homeLbl.setAttribute('y', hy - 10 * inv); homeLbl.setAttribute('stroke-width', 3 * inv);
-      gRegions.querySelectorAll('text').forEach(function (t) { t.setAttribute('font-size', (9.5 * inv).toFixed(2)); t.setAttribute('opacity', Z.s > 2.2 ? .35 : 1); });
+      gRegions.querySelectorAll('.gm-zonelbl').forEach(function (g) { var t = g.querySelectorAll('text'); t[0].setAttribute('font-size', (10 * inv).toFixed(2)); t[0].setAttribute('y', g._y - 7 * inv); t[1].setAttribute('font-size', (10.5 * inv).toFixed(2)); t[1].setAttribute('y', g._y + 8 * inv); g.setAttribute('opacity', Z.s > 2.4 ? .45 : 1); });
+      recluster(inv);
       gRun.querySelectorAll('circle').forEach(function (c) { c.setAttribute('r', 2.2 * inv); });
       gArcs.querySelectorAll('path').forEach(function (a) { a.setAttribute('stroke-width', U > 1.5 ? 0.8 : 1); });
       mapbox.classList.toggle('gm-zoomed', Z.s >= 1.9);
@@ -344,6 +419,7 @@
       card.style.transform = top < 120 ? 'translate(-50%,22px)' : 'translate(-50%,-115%)';
     }
     function show(i, quiet) {
+      if (clusterOf[i] && !quiet) { centerOn(arcs[i].x, arcs[i].y, Math.max(Z.s * 2.4, 3)); }
       active = i; var o = OBJ[i];
       pts.forEach(function (g, j) { g.classList.toggle('active', j === i); });
       rows.forEach(function (r, j) { r.classList.toggle('active', j === i); });
@@ -367,7 +443,7 @@
     var q = '';
     function match(o) { return on[o.t] && (!q || (o.city + ' ' + o.reg).toLowerCase().indexOf(q) >= 0); }
     function visible() { return OBJ.map(function (o, i) { return i; }).filter(function (i) { return match(OBJ[i]); }); }
-    function rotate() { if (paused || document.hidden || q) return; var v = visible(); if (!v.length) return hide(); show(v[(v.indexOf(active) + 1) % v.length]); }
+    function rotate() { if (paused || document.hidden || q) return; var v = visible().filter(function (i) { return !clusterOf[i]; }); if (!v.length) return hide(); show(v[(v.indexOf(active) + 1) % v.length]); }
     var filters = root.querySelector('.gm-filters');
     Object.keys(TYPES).forEach(function (key) {
       var t = TYPES[key], b = document.createElement('button'); b.className = 'gm-chip'; b.type = 'button'; b.setAttribute('aria-pressed', 'true');
@@ -380,6 +456,7 @@
       OBJ.forEach(function (o, i) { var off = !match(o); pts[i].classList.toggle('off', off); arcs[i].a.classList.toggle('off', off); arcs[i].r.classList.toggle('off', off); rows[i].hidden = off; if (!off) { shown++; objs += o.n; } });
       root.querySelector('[data-gm-pts]').textContent = shown; root.querySelector('[data-gm-obj]').textContent = objs;
       if (active >= 0 && !match(OBJ[active])) hide();
+      if (root.dataset.gmReady) applyZoom();
     }
     var list = root.querySelector('.gm-list');
     var order = OBJ.map(function (o, i) { return i; }).sort(function (a, b) { return OBJ[b].n - OBJ[a].n || OBJ[a].city.localeCompare(OBJ[b].city, 'ru'); });
@@ -395,7 +472,7 @@
     var st;
     search.addEventListener('input', function () { clearTimeout(st); st = setTimeout(function () { q = search.value.trim().toLowerCase(); apply(); var v = visible(); if (q && v.length) { paused = true; if (v.length === 1) centerOn(arcs[v[0]].x, arcs[v[0]].y, 3); show(v[0]); } else if (!q) { paused = false; } }, 200); });
     root.querySelector('[data-gm-km]').textContent = Math.max.apply(null, OBJ.map(km)).toLocaleString('ru-RU');
-    apply(); applyZoom();
+    root.dataset.gmReady = '1'; apply();
     window.addEventListener('resize', function () { clearTimeout(root._gmRt); root._gmRt = setTimeout(applyZoom, 150); });
     // узкий экран: вся карта в 340 px не читается — стартуем с европейской части
     if (mapbox.getBoundingClientRect().width < 640) setView('eu');
