@@ -19,6 +19,7 @@
   padding:10px 16px;font:800 13px Inter,system-ui,sans-serif;box-shadow:0 8px 20px rgba(0,0,0,.25);cursor:pointer}
 #kp-fab:hover{background:#F59E0B}
 #kp-fab.hidden{display:none}
+#kp-fab.dragging{transition:none!important;cursor:grabbing;box-shadow:0 9px 25px rgba(120,82,0,.38)!important}
 #kp-layer{position:fixed;inset:0;z-index:99990;cursor:crosshair;background:rgba(15,30,50,.12)}
 #kp-bar{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:99992;background:#0F1E32;color:#fff;border-radius:999px;
   padding:9px 16px;font-weight:700;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.3);white-space:nowrap;max-width:96vw;overflow:hidden}
@@ -47,6 +48,24 @@
 .kp-ph .x{margin-left:auto;background:none;border:0;color:#9AA7B8;font-size:18px;cursor:pointer;line-height:1}
 .kp-topic{margin:10px 14px 4px;display:flex;align-items:center;gap:8px;font-size:11.5px;color:#4B5563}
 .kp-topic select{flex:1;min-width:0;border:1px solid #D9E1EC;border-radius:8px;padding:5px 8px;font:600 12px Inter,system-ui,sans-serif;color:#1E4E8C;background:#EEF4FF}
+.kp-topic-open{display:none}
+.kp-topic-picker{position:absolute;inset:0;z-index:8;display:flex;flex-direction:column;background:#F6F8FC}
+.kp-topic-picker.hidden{display:none}
+.kp-topic-picker-head{display:flex;align-items:center;gap:10px;padding:14px 16px;background:#fff;border-bottom:1px solid #E5E9F0}
+.kp-topic-picker-head div{min-width:0;flex:1}
+.kp-topic-picker-head span{display:block;color:#8290A3;font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase}
+.kp-topic-picker-head b{display:block;margin-top:1px;color:#172033;font-size:18px}
+.kp-topic-picker-head button{width:40px;height:40px;flex:none;border:1px solid #E2E8F0;border-radius:13px;background:#F8FAFC;color:#64748B;font-size:18px}
+.kp-topic-list{flex:1;overflow-y:auto;padding:8px 12px max(16px,env(safe-area-inset-bottom))}
+.kp-topic-group{padding:10px 6px 6px;color:#8492A6;font-size:10px;font-weight:800;letter-spacing:.65px;text-transform:uppercase}
+.kp-topic-choice{width:100%;min-height:62px;margin-bottom:7px;padding:10px 12px;border:1px solid #E2E8F0;border-radius:15px;background:#fff;color:#263348;text-align:left;display:flex;align-items:center;gap:11px;box-shadow:0 2px 7px rgba(15,30,50,.04)}
+.kp-topic-choice .ico{width:34px;height:34px;flex:none;border-radius:11px;background:#EEF4FF;color:#2563EB;display:grid;place-items:center;font-size:17px;font-weight:800}
+.kp-topic-choice .txt{flex:1;min-width:0}
+.kp-topic-choice b{display:block;font-size:13.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kp-topic-choice small{display:block;margin-top:2px;color:#8290A3;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kp-topic-choice .ok{visibility:hidden;color:#2563EB;font-size:18px;font-weight:800}
+.kp-topic-choice.active{border-color:#8DB8F8;background:#F0F6FF}
+.kp-topic-choice.active .ok{visibility:visible}
 .kp-ctx{margin:6px 14px;background:#F5F7FA;border:1px solid #E5E9F0;border-radius:12px;padding:9px 12px;font-size:12px}
 .kp-ctx .t{font-size:10px;font-weight:800;letter-spacing:.5px;color:#7E93AC;margin-bottom:5px;display:flex;align-items:center}
 .kp-ctx .t button{margin-left:auto;border:0;background:#0F1E32;color:#fff;border-radius:7px;padding:3px 9px;font:700 11px Inter,system-ui,sans-serif;cursor:pointer}
@@ -90,16 +109,29 @@
 .kp-lock{margin:14px;background:#FEF3C7;border-radius:12px;padding:12px;color:#92400E;font-weight:600}
 @media (max-width:640px){#kp-panel{right:0;left:0;top:auto;bottom:0;width:auto;max-width:none;height:72vh;border-radius:16px 16px 0 0}
   .kp-mark .tag{max-width:60vw}
-  #kp-fab.kp-fab-crm{right:78px!important;bottom:86px!important;width:46px!important;height:46px!important;min-width:46px;padding:0!important;
-    display:grid;place-items:center;font-size:0!important;line-height:1;box-shadow:0 5px 15px rgba(120,82,0,.24)}
+  #kp-fab.kp-fab-crm{left:var(--kp-left,auto)!important;top:var(--kp-top,auto)!important;right:var(--kp-right,78px)!important;bottom:var(--kp-bottom,86px)!important;
+    width:46px!important;height:46px!important;min-width:46px;padding:0!important;display:grid;place-items:center;font-size:0!important;line-height:1;
+    touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;box-shadow:0 5px 15px rgba(120,82,0,.24)}
   #kp-fab.kp-fab-crm::before{content:'✦';font-size:22px;line-height:1}
   body.dchat-ag .dchat-input{padding-right:52px}
+  #kp-panel{height:min(78dvh,740px);border-radius:24px 24px 0 0;box-shadow:0 -16px 45px rgba(15,30,50,.25)}
+  .kp-ph{padding:14px 16px;font-size:15px}
+  .kp-ph .ava{width:34px;height:34px;border-radius:12px}
+  .kp-topic{margin:12px 14px 5px;align-items:stretch;flex-direction:column;gap:5px;color:#8290A3;font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase}
+  .kp-topic select{display:none}
+  .kp-topic-open{width:100%;min-height:50px;padding:8px 11px;border:1px solid #DCE4EF;border-radius:14px;background:#F5F8FC;color:#21324A;display:flex;align-items:center;gap:9px;text-align:left;letter-spacing:0;text-transform:none}
+  .kp-topic-open .star{width:32px;height:32px;flex:none;border-radius:10px;background:#FBBF24;color:#1F2937;display:grid;place-items:center;font-size:17px}
+  .kp-topic-open .current{flex:1;min-width:0}
+  .kp-topic-open b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kp-topic-open small{display:block;margin-top:1px;color:#8290A3;font-size:10.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kp-topic-open .chev{color:#64748B;font-size:18px}
+  .kp-ctx{margin-top:7px;border:0;background:#F5F7FA}
 }
 `;
 
   const KP = window.KlavaPick = {
     cfg: null, marks: [], seq: 0, picking: false, open: false, tid: null, threads: [],
-    busy: false, els: {}, drag: null, hoverEl: null, raf: 0, feedThread: null,
+    busy: false, els: {}, drag: null, hoverEl: null, raf: 0, feedThread: null, fabDrag: null,
   };
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -110,20 +142,88 @@
     KP.cfg = Object.assign({ page: 'crm', apiBase: '', fabStyle: null, fabText: '✦ Показать Клаве', enabled: true }, cfg || {});
     if (document.getElementById('kp-style')) return;
     const st = el('style'); st.id = 'kp-style'; st.textContent = CSS; document.head.appendChild(st);
-    const fab = el('button', 'kp-ui', esc(KP.cfg.fabText)); fab.id = 'kp-fab'; fab.title = 'Отметить на экране, что обсудить с Клавой';
+    const fab = el('button', 'kp-ui', esc(KP.cfg.fabText)); fab.id = 'kp-fab'; fab.title = 'Нажмите — открыть, зажмите — перенести';
     fab.setAttribute('aria-label', 'Показать Клаве');
     if (KP.cfg.page === 'crm') fab.classList.add('kp-fab-crm');
     if (KP.cfg.fabStyle) Object.assign(fab.style, KP.cfg.fabStyle);
-    fab.onclick = () => KP.toggle();
+    fab.onclick = e => { if (KP._fabSkipClick) { e.preventDefault(); return; } KP.toggle(); };
+    if (KP.cfg.page === 'crm') KP._bindFabDrag(fab);
     // v2.46.176: remote — модуль живёт внутри чужой страницы (предпросмотр сайта в
     // iframe): без кнопки и панели, метки отдаются наружу через cfg.onDone
     if (KP.cfg.remote) fab.classList.add('hidden');
     document.body.appendChild(fab);
     const marks = el('div', 'kp-ui'); marks.id = 'kp-marks'; document.body.appendChild(marks);
     KP.els.fab = fab; KP.els.marks = marks;
+    KP._restoreFabPosition();
     KP.syncVisibility();
-    addEventListener('resize', KP.layout); addEventListener('scroll', KP.layout, true);
+    addEventListener('resize', () => { KP.layout(); KP._restoreFabPosition(); }); addEventListener('scroll', KP.layout, true);
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && KP.picking) { e.stopPropagation(); KP.pick(false); } }, true);
+  };
+
+  // На телефоне кругляшок переносится долгим нажатием. Координаты храним как
+  // долю свободного экрана, чтобы место сохранялось после поворота телефона.
+  KP._fabPositionKey = function () { return 'kp.fab.position.' + ((KP.cfg && KP.cfg.page) || 'crm'); };
+  KP._placeFab = function (left, top) {
+    const fab = KP.els.fab; if (!fab || !fab.style || !fab.style.setProperty) return;
+    const r = fab.getBoundingClientRect();
+    const w = r.width || 46, h = r.height || 46, pad = 8;
+    left = Math.max(pad, Math.min(innerWidth - w - pad, left));
+    top = Math.max(pad, Math.min(innerHeight - h - pad, top));
+    fab.style.setProperty('--kp-left', Math.round(left) + 'px');
+    fab.style.setProperty('--kp-top', Math.round(top) + 'px');
+    fab.style.setProperty('--kp-right', 'auto');
+    fab.style.setProperty('--kp-bottom', 'auto');
+  };
+  KP._saveFabPosition = function () {
+    const fab = KP.els.fab; if (!fab) return;
+    const r = fab.getBoundingClientRect();
+    const freeX = Math.max(1, innerWidth - r.width), freeY = Math.max(1, innerHeight - r.height);
+    try { localStorage.setItem(KP._fabPositionKey(), JSON.stringify({ x: r.left / freeX, y: r.top / freeY })); } catch (e) {}
+  };
+  KP._restoreFabPosition = function () {
+    if (!KP.cfg || KP.cfg.page !== 'crm' || innerWidth > 640) return;
+    let pos = null;
+    try { pos = JSON.parse(localStorage.getItem(KP._fabPositionKey()) || 'null'); } catch (e) { pos = null; }
+    if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return;
+    const fab = KP.els.fab; if (!fab) return;
+    const r = fab.getBoundingClientRect(), w = r.width || 46, h = r.height || 46;
+    KP._placeFab(pos.x * Math.max(1, innerWidth - w), pos.y * Math.max(1, innerHeight - h));
+  };
+  KP._bindFabDrag = function (fab) {
+    fab.addEventListener('pointerdown', e => {
+      if (innerWidth > 640) return;
+      if (e.button != null && e.button !== 0) return;
+      const r = fab.getBoundingClientRect();
+      const d = KP.fabDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY,
+        left: r.left, top: r.top, dragging: false, timer: null };
+      try { fab.setPointerCapture(e.pointerId); } catch (_) {}
+      d.timer = setTimeout(() => {
+        if (KP.fabDrag !== d) return;
+        d.dragging = true; fab.classList.add('dragging');
+        try { if (navigator.vibrate) navigator.vibrate(18); } catch (_) {}
+      }, 320);
+    });
+    fab.addEventListener('pointermove', e => {
+      const d = KP.fabDrag; if (!d || e.pointerId !== d.id) return;
+      d.lastX = e.clientX; d.lastY = e.clientY;
+      if (!d.dragging) return;
+      e.preventDefault();
+      KP._placeFab(d.left + e.clientX - d.x, d.top + e.clientY - d.y);
+    });
+    const finish = e => {
+      const d = KP.fabDrag; if (!d || (e.pointerId != null && e.pointerId !== d.id)) return;
+      clearTimeout(d.timer);
+      if (d.dragging) {
+        KP._placeFab(d.left + d.lastX - d.x, d.top + d.lastY - d.y);
+        KP._saveFabPosition();
+        KP._fabSkipClick = true;
+        setTimeout(() => { KP._fabSkipClick = false; }, 80);
+      }
+      fab.classList.remove('dragging'); KP.fabDrag = null;
+    };
+    fab.addEventListener('pointerup', finish);
+    fab.addEventListener('pointercancel', finish);
+    fab.addEventListener('contextmenu', e => { if (innerWidth <= 640) e.preventDefault(); });
   };
 
   // v2.46.193: на странице входа кнопки Клавы быть не должно. В CRM enabled
@@ -168,6 +268,7 @@
   KP.close = function () {
     KP.open = false; KP.pick(false);
     clearInterval(KP._liveT); KP._liveT = null;
+    KP._closeTopicPicker();
     if (KP.els.panel) KP.els.panel.classList.add('hidden');
     KP.syncVisibility();
   };
@@ -175,7 +276,11 @@
     const p = el('div', 'kp-ui'); p.id = 'kp-panel';
     p.innerHTML =
       '<div class="kp-ph"><div class="ava">✦</div>Обсудить с Клавой<button class="x" title="Закрыть">✕</button></div>' +
-      '<div class="kp-topic">В тему: <select id="kp-topic"><option value="">загружаю…</option></select></div>' +
+      '<div class="kp-topic"><span>В тему</span><select id="kp-topic"><option value="">загружаю…</option></select>' +
+        '<button type="button" class="kp-topic-open" id="kp-topic-open"><span class="star">✦</span>' +
+          '<span class="current"><b id="kp-topic-current">загружаю…</b><small id="kp-topic-current-meta">Выберите переписку</small></span><span class="chev">⌄</span></button></div>' +
+      '<div class="kp-topic-picker hidden" id="kp-topic-picker"><div class="kp-topic-picker-head"><div><span>Куда отправить</span><b>Выберите тему</b></div>' +
+        '<button type="button" id="kp-topic-close" aria-label="Закрыть">✕</button></div><div class="kp-topic-list" id="kp-topic-list"></div></div>' +
       '<div class="kp-ctx" id="kp-ctx"></div>' +
       '<div class="kp-feed" id="kp-feed"></div>' +
       '<div class="kp-acts" id="kp-acts"></div>' +
@@ -186,12 +291,53 @@
     KP.els.panel = p;
     p.querySelector('.x').onclick = KP.close;
     KP.els.topic = p.querySelector('#kp-topic');
-    KP.els.topic.onchange = () => { KP.tid = KP.els.topic.value ? parseInt(KP.els.topic.value, 10) : null; KP._remember(); KP._loadFeed(); };
+    KP.els.topicOpen = p.querySelector('#kp-topic-open');
+    KP.els.topicPicker = p.querySelector('#kp-topic-picker');
+    KP.els.topicList = p.querySelector('#kp-topic-list');
+    KP.els.topicCurrent = p.querySelector('#kp-topic-current');
+    KP.els.topicCurrentMeta = p.querySelector('#kp-topic-current-meta');
+    KP.els.topic.onchange = () => KP._chooseTopic(KP.els.topic.value);
+    KP.els.topicOpen.onclick = KP._openTopicPicker;
+    p.querySelector('#kp-topic-close').onclick = KP._closeTopicPicker;
     KP.els.in = p.querySelector('#kp-in');
     KP.els.in.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); KP.send(); } });
     KP.els.in.addEventListener('input', () => { KP.els.in.style.height = 'auto'; KP.els.in.style.height = Math.min(120, KP.els.in.scrollHeight) + 'px'; });
     p.querySelector('#kp-send').onclick = KP.send;
     KP.els.feed = p.querySelector('#kp-feed'); KP.els.note = p.querySelector('#kp-note');
+  };
+
+  KP._topicMeta = function (t) {
+    if (!t) return 'Начать отдельное обсуждение';
+    return (t.shared ? 'Общая тема' : 'Моя идея') + (t.rounds ? ' · ' + t.rounds + ' в работе' : '');
+  };
+  KP._renderTopicPicker = function () {
+    const list = KP.els.topicList; if (!list) return;
+    const shared = KP.threads.filter(t => t.shared);
+    const own = KP.threads.filter(t => !t.shared && ['open', 'ready', 'revision'].includes(t.status || 'open'));
+    const choice = (t, icon) => '<button type="button" class="kp-topic-choice' + (KP.tid === t.id ? ' active' : '') + '" data-topic="' + t.id + '">' +
+      '<span class="ico">' + icon + '</span><span class="txt"><b>' + esc(t.title || 'Без названия') + '</b><small>' + esc(KP._topicMeta(t)) + '</small></span><span class="ok">✓</span></button>';
+    let h = '';
+    if (shared.length) h += '<div class="kp-topic-group">Общие темы</div>' + shared.map(t => choice(t, '◎')).join('');
+    if (own.length) h += '<div class="kp-topic-group">Мои идеи</div>' + own.map(t => choice(t, '✦')).join('');
+    h += '<div class="kp-topic-group">Новая</div><button type="button" class="kp-topic-choice' + (!KP.tid ? ' active' : '') + '" data-topic="">' +
+      '<span class="ico">＋</span><span class="txt"><b>Новая идея</b><small>Начать отдельное обсуждение</small></span><span class="ok">✓</span></button>';
+    list.innerHTML = h;
+    list.querySelectorAll('.kp-topic-choice').forEach(b => { b.onclick = () => KP._chooseTopic(b.dataset.topic); });
+    const current = KP.threads.find(t => t.id === KP.tid) || null;
+    if (KP.els.topicCurrent) KP.els.topicCurrent.textContent = current ? current.title : 'Новая идея';
+    if (KP.els.topicCurrentMeta) KP.els.topicCurrentMeta.textContent = KP._topicMeta(current);
+  };
+  KP._openTopicPicker = function () {
+    KP._renderTopicPicker();
+    if (KP.els.topicPicker) KP.els.topicPicker.classList.remove('hidden');
+  };
+  KP._closeTopicPicker = function () {
+    if (KP.els.topicPicker) KP.els.topicPicker.classList.add('hidden');
+  };
+  KP._chooseTopic = function (value) {
+    KP.tid = value ? parseInt(value, 10) : null;
+    if (KP.els.topic) KP.els.topic.value = KP.tid ? String(KP.tid) : '';
+    KP._remember(); KP._renderTopicPicker(); KP._closeTopicPicker(); KP._loadFeed();
   };
 
   KP._api = async function (path, opts) {
@@ -212,6 +358,7 @@
       const msg = r.status === 403 ? (r.data.message || 'Чат идей закрыт паролем — спросите у директора') : ('Нет связи с CRM (' + r.status + ')');
       KP.els.feed.innerHTML = '<div class="kp-lock">' + esc(msg) + (r.status === 403 ? '<br><small>Пароль вводится в CRM: Главная → Идеи.</small>' : '') + '</div>';
       sel.innerHTML = '<option value="">—</option>';
+      KP.threads = []; KP._renderTopicPicker();
       return;
     }
     const list = (r.data.ideas || []);
@@ -231,12 +378,15 @@
       sel.value = KP.tid ? String(KP.tid) : '';
     }
     KP._remember();
+    KP._renderTopicPicker();
     await KP._loadFeed();
   };
 
   KP._loadFeed = async function () {
     const feed = KP.els.feed;
     if (!KP.tid) {
+      KP.feedThread = null;
+      KP._renderActs();
       feed.innerHTML = '<div class="kp-bub"><div class="who">Клава</div>Новая идея: отметьте на экране, что обсуждаем, и напишите пару слов — я посмотрю, как это устроено сейчас, и предложу решение.</div>';
       return;
     }
