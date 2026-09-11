@@ -26851,4 +26851,7 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
 .mem-graph-legend span { display: inline-flex; align-items: center; gap: 4px; }
 .mem-graph-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .mem-graph-hint { color: #64748b; }
+.mem-graph-modes { position: absolute; left: 10px; top: 10px; display: flex; gap: 6px; }
+.mem-graph-modes .mem-chip { background: rgba(11,18,32,.75); color: #cbd5e1; border-color: #334155; }
+.mem-graph-modes .mem-chip.active { background: #7C3AED; border-color: #7C3AED; color: #fff; }
 @media (max-width: 760px) { .mem-split { grid-template-columns: 1fr; } .mem-list { max-height: 34vh; } .mem-head-actions { margin: 0; } .mem-body { max-height: 82vh; } }
