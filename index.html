@@ -1481,6 +1481,7 @@
           </div>
           <div class="page-actions">
             <select class="form-input" id="ps-rev" onchange="state._ps.rev = parseInt(this.value, 10); loadPanelSheets()"></select>
+            <button class="btn btn-secondary" id="ps-refresh" onclick="psRefresh()" title="Перечитать ревизии и открыть последнюю"><i class="ti ti-refresh"></i> <span>Обновить</span></button>
             <button class="btn btn-secondary" id="ps-build" onclick="psBuild()"><i class="ti ti-player-play"></i> <span>Собрать пакет</span></button>
             <button class="btn btn-primary" onclick="pjTopic(state._ps && state._ps.id)"><i class="ti ti-sparkles"></i> <span>Обсудить с Клавой</span></button>
           </div>

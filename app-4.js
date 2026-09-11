@@ -23569,6 +23569,8 @@ async function loadPanelSheets() {
   const sel = document.getElementById('ps-rev');
   if (!revs.length) { sel.innerHTML = '<option>нет ревизий</option>'; host.innerHTML = '<div class="empty-block"><i class="ti ti-file-off"></i>Пакета ещё нет — нажмите «Собрать пакет»</div>'; return; }
   if (!state._ps.rev || !revs.some(function (r) { return r.rev === state._ps.rev; })) state._ps.rev = revs[0].rev;
+  // v2.46.197: помним последнюю ревизию и раз в 20 с проверяем, не появилась ли новая
+  state._ps.newest = revs[0].rev; _psResetRefresh(); _psWatch();
   sel.innerHTML = revs.map(function (r) {
     return '<option value="' + r.rev + '"' + (r.rev === state._ps.rev ? ' selected' : '') + '>рев. ' + r.rev + ' · ' + escapeHtml(_ideasWhen(r.created_at)) +
       (r.qa_ok === null || r.qa_ok === undefined ? '' : (r.qa_ok ? ' · QA чисто' : ' · QA замечания')) + '</option>';
@@ -23598,6 +23600,36 @@ async function loadPanelSheets() {
       box.querySelector('.ps-page-body').innerHTML = ''; box.querySelector('.ps-page-body').appendChild(img);
     } catch (e) { box.querySelector('.ps-page-body').textContent = 'Ошибка связи'; break; }
   }
+}
+
+// v2.46.197: «Обновить» — перечитать ревизии и открыть последнюю (агент закрыл
+// раунд → новая ревизия в журнале, а открытые листы сами не менялись)
+function psRefresh() {
+  if (!state._ps) return;
+  state._ps.rev = null;
+  loadPanelSheets();
+}
+function _psResetRefresh() {
+  const b = document.getElementById('ps-refresh'); if (!b) return;
+  b.classList.remove('btn-primary', 'ps-refresh-new'); b.classList.add('btn-secondary');
+  b.innerHTML = '<i class="ti ti-refresh"></i> <span>Обновить</span>';
+}
+var _psWatchT = null;
+function _psWatch() {
+  if (_psWatchT) clearInterval(_psWatchT);
+  _psWatchT = setInterval(async function () {
+    if ((state.currentScreen || '') !== 'panel-sheets' || !state._ps || !state._ps.id) { clearInterval(_psWatchT); _psWatchT = null; return; }
+    if (document.hidden) return;
+    let d; try { d = await apiGet('/api/panels/' + state._ps.id); } catch (e) { return; }
+    const revs = (((d || {}).panel || {}).revisions || []).filter(function (r) { return r.url; });
+    if (!revs.length || !(revs[0].rev > (state._ps.newest || 0))) return;
+    const b = document.getElementById('ps-refresh');
+    if (b && !b.classList.contains('ps-refresh-new')) {
+      b.classList.remove('btn-secondary'); b.classList.add('btn-primary', 'ps-refresh-new');
+      b.innerHTML = '<i class="ti ti-refresh"></i> <span>Новая ревизия ' + revs[0].rev + ' — открыть</span>';
+      showToast('Готова ревизия ' + revs[0].rev + (revs[0].qa_ok ? ', QA чисто' : '') + '. Нажмите «Обновить»', 'success');
+    }
+  }, 20000);
 }
 
 // v2.46.175: включить метки одним нажатием — панель Клавы откроется сама
