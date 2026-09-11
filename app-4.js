@@ -2558,10 +2558,19 @@ async function ideasMockup() {
   const acts = document.getElementById('ideas-actions');
   if (acts) acts.innerHTML = '<span class="ich-note"><i class="ti ti-loader"></i> ' +
     'Клава проектирует экран и проверяет вложения…</span>';
-  const r = await apiPost('/api/ideas/' + id + '/mockup', {});
+  // v2.46.191: макет рисуется в фоне — страница на минуту-две, прокси столько
+  // не ждёт («макет не собирается»). Сервер отвечает сразу, тему опрашиваем.
+  const r = await apiPost('/api/ideas/' + id + '/mockup', { async: true });
   const d = (r && r.data) || {};
   if (!r.ok || !d.ok) {
     if (ph) ph.textContent = d.message || 'Макет не получился, попробуйте ещё раз';
+    _ideasRenderActions(state._ideas.thread || { id: id, status: 'open' });
+    return;
+  }
+  if (d.pending) {
+    const landed = await _ideaWaitMockup(id, d.after_id || 0, ph);
+    if (landed) { await ideasOpen(id); return; }
+    if (ph) ph.textContent = 'Макет не дошёл (сервер перезапустился). Нажмите «Показать макет» ещё раз.';
     _ideasRenderActions(state._ideas.thread || { id: id, status: 'open' });
     return;
   }
@@ -2576,6 +2585,22 @@ async function ideasMockup() {
   _ideasRenderActions(state._ideas.thread);
   _ideasScroll();
   ideasLoadListSilent();
+}
+
+// v2.46.191: ждём макет опросом темы (каждые 3 с, до 15 минут); true — сообщение Клавы легло
+async function _ideaWaitMockup(tid, afterId, ph) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < 15 * 60 * 1000) {
+    await new Promise(function (res) { setTimeout(res, 3000); });
+    if (ph) ph.textContent = 'Клава рисует макет… ' + Math.round((Date.now() - t0) / 1000) + ' с';
+    let d; try { d = await apiGet('/api/ideas/' + tid); } catch (e) { continue; }
+    const th = (d && d.thread) || {};
+    const after = (th.messages || []).filter(function (m) { return m.role === 'assistant' && m.id > afterId; });
+    if (after.length) return true;
+    if (!th.pending) return false;
+  }
+  if (ph) ph.textContent = 'Макет рисуется слишком долго — откройте тему чуть позже.';
+  return false;
 }
 
 async function ideasApproveMockup() {
