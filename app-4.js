@@ -2173,7 +2173,7 @@ function _ideaReportHtml(rounds) {
       '<div class="ir-head"><b>Раунд ' + r.round + '</b>' + (r.kind === 'fix' ? ' · правка под кодом' : ' · внедрение') +
         ' <span class="ich-chip ' + s[1] + '">' + s[0] + '</span></div>' +
       '<div class="ir-title">' + escapeHtml(r.title || '') + '</div>' +
-      '<div class="ir-meta">В работу: ' + escapeHtml(_ideaReportWhen(r.started_at)) + (r.started_by ? ' · ' + escapeHtml(r.started_by) : '') +
+      '<div class="ir-meta">В работу: ' + escapeHtml(_ideaReportWhen(r.started_at)) + (r.started_by ? ' · ' + escapeHtml(r.started_by) : '') + (r.worker ? ' · воркер: ' + escapeHtml(r.worker) : '') +
         (r.done_at ? ' &nbsp;→&nbsp; Готово: ' + escapeHtml(_ideaReportWhen(r.done_at)) : '') + '</div>' +
       (r.summary ? '<div class="ir-sum">' + _ideaFormat(r.summary.slice(0, 1200)) + (r.summary.length > 1200 ? '…' : '') + '</div>' : '') +
     '</div>';
