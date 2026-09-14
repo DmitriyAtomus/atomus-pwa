@@ -5242,9 +5242,28 @@ function _parseModelChars(m) {
   return { sections: [] };
 }
 
+function _isPanelModel(m) {
+  if (!m || !m.direction_id) return false;
+  const dirs = (cache.models && cache.models.directions) || [];
+  const dir = dirs.find(d => Number(d.id) === Number(m.direction_id));
+  if (!dir) return false;
+  const code = String(dir.code || '').trim().toLowerCase();
+  const name = String(dir.name || '').trim().toLowerCase();
+  return code === 'panels' || code === 'schitsy' || name === 'щиты управления' || name === 'щиты';
+}
+
+function canManagePanelSchemes(m) {
+  const fullCatalogAccess = (typeof canManageSales === 'function') && canManageSales();
+  if (fullCatalogAccess) return true;
+  return _isPanelModel(m)
+      && (typeof hasPermission === 'function')
+      && hasPermission('catalog.manage_panel_schemes');
+}
+
 function _renderModelCharsBlock(m) {
   const chars = _parseModelChars(m);
   const canEdit = (typeof canManageSales === 'function') && canManageSales();
+  const canEditScheme = canManagePanelSchemes(m);
   const hasChars = chars.sections.length > 0;
   const hasPhoto = !!m.photo_key;
   const hasSpec = !!m.spec_file_key;
@@ -5252,23 +5271,27 @@ function _renderModelCharsBlock(m) {
   let html = '<div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:18px;">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
   html += '<h4 style="margin:0;font-size:15px;"><i class="ti ti-list-check"></i> Характеристики</h4>';
-  if (canEdit) {
+  if (canEdit || canEditScheme) {
     html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
-    html += '<button class="btn btn-secondary btn-small" onclick="openCharsEditor(' + m.id + ')"><i class="ti ti-edit"></i> Редактировать</button>';
-    html += '<label class="btn btn-secondary btn-small" style="cursor:pointer;margin:0;">' +
-              '<i class="ti ti-photo-plus"></i> Фото' +
-              '<input type="file" accept="image/*" style="display:none;" onchange="uploadModelPhoto(' + m.id + ', this)">' +
-            '</label>';
-    html += '<label class="btn btn-secondary btn-small" style="cursor:pointer;margin:0;">' +
-              '<i class="ti ti-file-upload"></i> Файл СП' +
-              '<input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" style="display:none;" onchange="uploadModelSpec(' + m.id + ', this)">' +
-            '</label>';
+    if (canEdit) {
+      html += '<button class="btn btn-secondary btn-small" onclick="openCharsEditor(' + m.id + ')"><i class="ti ti-edit"></i> Редактировать</button>';
+      html += '<label class="btn btn-secondary btn-small" style="cursor:pointer;margin:0;">' +
+                '<i class="ti ti-photo-plus"></i> Фото' +
+                '<input type="file" accept="image/*" style="display:none;" onchange="uploadModelPhoto(' + m.id + ', this)">' +
+              '</label>';
+      html += '<label class="btn btn-secondary btn-small" style="cursor:pointer;margin:0;">' +
+                '<i class="ti ti-file-upload"></i> Файл СП' +
+                '<input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" style="display:none;" onchange="uploadModelSpec(' + m.id + ', this)">' +
+              '</label>';
+    }
     // v2.45.228: принципиальная схема (PDF)
-    html += '<label class="btn btn-secondary btn-small" style="cursor:pointer;margin:0;">' +
-              '<i class="ti ti-schema"></i> Схема (PDF)' +
-              '<input type="file" accept=".pdf,image/*" style="display:none;" onchange="uploadModelScheme(' + m.id + ', this)">' +
-            '</label>';
-    if (hasSpec) {
+    if (canEditScheme) {
+      html += '<label class="btn btn-secondary btn-small" style="cursor:pointer;margin:0;">' +
+                '<i class="ti ti-schema"></i> Схема (PDF)' +
+                '<input type="file" accept=".pdf,image/*" style="display:none;" onchange="uploadModelScheme(' + m.id + ', this)">' +
+              '</label>';
+    }
+    if (canEdit && hasSpec) {
       html += '<button class="btn btn-primary btn-small" onclick="parseModelSpec(' + m.id + ')" title="Разобрать загруженный файл через AI"><i class="ti ti-sparkles"></i> Разобрать AI</button>';
     }
     html += '</div>';
@@ -5294,7 +5317,7 @@ function _renderModelCharsBlock(m) {
               '<span style="flex:1;color:var(--text-dark);min-width:120px;">Принципиальная схема: ' + sname + '</span>' +
               '<button class="btn btn-secondary btn-small" onclick="downloadModelScheme(' + m.id + ')"><i class="ti ti-download"></i> Открыть</button>' +
               (String(m.scheme_file_key || '').toLowerCase().endsWith('.pdf') ? '<button class="btn btn-secondary btn-small" onclick="printModelScheme(' + m.id + ')" title="Печать на офисный принтер"><i class="ti ti-printer"></i> Печать</button>' : '') +
-              (canEdit ? '<button class="btn btn-secondary btn-small" style="color:var(--danger);" onclick="deleteModelSchemeFile(' + m.id + ')" title="Удалить схему"><i class="ti ti-trash"></i></button>' : '') +
+              (canEditScheme ? '<button class="btn btn-secondary btn-small" style="color:var(--danger);" onclick="deleteModelSchemeFile(' + m.id + ')" title="Удалить схему"><i class="ti ti-trash"></i></button>' : '') +
             '</div>';
   }
 
