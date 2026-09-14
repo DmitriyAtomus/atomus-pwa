@@ -50,3 +50,11 @@ test('плавающая шторка и чат чиллера остаются 
   assert.match(chiller, /_devChatUseAgent\('claude'\)/);
   assert.match(chiller, /apiGet\('\/api\/dev-chat\/threads'\)/);
 });
+
+test('ссылка сайта камер показывается человеку понятным названием', () => {
+  const format = app.slice(app.indexOf('function _devChatFormat'),
+    app.indexOf('// v2.45.957: копирование куском'));
+  assert.match(format, /xn----7sbbfockl8bfxhck4m\.xn--p1ai/);
+  assert.match(format, /Созревание сыра/);
+  assert.match(format, /href="' \+ url \+ '"/);
+});

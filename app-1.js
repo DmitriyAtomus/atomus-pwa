@@ -109,7 +109,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.208";
+const APP_VERSION = "v2.46.210";
 const APP_VERSION_DATE = "14.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2549,7 +2549,14 @@ function _devChatFormat(text) {
     .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
     .replace(/^#{1,6}\s*(.+)$/gm, '<b>$1</b>')
     .replace(/^\s*[-*]\s+/gm, '• ')
-    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    .replace(/(https?:\/\/[^\s<]+)/g, function (_, url) {
+      let label = url;
+      try {
+        const host = new URL(url.replace(/&amp;/g, '&')).hostname.toLowerCase();
+        if (host === 'xn----7sbbfockl8bfxhck4m.xn--p1ai') label = 'Созревание сыра';
+      } catch (e) { /* оставляем исходный адрес */ }
+      return '<a href="' + url + '" target="_blank" rel="noopener">' + label + '</a>';
+    });
   // пустые строки вокруг блока кода лишние — отступ даёт сам <pre>
   // v2.45.957: блок кода с телефона не выделишь пальцем — рядом кнопка «копировать»
   html = html.replace(new RegExp('\\n*' + MARK + 'B(\\d+)' + MARK + '\\n*', 'g'), function (_, i) {
