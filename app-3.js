@@ -617,12 +617,12 @@ function renderComponentsList() {
     list = list.filter(c => String(c.category_id) === catFilter);
   }
   // Поиск
-  const q = ((document.getElementById('comp-search') || {}).value || '').toLowerCase().trim();
+  // Поиск без учёта ё/е и лишних пробелов: в названиях из УПД бывают двойные
+  // пробелы («Прямое  быстроразъёмное…» не находилось по тексту с одним).
+  const _sn = v => String(v || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+  const q = _sn((document.getElementById('comp-search') || {}).value);
   if (q) {
-    list = list.filter(c =>
-      (c.name || '').toLowerCase().includes(q) ||
-      (c.sku || '').toLowerCase().includes(q)
-    );
+    list = list.filter(c => _sn(c.name).includes(q) || _sn(c.sku).includes(q));
   }
   if (counter) counter.textContent = list.length;
   // ЭТАП 28.1: обновим бейдж таба
