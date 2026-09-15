@@ -162,6 +162,9 @@
         <button class="section-tab" data-section="hr" title="Открыть кадровый раздел">
           <i class="ti ti-users-group"></i>Кадры
         </button>
+        <button class="section-tab" data-section="sites" title="Сайты — заявки и посетители">
+          <i class="ti ti-world"></i>Сайты
+        </button>
         <button class="section-tab" data-section="help" title="Открыть справку">
           <i class="ti ti-help-circle"></i>Помощь
         </button>
@@ -227,6 +230,7 @@
       <button data-section="defects"><i class="ti ti-lifebuoy"></i>Сервис</button>
       <button data-section="installation"><i class="ti ti-crane"></i>Монтаж</button>
       <button data-section="hr"><i class="ti ti-users-group"></i>Кадры</button>
+      <button data-section="sites"><i class="ti ti-world"></i>Сайты</button>
       <button data-section="help"><i class="ti ti-help-circle"></i>Помощь</button>
     </nav>
     <button class="m-section-tabs-all" id="m-section-tabs-all" onclick="openMobileSections()" aria-label="Показать все разделы">
@@ -672,6 +676,27 @@
     </aside>
 
     <!-- SIDEBAR ПОМОЩЬ -->
+    <!-- v2.46.212: Сайты — заявки и посетители -->
+    <aside class="sidebar" id="sidebar-sites" data-section="sites" data-visible="0">
+      <div class="sidebar-title">
+        <i class="ti ti-world"></i> Сайты
+      </div>
+      <div class="sidebar-nav">
+        <button class="nav-item active" data-nav="sites-dashboard" onclick="selectSidebarItem('sites-dashboard')">
+          <i class="ti ti-chart-dots"></i><span>Обзор</span><span class="nav-badge nav-badge-green" id="sites-online-badge" style="display:none;"></span>
+        </button>
+        <button class="nav-item" data-nav="sites-leads" onclick="selectSidebarItem('sites-leads')">
+          <i class="ti ti-inbox"></i><span>Заявки</span><span class="nav-badge" id="sites-leads-badge" style="display:none;"></span>
+        </button>
+        <button class="nav-item" data-nav="sites-visitors" onclick="selectSidebarItem('sites-visitors')">
+          <i class="ti ti-users"></i><span>Посетители</span>
+        </button>
+        <button class="nav-item" id="sb-sites-code" onclick="sitesShowCode()" style="display:none;">
+          <i class="ti ti-code"></i><span>Код для сайта</span>
+        </button>
+      </div>
+    </aside>
+
     <aside class="sidebar" id="sidebar-help" data-section="help" data-visible="0">
       <div class="sidebar-title">
         <i class="ti ti-help-circle"></i> Помощь
@@ -948,6 +973,60 @@
       <!-- Клава здесь только СМОТРИТ: код не правит, договоры и суммы не видит.
            Вместе с сотрудником доводит идею до ТЗ, готовое ТЗ уезжает директору
            в ленту разработки предложением — внедрять или нет, решает он. -->
+      <!-- v2.46.212: Сайты -->
+      <div class="screen" data-screen="sites-dashboard" data-section="sites">
+        <div class="screen-header"><h2>Сайты · Обзор</h2></div>
+        <div class="page-header">
+          <div>
+            <h1>Сайт: заявки и посетители</h1>
+            <div class="page-subtitle">Кто заходил, сколько просидели, откуда пришли и какие заявки упали — прямо с сайта в CRM</div>
+          </div>
+          <div class="page-actions">
+            <select class="form-input" id="sites-pick" onchange="sitesPick(this.value)" style="display:none;"></select>
+            <select class="form-input" id="sites-days" onchange="sitesDays(this.value)">
+              <option value="7">7 дней</option><option value="30" selected>30 дней</option><option value="90">90 дней</option>
+            </select>
+            <button class="btn btn-secondary" onclick="loadSitesDashboard()"><i class="ti ti-refresh"></i> <span>Обновить</span></button>
+          </div>
+        </div>
+        <div class="content-inner"><div id="sites-dashboard-body"><div class="loading-block">Загружаем…</div></div></div>
+      </div>
+      <div class="screen" data-screen="sites-leads" data-section="sites">
+        <div class="screen-header"><h2>Сайты · Заявки</h2></div>
+        <div class="page-header">
+          <div>
+            <h1>Заявки с сайта</h1>
+            <div class="page-subtitle">Новая → в работе → сделано. Откройте заявку: контакт, что нужно, параметры камеры, откуда пришли</div>
+          </div>
+          <div class="page-actions">
+            <div class="filter-tabs" id="sites-leads-filter">
+              <button class="filter-tab active" data-st="" onclick="sitesLeadsFilter('')">Все</button>
+              <button class="filter-tab" data-st="new" onclick="sitesLeadsFilter('new')">Новые</button>
+              <button class="filter-tab" data-st="work" onclick="sitesLeadsFilter('work')">В работе</button>
+              <button class="filter-tab" data-st="done" onclick="sitesLeadsFilter('done')">Сделано</button>
+            </div>
+            <button class="btn btn-secondary" onclick="loadSitesLeads()"><i class="ti ti-refresh"></i> <span>Обновить</span></button>
+          </div>
+        </div>
+        <div class="content-inner"><div id="sites-leads-body"><div class="loading-block">Загружаем…</div></div></div>
+      </div>
+      <div class="screen" data-screen="sites-visitors" data-section="sites">
+        <div class="screen-header"><h2>Сайты · Посетители</h2></div>
+        <div class="page-header">
+          <div>
+            <h1>Посетители сайта</h1>
+            <div class="page-subtitle">Каждая строка — один заход: когда, сколько просидел, какие страницы, откуда, с какого устройства</div>
+          </div>
+          <div class="page-actions">
+            <select class="form-input" id="sites-vdays" onchange="loadSitesVisitors()">
+              <option value="1">Сегодня</option><option value="7" selected>7 дней</option><option value="30">30 дней</option>
+            </select>
+            <button class="btn btn-secondary" onclick="loadSitesVisitors()"><i class="ti ti-refresh"></i> <span>Обновить</span></button>
+          </div>
+        </div>
+        <div class="content-inner"><div id="sites-visitors-body"><div class="loading-block">Загружаем…</div></div></div>
+      </div>
+
       <div class="screen" data-screen="ideas" data-section="home">
         <div class="page-header">
           <div class="page-header-title">

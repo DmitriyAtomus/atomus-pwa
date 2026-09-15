@@ -109,7 +109,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.211";
+const APP_VERSION = "v2.46.212";
 const APP_VERSION_DATE = "14.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -166,6 +166,7 @@ const SECTION_CONFIG = {
   defects:    { sidebar: 'sidebar-defects',    defaultScreen: 'defects-list' },       // ЭТАП 22
   installation: { sidebar: 'sidebar-installation', defaultScreen: 'installation-list' }, // v2.45.346 Монтаж
   hr:         { sidebar: 'sidebar-hr',         defaultScreen: 'hr-vacations-timeline' }, // ЭТАП 20
+  sites:      { sidebar: 'sidebar-sites',      defaultScreen: 'sites-dashboard' },   // v2.46.212: сайты ↔ CRM
   help:       { sidebar: 'sidebar-help',       defaultScreen: 'help-knowledge' },
 };
 
@@ -1682,6 +1683,7 @@ const RAIL_SECTIONS = [
   { code: 'defects',      icon: 'ti-lifebuoy',           label: 'Сервис' },
   { code: 'installation', icon: 'ti-crane',              label: 'Монтаж' },
   { code: 'hr',           icon: 'ti-users-group',        label: 'Кадры' },
+  { code: 'sites',        icon: 'ti-world',              label: 'Сайты' },
   { code: 'help',         icon: 'ti-help-circle',        label: 'Помощь' },
 ];
 
@@ -2044,6 +2046,9 @@ function runScreenLoader(screenName) {
   if (screenName === 'supply-catalog')      loadSupplyCatalog();
   // Идеи: чат сотрудника с Клавой (только чтение, ТЗ уходит директору)
   if (screenName === 'ideas')               loadIdeas();
+  if (screenName === 'sites-dashboard')     loadSitesDashboard();   // v2.46.212
+  if (screenName === 'sites-leads')         loadSitesLeads();
+  if (screenName === 'sites-visitors')      loadSitesVisitors();
   // Помощь
   if (screenName === 'help-knowledge')      loadHelpKnowledge();
   if (screenName === 'help-training')       loadHelpTraining();

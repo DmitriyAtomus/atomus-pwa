@@ -23973,3 +23973,193 @@ function _memColor(f) {
   return { 'Хабы': '#F8FAFC', 'Решения': '#FBBF24', 'Правила': '#A78BFA', 'Объекты': '#60A5FA', 'Оборудование': '#34D399', 'Журнал': '#F472B6', 'Теги': '#C084FC', 'Регионы': '#22D3EE', 'Система': '#FB923C',
     'Направления': '#FBBF24', 'Категории': '#F59E0B', 'Модели': '#34D399', 'Комплектующие': '#60A5FA', 'Группы комплектующих': '#A78BFA', 'Щиты': '#F472B6' }[f] || '#94A3B8';
 }
+
+// ============ v2.46.212: САЙТЫ ↔ CRM — заявки и посетители ============
+// Сайт подключает syrovarnya/atomus-site.js с ключом; сервер складывает заходы в
+// сессии (время, страницы, источник, устройство) и принимает заявки с форм.
+// Здесь три экрана: обзор с цифрами и графиком, заявки со статусами, посетители.
+
+var _sites = { list: [], current: null, days: 30, leadsFilter: '', poll: null };
+
+async function _sitesLoadList() {
+  let d;
+  try { d = await apiGet('/api/sites'); } catch (e) { return { error: String(e.message || e) }; }
+  _sites.list = d.sites || []; _sites.apiBase = d.api_base || '';
+  if (!_sites.current || !_sites.list.some(function (s) { return s.id === _sites.current; })) _sites.current = _sites.list.length ? _sites.list[0].id : null;
+  const pick = document.getElementById('sites-pick');
+  if (pick) {
+    pick.innerHTML = _sites.list.map(function (s) { return '<option value="' + s.id + '"' + (s.id === _sites.current ? ' selected' : '') + '>' + escapeHtml(s.name) + '</option>'; }).join('');
+    pick.style.display = _sites.list.length > 1 ? '' : 'none';
+  }
+  const cur = _sites.list.find(function (s) { return s.id === _sites.current; }) || {};
+  const lb = document.getElementById('sites-leads-badge');
+  if (lb) { lb.textContent = cur.leads_new || ''; lb.style.display = cur.leads_new ? '' : 'none'; }
+  const ob = document.getElementById('sites-online-badge');
+  if (ob) { ob.textContent = cur.online || ''; ob.style.display = cur.online ? '' : 'none'; ob.title = 'Сейчас на сайте'; }
+  const code = document.getElementById('sb-sites-code');
+  if (code) code.style.display = cur.key ? '' : 'none';
+  return d;
+}
+function _sitesForbidden(el, e) {
+  const msg = /403/.test(String(e && e.message)) ? 'Раздел «Сайты» открыт директору, заму и менеджерам' : 'Нет связи с сервером';
+  el.innerHTML = '<div class="empty-block"><i class="ti ti-lock"></i>' + msg + '</div>';
+}
+function sitesPick(v) { _sites.current = parseInt(v, 10); const s = state.currentScreen; if (s === 'sites-leads') loadSitesLeads(); else if (s === 'sites-visitors') loadSitesVisitors(); else loadSitesDashboard(); }
+function sitesDays(v) { _sites.days = parseInt(v, 10) || 30; loadSitesDashboard(); }
+function _sDur(sec) { sec = parseInt(sec, 10) || 0; if (sec < 60) return sec + ' с'; const m = Math.floor(sec / 60), s = sec % 60; if (m < 60) return m + ' мин' + (s ? ' ' + s + ' с' : ''); return Math.floor(m / 60) + ' ч ' + (m % 60) + ' мин'; }
+function _sWhen(iso) { return _ideaReportWhen(iso); }
+function _sDay(day) { const p = String(day || '').split('-'); return p.length === 3 ? p[2] + '.' + p[1] : day; }
+
+// ---- обзор
+async function loadSitesDashboard() {
+  const el = document.getElementById('sites-dashboard-body'); if (!el) return;
+  const d = await _sitesLoadList();
+  if (d.error) { _sitesForbidden(el, { message: d.error }); return; }
+  if (!_sites.current) { el.innerHTML = '<div class="empty-block"><i class="ti ti-world-off"></i>Сайты не подключены</div>'; return; }
+  let sm; try { sm = await apiGet('/api/sites/' + _sites.current + '/summary?days=' + _sites.days); } catch (e) { _sitesForbidden(el, e); return; }
+  const site = _sites.list.find(function (s) { return s.id === _sites.current; }) || {};
+  const t = sm.today || {}, w = sm.week || {}, p = sm.period || {};
+  const kpi = function (n, l, sub, cls) { return '<div class="st-kpi' + (cls ? ' ' + cls : '') + '"><div class="st-kpi-n">' + n + '</div><div class="st-kpi-l">' + l + '</div>' + (sub ? '<div class="st-kpi-s">' + sub + '</div>' : '') + '</div>'; };
+  let h = '<div class="st-head"><b>' + escapeHtml(site.name || '') + '</b>' + (site.domain ? ' <span class="st-domain">' + escapeHtml(site.domain) + '</span>' : '') +
+    (sm.online ? '<span class="st-live"><i></i>сейчас на сайте: ' + sm.online + '</span>' : '<span class="st-live off"><i></i>сейчас на сайте никого</span>') + '</div>';
+  h += '<div class="st-kpis">' +
+    kpi(t.visits || 0, 'заходов сегодня', (t.visitors || 0) + ' уникальных') +
+    kpi(w.visits || 0, 'за 7 дней', (w.visitors || 0) + ' уникальных') +
+    kpi(p.visits || 0, 'за ' + sm.days + ' дней', (p.visitors || 0) + ' уникальных') +
+    kpi(_sDur(p.avg_sec || 0), 'среднее время на сайте', 'в среднем ' + (p.avg_pages || 0) + ' стр. за заход') +
+    kpi(sm.leads_new || 0, 'новых заявок', (p.leads || 0) + ' за период · <a href="#" onclick="selectSidebarItem(\'sites-leads\');return false;">открыть</a>', sm.leads_new ? 'is-hot' : '') +
+    kpi(p.visits ? Math.round(100 * (p.bounces || 0) / p.visits) + '%' : '—', 'ушли сразу', 'одна страница, меньше 10 секунд') +
+    '</div>';
+  // график по дням
+  const days = sm.by_day || [];
+  const mx = Math.max(1, Math.max.apply(null, days.map(function (x) { return x.visits; }).concat([1])));
+  h += '<div class="st-card"><div class="st-card-h">Заходы по дням' + (days.length ? '' : ' — пока пусто') + '</div><div class="st-bars">' +
+    days.map(function (x) { return '<div class="st-bar" title="' + _sDay(x.day) + ': ' + x.visits + ' заходов, ' + x.visitors + ' уникальных' + (x.leads ? ', заявок: ' + x.leads : '') + '"><div class="st-bar-v" style="height:' + Math.max(3, Math.round(100 * x.visits / mx)) + '%"></div>' + (x.leads ? '<b class="st-bar-lead">' + x.leads + '</b>' : '') + '<span>' + _sDay(x.day) + '</span></div>'; }).join('') + '</div></div>';
+  const list = function (title, rows, key, valKey, unit) {
+    const total = rows.reduce(function (a, r) { return a + (r[valKey] || 0); }, 0) || 1;
+    return '<div class="st-card"><div class="st-card-h">' + title + '</div>' + (rows.length ? rows.map(function (r) {
+      return '<div class="st-row"><span class="st-row-l" title="' + escapeHtml(r[key] || '') + '">' + escapeHtml(r[key] || '—') + '</span><span class="st-row-bar"><i style="width:' + Math.round(100 * (r[valKey] || 0) / total) + '%"></i></span><span class="st-row-v">' + (r[valKey] || 0) + ' ' + unit + '</span></div>';
+    }).join('') : '<div class="st-empty">пока нет данных</div>') + '</div>';
+  };
+  h += '<div class="st-grid">' + list('Откуда приходят', sm.sources || [], 'source', 'visits', 'зах.') + list('Какие страницы смотрят', sm.pages || [], 'page', 'views', 'просм.') + list('С каких устройств', sm.devices || [], 'device', 'visits', 'зах.') + '</div>';
+  if (!p.visits) h += '<div class="st-hint"><i class="ti ti-info-circle"></i> Данных нет: сайт ещё не подключён. Нажмите «Код для сайта» в меню слева — там ключ и строка для вставки.</div>';
+  el.innerHTML = h;
+  if (_sites.poll) clearInterval(_sites.poll);
+  _sites.poll = setInterval(function () { if ((state.currentScreen || '') !== 'sites-dashboard') { clearInterval(_sites.poll); _sites.poll = null; return; } if (!document.hidden) loadSitesDashboard(); }, 60000);
+}
+
+// ---- заявки
+function sitesLeadsFilter(st) { _sites.leadsFilter = st || ''; document.querySelectorAll('#sites-leads-filter .filter-tab').forEach(function (b) { b.classList.toggle('active', (b.dataset.st || '') === _sites.leadsFilter); }); loadSitesLeads(); }
+async function loadSitesLeads() {
+  const el = document.getElementById('sites-leads-body'); if (!el) return;
+  const d = await _sitesLoadList();
+  if (d.error) { _sitesForbidden(el, { message: d.error }); return; }
+  if (!_sites.current) { el.innerHTML = '<div class="empty-block">Сайты не подключены</div>'; return; }
+  let r; try { r = await apiGet('/api/sites/' + _sites.current + '/leads' + (_sites.leadsFilter ? '?status=' + _sites.leadsFilter : '')); } catch (e) { _sitesForbidden(el, e); return; }
+  _sites.leads = r.leads || []; _sites.dict = r;
+  if (!_sites.leads.length) { el.innerHTML = '<div class="empty-block"><i class="ti ti-inbox-off"></i>' + (_sites.leadsFilter ? 'В этом статусе заявок нет' : 'Заявок с сайта пока не было') + '</div>'; return; }
+  const cls = { new: 'is-open', work: 'is-taken', done: 'is-done', spam: 'is-declined' };
+  el.innerHTML = '<div class="st-leads">' + _sites.leads.map(function (l) {
+    return '<div class="st-lead' + (l.status === 'new' ? ' is-new' : '') + '" onclick="sitesOpenLead(' + l.id + ')">' +
+      '<div class="st-lead-top"><span class="ich-chip ' + (cls[l.status] || '') + '">' + escapeHtml(l.status_label) + '</span><b>№' + l.id + '</b> · ' + escapeHtml(l.scenario_label || '') + (l.equipment ? ' · ' + escapeHtml(l.equipment) : '') + '<span class="st-lead-when">' + _sWhen(l.created_at) + '</span></div>' +
+      '<div class="st-lead-contact"><i class="ti ' + (l.contact_method === 'email' ? 'ti-mail' : l.contact_method === 'telegram' ? 'ti-brand-telegram' : l.contact_method === 'whatsapp' ? 'ti-brand-whatsapp' : 'ti-phone') + '"></i> ' + escapeHtml(l.contact || '') + (l.name ? ' · ' + escapeHtml(l.name) : '') + (l.company ? ' · ' + escapeHtml(l.company) : '') + '</div>' +
+      (l.comment ? '<div class="st-lead-comment">' + escapeHtml(l.comment.slice(0, 160)) + (l.comment.length > 160 ? '…' : '') + '</div>' : '') +
+      '<div class="st-lead-meta">' + [l.params && l.params.volume_m3 ? l.params.volume_m3 + ' м³' : '', l.source ? 'пришёл: ' + l.source : '', l.page ? 'страница: ' + l.page : '', l.source_button ? l.source_button : '', l.assignee ? 'ведёт: ' + l.assignee : ''].filter(Boolean).map(escapeHtml).join(' · ') + '</div>' +
+      '</div>';
+  }).join('') + '</div>';
+}
+function _sParamsHtml(p) {
+  if (!p || !Object.keys(p).length) return '<div class="st-empty">Параметры камеры не указаны</div>';
+  const rows = [];
+  if (p.dims && (p.dims.l || p.dims.w || p.dims.h)) rows.push(['Размеры', [p.dims.l, p.dims.w, p.dims.h].filter(Boolean).join(' × ') + ' м']);
+  if (p.volume_m3) rows.push(['Объём', p.volume_m3 + ' м³']);
+  if (p.dims_unknown) rows.push(['Размеры', 'пока неизвестны']);
+  if (p.cheese) rows.push(['Сыры', Array.isArray(p.cheese) ? p.cheese.join(', ') : String(p.cheese)]);
+  if (p.wall) rows.push(['Стены', String(p.wall) + (p.wall_mm ? ', ' + p.wall_mm + ' мм' : '')]);
+  if (p.location) rows.push(['Где', String(p.location)]);
+  if (p.city) rows.push(['Город', String(p.city)]);
+  if (p.load_kg) rows.push(['Загрузка', p.load_kg + ' кг']);
+  if (p.temp != null && p.temp !== '') rows.push(['Температура', p.temp + ' °C']);
+  if (p.humidity != null && p.humidity !== '') rows.push(['Влажность', p.humidity + ' %']);
+  Object.keys(p).forEach(function (k) { if (['dims', 'volume_m3', 'dims_unknown', 'cheese', 'wall', 'wall_mm', 'location', 'city', 'load_kg', 'temp', 'humidity'].indexOf(k) < 0) rows.push([k, typeof p[k] === 'object' ? JSON.stringify(p[k]) : String(p[k])]); });
+  return '<table class="st-params">' + rows.map(function (r) { return '<tr><td>' + escapeHtml(r[0]) + '</td><td>' + escapeHtml(r[1]) + '</td></tr>'; }).join('') + '</table>';
+}
+function sitesOpenLead(id) {
+  const l = (_sites.leads || []).find(function (x) { return x.id === id; }); if (!l) return;
+  let overlay = document.getElementById('sites-lead-modal');
+  if (!overlay) {
+    overlay = document.createElement('div'); overlay.className = 'modal-overlay'; overlay.id = 'sites-lead-modal';
+    overlay.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:640px;"><div class="modal-header"><h3 id="sites-lead-title"></h3><button class="icon-btn" onclick="document.getElementById(\'sites-lead-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div><div class="modal-body" id="sites-lead-body"></div></div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('visible'); });
+  }
+  document.getElementById('sites-lead-title').textContent = 'Заявка №' + l.id + ' · ' + (l.scenario_label || '');
+  const contactLink = l.contact_method === 'email' ? 'mailto:' + l.contact : (l.contact_method === 'telegram' && /^@/.test(l.contact) ? 'https://t.me/' + l.contact.slice(1) : (l.contact_method === 'whatsapp' ? 'https://wa.me/' + l.contact.replace(/\D/g, '') : 'tel:' + l.contact.replace(/[^\d+]/g, '')));
+  document.getElementById('sites-lead-body').innerHTML =
+    '<div class="st-lead-hero"><div><div class="st-lead-hero-l">' + escapeHtml(l.method_label || '') + '</div><a class="st-lead-hero-v" href="' + escapeHtml(contactLink) + '" target="_blank" rel="noopener">' + escapeHtml(l.contact || '') + '</a>' + (l.name ? '<div class="st-lead-hero-s">' + escapeHtml(l.name) + (l.company ? ' · ' + escapeHtml(l.company) : '') + '</div>' : '') + '</div>' +
+    '<div class="st-lead-status">' + ['new', 'work', 'done', 'spam'].map(function (st) { return '<button class="btn btn-small ' + (l.status === st ? 'btn-primary' : 'btn-secondary') + '" onclick="sitesLeadStatus(' + l.id + ',\'' + st + '\')">' + (_sites.dict.statuses[st] || st) + '</button>'; }).join('') + '</div></div>' +
+    (l.comment ? '<div class="st-block"><div class="st-block-h">Коротко о задаче</div><div>' + escapeHtml(l.comment) + '</div></div>' : '') +
+    (l.equipment ? '<div class="st-block"><div class="st-block-h">Оборудование</div><div>' + escapeHtml(l.equipment) + '</div></div>' : '') +
+    '<div class="st-block"><div class="st-block-h">Параметры камеры</div>' + _sParamsHtml(l.params) + '</div>' +
+    '<div class="st-block"><div class="st-block-h">Откуда</div><div class="st-lead-meta">' + [_sWhen(l.created_at), l.source ? 'пришёл: ' + l.source : '', l.device || '', l.page ? 'страница ' + l.page : '', l.source_button ? 'кнопка: ' + l.source_button : ''].filter(Boolean).map(escapeHtml).join(' · ') + '</div></div>' +
+    '<div class="st-block"><div class="st-block-h">Заметка' + (l.assignee ? ' · ведёт ' + escapeHtml(l.assignee) : '') + '</div><textarea class="form-input" id="sites-lead-note" rows="3" placeholder="Что ответили, о чём договорились">' + escapeHtml(l.note || '') + '</textarea>' +
+    '<div class="modal-actions"><button class="btn btn-primary" onclick="sitesLeadNote(' + l.id + ')"><i class="ti ti-check"></i> Сохранить заметку</button></div></div>';
+  overlay.classList.add('visible');
+}
+async function sitesLeadStatus(id, st) { await _sitesLeadPatch(id, { status: st }); }
+async function _sitesLeadPatch(id, body) {
+  try { await apiPatch('/api/sites/' + _sites.current + '/leads/' + id, body); } catch (e) { showToast(e.message || 'Не сохранилось', 'error'); return; }
+  showToast('Сохранено', 'success');
+  await loadSitesLeads();
+  const o = document.getElementById('sites-lead-modal'); if (o && o.classList.contains('visible')) sitesOpenLead(id);
+}
+function sitesLeadNote(id) { const t = document.getElementById('sites-lead-note'); _sitesLeadPatch(id, { note: t ? t.value : '' }); }
+
+// ---- посетители
+async function loadSitesVisitors() {
+  const el = document.getElementById('sites-visitors-body'); if (!el) return;
+  const d = await _sitesLoadList();
+  if (d.error) { _sitesForbidden(el, { message: d.error }); return; }
+  if (!_sites.current) { el.innerHTML = '<div class="empty-block">Сайты не подключены</div>'; return; }
+  const days = (document.getElementById('sites-vdays') || {}).value || 7;
+  let r; try { r = await apiGet('/api/sites/' + _sites.current + '/sessions?days=' + days + '&limit=300'); } catch (e) { _sitesForbidden(el, e); return; }
+  const rows = r.sessions || [];
+  if (!rows.length) { el.innerHTML = '<div class="empty-block"><i class="ti ti-users"></i>Заходов за этот период нет</div>'; return; }
+  el.innerHTML = '<div class="table-scroll"><table class="st-table"><thead><tr><th>Когда</th><th>Просидел</th><th>Стр.</th><th>Вход</th><th>Откуда</th><th>Устройство</th><th></th></tr></thead><tbody>' +
+    rows.map(function (s) {
+      return '<tr class="' + (s.online ? 'is-online' : '') + (s.leads ? ' has-lead' : '') + '" onclick="sitesSessionPages(' + s.id + ', this)">' +
+        '<td>' + _sWhen(s.started_at) + (s.online ? ' <span class="st-online-dot" title="сейчас на сайте"></span>' : '') + '</td>' +
+        '<td>' + _sDur(s.duration_sec) + '</td><td>' + s.pages + '</td>' +
+        '<td title="' + escapeHtml(s.entry_title || '') + '">' + escapeHtml(s.entry_page || '/') + '</td>' +
+        '<td>' + escapeHtml(s.source || '') + '</td><td>' + escapeHtml(s.device || '') + (s.returning ? ' · <span class="st-ret">вернулся</span>' : '') + '</td>' +
+        '<td>' + (s.leads ? '<span class="ich-chip is-open">заявка</span>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+async function sitesSessionPages(id, tr) {
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains('st-pages-row')) { next.remove(); return; }
+  let r; try { r = await apiGet('/api/sites/' + _sites.current + '/sessions/' + id + '/pages'); } catch (e) { return; }
+  const row = document.createElement('tr'); row.className = 'st-pages-row';
+  row.innerHTML = '<td colspan="7"><div class="st-pages">' + (r.pages || []).map(function (p) { return '<span class="st-page ' + p.event + '">' + (p.event === 'lead' ? '<i class="ti ti-inbox"></i> заявка' : p.event === 'click' ? '<i class="ti ti-click"></i> ' + escapeHtml(p.title || '') : escapeHtml(p.page || '/')) + ' <small>' + String(p.ts || '').slice(11, 16) + '</small></span>'; }).join('<i class="ti ti-arrow-right st-arrow"></i>') + '</div></td>';
+  tr.parentNode.insertBefore(row, tr.nextSibling);
+}
+
+// ---- код для сайта (директор)
+function sitesShowCode() {
+  const site = (_sites.list || []).find(function (s) { return s.id === _sites.current; });
+  if (!site || !site.key) { showToast('Ключ виден только директору', 'error'); return; }
+  const snippet = '<script src="atomus-site.js" data-key="' + site.key + '" defer><' + '/script>';
+  let overlay = document.getElementById('sites-code-modal');
+  if (!overlay) {
+    overlay = document.createElement('div'); overlay.className = 'modal-overlay'; overlay.id = 'sites-code-modal';
+    overlay.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:640px;"><div class="modal-header"><h3><i class="ti ti-code"></i> Код для сайта</h3><button class="icon-btn" onclick="document.getElementById(\'sites-code-modal\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button></div><div class="modal-body" id="sites-code-body"></div></div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('visible'); });
+  }
+  document.getElementById('sites-code-body').innerHTML =
+    '<p>Файл <b>atomus-site.js</b> лежит в репозитории сайта (папка syrovarnya). Положить его рядом со страницами и на каждой странице перед <code>&lt;/body&gt;</code> добавить строку:</p>' +
+    '<pre class="st-code" id="sites-code-snippet">' + escapeHtml(snippet) + '</pre>' +
+    '<div class="modal-actions"><button class="btn btn-primary" onclick="navigator.clipboard.writeText(document.getElementById(\'sites-code-snippet\').textContent).then(function(){showToast(\'Скопировано\',\'success\')})"><i class="ti ti-copy"></i> Скопировать строку</button></div>' +
+    '<p class="st-hint-p">Форма заявки вызывает <code>AtomusSite.lead({...})</code> и получает ответ сервера: «Заявка принята» показывается только после сохранения. Сервер: <code>' + escapeHtml(_sites.apiBase || '') + '</code>. Ключ — секрет сайта: не публикуйте его в чатах.</p>';
+  overlay.classList.add('visible');
+}
