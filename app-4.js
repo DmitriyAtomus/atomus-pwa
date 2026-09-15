@@ -24074,15 +24074,28 @@ function _sParamsHtml(p) {
   if (p.dims && (p.dims.l || p.dims.w || p.dims.h)) rows.push(['Размеры', [p.dims.l, p.dims.w, p.dims.h].filter(Boolean).join(' × ') + ' м']);
   if (p.volume_m3) rows.push(['Объём', p.volume_m3 + ' м³']);
   if (p.dims_unknown) rows.push(['Размеры', 'пока неизвестны']);
-  if (p.cheese) rows.push(['Сыры', Array.isArray(p.cheese) ? p.cheese.join(', ') : String(p.cheese)]);
-  if (p.wall) rows.push(['Стены', String(p.wall) + (p.wall_mm ? ', ' + p.wall_mm + ' мм' : '')]);
-  if (p.location) rows.push(['Где', String(p.location)]);
+  if (p.cheeses || p.cheese) { const c = p.cheeses || p.cheese; rows.push(['Сыры', Array.isArray(c) ? c.join(', ') : String(c)]); }
+  if (p.walls || p.wall) rows.push(['Стены', String(p.walls || p.wall) + ((p.panel_thickness_mm || p.wall_mm) ? ', ' + (p.panel_thickness_mm || p.wall_mm) + ' мм' : '')]);
+  if (p.placement || p.location) rows.push(['Где', String(p.placement || p.location)]);
   if (p.city) rows.push(['Город', String(p.city)]);
-  if (p.load_kg) rows.push(['Загрузка', p.load_kg + ' кг']);
-  if (p.temp != null && p.temp !== '') rows.push(['Температура', p.temp + ' °C']);
-  if (p.humidity != null && p.humidity !== '') rows.push(['Влажность', p.humidity + ' %']);
-  Object.keys(p).forEach(function (k) { if (['dims', 'volume_m3', 'dims_unknown', 'cheese', 'wall', 'wall_mm', 'location', 'city', 'load_kg', 'temp', 'humidity'].indexOf(k) < 0) rows.push([k, typeof p[k] === 'object' ? JSON.stringify(p[k]) : String(p[k])]); });
+  const load = p.cheese_load_kg != null ? p.cheese_load_kg : p.load_kg;
+  if (load != null && load !== '') rows.push(['Загрузка', load + ' кг']);
+  const temp = p.temperature_c != null ? p.temperature_c : p.temp;
+  if (temp != null && temp !== '') rows.push(['Температура', temp + ' °C']);
+  const humidity = p.humidity_percent != null ? p.humidity_percent : p.humidity;
+  if (humidity != null && humidity !== '') rows.push(['Влажность', humidity + ' %']);
+  if (p.article) rows.push(['Статья', p.article]);
+  if (p.project_id) rows.push(['Проект', p.project_id]);
+  const known = ['dims', 'volume_m3', 'dims_unknown', 'cheeses', 'cheese', 'walls', 'wall', 'panel_thickness_mm', 'wall_mm', 'placement', 'location', 'city', 'cheese_load_kg', 'load_kg', 'temperature_c', 'temp', 'humidity_percent', 'humidity', 'article', 'project_id', 'submitted_at', 'landing_page', 'utm'];
+  Object.keys(p).forEach(function (k) { if (known.indexOf(k) < 0) rows.push([k, typeof p[k] === 'object' ? JSON.stringify(p[k]) : String(p[k])]); });
   return '<table class="st-params">' + rows.map(function (r) { return '<tr><td>' + escapeHtml(r[0]) + '</td><td>' + escapeHtml(r[1]) + '</td></tr>'; }).join('') + '</table>';
+}
+function _sLeadFilesHtml(files) {
+  if (!files || !files.length) return '';
+  return '<div class="st-block"><div class="st-block-h">Вложения</div><div class="st-lead-files">' + files.map(function (f) {
+    const size = f.size ? Math.max(1, Math.round(f.size / 1024)) + ' КБ' : '';
+    return '<a href="' + escapeHtml(f.url || '#') + '" target="_blank" rel="noopener"><i class="ti ti-paperclip"></i><span>' + escapeHtml(f.original_name || 'Файл') + '</span><small>' + escapeHtml(size) + '</small></a>';
+  }).join('') + '</div></div>';
 }
 function sitesOpenLead(id) {
   const l = (_sites.leads || []).find(function (x) { return x.id === id; }); if (!l) return;
@@ -24101,6 +24114,8 @@ function sitesOpenLead(id) {
     (l.comment ? '<div class="st-block"><div class="st-block-h">Коротко о задаче</div><div>' + escapeHtml(l.comment) + '</div></div>' : '') +
     (l.equipment ? '<div class="st-block"><div class="st-block-h">Оборудование</div><div>' + escapeHtml(l.equipment) + '</div></div>' : '') +
     '<div class="st-block"><div class="st-block-h">Параметры камеры</div>' + _sParamsHtml(l.params) + '</div>' +
+    _sLeadFilesHtml(l.files) +
+    '<div class="st-block"><div class="st-block-h">Приём заявки</div><div class="st-lead-meta">' + [l.consent_version ? 'согласие: ' + l.consent_version : '', l.consented_at ? 'время согласия: ' + l.consented_at : '', l.notification_status === 'sent' ? 'ответственные уведомлены' : l.notification_status === 'error' ? 'заявка сохранена, уведомление будет повторено' : 'уведомление ожидает отправки'].filter(Boolean).map(escapeHtml).join(' · ') + '</div></div>' +
     '<div class="st-block"><div class="st-block-h">Откуда</div><div class="st-lead-meta">' + [_sWhen(l.created_at), l.source ? 'пришёл: ' + l.source : '', l.device || '', l.page ? 'страница ' + l.page : '', l.source_button ? 'кнопка: ' + l.source_button : ''].filter(Boolean).map(escapeHtml).join(' · ') + '</div></div>' +
     '<div class="st-block"><div class="st-block-h">Заметка' + (l.assignee ? ' · ведёт ' + escapeHtml(l.assignee) : '') + '</div><textarea class="form-input" id="sites-lead-note" rows="3" placeholder="Что ответили, о чём договорились">' + escapeHtml(l.note || '') + '</textarea>' +
     '<div class="modal-actions"><button class="btn btn-primary" onclick="sitesLeadNote(' + l.id + ')"><i class="ti ti-check"></i> Сохранить заметку</button></div></div>';
