@@ -24254,25 +24254,35 @@ async function _adsPost(path, body) {
   try { const r = await apiPost(path, body || {}); r.data = r.data || {}; return r; }
   catch (e) { return { ok: false, status: 0, data: { message: 'Сервер не ответил — попробуйте ещё раз' } }; }
 }
+// Кнопок синхронизации две: в шапке (десктоп) и в панели над экраном (телефон,
+// где шапка скрыта). Обе — класс .ads-sync, состояние ведём здесь одним местом.
 function _adsSyncBtn() {
-  const b = document.getElementById('ads-sync-btn'); if (!b) return;
-  b.style.display = _adsIsDirector() && _ads.data ? '' : 'none';
-  b.disabled = _ads.busy;
-  b.innerHTML = _ads.busy ? '<i class="ti ti-loader-2 ads-spin"></i> <span>Тянем из Директа…</span>' : '<i class="ti ti-cloud-download"></i> <span>Обновить из Директа</span>';
+  document.querySelectorAll('.ads-sync').forEach(function (b) {
+    b.style.display = _adsIsDirector() && _ads.data ? '' : 'none';
+    b.disabled = _ads.busy;
+    b.innerHTML = _ads.busy ? '<i class="ti ti-loader-2 ads-spin"></i> <span>Тянем из Директа…</span>' : '<i class="ti ti-cloud-download"></i> <span>Обновить из Директа</span>';
+  });
+}
+// Панель для телефона: те же обработчики, что у шапки (adsDays / adsSync / loadSitesAds)
+function _adsToolsHtml() {
+  return '<div class="ads-mtools"><select class="form-input ads-days" onchange="adsDays(this.value)">' +
+    [7, 30, 90].map(function (n) { return '<option value="' + n + '"' + (n === _ads.days ? ' selected' : '') + '>' + n + ' дней</option>'; }).join('') + '</select>' +
+    '<button class="btn btn-secondary ads-sync" onclick="adsSync()" style="display:none;"></button>' +
+    '<button class="btn btn-secondary" onclick="loadSitesAds()" title="Обновить"><i class="ti ti-refresh"></i></button></div>';
 }
 function adsDays(v) { _ads.days = parseInt(v, 10) || 30; loadSitesAds(); }
 
 async function loadSitesAds() {
   const el = document.getElementById('sites-ads-body'); if (!el) return;
   if (!_adsCanSee()) { _ads.data = null; _adsSyncBtn(); _adsForbidden(el, { message: '403' }); return; }
-  const dsel = document.getElementById('sites-ads-days'); if (dsel) dsel.value = String(_ads.days);
+  document.querySelectorAll('.ads-days').forEach(function (s) { s.value = String(_ads.days); });
   const prP = apiGet('/api/ads/proposals?status=all').catch(function (e) { return { error: String(e.message || e) }; });
   let d; try { d = await apiGet('/api/ads/overview?days=' + _ads.days); } catch (e) { _ads.data = null; _adsSyncBtn(); _adsForbidden(el, e); return; }
   _ads.data = d || {};
   const pr = await prP;
   _ads.proposals = (pr && Array.isArray(pr.proposals)) ? pr.proposals : [];
-  _adsSyncBtn();
   _adsRender(el, pr && pr.error);
+  _adsSyncBtn();   // после рендера: кнопка в панели телефона появляется вместе с телом
 }
 
 function _adsMetaHtml(d) {
@@ -24285,7 +24295,7 @@ function _adsMetaHtml(d) {
 
 function _adsRender(el, prError) {
   const d = _ads.data || {}, st = d.settings || {}, dir = _adsIsDirector();
-  let h = _adsMetaHtml(d);
+  let h = _adsToolsHtml() + _adsMetaHtml(d);
   if (!d.configured) {
     h += '<div class="st-card"><div class="ads-empty-h"><i class="ti ti-plug-connected-x"></i> Директ ещё не подключён</div>' +
       '<p class="ads-lead-p">Как только будет токен, Клод сам начнёт вести кампании в согласованных рамках.</p>' +

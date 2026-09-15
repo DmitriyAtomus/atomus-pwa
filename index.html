@@ -1039,10 +1039,10 @@
             <div class="page-subtitle">Расход, заявки и цена заявки; журнал того, что Клод поменял в кампаниях</div>
           </div>
           <div class="page-actions">
-            <select class="form-input" id="sites-ads-days" onchange="adsDays(this.value)">
+            <select class="form-input ads-days" id="sites-ads-days" onchange="adsDays(this.value)">
               <option value="7">7 дней</option><option value="30" selected>30 дней</option><option value="90">90 дней</option>
             </select>
-            <button class="btn btn-secondary" id="ads-sync-btn" onclick="adsSync()" style="display:none;"><i class="ti ti-cloud-download"></i> <span>Обновить из Директа</span></button>
+            <button class="btn btn-secondary ads-sync" id="ads-sync-btn" onclick="adsSync()" style="display:none;"><i class="ti ti-cloud-download"></i> <span>Обновить из Директа</span></button>
             <button class="btn btn-secondary" onclick="loadSitesAds()"><i class="ti ti-refresh"></i> <span>Обновить</span></button>
           </div>
         </div>

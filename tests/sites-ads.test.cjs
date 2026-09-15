@@ -70,6 +70,18 @@ test('журнал «Что сделано»: отмена применённо�
   assert.doesNotMatch(app, /auto_negatives/);
 });
 
+test('на телефоне период и синхронизация доступны в теле экрана', () => {
+  const tools = grab('_adsToolsHtml');
+  assert.match(tools, /onchange="adsDays\(this\.value\)"/);
+  assert.match(tools, /class="btn btn-secondary ads-sync" onclick="adsSync\(\)"/);
+  assert.match(grab('_adsRender'), /_adsToolsHtml\(\) \+ _adsMetaHtml/);
+  assert.match(grab('_adsSyncBtn'), /querySelectorAll\('\.ads-sync'\)/);
+  assert.match(html, /class="btn btn-secondary ads-sync" id="ads-sync-btn"/);
+  const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
+  assert.match(css, /\.ads-mtools \{ display: none; \}/);
+  assert.match(css, /\.app\.mobile-layout \.ads-mtools \{ display: flex;/);
+});
+
 test('ответ 404/403 от /api/ads не ломает экран', () => {
   const f = grab('_adsForbidden');
   assert.match(f, /403/);
