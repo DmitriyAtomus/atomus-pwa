@@ -109,7 +109,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.213";
+const APP_VERSION = "v2.46.214";
 const APP_VERSION_DATE = "15.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1565,6 +1565,13 @@ function renderProfile() {
     navSec.style.display = (state.user.roles && state.user.roles.includes('director')) ? '' : 'none';
   }
 
+  // «Сайты → Реклама» (Яндекс.Директ) — директору и заму; бэк менеджеру отдаёт 403
+  const navAds = document.getElementById('sb-sites-ads');
+  if (navAds) {
+    const r = state.user.roles || [];
+    navAds.style.display = (r.includes('director') || r.includes('zam')) ? '' : 'none';
+  }
+
   // Общий сайт виден всем. Личная Клава разработки остаётся только директору.
   const isDirector = !!(state.user.roles && state.user.roles.includes('director'));
   const navSite = document.getElementById('sb-sitechat');
@@ -2049,6 +2056,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'sites-dashboard')     loadSitesDashboard();   // v2.46.212
   if (screenName === 'sites-leads')         loadSitesLeads();
   if (screenName === 'sites-visitors')      loadSitesVisitors();
+  if (screenName === 'sites-ads')           loadSitesAds();         // v2.46.214: Яндекс.Директ
   // Помощь
   if (screenName === 'help-knowledge')      loadHelpKnowledge();
   if (screenName === 'help-training')       loadHelpTraining();
