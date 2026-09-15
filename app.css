@@ -27017,6 +27017,11 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
 .st-block { border-top: 1px solid var(--border, #E2E5EA); padding: 10px 0; font-size: 13.5px; color: #1f2430; }
 .st-block-h { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6b7280; margin-bottom: 6px; }
 .st-params { border-collapse: collapse; font-size: 13px; } .st-params td { padding: 3px 12px 3px 0; vertical-align: top; } .st-params td:first-child { color: #6b7280; white-space: nowrap; }
+.st-lead-files { display: grid; gap: 7px; }
+.st-lead-files a { display: grid; grid-template-columns: 20px minmax(0,1fr) auto; align-items: center; gap: 8px; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border, #E2E5EA); border-radius: 10px; color: #1f2430; text-decoration: none; }
+.st-lead-files a:hover { border-color: var(--brand); color: var(--brand); }
+.st-lead-files span { overflow-wrap: anywhere; }
+.st-lead-files small { color: #6b7280; }
 .st-table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; border-radius: 12px; overflow: hidden; }
 .st-table th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; padding: 10px 10px; background: #F8FAFC; border-bottom: 1px solid var(--border, #E2E5EA); }
 .st-table td { padding: 9px 10px; border-bottom: 1px solid #F1F5F9; vertical-align: middle; white-space: nowrap; }
