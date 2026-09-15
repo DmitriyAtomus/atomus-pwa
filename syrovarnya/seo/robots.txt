@@ -1,0 +1,10 @@
+# Атомус Групп — созревание-сыра.рф
+# Правила для поисковых роботов. Открыто всё, кроме служебного.
+User-agent: *
+Disallow: /chillers-legacy.html
+Disallow: /tools/
+Disallow: /control-panel.html
+Allow: /
+
+# Карта сайта — обязательно по https и по основному адресу
+Sitemap: https://xn----7sbbfockl8bfxhck4m.xn--p1ai/sitemap.xml

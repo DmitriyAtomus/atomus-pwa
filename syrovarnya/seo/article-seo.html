@@ -1,0 +1,113 @@
+<!-- ============================================================================
+     SEO-фрагменты для статей созревание-сыра.рф. Вставлять В КАЖДУЮ статью в /publications/.
+     Заполнять плейсхолдеры {{...}} из данных статьи при публикации. Ничего не перекрашивать:
+     стили ниже минимальные и берут цвета из переменных сайта (fallback — зелёный/золото).
+     ============================================================================ -->
+
+<!-- 1. В <head> статьи (после <title>). Описание — 1–2 фразы, 120–160 знаков, без повторов заголовка. -->
+<meta name="description" content="{{description}}">
+<link rel="canonical" href="https://xn----7sbbfockl8bfxhck4m.xn--p1ai/publications/{{slug}}.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="{{title}}">
+<meta property="og:description" content="{{description}}">
+<meta property="og:url" content="https://xn----7sbbfockl8bfxhck4m.xn--p1ai/publications/{{slug}}.html">
+<meta property="og:image" content="https://xn----7sbbfockl8bfxhck4m.xn--p1ai/{{cover_image}}">
+<meta property="og:site_name" content="Атомус Групп">
+<meta property="article:published_time" content="{{date_iso}}">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "{{title}}",
+  "description": "{{description}}",
+  "image": "https://xn----7sbbfockl8bfxhck4m.xn--p1ai/{{cover_image}}",
+  "datePublished": "{{date_iso}}",
+  "dateModified": "{{date_iso}}",
+  "inLanguage": "ru-RU",
+  "mainEntityOfPage": "https://xn----7sbbfockl8bfxhck4m.xn--p1ai/publications/{{slug}}.html",
+  "author": {"@type": "Organization", "name": "Инженеры Атомус Групп", "url": "https://xn----7sbbfockl8bfxhck4m.xn--p1ai/"},
+  "publisher": {
+    "@type": "Organization",
+    "name": "Атомус Групп",
+    "url": "https://xn----7sbbfockl8bfxhck4m.xn--p1ai/",
+    "logo": {"@type": "ImageObject", "url": "https://xn----7sbbfockl8bfxhck4m.xn--p1ai/{{logo_image}}"}
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Главная", "item": "https://xn----7sbbfockl8bfxhck4m.xn--p1ai/"},
+    {"@type": "ListItem", "position": 2, "name": "Статьи", "item": "https://xn----7sbbfockl8bfxhck4m.xn--p1ai/publications/index.html"},
+    {"@type": "ListItem", "position": 3, "name": "{{title}}"}
+  ]
+}
+</script>
+
+<!-- 2. Сразу под заголовком статьи (h1) и датой — автор. Заменяет обезличенное «4 мин чтения». -->
+<div class="art-author">
+  <span class="art-author-name">Инженеры Атомус Групп</span>
+  <span class="art-author-role">проектируем и собираем климат для камер созревания с 2019 года · более 60 городов</span>
+</div>
+
+<!-- 3. ВНУТРИ текста статьи, после 2–3-го раздела (h2) — ссылка на оборудование по теме.
+     Выбирать одну по теме статьи; текст ссылки — естественный, без «кликните здесь». -->
+<aside class="art-related">
+  <div class="art-related-h">По теме</div>
+  <a href="/equipment.html#dehumidification">Как мы осушаем камеру той же сплит-системой с донагревом</a>
+</aside>
+
+<!-- 4. В КОНЦЕ статьи, перед подвалом — блок «Связанное оборудование» и переход к расчёту.
+     Оставить 2–3 ссылки, релевантные статье. Полный список якорей: -->
+<section class="art-next">
+  <h2>Что поможет решить эту задачу</h2>
+  <ul class="art-next-list">
+    <li><a href="/equipment.html#split">Сплит-системы для камер созревания</a> — холод и движение воздуха без пересушивания продукта</li>
+    <li><a href="/equipment.html#dehumidification">Осушение</a> — та же сплит-система с донагревом, без отдельного осушителя</li>
+    <li><a href="/equipment.html#humidification">Увлажнение УДФ-1</a> — двухфазный туман без капель на продукте</li>
+    <li><a href="/equipment.html#control">Щиты управления</a> — своя программа: охлаждение, нагрев, осушение, увлажнение и воздухообмен в одном контроллере</li>
+    <li><a href="/equipment.html#ventilation">Вентиляция и очистка воздуха</a> — приток, вытяжка, УФО</li>
+    <li><a href="/equipment.html#ducts">Текстильные рукава</a> — ровный поток вдоль стеллажей</li>
+  </ul>
+  <div class="art-cta">
+    <p>Не уверены, что именно даёт конденсат, застой или запах в вашей камере? Опишите задачу — инженер разберёт и предложит решение.</p>
+    <a class="art-cta-btn" href="/project.html?scenario=modernization&amp;source=article-{{slug}}">Получить расчёт</a>
+    <a class="art-cta-link" href="tel:{{phone_e164}}">Позвонить инженеру</a>
+  </div>
+</section>
+
+<!-- 5. Стили (один раз в site.css). -->
+<style>
+.art-author{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;margin:10px 0 22px;font-size:14px}
+.art-author-name{font-weight:700;color:var(--gold,#e3b656)}
+.art-author-role{color:var(--tx-mute,#9DB6CC)}
+.art-related{margin:26px 0;padding:14px 18px;border-left:3px solid var(--gold,#e3b656);background:rgba(255,255,255,.04);border-radius:0 10px 10px 0}
+.art-related-h{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--tx-mute,#9DB6CC);margin-bottom:4px}
+.art-related a{color:inherit;font-weight:600;text-decoration:underline;text-decoration-color:var(--gold,#e3b656)}
+.art-next{margin:40px 0 20px;padding:24px;border:1px solid rgba(255,255,255,.12);border-radius:14px}
+.art-next h2{margin:0 0 12px;font-size:22px}
+.art-next-list{list-style:none;padding:0;margin:0 0 18px;display:grid;gap:8px}
+.art-next-list a{font-weight:700;color:var(--gold,#e3b656)}
+.art-cta{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1)}
+.art-cta p{flex:1 1 320px;margin:0;color:var(--tx-mute,#9DB6CC)}
+.art-cta-btn{display:inline-block;padding:12px 20px;border-radius:999px;background:var(--gold,#e3b656);color:#1a1405;font-weight:800;text-decoration:none}
+.art-cta-link{color:inherit;font-weight:600}
+</style>
+
+<!-- 6. На ГЛАВНОЙ (index.html) в <head> — организация. Один раз. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Атомус Групп",
+  "alternateName": "Atomus Group",
+  "url": "https://xn----7sbbfockl8bfxhck4m.xn--p1ai/",
+  "logo": "https://xn----7sbbfockl8bfxhck4m.xn--p1ai/{{logo_image}}",
+  "description": "Производим климатическое оборудование и автоматику для камер созревания сыра: охлаждение, нагрев, осушение, увлажнение, воздухообмен.",
+  "address": {"@type": "PostalAddress", "addressLocality": "Миасс", "addressRegion": "Челябинская область", "addressCountry": "RU"},
+  "telephone": "{{phone_e164}}",
+  "areaServed": "RU"
+}
+</script>

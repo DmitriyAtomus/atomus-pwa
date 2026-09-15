@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Карта сайта созревание-сыра.рф. Публикатор статей обязан добавлять новую статью сюда
+     при каждой публикации (url + lastmod = дата статьи) и обновлять lastmod у /publications/index.html.
+     Адреса только по https и в punycode. Служебные страницы (control-panel, tools, legacy) не включать. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://xn----7sbbfockl8bfxhck4m.xn--p1ai/</loc><lastmod>2026-09-15</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://xn----7sbbfockl8bfxhck4m.xn--p1ai/equipment.html</loc><lastmod>2026-09-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://xn----7sbbfockl8bfxhck4m.xn--p1ai/project.html</loc><lastmod>2026-09-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xn----7sbbfockl8bfxhck4m.xn--p1ai/technology.html</loc><lastmod>2026-09-15</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://xn----7sbbfockl8bfxhck4m.xn--p1ai/publications/index.html</loc><lastmod>2026-09-15</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <!-- статьи: одна запись на статью, lastmod = дата публикации -->
+  <url><loc>https://xn----7sbbfockl8bfxhck4m.xn--p1ai/publications/kondensat-v-kamere-sozrevaniya-syra.html</loc><lastmod>2026-09-14</lastmod><changefreq>yearly</changefreq><priority>0.6</priority></url>
+</urlset>
