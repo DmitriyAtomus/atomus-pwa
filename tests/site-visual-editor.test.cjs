@@ -8,11 +8,13 @@ const app = fs.readFileSync(path.join(root, 'app-1.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
 const version = JSON.parse(fs.readFileSync(path.join(root, 'version.json'), 'utf8'));
 
-test('визуальный редактор доступен только в рабочем чате сайта', () => {
-  assert.match(app, /const visual = _devChatEmployeeMode\(\)/);
+test('визуальный редактор доступен директору и в рабочем чате сайта', () => {
+  assert.match(app, /const visual = true/);
   assert.match(app, /data-art-pick[^>]*aria-pressed="false"/);
   assert.match(app, /ВИЗУАЛЬНАЯ ПРАВКА САЙТА/);
   assert.match(app, /screen: 'site_visual_editor'/);
+  const send = app.slice(app.indexOf('async function _devChatArtifactSend()'), app.indexOf('async function devChatOpenArtifact'));
+  assert.doesNotMatch(send, /_devChatEmployeeMode\(\)/);
 });
 
 test('выбранный блок передаётся Клаве с точным контекстом', () => {

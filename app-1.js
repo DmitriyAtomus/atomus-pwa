@@ -109,7 +109,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.215";
+const APP_VERSION = "v2.46.216";
 const APP_VERSION_DATE = "16.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -3137,7 +3137,7 @@ function _devChatArtifactShotFile(dataUrl) {
 
 async function _devChatArtifactSend() {
   const state = _devChatArtifactState;
-  if (!state || !_devChatEmployeeMode()) return;
+  if (!state) return;
   const note = state.box.querySelector('[data-art-note]');
   const request = (note && note.value || '').trim();
   if (!request) {
@@ -3212,7 +3212,10 @@ async function devChatOpenArtifact(url, name) {
   const box = document.createElement('div');
   box.className = 'dchat-artview';
   box.id = 'dchat-artview';
-  const visual = _devChatEmployeeMode();
+  // HTML-макет можно править из любого чата разработки. Раньше редактор
+  // ошибочно показывался только в рабочем чате сайта, поэтому у директора
+  // оставались просмотр и крестик без «Указать блок» и поля правки.
+  const visual = true;
   box.innerHTML =
     '<div class="dchat-artview-back"></div>' +
     '<div class="dchat-artview-panel">' +
