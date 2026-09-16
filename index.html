@@ -688,6 +688,9 @@
         <button class="nav-item" data-nav="sites-leads" onclick="selectSidebarItem('sites-leads')">
           <i class="ti ti-inbox"></i><span>Заявки</span><span class="nav-badge" id="sites-leads-badge" style="display:none;"></span>
         </button>
+        <button class="nav-item" data-nav="sites-chats" onclick="selectSidebarItem('sites-chats')">
+          <i class="ti ti-messages"></i><span>Диалоги</span><span class="nav-badge" id="sites-chats-badge" style="display:none;"></span>
+        </button>
         <button class="nav-item" data-nav="sites-visitors" onclick="selectSidebarItem('sites-visitors')">
           <i class="ti ti-users"></i><span>Посетители</span>
         </button>
@@ -1009,6 +1012,14 @@
           </div>
         </div>
         <div class="content-inner"><div id="sites-leads-body"><div class="loading-block">Загружаем…</div></div></div>
+      </div>
+      <div class="screen" data-screen="sites-chats" data-section="sites">
+        <div class="screen-header"><h2>Сайты · Диалоги</h2></div>
+        <div class="page-header">
+          <div><h1>Чат с посетителями</h1><div class="page-subtitle">Вопросы с сайта, фотографии и планы — отвечайте прямо из CRM</div></div>
+          <div class="page-actions"><button class="btn btn-secondary" onclick="loadSitesChats()"><i class="ti ti-refresh"></i> <span>Обновить</span></button></div>
+        </div>
+        <div class="content-inner"><div id="sites-chats-body" class="st-chat-layout"><div class="loading-block">Загружаем…</div></div></div>
       </div>
       <div class="screen" data-screen="sites-visitors" data-section="sites">
         <div class="screen-header"><h2>Сайты · Посетители</h2></div>
