@@ -109,8 +109,8 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.214";
-const APP_VERSION_DATE = "15.09.2026";
+const APP_VERSION = "v2.46.215";
+const APP_VERSION_DATE = "16.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -2055,6 +2055,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'ideas')               loadIdeas();
   if (screenName === 'sites-dashboard')     loadSitesDashboard();   // v2.46.212
   if (screenName === 'sites-leads')         loadSitesLeads();
+  if (screenName === 'sites-chats')         loadSitesChats();
   if (screenName === 'sites-visitors')      loadSitesVisitors();
   if (screenName === 'sites-ads')           loadSitesAds();         // v2.46.214: Яндекс.Директ
   // Помощь

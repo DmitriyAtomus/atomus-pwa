@@ -23979,7 +23979,7 @@ function _memColor(f) {
 // сессии (время, страницы, источник, устройство) и принимает заявки с форм.
 // Здесь три экрана: обзор с цифрами и графиком, заявки со статусами, посетители.
 
-var _sites = { list: [], current: null, days: 30, leadsFilter: '', poll: null };
+var _sites = { list: [], current: null, days: 30, leadsFilter: '', poll: null, chatId: null, chatPoll: null };
 
 async function _sitesLoadList() {
   let d;
@@ -23994,6 +23994,8 @@ async function _sitesLoadList() {
   const cur = _sites.list.find(function (s) { return s.id === _sites.current; }) || {};
   const lb = document.getElementById('sites-leads-badge');
   if (lb) { lb.textContent = cur.leads_new || ''; lb.style.display = cur.leads_new ? '' : 'none'; }
+  const cb = document.getElementById('sites-chats-badge');
+  if (cb) { cb.textContent = cur.chats_unread || ''; cb.style.display = cur.chats_unread ? '' : 'none'; }
   const ob = document.getElementById('sites-online-badge');
   if (ob) { ob.textContent = cur.online || ''; ob.style.display = cur.online ? '' : 'none'; ob.title = 'Сейчас на сайте'; }
   const code = document.getElementById('sb-sites-code');
@@ -24004,7 +24006,7 @@ function _sitesForbidden(el, e) {
   const msg = /403/.test(String(e && e.message)) ? 'Раздел «Сайты» открыт директору, заму и менеджерам' : 'Нет связи с сервером';
   el.innerHTML = '<div class="empty-block"><i class="ti ti-lock"></i>' + msg + '</div>';
 }
-function sitesPick(v) { _sites.current = parseInt(v, 10); const s = state.currentScreen; if (s === 'sites-leads') loadSitesLeads(); else if (s === 'sites-visitors') loadSitesVisitors(); else loadSitesDashboard(); }
+function sitesPick(v) { _sites.current = parseInt(v, 10); const s = state.currentScreen; if (s === 'sites-leads') loadSitesLeads(); else if (s === 'sites-chats') loadSitesChats(); else if (s === 'sites-visitors') loadSitesVisitors(); else loadSitesDashboard(); }
 function sitesDays(v) { _sites.days = parseInt(v, 10) || 30; loadSitesDashboard(); }
 function _sDur(sec) { sec = parseInt(sec, 10) || 0; if (sec < 60) return sec + ' с'; const m = Math.floor(sec / 60), s = sec % 60; if (m < 60) return m + ' мин' + (s ? ' ' + s + ' с' : ''); return Math.floor(m / 60) + ' ч ' + (m % 60) + ' мин'; }
 function _sWhen(iso) { return _ideaReportWhen(iso); }
@@ -24173,6 +24175,72 @@ async function _sitesLeadPatch(id, body) {
   const o = document.getElementById('sites-lead-modal'); if (o && o.classList.contains('visible')) sitesOpenLead(id);
 }
 function sitesLeadNote(id) { const t = document.getElementById('sites-lead-note'); _sitesLeadPatch(id, { note: t ? t.value : '' }); }
+
+// ---- живые диалоги с посетителями сайта
+async function loadSitesChats() {
+  const el = document.getElementById('sites-chats-body'); if (!el) return;
+  const d = await _sitesLoadList();
+  if (d.error) { _sitesForbidden(el, { message: d.error }); return; }
+  if (!_sites.current) { el.innerHTML = '<div class="empty-block">Сайты не подключены</div>'; return; }
+  let r; try { r = await apiGet('/api/sites/' + _sites.current + '/chats'); } catch (e) { _sitesForbidden(el, e); return; }
+  _sites.chats = r.chats || [];
+  const active = _sites.chats.some(function (c) { return c.id === _sites.chatId; }) ? _sites.chatId : (_sites.chats[0] || {}).id;
+  _sites.chatId = active || null;
+  if (!_sites.chats.length) {
+    el.innerHTML = '<div class="empty-block"><i class="ti ti-messages-off"></i>Диалогов с сайта пока нет</div>';
+  } else {
+    el.innerHTML = '<aside class="st-chat-list" id="sites-chat-list"></aside><section class="st-chat-thread" id="sites-chat-thread"><div class="loading-block">Открываем диалог…</div></section>';
+    _sitesRenderChatList();
+    if (_sites.chatId) await sitesOpenChat(_sites.chatId, true);
+  }
+  const cb = document.getElementById('sites-chats-badge');
+  if (cb) { cb.textContent = r.unread || ''; cb.style.display = r.unread ? '' : 'none'; }
+  if (_sites.chatPoll) clearInterval(_sites.chatPoll);
+  _sites.chatPoll = setInterval(function () {
+    if ((state.currentScreen || '') !== 'sites-chats') { clearInterval(_sites.chatPoll); _sites.chatPoll = null; return; }
+    if (!document.hidden) loadSitesChats();
+  }, 10000);
+}
+function _sitesRenderChatList() {
+  const box = document.getElementById('sites-chat-list'); if (!box) return;
+  box.innerHTML = (_sites.chats || []).map(function (c) {
+    const title = c.name || c.contact || ('Посетитель ' + String(c.vid || '').slice(0, 8)) || ('Диалог №' + c.id);
+    return '<button type="button" class="st-chat-card' + (c.id === _sites.chatId ? ' is-active' : '') + (c.unread_staff ? ' is-unread' : '') + '" onclick="sitesOpenChat(' + c.id + ')">' +
+      '<span class="st-chat-avatar"><i class="ti ti-user"></i></span><span class="st-chat-copy"><b>' + escapeHtml(title) + '</b><em>' + escapeHtml((c.last_text || 'Новый диалог').slice(0, 100)) + '</em><small>' + _sWhen(c.last_message_at) + (c.page ? ' · ' + escapeHtml(c.page) : '') + '</small></span>' +
+      (c.unread_staff ? '<i class="st-chat-unread">' + c.unread_staff + '</i>' : '') + '</button>';
+  }).join('');
+}
+async function sitesOpenChat(id, quiet) {
+  _sites.chatId = Number(id); _sitesRenderChatList();
+  const box = document.getElementById('sites-chat-thread'); if (!box) return;
+  if (!quiet) box.innerHTML = '<div class="loading-block">Открываем диалог…</div>';
+  let r; try { r = await apiGet('/api/sites/' + _sites.current + '/chats/' + id); } catch (e) { box.innerHTML = '<div class="empty-block">Не удалось открыть диалог</div>'; return; }
+  const c = r.chat; _sites.chat = c;
+  const who = c.name || c.contact || ('Посетитель ' + String(c.vid || '').slice(0, 8));
+  box.innerHTML = '<header class="st-chat-head"><div><b>' + escapeHtml(who) + '</b><span>' + [c.contact, c.page, c.source, c.lead_id ? 'заявка №' + c.lead_id : 'контакт ещё не оставлен'].filter(Boolean).map(escapeHtml).join(' · ') + '</span></div>' +
+    '<button class="btn btn-small btn-secondary" onclick="sitesChatStatus(\'' + (c.status === 'open' ? 'closed' : 'open') + '\')"><i class="ti ti-' + (c.status === 'open' ? 'check' : 'restore') + '"></i> ' + (c.status === 'open' ? 'Закрыть' : 'Вернуть') + '</button></header>' +
+    '<div class="st-chat-messages" id="sites-chat-messages">' + (c.messages || []).map(_sitesChatMessageHtml).join('') + '</div>' +
+    '<form class="st-chat-compose" onsubmit="sitesChatSend(event)"><textarea class="form-input" id="sites-chat-reply" rows="2" maxlength="3000" placeholder="Ответ посетителю…"></textarea><button class="btn btn-primary" type="submit"><i class="ti ti-send"></i> Отправить</button></form>';
+  const msgs = document.getElementById('sites-chat-messages'); if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  const cb = document.getElementById('sites-chats-badge'); if (cb && c.unread_staff) { const left = Math.max(0, Number(cb.textContent || 0) - c.unread_staff); cb.textContent = left || ''; cb.style.display = left ? '' : 'none'; }
+}
+function _sitesChatMessageHtml(m) {
+  const files = (m.files || []).map(function (f) { return '<a href="' + escapeHtml(f.url || '#') + '" target="_blank" rel="noopener"><i class="ti ti-paperclip"></i>' + escapeHtml(f.original_name || 'Файл') + '</a>'; }).join('');
+  return '<div class="st-chat-msg is-' + escapeHtml(m.sender || 'system') + '"><div>' + (m.sender === 'staff' && m.author_name ? '<b>' + escapeHtml(m.author_name) + '</b>' : '') + '<p>' + escapeHtml(m.text || '') + '</p>' + files + '<small>' + _sWhen(m.created_at) + '</small></div></div>';
+}
+async function sitesChatSend(event) {
+  event.preventDefault(); const field = document.getElementById('sites-chat-reply'); const text = (field && field.value || '').trim();
+  if (!text || !_sites.chatId) return;
+  const button = event.target.querySelector('button[type=submit]'); if (button) button.disabled = true;
+  try { await apiPost('/api/sites/' + _sites.current + '/chats/' + _sites.chatId + '/messages', { text: text }); field.value = ''; await sitesOpenChat(_sites.chatId, true); }
+  catch (e) { showToast(e.message || 'Ответ не отправлен', 'error'); }
+  finally { if (button) button.disabled = false; }
+}
+async function sitesChatStatus(status) {
+  if (!_sites.chatId) return;
+  try { await apiPatch('/api/sites/' + _sites.current + '/chats/' + _sites.chatId, { status: status }); await loadSitesChats(); }
+  catch (e) { showToast(e.message || 'Статус не изменён', 'error'); }
+}
 
 // ---- посетители
 async function loadSitesVisitors() {
