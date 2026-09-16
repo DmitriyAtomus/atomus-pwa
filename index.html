@@ -694,6 +694,10 @@
         <button class="nav-item" data-nav="sites-visitors" onclick="selectSidebarItem('sites-visitors')">
           <i class="ti ti-users"></i><span>Посетители</span>
         </button>
+        <!-- v2.46.214: Реклама (Яндекс.Директ) — директор и зам -->
+        <button class="nav-item" id="sb-sites-ads" data-nav="sites-ads" onclick="selectSidebarItem('sites-ads')" style="display:none;">
+          <i class="ti ti-speakerphone"></i><span>Реклама</span><span class="nav-badge" id="sites-ads-badge" style="display:none;"></span>
+        </button>
         <button class="nav-item" id="sb-sites-code" onclick="sitesShowCode()" style="display:none;">
           <i class="ti ti-code"></i><span>Код для сайта</span>
         </button>
@@ -1036,6 +1040,24 @@
           </div>
         </div>
         <div class="content-inner"><div id="sites-visitors-body"><div class="loading-block">Загружаем…</div></div></div>
+      </div>
+      <!-- v2.46.214: Реклама — Яндекс.Директ ↔ заявки CRM (директор, зам) -->
+      <div class="screen" data-screen="sites-ads" data-section="sites">
+        <div class="screen-header"><h2>Сайты · Реклама</h2></div>
+        <div class="page-header">
+          <div>
+            <h1>Реклама в Яндекс.Директе</h1>
+            <div class="page-subtitle">Расход, заявки и цена заявки; журнал того, что Клод поменял в кампаниях</div>
+          </div>
+          <div class="page-actions">
+            <select class="form-input ads-days" id="sites-ads-days" onchange="adsDays(this.value)">
+              <option value="7">7 дней</option><option value="30" selected>30 дней</option><option value="90">90 дней</option>
+            </select>
+            <button class="btn btn-secondary ads-sync" id="ads-sync-btn" onclick="adsSync()" style="display:none;"><i class="ti ti-cloud-download"></i> <span>Обновить из Директа</span></button>
+            <button class="btn btn-secondary" onclick="loadSitesAds()"><i class="ti ti-refresh"></i> <span>Обновить</span></button>
+          </div>
+        </div>
+        <div class="content-inner"><div id="sites-ads-body"><div class="loading-block">Загружаем…</div></div></div>
       </div>
 
       <div class="screen" data-screen="ideas" data-section="home">

@@ -1565,6 +1565,13 @@ function renderProfile() {
     navSec.style.display = (state.user.roles && state.user.roles.includes('director')) ? '' : 'none';
   }
 
+  // «Сайты → Реклама» (Яндекс.Директ) — директору и заму; бэк менеджеру отдаёт 403
+  const navAds = document.getElementById('sb-sites-ads');
+  if (navAds) {
+    const r = state.user.roles || [];
+    navAds.style.display = (r.includes('director') || r.includes('zam')) ? '' : 'none';
+  }
+
   // Общий сайт виден всем. Личная Клава разработки остаётся только директору.
   const isDirector = !!(state.user.roles && state.user.roles.includes('director'));
   const navSite = document.getElementById('sb-sitechat');
@@ -2050,6 +2057,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'sites-leads')         loadSitesLeads();
   if (screenName === 'sites-chats')         loadSitesChats();
   if (screenName === 'sites-visitors')      loadSitesVisitors();
+  if (screenName === 'sites-ads')           loadSitesAds();         // v2.46.214: Яндекс.Директ
   // Помощь
   if (screenName === 'help-knowledge')      loadHelpKnowledge();
   if (screenName === 'help-training')       loadHelpTraining();

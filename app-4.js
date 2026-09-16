@@ -24099,6 +24099,49 @@ function _sLeadFilesHtml(files) {
     return '<a href="' + escapeHtml(f.url || '#') + '" target="_blank" rel="noopener"><i class="ti ti-paperclip"></i><span>' + escapeHtml(f.original_name || 'Файл') + '</span><small>' + escapeHtml(size) + '</small></a>';
   }).join('') + '</div></div>';
 }
+// v2.46.214: блок «Реклама» в карточке заявки. params.utm пишет скрипт сайта:
+// последняя метка перед заявкой (utm_*, yclid, gclid) и первая (first_*, first_at).
+// ym_client_id — технический идентификатор Метрики, наружу его не показываем.
+// В общий список параметров utm не попадает (_sParamsHtml его прячет).
+function _sAdsLeadHtml(u) {
+  if (!u || typeof u !== 'object') return '';
+  const v = function (k) { const x = u[k]; return x === null || x === undefined ? '' : String(x).trim(); };
+  const tail = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'yclid', 'gclid'];
+  const hasLast = tail.some(function (k) { return v(k); });
+  const hasFirst = tail.some(function (k) { return v('first_' + k); });
+  const metrika = !!(v('ym_client_id') || v('first_ym_client_id'));
+  if (!hasLast && !hasFirst && !metrika) return '';
+  const parts = function (pfx) {
+    const src = v(pfx + 'utm_source'), med = v(pfx + 'utm_medium');
+    return [
+      src ? 'источник: ' + src + (med ? ' (' + med + ')' : '') : '',
+      v(pfx + 'utm_campaign') ? 'кампания: ' + v(pfx + 'utm_campaign') : '',
+      v(pfx + 'utm_term') ? 'фраза: «' + v(pfx + 'utm_term') + '»' : '',
+    ];
+  };
+  const row = function (title, items) {
+    items = items.filter(Boolean); if (!items.length) return '';
+    return '<div class="ads-lead-row"><div class="ads-lead-l">' + title + '</div><div class="st-lead-meta">' + items.map(escapeHtml).join(' · ') + '</div></div>';
+  };
+  let h = '';
+  if (hasLast || metrika) {
+    h += row('Последняя реклама перед заявкой', (hasLast ? parts('') : ['без рекламной метки']).concat([
+      v('utm_content') ? 'объявление: ' + v('utm_content') : '',
+      v('yclid') ? 'клик Директа ✓' : '',
+      v('gclid') ? 'клик Google ✓' : '',
+      metrika ? 'связан с Метрикой ✓' : '',
+    ]));
+  }
+  const same = ['utm_source', 'utm_campaign', 'utm_term'].every(function (k) { return v('first_' + k) === v(k); });
+  if (hasFirst && (!hasLast || !same)) {
+    h += row('Первая реклама', parts('first_').concat([
+      v('first_yclid') ? 'клик Директа ✓' : '',
+      v('first_gclid') ? 'клик Google ✓' : '',
+      v('first_at') ? 'впервые: ' + _adsDate(v('first_at')) : '',
+    ]));
+  }
+  return h ? '<div class="st-block"><div class="st-block-h">Реклама</div>' + h + '</div>' : '';
+}
 function sitesOpenLead(id) {
   const l = (_sites.leads || []).find(function (x) { return x.id === id; }); if (!l) return;
   let overlay = document.getElementById('sites-lead-modal');
@@ -24119,6 +24162,7 @@ function sitesOpenLead(id) {
     _sLeadFilesHtml(l.files) +
     '<div class="st-block"><div class="st-block-h">Приём заявки</div><div class="st-lead-meta">' + [l.consent_version ? 'согласие: ' + l.consent_version : '', l.consented_at ? 'время согласия: ' + l.consented_at : '', l.notification_status === 'sent' ? 'ответственные уведомлены' : l.notification_status === 'error' ? 'заявка сохранена, уведомление будет повторено' : 'уведомление ожидает отправки'].filter(Boolean).map(escapeHtml).join(' · ') + '</div></div>' +
     '<div class="st-block"><div class="st-block-h">Откуда</div><div class="st-lead-meta">' + [_sWhen(l.created_at), l.source ? 'пришёл: ' + l.source : '', l.device || '', l.page ? 'страница ' + l.page : '', l.source_button ? 'кнопка: ' + l.source_button : ''].filter(Boolean).map(escapeHtml).join(' · ') + '</div></div>' +
+    _sAdsLeadHtml(l.params && l.params.utm) +
     '<div class="st-block"><div class="st-block-h">Заметка' + (l.assignee ? ' · ведёт ' + escapeHtml(l.assignee) : '') + '</div><textarea class="form-input" id="sites-lead-note" rows="3" placeholder="Что ответили, о чём договорились">' + escapeHtml(l.note || '') + '</textarea>' +
     '<div class="modal-actions"><button class="btn btn-primary" onclick="sitesLeadNote(' + l.id + ')"><i class="ti ti-check"></i> Сохранить заметку</button></div></div>';
   overlay.classList.add('visible');
@@ -24245,4 +24289,256 @@ function sitesShowCode() {
     '<div class="modal-actions"><button class="btn btn-primary" onclick="navigator.clipboard.writeText(document.getElementById(\'sites-code-snippet\').textContent).then(function(){showToast(\'Скопировано\',\'success\')})"><i class="ti ti-copy"></i> Скопировать строку</button></div>' +
     '<p class="st-hint-p">Форма заявки вызывает <code>AtomusSite.lead({...})</code> и получает ответ сервера: «Заявка принята» показывается только после сохранения. Сервер: <code>' + escapeHtml(_sites.apiBase || '') + '</code>. Ключ — секрет сайта: не публикуйте его в чатах.</p>';
   overlay.classList.add('visible');
+}
+
+// ============ v2.46.214: САЙТЫ → РЕКЛАМА (Яндекс.Директ ↔ заявки CRM) ============
+// Бэк раз в сутки (и по кнопке) тянет из Директа расход/клики/запросы, связывает
+// клики (yclid) с заявками сайта. Клод сам ведёт кампании в согласованных рамках
+// (минус-слова, остановка фраз без заявок) — здесь журнал «Что сделано»: директор
+// может отменить любое изменение, а если в настройках попросил спрашивать —
+// решает «Применить»/«Отклонить». Зам только смотрит.
+// Пока сервер не отдаёт /api/ads/* (404) или токена нет (configured:false) —
+// показываем понятную заглушку, а не пустые таблицы.
+
+var _ads = { days: 30, data: null, proposals: [], busy: false, openItems: {}, settingsOpen: false };
+
+// escapeHtml не трогает кавычки — для значений в атрибутах добиваем их сами
+function _adsAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+function _adsRoles() { return (state.user && state.user.roles) || []; }
+function _adsIsDirector() { return _adsRoles().indexOf('director') >= 0; }
+function _adsCanSee() { const r = _adsRoles(); return r.indexOf('director') >= 0 || r.indexOf('zam') >= 0; }
+function _adsRub(v) { if (v === null || v === undefined || v === '' || isNaN(Number(v))) return '—'; return Math.round(Number(v)).toLocaleString('ru-RU') + ' ₽'; }
+function _adsNum(v) { return (Number(v) || 0).toLocaleString('ru-RU'); }
+function _adsDate(s) { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '.' + m[2] + '.' + m[1] : String(s || ''); }
+function _adsKpi(n, l, sub, cls) { return '<div class="st-kpi' + (cls ? ' ' + cls : '') + '"><div class="st-kpi-n">' + n + '</div><div class="st-kpi-l">' + l + '</div>' + (sub ? '<div class="st-kpi-s">' + sub + '</div>' : '') + '</div>'; }
+function _adsForbidden(el, e) {
+  const s = String((e && e.message) || e || '');
+  if (/403/.test(s)) { el.innerHTML = '<div class="empty-block"><i class="ti ti-lock"></i>Раздел «Реклама» открыт директору и заму</div>'; return; }
+  if (/404/.test(s)) { el.innerHTML = '<div class="empty-block"><i class="ti ti-plug-connected-x"></i>Реклама пока не подключена на сервере — раздел заработает после обновления CRM</div>'; return; }
+  el.innerHTML = '<div class="empty-block"><i class="ti ti-lock"></i>Нет связи с сервером</div>';
+}
+// apiPost падает на не-JSON ответе (404 от старого бэка) — здесь всегда {ok,status,data}
+async function _adsPost(path, body) {
+  try { const r = await apiPost(path, body || {}); r.data = r.data || {}; return r; }
+  catch (e) { return { ok: false, status: 0, data: { message: 'Сервер не ответил — попробуйте ещё раз' } }; }
+}
+// Кнопок синхронизации две: в шапке (десктоп) и в панели над экраном (телефон,
+// где шапка скрыта). Обе — класс .ads-sync, состояние ведём здесь одним местом.
+function _adsSyncBtn() {
+  document.querySelectorAll('.ads-sync').forEach(function (b) {
+    b.style.display = _adsIsDirector() && _ads.data ? '' : 'none';
+    b.disabled = _ads.busy;
+    b.innerHTML = _ads.busy ? '<i class="ti ti-loader-2 ads-spin"></i> <span>Тянем из Директа…</span>' : '<i class="ti ti-cloud-download"></i> <span>Обновить из Директа</span>';
+  });
+}
+// Панель для телефона: те же обработчики, что у шапки (adsDays / adsSync / loadSitesAds)
+function _adsToolsHtml() {
+  return '<div class="ads-mtools"><select class="form-input ads-days" onchange="adsDays(this.value)">' +
+    [7, 30, 90].map(function (n) { return '<option value="' + n + '"' + (n === _ads.days ? ' selected' : '') + '>' + n + ' дней</option>'; }).join('') + '</select>' +
+    '<button class="btn btn-secondary ads-sync" onclick="adsSync()" style="display:none;"></button>' +
+    '<button class="btn btn-secondary" onclick="loadSitesAds()" title="Обновить"><i class="ti ti-refresh"></i></button></div>';
+}
+function adsDays(v) { _ads.days = parseInt(v, 10) || 30; loadSitesAds(); }
+
+async function loadSitesAds() {
+  const el = document.getElementById('sites-ads-body'); if (!el) return;
+  if (!_adsCanSee()) { _ads.data = null; _adsSyncBtn(); _adsForbidden(el, { message: '403' }); return; }
+  document.querySelectorAll('.ads-days').forEach(function (s) { s.value = String(_ads.days); });
+  const prP = apiGet('/api/ads/proposals?status=all').catch(function (e) { return { error: String(e.message || e) }; });
+  let d; try { d = await apiGet('/api/ads/overview?days=' + _ads.days); } catch (e) { _ads.data = null; _adsSyncBtn(); _adsForbidden(el, e); return; }
+  _ads.data = d || {};
+  const pr = await prP;
+  _ads.proposals = (pr && Array.isArray(pr.proposals)) ? pr.proposals : [];
+  _adsRender(el, pr && pr.error);
+  _adsSyncBtn();   // после рендера: кнопка в панели телефона появляется вместе с телом
+}
+
+function _adsMetaHtml(d) {
+  const bits = [];
+  bits.push(d.last_sync ? '<span>данные из Директа: ' + escapeHtml(_sWhen(d.last_sync)) + '</span>' : '<span>из Директа ещё не загружали</span>');
+  if (d.offline && (d.offline.uploaded || d.offline.pending)) bits.push('<span>заявок передано в Метрику: ' + _adsNum(d.offline.uploaded) + (d.offline.pending ? ', ждут отправки: ' + _adsNum(d.offline.pending) : '') + '</span>');
+  if (d.last_error) bits.push('<span class="is-warn"><i class="ti ti-alert-triangle"></i> ' + escapeHtml(d.last_error) + '</span>');
+  return '<div class="ads-meta">' + bits.join('') + '</div>';
+}
+
+function _adsRender(el, prError) {
+  const d = _ads.data || {}, st = d.settings || {}, dir = _adsIsDirector();
+  let h = _adsToolsHtml() + _adsMetaHtml(d);
+  if (!d.configured) {
+    h += '<div class="st-card"><div class="ads-empty-h"><i class="ti ti-plug-connected-x"></i> Директ ещё не подключён</div>' +
+      '<p class="ads-lead-p">Как только будет токен, Клод сам начнёт вести кампании в согласованных рамках.</p>' +
+      '<ol class="ads-steps">' +
+      '<li>Директор получает OAuth-токен Яндекса с доступом к Директу и Метрике — от того аккаунта, где ведётся реклама.</li>' +
+      '<li>Вставляет токен в поле ниже и сохраняет. Токен хранится на сервере и больше нигде не показывается.</li>' +
+      '<li>Нажимает «Обновить из Директа»: подтянутся расход, клики и запросы, заявки с сайта свяжутся с кликами. Всё, что Клод поменяет, видно в журнале «Что сделано» — любое изменение можно отменить.</li>' +
+      '</ol>' +
+      (dir ? _adsSettingsHtml(st, false) : '<div class="st-empty">Подключает Директ директор.</div>') + '</div>';
+    el.innerHTML = h; return;
+  }
+  const p = d.period || {};
+  h += '<div class="st-kpis">' +
+    _adsKpi(_adsRub(p.cost), 'расход', 'за ' + (parseInt(p.days, 10) || _ads.days) + ' дней') +
+    _adsKpi(_adsNum(p.clicks), 'клики', _adsNum(p.impressions) + ' показов') +
+    _adsKpi(_adsNum(p.crm_leads), 'заявки из CRM', 'пришли с кликов по рекламе') +
+    _adsKpi(_adsRub(p.cpl), 'цена заявки', 'расход ÷ заявки из CRM') +
+    _adsKpi(_adsNum(p.direct_conversions), 'конверсии Директа', 'как их считает Яндекс') +
+    '</div>';
+  // журнал «Что сделано»: ждущие решения сверху, дальше свежие первыми
+  const props = _ads.proposals.slice().sort(function (a, b) {
+    const pa = a.status === 'pending' ? 0 : 1, pb = b.status === 'pending' ? 0 : 1;
+    return pa - pb || String(b.decided_at || b.created_at || '').localeCompare(String(a.decided_at || a.created_at || ''));
+  });
+  const pending = props.filter(function (x) { return x.status === 'pending'; }).length;
+  h += '<div class="st-card"><div class="st-card-h ads-card-h"><span>Что сделано</span>' + (pending ? '<span class="ich-chip is-ready ads-wait">ждут решения: ' + pending + '</span>' : '') + '</div>' +
+    (prError ? '<div class="st-empty">Журнал не загрузился — нажмите «Обновить»</div>'
+      : props.length ? '<div class="ads-props">' + props.map(_adsProposalHtml).join('') + '</div>'
+      : '<div class="st-empty">Клод пока ничего не менял в кампаниях</div>') +
+    '</div>';
+  // расход по дням
+  const days = d.by_day || [];
+  if (days.length) {
+    const mx = Math.max.apply(null, days.map(function (x) { return Number(x.cost) || 0; }).concat([1]));
+    h += '<div class="st-card"><div class="st-card-h">Расход по дням</div><div class="st-bars">' + days.map(function (x) {
+      return '<div class="st-bar" title="' + _adsAttr(_sDay(x.day) + ': ' + _adsRub(x.cost) + ', кликов ' + _adsNum(x.clicks) + (x.crm_leads ? ', заявок: ' + x.crm_leads : '')) + '"><div class="st-bar-v" style="height:' + Math.max(3, Math.round(100 * (Number(x.cost) || 0) / mx)) + '%"></div>' + (x.crm_leads ? '<b class="st-bar-lead">' + _adsNum(x.crm_leads) + '</b>' : '') + '<span>' + escapeHtml(_sDay(x.day)) + '</span></div>';
+    }).join('') + '</div></div>';
+  }
+  // кампании
+  const camps = d.campaigns || [];
+  h += '<div class="st-card"><div class="st-card-h">Кампании</div>' + (camps.length
+    ? '<div class="table-scroll"><table class="st-table ads-table"><thead><tr><th>Кампания</th><th class="num">Расход</th><th class="num">Клики</th><th class="num">Заявки CRM</th><th class="num">Цена заявки</th><th class="num">Конверсии Директа</th></tr></thead><tbody>' +
+      camps.map(function (c) {
+        return '<tr><td>' + escapeHtml(c.name || ('Кампания ' + (c.campaign_id || ''))) + '</td><td class="num">' + _adsRub(c.cost) + '</td><td class="num">' + _adsNum(c.clicks) + '</td><td class="num">' + _adsNum(c.crm_leads) + '</td><td class="num">' + _adsRub(c.cpl) + '</td><td class="num">' + _adsNum(c.direct_conversions) + '</td></tr>';
+      }).join('') + '</tbody></table></div>'
+    : '<div class="st-empty">За этот период по кампаниям данных нет</div>') + '</div>';
+  // запросы
+  const qs = (d.top_queries || []).slice(0, 20);
+  h += '<div class="st-card"><div class="st-card-h">По каким запросам кликали</div>' + (qs.length
+    ? '<div class="table-scroll"><table class="st-table ads-table"><thead><tr><th>Запрос</th><th class="num">Клики</th><th class="num">Расход</th><th class="num">Конверсии</th></tr></thead><tbody>' +
+      qs.map(function (q) { return '<tr><td>' + escapeHtml(q.query || '') + '</td><td class="num">' + _adsNum(q.clicks) + '</td><td class="num">' + _adsRub(q.cost) + '</td><td class="num">' + _adsNum(q.conversions) + '</td></tr>'; }).join('') + '</tbody></table></div>'
+    : '<div class="st-empty">Запросов за период нет</div>') + '</div>';
+  if (dir) h += '<details class="st-card ads-settings" id="ads-settings"' + (_ads.settingsOpen ? ' open' : '') + ' ontoggle="_ads.settingsOpen=this.open"><summary>Настройки</summary>' + _adsSettingsHtml(st, true) + '</details>';
+  el.innerHTML = h;
+}
+
+var _ADS_STATUS = {
+  pending:  { cls: 'is-ready ads-wait', label: 'Ждёт решения' },
+  applying: { cls: 'is-sent',     label: 'Применяется' },
+  applied:  { cls: 'is-taken',    label: 'Применено' },
+  reverted: { cls: 'is-declined', label: 'Отменено' },
+  rejected: { cls: 'is-declined', label: 'Отклонено' },
+  failed:   { cls: 'is-revision', label: 'Ошибка' },
+};
+function _adsProposalHtml(p) {
+  const id = parseInt(p.id, 10) || 0;
+  const s = _ADS_STATUS[p.status] || { cls: '', label: p.status || '' };
+  const items = Array.isArray(p.items) ? p.items : [];
+  const open = !!_ads.openItems[id];
+  const shown = open ? items : items.slice(0, 12);
+  const who = [p.decided_by || '', p.decided_at ? _sWhen(p.decided_at) : ''].filter(Boolean);
+  const dir = _adsIsDirector();
+  let btns = '';
+  if (dir && p.status === 'pending') btns = '<button class="btn btn-small btn-primary" data-act="1" onclick="adsProposalAct(' + id + ',\'apply\')"><i class="ti ti-check"></i> Применить</button><button class="btn btn-small btn-secondary" data-act="1" onclick="adsProposalAct(' + id + ',\'reject\')"><i class="ti ti-x"></i> Отклонить</button>';
+  else if (dir && p.status === 'applied') btns = '<button class="btn btn-small btn-secondary" data-act="1" onclick="adsProposalAct(' + id + ',\'revert\')"><i class="ti ti-arrow-back-up"></i> Отменить</button>';
+  return '<div class="ads-prop' + (p.status === 'pending' ? ' is-pending' : '') + '" id="ads-prop-' + id + '">' +
+    '<div class="st-lead-top"><span class="ich-chip ' + s.cls + '">' + escapeHtml(p.status_label || s.label) + '</span><span class="ich-chip is-sent">' + escapeHtml(p.kind_label || p.kind || '') + '</span><b>' + escapeHtml(p.title || '') + '</b><span class="st-lead-when">' + escapeHtml(_sWhen(p.created_at)) + '</span></div>' +
+    (p.result ? '<div class="ads-result">' + escapeHtml(p.result) + '</div>' : '') +
+    (p.campaign_name ? '<div class="st-lead-meta">кампания: ' + escapeHtml(p.campaign_name) + '</div>' : '') +
+    (p.reason ? '<div class="st-lead-comment">' + escapeHtml(p.reason) + '</div>' : '') +
+    (items.length ? '<div class="ads-items">' + shown.map(function (i) { return '<span class="st-page">' + escapeHtml(i) + '</span>'; }).join('') +
+      (items.length > 12 ? '<button class="ads-more" onclick="adsToggleItems(' + id + ')">' + (open ? 'свернуть' : 'ещё ' + (items.length - 12)) + '</button>' : '') + '</div>' : '') +
+    (p.est_saving_rub ? '<div class="st-lead-meta">примерная экономия: ' + _adsRub(p.est_saving_rub) + '</div>' : '') +
+    (who.length ? '<div class="st-lead-meta">' + who.map(escapeHtml).join(' · ') + '</div>' : '') +
+    '<div class="ads-prop-actions">' + btns + '<span class="ads-msg"></span></div></div>';
+}
+function _adsReplaceCard(p, msg) {
+  const id = parseInt(p.id, 10) || 0;
+  const i = _ads.proposals.findIndex(function (x) { return parseInt(x.id, 10) === id; });
+  if (i >= 0) _ads.proposals[i] = p;
+  const card = document.getElementById('ads-prop-' + id); if (!card) return;
+  card.outerHTML = _adsProposalHtml(p);
+  if (msg) { const m = document.querySelector('#ads-prop-' + id + ' .ads-msg'); if (m) { m.className = 'ads-msg is-err'; m.textContent = msg; } }
+}
+function adsToggleItems(id) {
+  _ads.openItems[id] = !_ads.openItems[id];
+  const p = _ads.proposals.find(function (x) { return parseInt(x.id, 10) === id; }); if (p) _adsReplaceCard(p);
+}
+var _ADS_ACT = {
+  apply:  { busy: 'Применяем в Директе…', done: 'Применено в Директе' },
+  reject: { busy: 'Отклоняем…', done: 'Предложение отклонено' },
+  revert: { busy: 'Возвращаем как было…', done: 'Отменено — в Директе всё как было' },
+};
+async function adsProposalAct(id, action) {
+  const a = _ADS_ACT[action]; if (!a) return;
+  const card = document.getElementById('ads-prop-' + id); if (!card) return;
+  if (action === 'revert') {
+    const p = _ads.proposals.find(function (x) { return parseInt(x.id, 10) === id; }) || {};
+    const q = p.kind === 'negatives' ? 'Снять эти минус-слова?' : p.kind === 'suspend_keywords' ? 'Включить эти фразы обратно?' : 'Отменить это изменение в Директе?';
+    if (!confirm(q)) return;
+  }
+  const btns = card.querySelectorAll('button[data-act]'), msg = card.querySelector('.ads-msg');
+  btns.forEach(function (b) { b.disabled = true; });
+  if (msg) { msg.className = 'ads-msg'; msg.textContent = a.busy; }
+  const r = await _adsPost('/api/ads/proposals/' + id + '/' + action, {});
+  const data = r.data;
+  if (r.ok && data.ok && data.proposal) {
+    _adsReplaceCard(data.proposal);
+    showToast(a.done, 'success');
+    return;
+  }
+  const text = data.message || (r.status === 403 ? 'Это решает директор' : r.status === 404 ? 'Сервер пока этого не умеет' : 'Не получилось' + (r.status ? ' (HTTP ' + r.status + ')' : ''));
+  if (data.proposal) { _adsReplaceCard(data.proposal, text); return; }
+  btns.forEach(function (b) { b.disabled = false; });
+  if (msg) { msg.className = 'ads-msg is-err'; msg.textContent = text; }
+}
+
+function _adsSettingsHtml(st, collapsible) {
+  st = st || {};
+  const offlineLabel = { crm_qualified: 'заявки, взятые в работу' }[st.offline_target] || st.offline_target || '';
+  return '<div class="ads-form">' +
+    '<label class="ads-f"><span>OAuth-токен Яндекса</span>' +
+      (st.token_set ? '<small class="ads-ok">токен сохранён ✓ — чтобы заменить, вставьте новый</small>' : '<small>доступ к Директу и Метрике; после сохранения токен не показывается</small>') +
+      '<input type="password" class="form-input" id="ads-token" autocomplete="new-password" spellcheck="false" placeholder="' + (st.token_set ? 'новый токен (необязательно)' : 'вставьте токен') + '"></label>' +
+    '<label class="ads-f"><span>Логин клиента в Директе</span><small>для агентского аккаунта, необязательно</small>' +
+      '<input type="text" class="form-input" id="ads-login" autocomplete="off" value="' + _adsAttr(st.client_login || '') + '"></label>' +
+    // auto_apply по умолчанию true: галка «спрашивать» — обратная, стоит только при auto_apply === false
+    '<label class="ads-check"><input type="checkbox" id="ads-ask"' + (st.auto_apply === false ? ' checked' : '') + '><span>Спрашивать меня перед каждым изменением' +
+      '<br><small class="ads-note">Обычно не нужно: Клод меняет только то, что снижает расход, и каждое изменение можно отменить.</small></span></label>' +
+    '<label class="ads-f"><span>Останавливать фразу без заявок после расхода, ₽</span>' +
+      '<input type="number" class="form-input" id="ads-suspend" min="0" step="100" inputmode="numeric" value="' + _adsAttr(st.suspend_spend_rub != null ? st.suspend_spend_rub : '') + '"></label>' +
+    ((st.counter_id || st.goal_id) ? '<div class="ads-note">Счётчик Метрики: ' + escapeHtml(st.counter_id || '—') + ' · цель: ' + escapeHtml(st.goal_id || '—') + (offlineLabel ? ' · в Метрику уходят: ' + escapeHtml(offlineLabel) : '') + '</div>' : '') +
+    '<div class="ads-prop-actions"><button class="btn btn-primary" id="ads-save-btn" onclick="adsSaveSettings()"><i class="ti ti-device-floppy"></i> Сохранить</button><span class="ads-msg" id="ads-settings-msg"></span></div>' +
+    '</div>';
+}
+
+async function adsSaveSettings() {
+  const g = function (id) { return document.getElementById(id); };
+  const body = {};
+  const tok = g('ads-token') ? g('ads-token').value.trim() : '';
+  if (tok) body.token = tok;
+  if (g('ads-login')) body.client_login = g('ads-login').value.trim();
+  if (g('ads-ask')) body.auto_apply = !g('ads-ask').checked;
+  if (g('ads-suspend') && g('ads-suspend').value !== '') { const n = parseInt(g('ads-suspend').value, 10); if (!isNaN(n) && n >= 0) body.suspend_spend_rub = n; }
+  const btn = g('ads-save-btn'), msg = g('ads-settings-msg');
+  if (btn) btn.disabled = true;
+  if (msg) { msg.className = 'ads-msg'; msg.textContent = 'Сохраняем…'; }
+  const r = await _adsPost('/api/ads/settings', body);
+  if (btn) btn.disabled = false;
+  if (r.ok && r.data.ok) {
+    if (g('ads-token')) g('ads-token').value = '';
+    showToast(tok ? 'Токен сохранён' : 'Настройки сохранены', 'success');
+    if (_ads.data && r.data.settings) _ads.data.settings = r.data.settings;
+    _ads.settingsOpen = true;
+    loadSitesAds();   // после токена меняется configured — перерисовываем всё
+    return;
+  }
+  if (msg) { msg.className = 'ads-msg is-err'; msg.textContent = r.data.message || (r.status === 403 ? 'Настройки меняет директор' : r.status === 404 ? 'Сервер пока не принимает настройки рекламы' : 'Не сохранилось' + (r.status ? ' (HTTP ' + r.status + ')' : '')); }
+}
+
+async function adsSync() {
+  if (_ads.busy) return;
+  _ads.busy = true; _adsSyncBtn();
+  const r = await _adsPost('/api/ads/sync', {});
+  _ads.busy = false; _adsSyncBtn();
+  if (r.ok && r.data.ok) { showToast(r.data.summary || 'Данные из Директа обновлены', 'success'); if (state.currentScreen === 'sites-ads') loadSitesAds(); return; }
+  showToast(r.data.message || (r.status === 403 ? 'Обновлять из Директа может директор' : r.status === 404 ? 'Сервер пока не умеет ходить в Директ' : 'Не удалось обновить'), 'error');
 }
