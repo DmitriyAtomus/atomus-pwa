@@ -24203,9 +24203,10 @@ function _sitesMobileNav(screenName) {
     ['sites-visitors', 'ti-users', 'Посетители', ''],
   ];
   if (ads && ads.style.display !== 'none') items.push(['sites-ads', 'ti-speakerphone', 'Реклама', '']);
-  nav.innerHTML = items.map(function (it) {
+  const html = items.map(function (it) {
     return '<button type="button" class="st-mnav-btn' + (it[0] === screenName ? ' is-active' : '') + '" onclick="selectSidebarItem(\'' + it[0] + '\')"><i class="ti ' + it[1] + '"></i>' + it[2] + it[3] + '</button>';
   }).join('');
+  if (nav.innerHTML !== html) { nav.innerHTML = html; nav.scrollLeft = 0; }  // не перерисовываем без изменений — иначе мигает при опросе
 }
 function _sitesSyncMnav() { if (state.currentScreen && String(state.currentScreen).indexOf('sites-') === 0) _sitesMobileNav(state.currentScreen); }
 
