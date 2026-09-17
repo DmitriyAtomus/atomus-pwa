@@ -24052,9 +24052,12 @@ async function loadSitesDashboard() {
       return '<div class="st-row"><span class="st-row-l" title="' + escapeHtml(r[key] || '') + '">' + escapeHtml(r[key] || '—') + '</span><span class="st-row-bar"><i style="width:' + Math.round(100 * (r[valKey] || 0) / total) + '%"></i></span><span class="st-row-v">' + (r[valKey] || 0) + ' ' + unit + '</span></div>';
     }).join('') : '<div class="st-empty">пока нет данных</div>') + '</div>';
   };
-  h += '<div class="st-grid">' + list('Откуда приходят', sm.sources || [], 'source', 'visits', 'зах.') + list('Какие страницы смотрят', sm.pages || [], 'page', 'views', 'просм.') + list('С каких устройств', sm.devices || [], 'device', 'visits', 'зах.') + '</div>';
+  h += '<div class="st-grid">' + list('Откуда приходят', sm.sources || [], 'source', 'visits', 'зах.') + list('Из каких городов', sm.cities || [], 'city', 'visits', 'зах.') + list('Какие страницы смотрят', sm.pages || [], 'page', 'views', 'просм.') + list('С каких устройств', sm.devices || [], 'device', 'visits', 'зах.') + '</div>';
   if (!p.visits) h += '<div class="st-hint"><i class="ti ti-info-circle"></i> Данных нет: сайт ещё не подключён. Нажмите «Код для сайта» в меню слева — там ключ и строка для вставки.</div>';
+  // v2.46.219: наши адреса (офис, VPN) — заходы с них не считаем
+  h += '<div class="st-card" id="sites-own-ips"><div class="st-card-h">Наши адреса — не считаем в статистике' + (sm.own_visits ? ' <small>(за период отфильтровано наших заходов: ' + sm.own_visits + ')</small>' : '') + '</div><div class="st-empty">Загружаем…</div></div>';
   el.innerHTML = h;
+  _sitesLoadOwnIps();
   if (_sites.poll) clearInterval(_sites.poll);
   _sites.poll = setInterval(function () { if ((state.currentScreen || '') !== 'sites-dashboard') { clearInterval(_sites.poll); _sites.poll = null; return; } if (!document.hidden) loadSitesDashboard(); }, 60000);
 }
@@ -24210,6 +24213,44 @@ function _sitesMobileNav(screenName) {
 }
 function _sitesSyncMnav() { if (state.currentScreen && String(state.currentScreen).indexOf('sites-') === 0) _sitesMobileNav(state.currentScreen); }
 
+// ---- v2.46.219: наши адреса (офис, VPN): не считаем в статистике
+async function _sitesLoadOwnIps() {
+  const box = document.getElementById('sites-own-ips'); if (!box) return;
+  let r; try { r = await apiGet('/api/sites/own-ips'); } catch (e) { box.querySelector('.st-empty').textContent = 'Не удалось загрузить'; return; }
+  _sites.ownIps = r;
+  const chips = (r.ips || []).map(function (i) {
+    return '<span class="st-ip"><b>' + escapeHtml(i.label || 'наш адрес') + '</b> ' + escapeHtml(i.ip) +
+      (r.can_manage ? ' <button type="button" class="st-ip-x" title="Убрать из списка" onclick="sitesOwnIpRemove(' + i.id + ')"><i class="ti ti-x"></i></button>' : '') + '</span>';
+  }).join('');
+  let cur = '';
+  if (r.current_ip) {
+    cur = '<div class="st-ip-cur">Сейчас вы зашли с адреса <code>' + escapeHtml(r.current_ip) + '</code>' +
+      (r.current_known ? ' — он в списке, ваши заходы на сайт не считаются.' : ' — его в списке нет' + (r.can_manage ? '.' : ', попросите директора добавить.')) + '</div>';
+  }
+  const actions = r.can_manage ? '<div class="st-ip-actions">' +
+    (r.current_ip && !r.current_known ? '<button class="btn btn-small btn-primary" onclick="sitesOwnIpAdd(true)"><i class="ti ti-plus"></i> Добавить этот адрес</button>' : '') +
+    '<button class="btn btn-small btn-secondary" onclick="sitesOwnIpAdd(false)"><i class="ti ti-keyboard"></i> Ввести адрес вручную</button></div>' : '';
+  box.innerHTML = '<div class="st-card-h">Наши адреса — не считаем в статистике</div>' +
+    '<div class="st-ip-hint">Заходы с этих адресов (офис, VPN, домашний интернет) не попадают в счётчики, источники и список посетителей. Меняется адрес — добавьте новый. Узнать адрес VPN: включить VPN, открыть эту страницу, нажать «Добавить этот адрес».</div>' +
+    (chips ? '<div class="st-ip-list">' + chips + '</div>' : '<div class="st-empty">Пока ни одного адреса</div>') + cur + actions;
+}
+async function sitesOwnIpAdd(useCurrent) {
+  const r = _sites.ownIps || {};
+  let ip = '';
+  if (!useCurrent) { ip = (prompt('IP-адрес (например 95.24.1.10)') || '').trim(); if (!ip) return; }
+  const label = (prompt('Как подписать адрес?', useCurrent ? 'Офис' : 'VPN') || '').trim();
+  try {
+    const res = await apiPost('/api/sites/own-ips', { ip: ip, label: label });
+    showToast('Адрес ' + res.ip.ip + ' добавлен' + (res.marked ? ', отфильтровано прошлых заходов: ' + res.marked : ''), 'success');
+    loadSitesDashboard();
+  } catch (e) { showToast(e.message || 'Не удалось добавить адрес', 'error'); }
+}
+async function sitesOwnIpRemove(id) {
+  if (!confirm('Убрать адрес из списка наших? Заходы с него снова будут считаться.')) return;
+  try { await apiDelete('/api/sites/own-ips/' + id); loadSitesDashboard(); }
+  catch (e) { showToast(e.message || 'Не удалось убрать адрес', 'error'); }
+}
+
 // ---- живые диалоги с посетителями сайта
 async function loadSitesChats() {
   const el = document.getElementById('sites-chats-body'); if (!el) return;
@@ -24287,17 +24328,20 @@ async function loadSitesVisitors() {
   if (d.error) { _sitesForbidden(el, { message: d.error }); return; }
   if (!_sites.current) { el.innerHTML = '<div class="empty-block">Сайты не подключены</div>'; return; }
   const days = (document.getElementById('sites-vdays') || {}).value || 7;
-  let r; try { r = await apiGet('/api/sites/' + _sites.current + '/sessions?days=' + days + '&limit=300'); } catch (e) { _sitesForbidden(el, e); return; }
+  const own = (document.getElementById('sites-vown') || {}).checked ? '&own=1' : '';   // v2.46.219: показать и наши заходы
+  let r; try { r = await apiGet('/api/sites/' + _sites.current + '/sessions?days=' + days + '&limit=300' + own); } catch (e) { _sitesForbidden(el, e); return; }
   const rows = r.sessions || [];
   if (!rows.length) { el.innerHTML = '<div class="empty-block"><i class="ti ti-users"></i>Заходов за этот период нет</div>'; return; }
-  el.innerHTML = '<div class="table-scroll"><table class="st-table"><thead><tr><th>Когда</th><th>Просидел</th><th>Стр.</th><th>Вход</th><th>Откуда</th><th>Устройство</th><th></th></tr></thead><tbody>' +
+  el.innerHTML = '<div class="table-scroll"><table class="st-table"><thead><tr><th>Когда</th><th>Просидел</th><th>Стр.</th><th>Вход</th><th>Откуда</th><th>Город</th><th>Устройство</th><th></th></tr></thead><tbody>' +
     rows.map(function (s) {
-      return '<tr class="' + (s.online ? 'is-online' : '') + (s.leads ? ' has-lead' : '') + '" onclick="sitesSessionPages(' + s.id + ', this)">' +
+      return '<tr class="' + (s.online ? 'is-online' : '') + (s.leads ? ' has-lead' : '') + (s.is_own ? ' is-own' : '') + '" onclick="sitesSessionPages(' + s.id + ', this)">' +
         '<td>' + _sWhen(s.started_at) + (s.online ? ' <span class="st-online-dot" title="сейчас на сайте"></span>' : '') + '</td>' +
         '<td>' + _sDur(s.duration_sec) + '</td><td>' + s.pages + '</td>' +
         '<td title="' + escapeHtml(s.entry_title || '') + '">' + escapeHtml(s.entry_page || '/') + '</td>' +
-        '<td>' + escapeHtml(s.source || '') + '</td><td>' + escapeHtml(s.device || '') + (s.returning ? ' · <span class="st-ret">вернулся</span>' : '') + '</td>' +
-        '<td>' + (s.leads ? '<span class="ich-chip is-open">заявка</span>' : '') + '</td></tr>';
+        '<td>' + escapeHtml(s.source || '') + '</td>' +
+        '<td title="' + escapeHtml(s.region || '') + '">' + (s.geo ? escapeHtml(s.geo) : '<span class="st-muted">—</span>') + '</td>' +
+        '<td>' + escapeHtml(s.device || '') + (s.returning ? ' · <span class="st-ret">вернулся</span>' : '') + '</td>' +
+        '<td>' + (s.is_own ? '<span class="ich-chip">мы</span> ' : '') + (s.leads ? '<span class="ich-chip is-open">заявка</span>' : '') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 }
 async function sitesSessionPages(id, tr) {
@@ -24305,7 +24349,7 @@ async function sitesSessionPages(id, tr) {
   if (next && next.classList.contains('st-pages-row')) { next.remove(); return; }
   let r; try { r = await apiGet('/api/sites/' + _sites.current + '/sessions/' + id + '/pages'); } catch (e) { return; }
   const row = document.createElement('tr'); row.className = 'st-pages-row';
-  row.innerHTML = '<td colspan="7"><div class="st-pages">' + (r.pages || []).map(function (p) { return '<span class="st-page ' + p.event + '">' + (p.event === 'lead' ? '<i class="ti ti-inbox"></i> заявка' : p.event === 'click' ? '<i class="ti ti-click"></i> ' + escapeHtml(p.title || '') : escapeHtml(p.page || '/')) + ' <small>' + String(p.ts || '').slice(11, 16) + '</small></span>'; }).join('<i class="ti ti-arrow-right st-arrow"></i>') + '</div></td>';
+  row.innerHTML = '<td colspan="8"><div class="st-pages">' + (r.pages || []).map(function (p) { return '<span class="st-page ' + p.event + '">' + (p.event === 'lead' ? '<i class="ti ti-inbox"></i> заявка' : p.event === 'click' ? '<i class="ti ti-click"></i> ' + escapeHtml(p.title || '') : escapeHtml(p.page || '/')) + ' <small>' + String(p.ts || '').slice(11, 16) + '</small></span>'; }).join('<i class="ti ti-arrow-right st-arrow"></i>') + '</div></td>';
   tr.parentNode.insertBefore(row, tr.nextSibling);
 }
 

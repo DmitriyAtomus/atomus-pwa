@@ -32,3 +32,11 @@ test('на телефоне раздел сайтов показывает по�
   assert.match(app4, /entityType === 'site_chat' && entityId/);
   assert.match(css, /\.app\.mobile-layout \.st-mnav\{display:flex/);
 });
+
+test('наши адреса и город посетителя (v2.46.219)', () => {
+  assert.match(app4, /async function _sitesLoadOwnIps\(\)/);
+  assert.match(app4, /apiPost\('\/api\/sites\/own-ips'/);
+  assert.match(app4, /list\('Из каких городов', sm\.cities/);
+  assert.match(app4, /<th>Город<\/th>/);
+  assert.match(html, /id="sites-vown"/);
+});
