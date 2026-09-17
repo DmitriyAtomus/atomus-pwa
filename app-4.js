@@ -24240,8 +24240,10 @@ async function sitesOwnIpAdd(useCurrent) {
   if (!useCurrent) { ip = (prompt('IP-адрес (например 95.24.1.10)') || '').trim(); if (!ip) return; }
   const label = (prompt('Как подписать адрес?', useCurrent ? 'Офис' : 'VPN') || '').trim();
   try {
-    const res = await apiPost('/api/sites/own-ips', { ip: ip, label: label });
-    showToast('Адрес ' + res.ip.ip + ' добавлен' + (res.marked ? ', отфильтровано прошлых заходов: ' + res.marked : ''), 'success');
+    const res = await apiPost('/api/sites/own-ips', { ip: ip, label: label });   // apiPost отдаёт {ok, status, data}
+    const d = res.data || {};
+    if (!res.ok) { showToast(d.message || (res.status === 404 ? 'Сервер ещё обновляется, попробуйте через пару минут' : 'Не удалось добавить адрес'), 'error'); return; }
+    showToast('Адрес ' + (d.ip && d.ip.ip || ip) + ' добавлен' + (d.marked ? ', отфильтровано прошлых заходов: ' + d.marked : ''), 'success');
     loadSitesDashboard();
   } catch (e) { showToast(e.message || 'Не удалось добавить адрес', 'error'); }
 }
