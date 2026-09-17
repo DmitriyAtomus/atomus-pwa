@@ -11817,11 +11817,14 @@ function _renderNotifications25(r) {
       else if (n.type === 'assembly_created')     icon = 'ti-tool';
       else if (n.type === 'contract_shipped')     icon = 'ti-truck-delivery';
       else if (n.type === 'supply_receipt_mismatch') icon = 'ti-scale';   // v2.45.1013
+      else if (n.type === 'site_chat_message')    icon = 'ti-message';    // v2.46.217: чат с сайта
       const onClick = n.entity_type === 'defect'
         ? 'onNotif25GlobalClick(' + n.id + ',\'defect\',' + (n.entity_id || 0) + ')'
         : (n.entity_type === 'contract'
             ? 'onNotif25GlobalClick(' + n.id + ',\'contract\',' + (n.entity_id || 0) + ')'
-            : 'onNotif25GlobalClick(' + n.id + ',\'\',\'\')');
+            : (n.entity_type === 'site_chat'
+                ? 'onNotif25GlobalClick(' + n.id + ',\'site_chat\',' + (n.entity_id || 0) + ')'
+                : 'onNotif25GlobalClick(' + n.id + ',\'\',\'\')'));
       html += '<div class="notif25-item notif-global" onclick="' + onClick + '">' +
         '<div class="notif25-item-head">' +
           '<div class="notif25-item-title"><i class="ti ' + icon + '"></i>' + escapeHtml(n.title || '') + '</div>' +
@@ -11879,6 +11882,11 @@ async function onNotif25GlobalClick(notifId, entityType, entityId) {
       showMobileContent();
       setTimeout(() => openContractDetail(entityId), 50);
     }
+  } else if (entityType === 'site_chat' && entityId) {
+    // v2.46.217: сообщение с сайта — открываем сам диалог
+    showMobileContent();
+    _sites.chatId = Number(entityId);
+    setTimeout(() => { if (state.currentSection !== 'sites') selectSection('sites'); selectSidebarItem('sites-chats'); }, 50);
   }
 }
 
@@ -24000,6 +24008,7 @@ async function _sitesLoadList() {
   if (ob) { ob.textContent = cur.online || ''; ob.style.display = cur.online ? '' : 'none'; ob.title = 'Сейчас на сайте'; }
   const code = document.getElementById('sb-sites-code');
   if (code) code.style.display = cur.key ? '' : 'none';
+  _sitesSyncMnav();
   return d;
 }
 function _sitesForbidden(el, e) {
@@ -24176,6 +24185,30 @@ async function _sitesLeadPatch(id, body) {
 }
 function sitesLeadNote(id) { const t = document.getElementById('sites-lead-note'); _sitesLeadPatch(id, { note: t ? t.value : '' }); }
 
+// ---- v2.46.217: подменю раздела «Сайты» на телефоне (боковое меню там скрыто)
+function _sitesMobileNav(screenName) {
+  const screen = document.querySelector('.screen[data-screen="' + screenName + '"]'); if (!screen) return;
+  let nav = screen.querySelector('.st-mnav');
+  if (!nav) {
+    nav = document.createElement('nav'); nav.className = 'st-mnav';
+    const inner = screen.querySelector('.content-inner');
+    if (inner) inner.parentNode.insertBefore(nav, inner); else screen.appendChild(nav);
+  }
+  const badge = function (id) { const b = document.getElementById(id); return b && b.style.display !== 'none' && b.textContent ? '<i>' + escapeHtml(b.textContent) + '</i>' : ''; };
+  const ads = document.getElementById('sb-sites-ads');
+  const items = [
+    ['sites-dashboard', 'ti-chart-dots', 'Обзор', ''],
+    ['sites-leads', 'ti-inbox', 'Заявки', badge('sites-leads-badge')],
+    ['sites-chats', 'ti-messages', 'Диалоги', badge('sites-chats-badge')],
+    ['sites-visitors', 'ti-users', 'Посетители', ''],
+  ];
+  if (ads && ads.style.display !== 'none') items.push(['sites-ads', 'ti-speakerphone', 'Реклама', '']);
+  nav.innerHTML = items.map(function (it) {
+    return '<button type="button" class="st-mnav-btn' + (it[0] === screenName ? ' is-active' : '') + '" onclick="selectSidebarItem(\'' + it[0] + '\')"><i class="ti ' + it[1] + '"></i>' + it[2] + it[3] + '</button>';
+  }).join('');
+}
+function _sitesSyncMnav() { if (state.currentScreen && String(state.currentScreen).indexOf('sites-') === 0) _sitesMobileNav(state.currentScreen); }
+
 // ---- живые диалоги с посетителями сайта
 async function loadSitesChats() {
   const el = document.getElementById('sites-chats-body'); if (!el) return;
@@ -24195,6 +24228,7 @@ async function loadSitesChats() {
   }
   const cb = document.getElementById('sites-chats-badge');
   if (cb) { cb.textContent = r.unread || ''; cb.style.display = r.unread ? '' : 'none'; }
+  _sitesSyncMnav();
   if (_sites.chatPoll) clearInterval(_sites.chatPoll);
   _sites.chatPoll = setInterval(function () {
     if ((state.currentScreen || '') !== 'sites-chats') { clearInterval(_sites.chatPoll); _sites.chatPoll = null; return; }
@@ -24223,6 +24257,9 @@ async function sitesOpenChat(id, quiet) {
     '<form class="st-chat-compose" onsubmit="sitesChatSend(event)"><textarea class="form-input" id="sites-chat-reply" rows="2" maxlength="3000" placeholder="Ответ посетителю…"></textarea><button class="btn btn-primary" type="submit"><i class="ti ti-send"></i> Отправить</button></form>';
   const msgs = document.getElementById('sites-chat-messages'); if (msgs) msgs.scrollTop = msgs.scrollHeight;
   const cb = document.getElementById('sites-chats-badge'); if (cb && c.unread_staff) { const left = Math.max(0, Number(cb.textContent || 0) - c.unread_staff); cb.textContent = left || ''; cb.style.display = left ? '' : 'none'; }
+  _sitesSyncMnav();
+  // v2.46.217: на телефоне список и переписка идут друг под другом — прокручиваем к переписке
+  if (!quiet) { try { if (document.getElementById('app').classList.contains('mobile-layout')) box.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) {} }
 }
 function _sitesChatMessageHtml(m) {
   const files = (m.files || []).map(function (f) { return '<a href="' + escapeHtml(f.url || '#') + '" target="_blank" rel="noopener"><i class="ti ti-paperclip"></i>' + escapeHtml(f.original_name || 'Файл') + '</a>'; }).join('');

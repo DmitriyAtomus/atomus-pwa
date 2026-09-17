@@ -23,3 +23,12 @@ test('сообщения и вложения диалога экранируют
   assert.match(app4, /escapeHtml\(f\.original_name \|\| 'Файл'\)/);
   assert.match(css, /\.st-chat-layout|\.st-chat-list/);
 });
+
+test('на телефоне раздел сайтов показывает подменю с диалогами и открывает диалог из уведомления', () => {
+  assert.match(app4, /function _sitesMobileNav\(screenName\)/);
+  assert.match(app4, /\['sites-chats', 'ti-messages', 'Диалоги'/);
+  assert.match(app1, /screenName\.indexOf\('sites-'\) === 0 && typeof _sitesMobileNav === 'function'/);
+  assert.match(app4, /n\.type === 'site_chat_message'/);
+  assert.match(app4, /entityType === 'site_chat' && entityId/);
+  assert.match(css, /\.app\.mobile-layout \.st-mnav\{display:flex/);
+});

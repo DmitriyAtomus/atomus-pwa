@@ -109,7 +109,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.216";
+const APP_VERSION = "v2.46.217";
 const APP_VERSION_DATE = "16.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2053,6 +2053,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'supply-catalog')      loadSupplyCatalog();
   // Идеи: чат сотрудника с Клавой (только чтение, ТЗ уходит директору)
   if (screenName === 'ideas')               loadIdeas();
+  if (screenName.indexOf('sites-') === 0 && typeof _sitesMobileNav === 'function') _sitesMobileNav(screenName); // v2.46.217: подменю раздела на телефоне
   if (screenName === 'sites-dashboard')     loadSitesDashboard();   // v2.46.212
   if (screenName === 'sites-leads')         loadSitesLeads();
   if (screenName === 'sites-chats')         loadSitesChats();
