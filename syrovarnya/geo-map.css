@@ -1,4 +1,4 @@
-/* География проектов Atomus Group — живая карта (виджет geo-map, v2). Подключается вместе с geo-map.js.
+/* География проектов Atomus Group — живая карта (виджет geo-map, v4). Подключается вместе с geo-map.js.
    Палитра: по умолчанию читает переменные страницы (--black, --panel, --gold, --cyan, --tx, --tx-mute, --line),
    fallback — тёмно-синяя. data-theme="green" на контейнере — зелёно-золотая под тёмно-зелёный сайт.
    Ничего снаружи перекрашивать не нужно: контраст точек и суши подобран внутри. */
@@ -17,6 +17,18 @@
 .gm-land{fill:var(--gm-land);stroke:var(--gm-land-edge);stroke-width:.9;stroke-linejoin:round;filter:url(#gm-landglow);vector-effect:non-scaling-stroke}
 .gm-arc{fill:none;stroke:var(--gm-gold);stroke-opacity:.3;stroke-width:1}
 .gm-arc.off{stroke-opacity:.04}
+.gm-arc.lit{stroke:var(--gm-gold-2);stroke-opacity:.95;stroke-width:1.6;filter:url(#gm-glow);transition:stroke-opacity .2s}
+.gm-spark{fill:#fff;opacity:.95}
+/* появление: до входа в экран дуги и точки скрыты; точки всплывают со своей задержкой */
+.gm-pre .gm-arc{stroke-dashoffset:1}
+.gm-pt{transition:opacity .35s,transform .6s cubic-bezier(.2,.9,.3,1.3)}
+.gm-pre .gm-pt{opacity:0;transform:scale(.2);transform-box:fill-box;transform-origin:center}
+.gm-pre.gm-in-pts .gm-pt{opacity:1;transform:scale(1)}
+.gm-pre .gm-runner{opacity:0;transition:opacity 1s 2.4s}.gm-pre.gm-in-pts .gm-runner{opacity:.9}
+.gm-pt circle.gm-pulse{fill:none;opacity:0;transform-box:fill-box;transform-origin:center}
+.gm-pt.active circle.gm-pulse{animation:gmPulse 1.7s cubic-bezier(.2,.6,.3,1) infinite}
+@keyframes gmPulse{0%{transform:scale(.9);opacity:.85}100%{transform:scale(2.8);opacity:0}}
+.gm-still .gm-pt.active circle.gm-pulse{animation:none}
 .gm-runner{fill:var(--gm-gold-2);opacity:.9}
 .gm-runner.off{opacity:0}
 .gm-still .gm-runner{display:none}
@@ -34,7 +46,8 @@
 .gm-regionlbl{font-family:var(--gm-font);font-weight:800;fill:var(--gm-ink-2);letter-spacing:.2em;text-transform:uppercase;paint-order:stroke;stroke:var(--gm-ground);stroke-width:3px;stroke-linejoin:round}
 .gm-regioncnt{font-family:var(--gm-font);font-weight:600;fill:var(--gm-gold);paint-order:stroke;stroke:var(--gm-ground);stroke-width:3px;stroke-linejoin:round}
 .gm-zonelbl{cursor:pointer} .gm-zonelbl:hover .gm-regionlbl{fill:#fff}
-.gm-zone{stroke:none} .gm-zone-0{fill:rgba(227,182,86,.09)} .gm-zone-1{fill:rgba(127,216,196,.09)}
+.gm-zone{stroke:none;transition:fill .3s} .gm-zone-0{fill:rgba(227,182,86,.09)} .gm-zone-1{fill:rgba(127,216,196,.09)}
+.gm-zone.hot{fill:rgba(227,182,86,.22)}
 .gm-zone-line{fill:none;stroke:rgba(255,255,255,.28);stroke-width:1;stroke-dasharray:4 5}
 .gm-pt.gm-hidden{display:none}
 .gm-cluster{cursor:pointer}
@@ -64,6 +77,12 @@
 .gm-stat-wide{grid-column:1/-1}
 .gm-stat .n{font-weight:800;font-size:30px;line-height:1;color:var(--gm-gold);font-variant-numeric:tabular-nums}
 .gm-stat .l{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gm-ink-3);margin-top:6px}
+.gm-records{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.gm-rec{display:grid;gap:3px;padding:9px 11px;border:1px solid var(--gm-line);border-radius:10px;background:rgba(255,255,255,.04);color:var(--gm-ink);text-align:left;cursor:pointer;font-family:var(--gm-font);transition:.2s}
+.gm-rec:hover{border-color:var(--gm-gold);background:rgba(255,255,255,.07)}
+.gm-rec:focus-visible{outline:2px solid var(--gm-gold);outline-offset:2px}
+.gm-rec .l{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gm-ink-3)}
+.gm-rec .v{font-size:14px;font-weight:800;color:var(--gm-gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gm-search input{width:100%;border:1px solid var(--gm-line);background:rgba(255,255,255,.05);color:var(--gm-ink);border-radius:10px;padding:9px 12px;font:500 14px var(--gm-font);outline:none}
 .gm-search input:focus{border-color:var(--gm-gold)}
 .gm-search input::placeholder{color:var(--gm-ink-3)}
