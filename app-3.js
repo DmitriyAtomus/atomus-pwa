@@ -16515,7 +16515,13 @@ function renderSupplyOrderDetail(o) {
   // FSM-кнопки (последовательность статусов лайфцикла)
   if (canToPay)        actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'to_pay\',\'Передать на оплату?\')"><i class="ti ti-wallet"></i> На оплату</button>');
   if (canMarkPaid)     actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'paid\',\'Отметить заказ как оплаченный?\')"><i class="ti ti-cash"></i> Оплачен</button>');
-  if (canMarkReceived) actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'received\',\'Поставка получена на склад?\')"><i class="ti ti-package-import"></i> Получено</button>');
+  // v2.46.222: «Всё пришло» — закрывает по факту все недополученные строки и переводит
+  // заказ в «Получены». Раньше «Получено» меняло только статус, а строки «принято 9 из 10»
+  // оставались, и заказ возвращался в «частично» после следующей приёмки.
+  const _shortLines = (o.items || []).filter(oi => parseFloat(oi.qty || 0) > parseFloat(oi.received_qty || 0)).length;
+  const canReceiveAll = canManage && ['sent', 'awaiting_invoice', 'invoice_received', 'to_pay', 'paid', 'partial'].includes(o.status) && (o.items || []).length > 0;
+  if (canReceiveAll) actions.push('<button class="btn btn-primary" onclick="receiveAllSupplyOrder(' + o.id + ',' + _shortLines + ')" title="Закрыть все строки по факту и перевести заказ в «Получены»"><i class="ti ti-checks"></i> Всё пришло' + (_shortLines ? ' <span style="display:inline-block;min-width:18px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.28);font-size:11px;font-weight:800;text-align:center;">' + _shortLines + '</span>' : '') + '</button>');
+  else if (canMarkReceived) actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'received\',\'Поставка получена на склад?\')"><i class="ti ti-package-import"></i> Получено</button>');
   if (canReceive) actions.push('<button class="btn btn-secondary" onclick="openReceiveOrder(' + o.id + ')"><i class="ti ti-package-import"></i> Приёмка</button>');
   // v2.45.x: откат прихода по заказу (receive-batch) — вернуть склад назад. Приходы
   // по УПД не затрагиваются (у них своя «Отменить оприходование»).
@@ -16669,6 +16675,24 @@ async function sendOrder(orderId) {
 }
 
 // ========== ЭТАП 52.2: FSM-переходы статусов и счёт от поставщика ==========
+
+// v2.46.222: «Всё пришло» — одна кнопка вместо построчного «Получено»
+async function receiveAllSupplyOrder(orderId, shortLines) {
+  const q = shortLines
+    ? 'Закрыть по факту ' + shortLines + ' ' + (shortLines === 1 ? 'недополученную строку' : (shortLines < 5 ? 'недополученные строки' : 'недополученных строк')) + ' и перевести заказ в «Получены»?\n\nСклад это не двигает: остатки приходят из приёмки УПД.'
+    : 'Все строки уже приняты. Перевести заказ в «Получены»?';
+  if (!confirm(q)) return;
+  try {
+    const res = await apiPost('/api/supply-orders/' + orderId + '/receive-all', {});
+    const d = res.data || {};
+    if (!res.ok) { showToast(d.message || ('Не удалось (HTTP ' + res.status + ')'), 'error'); return; }
+    showToast(d.closed ? 'Закрыто строк: ' + d.closed + '. Заказ получен' : 'Заказ получен', 'success');
+    cache.supplyOrders = null;
+    loadSupplyOrderDetail();
+  } catch (e) {
+    showToast('Сеть: не удалось закрыть заказ', 'error');
+  }
+}
 
 async function transitionSupplyOrder(orderId, newStatus, confirmText) {
   // v2.45.986: платить по счёту-повтору — отдельный вопрос, с текстом совпадения
@@ -18774,6 +18798,15 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.46.222',
+    date: '22.09.2026',
+    title: 'Снабжение: кнопка «Всё пришло» в заказе',
+    features: [
+      'В карточке заказа поставщику появилась кнопка «Всё пришло». Она закрывает по факту все строки, где принято меньше заказанного (УПД пришла с меньшим количеством, в других единицах или строка не сопоставилась), и переводит заказ в «Получены». На кнопке видно, сколько таких строк.',
+      'Раньше «Получено» меняло только статус, а строки «принято 9 из 10» оставались, и заказ снова уезжал в «Получено частично». Теперь статус и строки согласованы. Склад кнопка не двигает: остатки по-прежнему приходят из приёмки УПД.',
+    ],
+  },
   {
     version: 'v2.46.221',
     date: '22.09.2026',
