@@ -109,8 +109,8 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.221";
-const APP_VERSION_DATE = "16.09.2026";
+const APP_VERSION = "v2.46.222";
+const APP_VERSION_DATE = "22.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -6696,7 +6696,10 @@ async function _fillPayDueBlock() {
     h += _payBlockHtml(recvList, 'Счёт получен — на оплату', '#3730A3', 'ti-file-invoice',
       o => '<button class="btn btn-primary btn-small" style="white-space:nowrap;" onclick="payQueueToPay(' + o.id + ', this)"><i class="ti ti-wallet"></i> На оплату</button>');
     h += _payBlockHtml(payList, 'На оплате', '#9A3412', 'ti-wallet',
-      o => '<button class="btn btn-primary btn-small" style="white-space:nowrap;" onclick="payDueMarkPaid(' + o.id + ', this)"><i class="ti ti-cash"></i> Оплатил</button>');
+      o => '<button class="btn btn-primary btn-small" style="white-space:nowrap;" onclick="payDueMarkPaid(' + o.id + ', this)"><i class="ti ti-cash"></i> Оплатил</button>' +
+           (canRejectInvoice()
+             ? '<button class="btn btn-secondary btn-small btn-reject" style="white-space:nowrap;" onclick="event.stopPropagation();openRejectInvoiceModal(' + o.id + ')"><i class="ti ti-ban"></i> Отклонить</button>'
+             : ''));
     box.innerHTML = h;
   } catch (e) { box.innerHTML = ''; }
 }
@@ -6849,6 +6852,181 @@ async function supplyOrderTransitionConfirmed(orderId, newStatus) {
     return res; // прочая ошибка
   }
   return { ok: false, message: 'Слишком много попыток ввода пароля' };
+}
+
+// ============ Отклонение счёта с причиной (раздел «Отклонённые») ============
+// Бухгалтер больше не проводит мусорный счёт оплатой: он отклоняет его с
+// причиной, счёт уходит в отдельную категорию учёта, а снабженец получает
+// причину и комментарий.
+const SUPPLY_REJECT_REASONS = [
+  ['incorrect',     'Некорректный счёт'],
+  ['wrong_payer',   'Неверный плательщик'],
+  ['duplicate',     'Дубликат счёта'],
+  ['not_our_payer', 'Мы не являемся плательщиком'],
+  ['other',         'Другое'],
+];
+
+function supplyRejectReasonLabel(key) {
+  const found = SUPPLY_REJECT_REASONS.find(r => r[0] === key);
+  return found ? found[1] : '';
+}
+
+// Кнопки «Отклонить» и «Закрыть» — бухгалтеру и директору/заму.
+function canRejectInvoice() {
+  if (!state.user || !state.user.roles) return false;
+  const r = state.user.roles;
+  return r.includes('accountant') || r.includes('director') || r.includes('zam');
+}
+
+// Реквизиты счёта для шапки окна: берём то, что уже загружено на экране.
+function _rejectOrderInfo(orderId) {
+  const fromPay = (typeof _payDueOrder === 'function') ? _payDueOrder(orderId) : null;
+  if (fromPay) return fromPay;
+  const list = (typeof cache !== 'undefined' && cache.supplyOrders) || [];
+  return list.find(o => o.id === orderId) || null;
+}
+
+let _rejectState = { orderId: null, reason: '', comment: '', loading: false };
+
+function openRejectInvoiceModal(orderId) {
+  if (!canRejectInvoice()) {
+    showToast('Отклонить счёт может бухгалтер или директор', 'error');
+    return;
+  }
+  _rejectState = { orderId: orderId, reason: '', comment: '', loading: false };
+  let m = document.getElementById('reject-invoice-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'reject-invoice-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) m.classList.remove('visible'); };
+    document.body.appendChild(m);
+  }
+  _renderRejectInvoiceModal();
+  m.classList.add('visible');
+}
+
+function _rejectSetReason(v) { _rejectState.reason = v; _renderRejectInvoiceModal(); }
+function _rejectSetComment(v) { _rejectState.comment = v; }
+
+function _renderRejectInvoiceModal() {
+  const m = document.getElementById('reject-invoice-modal');
+  if (!m) return;
+  const s = _rejectState;
+  const o = _rejectOrderInfo(s.orderId) || {};
+  const sumNum = Number(o.invoice_total || o.total_amount || 0);
+  const head = [
+    o.order_label || ('#' + s.orderId),
+    o.supplier_name || '',
+    o.invoice_number ? ('счёт № ' + o.invoice_number) : '',
+    sumNum > 0 ? (Math.round(sumNum).toLocaleString('ru-RU') + ' ₽') : '',
+  ].filter(Boolean).join(' · ');
+  // «Другое» без пояснения снабженцу бесполезно — просим комментарий.
+  const needComment = s.reason === 'other';
+  const reasons = SUPPLY_REJECT_REASONS.map(function (pair) {
+    const key = pair[0], label = pair[1];
+    return '<label class="reject-reason' + (s.reason === key ? ' is-on' : '') + '">' +
+      '<input type="radio" name="reject-reason" value="' + key + '"' +
+        (s.reason === key ? ' checked' : '') +
+        ' onchange="_rejectSetReason(\'' + key + '\')">' +
+      '<span>' + escapeHtml(label) + '</span>' +
+    '</label>';
+  }).join('');
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-ban"></i> Отклонить счёт</h3>' +
+        '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:16px 20px;">' +
+        '<div class="reject-invoice-head">' + escapeHtml(head) + '</div>' +
+        '<div class="reject-label">Причина отклонения <span style="color:#DC2626;">*</span></div>' +
+        '<div class="reject-reasons">' + reasons + '</div>' +
+        '<div class="reject-label">Комментарий для снабженца' +
+          (needComment ? ' <span style="color:#DC2626;">*</span>' : ' <span style="color:var(--text-light);font-weight:400;">(необязательно)</span>') +
+        '</div>' +
+        '<textarea id="reject-comment" rows="3" placeholder="Что не так со счётом и что делать дальше"' +
+          ' oninput="_rejectSetComment(this.value)"' +
+          ' style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;">' +
+          escapeHtml(s.comment) + '</textarea>' +
+        '<div id="reject-hint" class="reject-hint" style="display:none;"></div>' +
+      '</div>' +
+      '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-secondary" onclick="this.closest(\'.modal-overlay\').classList.remove(\'visible\')">Отмена</button>' +
+        '<button class="btn btn-danger" id="reject-submit" onclick="submitRejectInvoice()"' +
+          (s.loading ? ' disabled' : '') + '>' +
+          (s.loading ? '<i class="ti ti-loader-2"></i> Отклоняем…' : '<i class="ti ti-ban"></i> Отклонить счёт') +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  const ta = document.getElementById('reject-comment');
+  if (ta && s.comment) ta.value = s.comment;
+}
+
+function _rejectShowHint(text) {
+  const el = document.getElementById('reject-hint');
+  if (!el) return;
+  el.textContent = text;
+  el.style.display = text ? '' : 'none';
+}
+
+async function submitRejectInvoice() {
+  const s = _rejectState;
+  if (!s.reason) { _rejectShowHint('Выберите причину — без неё отклонить нельзя'); return; }
+  if (s.reason === 'other' && !(s.comment || '').trim()) {
+    _rejectShowHint('Для причины «Другое» напишите комментарий для снабженца');
+    return;
+  }
+  _rejectShowHint('');
+  s.loading = true; _renderRejectInvoiceModal();
+  try {
+    const res = await apiPost('/api/supply-orders/' + s.orderId + '/reject',
+      { reason: s.reason, comment: (s.comment || '').trim() });
+    if (!res.ok) {
+      s.loading = false; _renderRejectInvoiceModal();
+      _rejectShowHint((res.data && res.data.message) || 'Не удалось отклонить счёт');
+      return;
+    }
+    const label = (res.data && res.data.reason_label) || supplyRejectReasonLabel(s.reason);
+    const m = document.getElementById('reject-invoice-modal');
+    if (m) m.classList.remove('visible');
+    showToast('Счёт отклонён: ' + label + '. Перенесён в раздел «Отклонённые»', 'success');
+    cache.supplyOrders = null;
+    try { _fillPayDueBlock(); } catch (_) {}
+    try {
+      if (typeof loadSupplyOrders === 'function' &&
+          document.querySelector('[data-screen="supply-orders"].active')) loadSupplyOrders();
+    } catch (_) {}
+    try {
+      if (state.currentSupplyOrderId === s.orderId && typeof openSupplyOrder === 'function') {
+        openSupplyOrder(s.orderId);
+      }
+    } catch (_) {}
+  } catch (e) {
+    s.loading = false; _renderRejectInvoiceModal();
+    _rejectShowHint('Сеть: ' + (e.message || e));
+  }
+}
+
+// «Закрыть» в разделе «Отклонённые» — счёт разобрали, строка остаётся на месте.
+async function closeRejectedInvoice(orderId, btn) {
+  if (!canRejectInvoice()) { showToast('Закрыть счёт может бухгалтер или директор', 'error'); return; }
+  if (!confirm('Закрыть отклонённый счёт? Он останется в разделе «Отклонённые» с пометкой «Закрыт».')) return;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i>'; }
+  try {
+    const res = await apiPost('/api/supply-orders/' + orderId + '/reject/close', {});
+    if (!res.ok) {
+      showToast((res.data && res.data.message) || 'Не удалось закрыть счёт', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Закрыть'; }
+      return;
+    }
+    showToast('Счёт закрыт ✓', 'success');
+    cache.supplyOrders = null;
+    if (typeof loadSupplyOrders === 'function') loadSupplyOrders();
+  } catch (e) {
+    showToast('Сеть: ' + (e.message || e), 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Закрыть'; }
+  }
 }
 
 async function payDueMarkPaid(orderId, btn) {

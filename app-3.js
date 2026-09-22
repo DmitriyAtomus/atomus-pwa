@@ -13161,6 +13161,7 @@ function onSupplyOrdSearch(val) {
 function _supOrdDateField(filter) {
   if (filter === 'paid')     return { label: 'Дата оплаты',   card: 'paid_at' };
   if (filter === 'received') return { label: 'Дата поставки', card: 'fulfilled_at' };
+  if (filter === 'rejected') return { label: 'Дата отклонения', card: 'rejected_at' };
   return { label: 'Дата создания', card: 'created_at' };
 }
 function _renderSupOrdDateLabel() {
@@ -13202,9 +13203,19 @@ async function loadSupplyOrders() {
       // конфликтовать со статусом (при поиске статус = all).
       params.set('date_field', _supOrdDateField(state.supplyOrdFilter || 'open').card);
     }
+    // Свои фильтры вкладки «Отклонённые»: причина, Отклонён/Закрыт, период
+    // (период считается по дате отклонения — см. get_supply_orders в db.py).
+    if (state.supplyOrdFilter === 'rejected' && !search) {
+      const rf = state.supplyRejectFilters || {};
+      if (rf.reason) params.set('reject_reason', rf.reason);
+      if (rf.state) params.set('reject_state', rf.state);
+      if (rf.from) params.set('from', rf.from);
+      if (rf.to) params.set('to', rf.to);
+    }
     const d = await apiGet('/api/supply-orders' + (params.toString() ? '?' + params.toString() : ''));
     cache.supplyOrders = d.orders || [];
     cache.supplyOrdersCounts = d.counts || {};
+    cache.supplyRejectedSummary = d.rejected_summary || null;
     _renderSupplyOrdTabCounts();
     renderSupplyOrders();
   } catch (e) {
@@ -13408,14 +13419,17 @@ function renderSupplyOrders() {
     if (!visibleIds.has(id)) state.supplyOrdersSelected.delete(id);
   });
 
+  const isRejectedTab = (state.supplyOrdFilter === 'rejected');
   if (!list.length) {
-    container.innerHTML = '<div class="empty-block"><i class="ti ti-file-invoice"></i>Под этот фильтр заказов нет</div>';
+    container.innerHTML = (isRejectedTab ? _rejectedTilesHtml() : '') +
+      '<div class="empty-block"><i class="ti ti-file-invoice"></i>Под этот фильтр заказов нет</div>';
     _renderSupplyOrdersActionBar();
     return;
   }
   const canDelete = canManageSupply();
 
   let html = '';
+  if (isRejectedTab) html += _rejectedTilesHtml();
   // v2.45.660: сводка по текущему фильтру — сколько заказов и на какую сумму
   // (директору/бухгалтеру): «Оплачены 43 · Σ 1 234 567 ₽». Заказы без суммы
   // считаем отдельно, чтобы Σ не выглядела полной, если по части сумм нет.
@@ -13516,7 +13530,18 @@ function renderSupplyOrders() {
               '</span>' + escapeHtml(o.created_by_name) + '</span>'
             : '') +
         '</div>' +
+        // Отклонённый счёт: причина, комментарий, кто и когда отклонил
+        _rejectedRowInfo(o) +
       '</div>' +
+      // Бухгалтеру: «Отклонить» из очереди на оплату и «Закрыть» в «Отклонённых»
+      ((typeof canRejectInvoice === 'function' && canRejectInvoice() &&
+        ['invoice_received', 'approval', 'to_pay'].indexOf(o.status) >= 0)
+        ? '<button class="btn btn-secondary btn-small btn-reject" onclick="event.stopPropagation();openRejectInvoiceModal(' + o.id + ')"><i class="ti ti-ban"></i> Отклонить</button>'
+        : '') +
+      ((typeof canRejectInvoice === 'function' && canRejectInvoice() &&
+        o.status === 'rejected' && !o.reject_closed_at)
+        ? '<button class="btn btn-secondary btn-small" onclick="event.stopPropagation();closeRejectedInvoice(' + o.id + ', this)"><i class="ti ti-check"></i> Закрыть</button>'
+        : '') +
       (canDelete
         ? '<button class="sup-row-delete" title="Удалить заказ" onclick="event.stopPropagation();deleteSupplyOrder(' + o.id + ',\'' + escapeHtml(label) + '\')"><i class="ti ti-trash"></i></button>'
         : '') +
@@ -13668,6 +13693,7 @@ const SUP_ORD_DESC = {
   paid:             'Оплачены — счёт оплачен, ждём поставку от поставщика.',
   partial:          'Частично — пришла часть позиций заказа, ждём остаток.',
   received:         'Получены — заказ полностью поставлен и оприходован на склад.',
+  rejected:         'Отклонённые — счета, которые бухгалтер отклонил с причиной (некорректный счёт, дубликат, не наш плательщик…). Это отдельная категория учёта: в «Оплаченные» и в расходы они не входят, обратно в оплату не возвращаются.',
   all:              'Все — все заказы поставщикам, в любом статусе.',
 };
 
@@ -13686,8 +13712,98 @@ function _renderSupplyOrdDesc() {
   });
 }
 
+// ============ Вкладка «Отклонённые» ============
+// Панель фильтров (причина / Отклонён-Закрыт / период) живёт только на этой
+// вкладке; на остальных прячем, чтобы не путала.
+state.supplyRejectFilters = state.supplyRejectFilters || { reason: '', state: '', from: '', to: '' };
+
+function _syncSupplyRejectFilters(f) {
+  const box = document.getElementById('sup-ord-reject-filters');
+  if (!box) return;
+  const on = (f === 'rejected');
+  box.style.display = on ? '' : 'none';
+  if (!on) return;
+  const sel = document.getElementById('sup-ord-reject-reason');
+  // Справочник причин один и тот же, что в окне отклонения (app-1.js)
+  if (sel && sel.options.length <= 1 && typeof SUPPLY_REJECT_REASONS !== 'undefined') {
+    SUPPLY_REJECT_REASONS.forEach(function (pair) {
+      const opt = document.createElement('option');
+      opt.value = pair[0];
+      opt.textContent = pair[1];
+      sel.appendChild(opt);
+    });
+  }
+}
+
+function onSupplyRejectFilter() {
+  const g = id => (document.getElementById(id) || {}).value || '';
+  state.supplyRejectFilters = {
+    reason: g('sup-ord-reject-reason'),
+    state:  g('sup-ord-reject-state'),
+    from:   g('sup-ord-reject-from'),
+    to:     g('sup-ord-reject-to'),
+  };
+  loadSupplyOrders();
+}
+
+function clearSupplyRejectFilters() {
+  ['sup-ord-reject-reason', 'sup-ord-reject-state', 'sup-ord-reject-from', 'sup-ord-reject-to']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  state.supplyRejectFilters = { reason: '', state: '', from: '', to: '' };
+  loadSupplyOrders();
+}
+
+// Плитки-сводка: сколько отклонённых счетов по каждой причине. Клик по плитке
+// ставит фильтр по этой причине (повторный клик — снимает).
+function _rejectedTilesHtml() {
+  const sum = cache.supplyRejectedSummary;
+  if (!sum) return '';
+  const cur = (state.supplyRejectFilters || {}).reason || '';
+  const reasons = (typeof SUPPLY_REJECT_REASONS !== 'undefined') ? SUPPLY_REJECT_REASONS : [];
+  let h = '<div class="reject-tiles">' +
+    '<div class="reject-tile is-total"><div class="n">' + (sum.total || 0) + '</div>' +
+      '<div class="k">Всего отклонено</div></div>';
+  reasons.forEach(function (pair) {
+    const key = pair[0], label = pair[1];
+    const n = (sum.reasons && sum.reasons[key]) || 0;
+    h += '<div class="reject-tile' + (cur === key ? ' is-on' : '') + '" ' +
+      'onclick="_rejectedTileClick(\'' + key + '\')" title="Показать только эту причину">' +
+      '<div class="n">' + n + '</div><div class="k">' + escapeHtml(label) + '</div></div>';
+  });
+  h += '<div class="reject-tile is-closed"><div class="n">' + (sum.closed || 0) + '</div>' +
+    '<div class="k">Закрыто</div></div>';
+  h += '</div>';
+  return h;
+}
+
+function _rejectedTileClick(key) {
+  const sel = document.getElementById('sup-ord-reject-reason');
+  const cur = (state.supplyRejectFilters || {}).reason || '';
+  if (sel) sel.value = (cur === key) ? '' : key;
+  onSupplyRejectFilter();
+}
+
+// Строка отклонённого счёта: дата отклонения, причина, комментарий, кто отклонил.
+function _rejectedRowInfo(o) {
+  if (o.status !== 'rejected') return '';
+  const closed = !!o.reject_closed_at;
+  const bits = [];
+  if (o.rejected_at) bits.push('отклонён ' + _supOrdDate(o.rejected_at));
+  if (o.rejected_by_name) bits.push(escapeHtml(o.rejected_by_name));
+  return '<div class="reject-row-info' + (closed ? ' is-closed' : '') + '">' +
+    '<span class="reject-row-reason"><i class="ti ti-ban"></i> ' +
+      escapeHtml(o.reject_reason_label || 'Причина не указана') + '</span>' +
+    (closed ? '<span class="reject-row-closed">Закрыт</span>' : '') +
+    (bits.length ? '<span class="reject-row-meta">' + bits.join(' · ') + '</span>' : '') +
+    (o.reject_comment
+      ? '<div class="reject-row-comment">' + escapeHtml(o.reject_comment) + '</div>'
+      : '') +
+  '</div>';
+}
+
 function setSupplyOrdFilter(f) {
   state.supplyOrdFilter = f;
+  _syncSupplyRejectFilters(f);
   // клик по статусу сбрасывает активный поиск (иначе список остаётся отфильтрован поиском)
   state.supplyOrdSearch = '';
   const _si = document.getElementById('sup-ord-search');

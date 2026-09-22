@@ -2729,6 +2729,7 @@
                 <button class="filter-tab"        data-sup-ord="paid"              onclick="setSupplyOrdFilter('paid')"><i class="ti ti-cash"></i> Оплачены</button>
                 <button class="filter-tab"        data-sup-ord="partial"           onclick="setSupplyOrdFilter('partial')"><i class="ti ti-progress"></i> Частично</button>
                 <button class="filter-tab"        data-sup-ord="received"          onclick="setSupplyOrdFilter('received')"><i class="ti ti-package-import"></i> Получены</button>
+                <button class="filter-tab"        data-sup-ord="rejected"          onclick="setSupplyOrdFilter('rejected')"><i class="ti ti-ban"></i> Отклонённые</button>
                 <button class="filter-tab"        data-sup-ord="all"               onclick="setSupplyOrdFilter('all')"><i class="ti ti-list"></i> Все</button>
               </div>
             </div>
@@ -2751,6 +2752,33 @@
               style="padding:7px 10px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--bg);color:var(--text);">
             <button id="sup-ord-date-clear" onclick="clearSupplyOrdDate()"
               style="display:none;padding:6px 11px;border:1px solid var(--border);border-radius:10px;background:var(--bg);cursor:pointer;font-size:13px;color:var(--text-light);"><i class="ti ti-x"></i> сброс</button>
+          </div>
+          <!-- Вкладка «Отклонённые»: свои фильтры (причина, статус, период).
+               Показывается только на этой вкладке — см. setSupplyOrdFilter. -->
+          <div id="sup-ord-reject-filters" class="sup-ord-reject-filters" style="display:none;">
+            <label>
+              <span>Причина</span>
+              <select id="sup-ord-reject-reason" onchange="onSupplyRejectFilter()">
+                <option value="">Все причины</option>
+              </select>
+            </label>
+            <label>
+              <span>Статус</span>
+              <select id="sup-ord-reject-state" onchange="onSupplyRejectFilter()">
+                <option value="">Отклонён и закрыт</option>
+                <option value="rejected">Отклонён</option>
+                <option value="closed">Закрыт</option>
+              </select>
+            </label>
+            <label>
+              <span>Отклонён с</span>
+              <input type="date" id="sup-ord-reject-from" onchange="onSupplyRejectFilter()">
+            </label>
+            <label>
+              <span>по</span>
+              <input type="date" id="sup-ord-reject-to" onchange="onSupplyRejectFilter()">
+            </label>
+            <button class="btn btn-secondary btn-small" onclick="clearSupplyRejectFilters()"><i class="ti ti-x"></i> Сбросить</button>
           </div>
           <!-- v2.45.615: пояснение к текущему статусу-разделу заказов -->
           <div class="sup-ord-desc" id="sup-ord-desc"></div>
