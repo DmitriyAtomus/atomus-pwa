@@ -5912,6 +5912,83 @@
   .sup-status-pill.ord-partial           { background: #FFF4E6; color: #C18B00; }
   .sup-status-pill.ord-received          { background: #E8F5E9; color: var(--success); }
   .sup-status-pill.ord-cancelled         { background: #F4F4F5; color: var(--text-faint); }
+  .sup-status-pill.ord-rejected          { background: #FEE2E2; color: #991B1B; }
+
+  /* ===== Отклонение счёта с причиной и раздел «Отклонённые» ===== */
+  .btn-danger { background: var(--danger, #DC2626); color: #fff; }
+  .btn-danger:hover { background: #B91C1C; }
+  .btn-danger:disabled { background: #E5A3A3; cursor: not-allowed; }
+  .btn-reject { color: #B91C1C; border-color: #FCA5A5; }
+  .btn-reject:hover { background: #FEF2F2; }
+
+  /* Фильтры вкладки «Отклонённые» */
+  .sup-ord-reject-filters {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
+    margin: 4px 0 8px; padding: 10px 12px;
+    background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px;
+  }
+  .sup-ord-reject-filters label {
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 12px; color: #7F1D1D;
+  }
+  .sup-ord-reject-filters select,
+  .sup-ord-reject-filters input {
+    padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13.5px; background: var(--bg); color: var(--text);
+  }
+
+  /* Плитки-сводка по причинам */
+  .reject-tiles {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;
+  }
+  .reject-tile {
+    flex: 1 1 130px; min-width: 120px; padding: 9px 12px; cursor: pointer;
+    background: white; border: 1px solid var(--border); border-radius: 10px;
+  }
+  .reject-tile .n { font-size: 20px; font-weight: 700; color: #991B1B; line-height: 1.1; }
+  .reject-tile .k { font-size: 11.5px; color: var(--text-light); margin-top: 2px; }
+  .reject-tile.is-on { border-color: #DC2626; background: #FEF2F2; }
+  .reject-tile.is-total { background: #FEF2F2; border-color: #FECACA; cursor: default; }
+  .reject-tile.is-closed { cursor: default; }
+  .reject-tile.is-closed .n { color: var(--text-mid); }
+
+  /* Причина и комментарий в строке списка */
+  .reject-row-info {
+    margin-top: 5px; padding: 6px 9px; border-radius: 8px;
+    background: #FEF2F2; border-left: 3px solid #DC2626;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  }
+  .reject-row-info.is-closed { background: var(--bg); border-left-color: #A1A1AA; }
+  .reject-row-reason { font-size: 12.5px; font-weight: 700; color: #991B1B; }
+  .reject-row-info.is-closed .reject-row-reason { color: var(--text-mid); }
+  .reject-row-closed {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    background: #E4E4E7; color: var(--text-mid); padding: 1px 7px; border-radius: 6px;
+  }
+  .reject-row-meta { font-size: 11.5px; color: var(--text-light); }
+  .reject-row-comment { flex-basis: 100%; font-size: 12.5px; color: var(--text-mid); }
+
+  /* Окно «Отклонить счёт» */
+  .reject-invoice-head {
+    font-size: 13px; color: var(--text-mid); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px;
+  }
+  .reject-label {
+    font-size: 11.5px; font-weight: 600; text-transform: uppercase;
+    color: var(--text-mid); margin: 14px 0 6px;
+  }
+  .reject-reasons { display: flex; flex-direction: column; gap: 6px; }
+  .reject-reason {
+    display: flex; align-items: center; gap: 9px; cursor: pointer;
+    padding: 8px 11px; border: 1px solid var(--border); border-radius: 9px;
+    font-size: 14px; color: var(--text-dark);
+  }
+  .reject-reason input { appearance: auto; -webkit-appearance: auto; accent-color: #DC2626; }
+  .reject-reason.is-on { border-color: #DC2626; background: #FEF2F2; }
+  .reject-hint {
+    margin-top: 10px; padding: 8px 11px; border-radius: 8px;
+    background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; font-size: 13px;
+  }
 
   /* Pill kind (material/product) */
   .sup-kind-pill {
