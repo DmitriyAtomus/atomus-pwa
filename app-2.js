@@ -787,6 +787,7 @@ async function loadHomeDashboard() {
   loadHomeContractsProgress(); // ЭТАП 31.4
   loadHomeDashboardExtras();   // v2.43.98: воронка / алерты / ТОП сборщиков
   loadHomeGatherings();        // v2.45.406: «Собрать к отгрузке» (запросы сборщику)
+  loadHomeSupplyBoard();       // доска «Заказано у поставщиков»
   loadHomeWorkStatus();        // статус-лента «кто чем занят»
   // v2.8.2: лента «Последние действия» — только для директора
   if (state.user && (state.user.roles || []).includes('director')) {
@@ -1068,6 +1069,15 @@ function renderHomeSkeleton() {
   html += '<div class="home-kpi-sticky">';
   html += '<div class="home-kpi-title"><i class="ti ti-activity-heartbeat"></i>Пульс дня</div>';
   html += '<div id="home-kpi-block"><div class="loading-block" style="padding: 14px;">Загружаем показатели…</div></div>';
+  html += '</div>';
+
+  // Доска «Заказано у поставщиков»: плитка — поставщик, карточка — оплаченный
+  // заказ. Видна снабжению и руководству; loadHomeSupplyBoard сам решит,
+  // показывать её или спрятать.
+  html += '<div id="home-supboard-wrap" style="display:none;">';
+  html += '<div class="home-kpi-title" style="margin-top:16px;"><i class="ti ti-building-warehouse" style="color:var(--brand);"></i>Заказано у поставщиков</div>';
+  html += '<div class="sbrd-hint">Плитка — поставщик, карточка внутри — оплаченный заказ. Нажмите на карточку, чтобы увидеть позиции.</div>';
+  html += '<div id="home-supboard-block"></div>';
   html += '</div>';
 
   // Статус-лента «кто чем занят» — последний статус на каждого человека
@@ -14599,3 +14609,229 @@ function renderPackingListPrint(box) {
   w.document.close();
 }
 
+// ============================================================
+// Доска «Заказано у поставщиков» на Главной
+// Плитка — поставщик, карточка внутри — оплаченный заказ. Вид и логику плиток
+// повторяем за Логистикой («Забрать / В пути»): та же сетка .lg-grid и та же
+// карточка .lgc с цветной шапкой и подвалом-счётчиком.
+// Сумм и платёжных данных здесь нет — доска отвечает на вопрос «что и у кого
+// сейчас в сборке», а деньги смотрят в самом заказе.
+// ============================================================
+
+// Цвет шапки плитки — от имени поставщика, чтобы один и тот же поставщик
+// всегда был одного цвета (перевозчики в Логистике покрашены так же вручную).
+const SBRD_COLORS = [
+  ['#0B5ED7', '#2380F0'], ['#047857', '#10B981'], ['#C2410C', '#F97316'],
+  ['#4338CA', '#6D28D9'], ['#0E7490', '#06B6D4'], ['#B45309', '#F59E0B'],
+  ['#7C3AED', '#A855F7'], ['#0F766E', '#14B8A6'], ['#9F1239', '#E11D48'],
+];
+function _sbrdColor(name) {
+  const s = String(name || '');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 100000;
+  return SBRD_COLORS[h % SBRD_COLORS.length];
+}
+function _sbrdDate(d) {
+  const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3] + '.' + m[2] + '.' + m[1]) : '';
+}
+function _sbrdDateShort(d) {
+  const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3] + '.' + m[2]) : '—';
+}
+function _sbrdQty(it) {
+  const q = Number(it.qty);
+  if (!isFinite(q) || q <= 0) return '';
+  const n = Math.round(q * 1000) / 1000;
+  return String(n).replace('.', ',') + (it.unit ? ' ' + it.unit : ' шт.');
+}
+function _sbrdPlural(n, one, two, many) {
+  const a = Math.abs(n) % 100, b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b > 1 && b < 5) return two;
+  if (b === 1) return one;
+  return many;
+}
+
+// Чипы «Все поставщики / Забираем сами / Ждём рейс логистики».
+// «Ждём рейс» — заказ уже стоит точкой в незакрытом рейсе; «забираем сами» —
+// поставщик с самовывозом, за которым ехать нам.
+function _sbrdMatch(o, filter) {
+  if (filter === 'trip') return !!o.in_trip;
+  if (filter === 'self') return !!o.self_pickup && !o.in_trip;
+  return true;
+}
+
+async function loadHomeSupplyBoard() {
+  const wrap = document.getElementById('home-supboard-wrap');
+  if (!wrap) return;
+  // Доска для снабжения и руководства: остальным блок не показываем вовсе.
+  if (!(hasPermission('supply.view') || hasPermission('supply.manage'))) {
+    wrap.style.display = 'none';
+    return;
+  }
+  try {
+    const d = await apiGet('/api/supply/board');
+    cache.supplyBoard = d;
+  } catch (e) {
+    // бэк ещё не задеплоен или нет доступа — блок просто не показываем
+    wrap.style.display = 'none';
+    return;
+  }
+  renderHomeSupplyBoard();
+}
+
+function setSupplyBoardFilter(key) {
+  state.supBoardFilter = key;
+  renderHomeSupplyBoard();
+}
+
+function renderHomeSupplyBoard() {
+  const wrap = document.getElementById('home-supboard-wrap');
+  const block = document.getElementById('home-supboard-block');
+  if (!wrap || !block) return;
+  const d = cache.supplyBoard;
+  const all = (d && d.suppliers) || [];
+  if (!all.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+
+  const filter = state.supBoardFilter || 'all';
+  const c = (d && d.counts) || {};
+
+  // ---- счётчики сверху
+  let html = '<div class="sbrd-stats">';
+  html += '<div class="sbrd-stat"><b>' + (c.suppliers || 0) + '</b><span>' +
+          _sbrdPlural(c.suppliers || 0, 'поставщик', 'поставщика', 'поставщиков') + '</span></div>';
+  html += '<div class="sbrd-stat"><b>' + (c.orders || 0) + '</b><span>' +
+          _sbrdPlural(c.orders || 0, 'оплаченный заказ', 'оплаченных заказа', 'оплаченных заказов') + '</span></div>';
+  html += '<div class="sbrd-stat"><b>' + (c.in_trip || 0) + '</b><span>ждут рейс</span></div>';
+  html += '<div class="sbrd-stat"><b>' + _sbrdDateShort(c.earliest_date) + '</b><span>самый ранний заказ</span></div>';
+  html += '</div>';
+
+  // ---- чипы
+  const chips = [
+    ['all', 'Все поставщики'],
+    ['self', 'Забираем сами'],
+    ['trip', 'Ждём рейс логистики'],
+  ];
+  html += '<div class="sbrd-chips">';
+  chips.forEach(ch => {
+    const n = all.reduce((s, g) => s + g.orders.filter(o => _sbrdMatch(o, ch[0])).length, 0);
+    html += '<button class="sbrd-chip' + (filter === ch[0] ? ' on' : '') +
+            '" onclick="setSupplyBoardFilter(\'' + ch[0] + '\')">' +
+            escapeHtml(ch[1]) + '<span>' + n + '</span></button>';
+  });
+  html += '</div>';
+
+  // ---- плитки поставщиков
+  const tiles = all.map((g, i) => _sbrdTile(g, i, filter)).filter(Boolean);
+  html += tiles.length
+    ? '<div class="lg-grid sbrd-grid">' + tiles.join('') + '</div>'
+    : '<div class="empty-block"><i class="ti ti-filter-off"></i>По этому фильтру заказов нет.</div>';
+  block.innerHTML = html;
+}
+
+function _sbrdTile(g, idx, filter) {
+  const orders = (g.orders || []).filter(o => _sbrdMatch(o, filter));
+  // Плитка без подходящих заказов остаётся на доске с пустым состоянием —
+  // поставщик не должен пропадать из поля зрения.
+  const col = _sbrdColor(g.supplier_name);
+  const cnt = orders.length
+    ? orders.length + ' ' + _sbrdPlural(orders.length, 'заказ', 'заказа', 'заказов')
+    : 'пусто';
+
+  let body = '';
+  if (orders.length) {
+    body = orders.map(o => _sbrdOrderCard(o)).join('');
+  } else {
+    body = '<div class="lgc-empty"><i class="ti ti-package-off"></i>Оплаченных заказов нет.<br>' +
+           'Появятся сами, как только счёт будет оплачен.</div>';
+  }
+
+  let foot = '<span>на сборке <b>' + orders.length + '</b></span>';
+  if (g.trip_count) foot += '<span>в рейсе <b>' + g.trip_count + '</b></span>';
+  if (g.done_count) {
+    foot += '<span class="lnk" onclick="sbrdOpenTaken(' + idx + ')">забрано: ' +
+            g.done_count + ' →</span>';
+  }
+
+  return '<div class="lgc sbrd-t' + (orders.length ? '' : ' empty') + '">' +
+    '<div class="lgc-hd" style="background:linear-gradient(120deg,' + col[0] + ',' + col[1] + ');" onclick="lgcToggle(this)">' +
+      '<span class="sbrd-ava">' + escapeHtml(g.abbr || '?') + '</span>' +
+      '<span class="sbrd-name">' + escapeHtml(g.supplier_name || 'Поставщик') + '</span>' +
+      '<span class="cnt">' + cnt + '</span>' +
+      '<i class="ti ti-chevron-down lgc-chev"></i>' +
+    '</div>' +
+    '<div class="lgc-bd">' + body + '</div>' +
+    '<div class="lgc-ft">' + foot + '</div>' +
+  '</div>';
+}
+
+function _sbrdOrderCard(o) {
+  const n = o.items_count || (o.order_items || []).length;
+  const items = (o.order_items || []).map(it =>
+    '<li><span class="nm">' + escapeHtml(it.name) + '</span>' +
+    '<span class="qt">' + escapeHtml(_sbrdQty(it)) + '</span></li>').join('');
+
+  let html = '<div class="sbrd-o' + (o.in_trip ? ' trip' : '') + '">';
+  html += '<div class="sbrd-o-hd" onclick="sbrdToggleOrder(this)">';
+  html += '<div class="sbrd-o-t">';
+  html += '<div class="sbrd-o-num">' + escapeHtml(o.order_label || ('ORD-' + o.order_id)) +
+          '<span class="sbrd-paid"><i class="ti ti-cash"></i>Оплачен</span>' +
+          (o.in_trip ? '<span class="sbrd-trip"><i class="ti ti-truck"></i>В рейсе</span>' : '') +
+          '</div>';
+  html += '<div class="sbrd-o-sub">Дата заказа: ' + (_sbrdDate(o.order_date) || '—') +
+          ' · ' + n + ' ' + _sbrdPlural(n, 'позиция', 'позиции', 'позиций') + '</div>';
+  if (o.in_trip) {
+    html += '<div class="sbrd-o-trip"><i class="ti ti-route"></i>' +
+            escapeHtml(o.trip_number || 'рейс') +
+            (o.trip_date ? ' · ' + _sbrdDate(o.trip_date) : '') +
+            (o.trip_driver ? ' · ' + escapeHtml(o.trip_driver) : '') + '</div>';
+  }
+  html += '</div><i class="ti ti-chevron-down sbrd-o-chev"></i></div>';
+
+  html += '<div class="sbrd-o-bd">';
+  html += items ? '<ul class="sbrd-items">' + items + '</ul>'
+                : '<div class="sbrd-noitems">Позиции в заказе не заполнены.</div>';
+  html += '<div class="sbrd-o-act">';
+  html += '<a class="sbrd-open" onclick="openSupplyOrderFromBoard(' + Number(o.order_id) + ')">Открыть заказ в Снабжении →</a>';
+  html += '<button type="button" class="sbrd-take" onclick="sbrdTake(' + Number(o.order_id) + ')"><i class="ti ti-check"></i> Отметить «Забрал»</button>';
+  html += '</div></div></div>';
+  return html;
+}
+
+function sbrdToggleOrder(hd) {
+  const card = hd.parentNode;
+  if (card) card.classList.toggle('open');
+}
+
+// Заказ открываем в Снабжении — раздел переключаем сами, иначе останемся
+// на Главной с пустым экраном заказа.
+function openSupplyOrderFromBoard(orderId) {
+  state.currentSupplyOrderId = orderId;
+  selectSection('supply');
+  selectSidebarItem('supply-order-detail');
+}
+
+// «забрано: N →» — список заказов этого поставщика в Снабжении.
+function sbrdOpenTaken(idx) {
+  const g = ((cache.supplyBoard || {}).suppliers || [])[idx];
+  if (!g) return;
+  state.supplyOrdFilter = 'all';
+  state.supplyOrdSearch = g.supplier_name || '';
+  selectSection('supply');
+  selectSidebarItem('supply-orders');
+  const inp = document.getElementById('sup-ord-search');
+  if (inp) inp.value = state.supplyOrdSearch;
+}
+
+// «Забрал» — та же отметка, что в Логистике (pickup_done_at), поэтому карточка
+// уходит сразу с обеих досок.
+async function sbrdTake(orderId) {
+  if (!confirm('Отметить заказ как забранный? Он уйдёт с доски и из «Забрать» в Логистике.')) return;
+  try {
+    const r = await apiPost('/api/logistics/pickups/' + orderId + '/done', { done: true });
+    if (r && r.ok) { showToast('Отмечено: забрал', 'success'); loadHomeSupplyBoard(); }
+    else showToast('Не удалось', 'error');
+  } catch (e) { showToast('Ошибка сети', 'error'); }
+}
