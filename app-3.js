@@ -8366,6 +8366,8 @@ async function loadLogisticsPickups() {
     const umList = (um && um.orders) || [];
     const umActive = umList.filter(o => !o.manual_done);
     const umDone = umList.filter(o => !!o.manual_done);
+    // v2.46.224: заказы, которые завод ещё делает — из снабжения
+    const umPending = (um && um.pending) || [];
 
     // ---- 🔥 «горит»: истёкший Ozon и самовывоз с горящим сроком хранения
     let fireOz = 0, firePk = 0;
@@ -8447,15 +8449,26 @@ async function loadLogisticsPickups() {
     // ---- карточка УТМ (готовые корпуса к забору, v2.45.935)
     let umCard = '';
     if (um) {
-      const body = umActive.length ? umActive.map(_utmCardHtml).join('')
-        : '<div class="lgc-empty"><i class="ti ti-building-factory-2"></i>Готовых заказов нет.<br>Появятся сами, когда УТМ пришлёт «Заказ готов».</div>';
+      const pendBlock = umPending.length
+        ? '<div class="um-pend-hd"><i class="ti ti-tools"></i> В изготовлении на заводе</div>' +
+          umPending.map(_utmPendingHtml).join('')
+        : '';
+      const body = (umActive.length ? umActive.map(_utmCardHtml).join('') : '') +
+        pendBlock +
+        (!umActive.length && !umPending.length
+          ? '<div class="lgc-empty"><i class="ti ti-building-factory-2"></i>Готовых заказов нет.<br>Появятся сами, когда УТМ пришлёт «Заказ готов».</div>'
+          : (!umActive.length
+            ? '<div class="um-pend-note">Готовых к забору нет — ждём от УТМ письмо «Заказ готов». Счёт из письма ляжет в заказ выше.</div>'
+            : ''));
       umCard = _lgCardHtml('lgc-um', 'ti-building-factory-2', 'УТМ · корпуса',
-        umActive.length ? umActive.length + ' готово' : 'пусто',
+        umActive.length ? umActive.length + ' готово'
+          : (umPending.length ? umPending.length + ' в изготовлении' : 'пусто'),
         '',
         body,
         '<span>забрать <b>' + umActive.length + '</b></span>' +
+          (umPending.length ? '<span>в изготовлении <b>' + umPending.length + '</b></span>' : '') +
           (umDone.length ? '<span class="lnk" onclick="lgScrollDone()">забрано: ' + umDone.length + ' →</span>' : ''),
-        !umActive.length);
+        !umActive.length && !umPending.length);
     }
 
     // ---- карточка Деловых линий
@@ -8598,7 +8611,7 @@ async function loadLogisticsPickups() {
     if (oz) cards.push({ hot: fireOz ? 1 : 0, act: ozActive.length ? 1 : 0, html: ozCard });
     if (lu) cards.push({ hot: 0, act: luActive.length ? 1 : 0, html: luCard });
     if (ea) cards.push({ hot: 0, act: eaActive.length ? 1 : 0, html: eaCard });
-    if (um) cards.push({ hot: 0, act: umActive.length ? 1 : 0, html: umCard });
+    if (um) cards.push({ hot: 0, act: (umActive.length || umPending.length) ? 1 : 0, html: umCard });
     if (dl) cards.push({ hot: 0, act: dlActive.length ? 1 : 0, html: dlCard });
     if (cd) cards.push({ hot: 0, act: cdActive.length ? 1 : 0, html: cdCard });
     cards.push({ hot: firePk ? 1 : 0, act: (ready.length + transit.length) ? 1 : 0, html: pkCard });
@@ -18774,6 +18787,17 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {
+    version: 'v2.46.224',
+    date: '22.09.2026',
+    title: 'УТМ: заказ на корпуса виден в Логистике и сам принимает счёт',
+    features: [
+      'Плитка <b>«УТМ · корпуса»</b> больше не пустует: под готовыми к забору идёт блок <b>«В изготовлении на заводе»</b> — заказы снабжения, отправленные на УТМ, но ещё без письма «Заказ готов». Клик по карточке открывает заказ',
+      'Счёт из письма УТМ теперь <b>ложится в уже заведённый заказ</b> (заказ на изготовление К-0XX), а не создаёт второй заказ тому же поставщику — оприходование идёт по нужным позициям',
+      'Если открытых заказов УТМ несколько, счёт цепляется к самому давнему, а в MAX приходит предупреждение — письмо можно перецепить в «Почте и MAX»',
+    ],
+  },
+
   {
     version: 'v2.46.221',
     date: '22.09.2026',
@@ -29182,6 +29206,26 @@ function _utmCardHtml(o) {
       (!completed ? '<button class="btn btn-primary btn-small" onclick="utmMarkDone(' + Number(o.id) + ')"><i class="ti ti-check"></i> Забрали</button>'
                   : '<button class="btn btn-secondary btn-small" onclick="utmMarkDone(' + Number(o.id) + ', true)"><i class="ti ti-rotate"></i> Вернуть</button>') +
     '</div>' +
+  '</div>';
+}
+
+// v2.46.224: заказ уже отправлен на завод, письма «Заказ готов» ещё не было
+function _utmPendingHtml(o) {
+  const label = escapeHtml(o.order_label || ('ORD-' + o.order_id));
+  const txt = String(o.comment || '').replace(/\s+/g, ' ').trim();
+  const short = txt.length > 110 ? txt.slice(0, 110) + '…' : txt;
+  const day = String(o.sent_at || o.created_at || '').slice(0, 10);
+  const meta = [];
+  if (o.items_count) meta.push('<span><i class="ti ti-list"></i> позиций: ' + Number(o.items_count) + '</span>');
+  if (day) meta.push('<span><i class="ti ti-calendar"></i> заказано ' + formatDateLong(day) + '</span>');
+  return '<div class="ozon-card um-card pend" onclick="openSupplyOrder(' + Number(o.order_id) + ')">' +
+    '<div class="ozon-top">' +
+      '<div class="ozon-logo um-logo pend">У</div>' +
+      '<div class="ozon-title"><b>' + label + '</b>' +
+        '<small>' + (escapeHtml(short) || 'заказ на изготовление') + '</small></div>' +
+      '<span class="ozon-status pend"><i class="ti ti-tools"></i> В изготовлении</span>' +
+    '</div>' +
+    (meta.length ? '<div class="ozon-meta">' + meta.join('') + '</div>' : '') +
   '</div>';
 }
 

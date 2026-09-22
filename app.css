@@ -27083,3 +27083,11 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
 .ads-spin { display: inline-block; animation: ads-spin 1s linear infinite; }
 @keyframes ads-spin { to { transform: rotate(360deg); } }
 @media (max-width: 760px) { .ads-table th:nth-child(4), .ads-table td:nth-child(4) { display: table-cell; } }
+
+/* ============ v2.46.224: УТМ — корпуса в изготовлении ============ */
+.um-pend-hd { display: flex; align-items: center; gap: 7px; padding: 10px 2px 6px; font-size: 12px; font-weight: 700; letter-spacing: .3px; text-transform: none; color: #7C3AED; }
+.um-pend-hd .ti { font-size: 15px; }
+.um-card.pend { border-left-color: #A78BFA; background: #FCFBFF; cursor: pointer; }
+.um-logo.pend { background: #A78BFA; }
+.ozon-status.pend { color: #6D28D9; background: #F5F3FF; }
+.um-pend-note { padding: 9px 12px; margin-top: 8px; border-radius: 10px; background: #F8FAFC; color: var(--text-light); font-size: 12.5px; line-height: 1.45; }
