@@ -27083,3 +27083,72 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
 .ads-spin { display: inline-block; animation: ads-spin 1s linear infinite; }
 @keyframes ads-spin { to { transform: rotate(360deg); } }
 @media (max-width: 760px) { .ads-table th:nth-child(4), .ads-table td:nth-child(4) { display: table-cell; } }
+
+/* ===== Доска «Заказано у поставщиков» на Главной =====
+   Плитки живут на сетке .lg-grid и в оболочке .lgc из Логистики — здесь только
+   то, чего там нет: шапка с аббревиатурой поставщика, чипы, счётчики и
+   раскрывающаяся карточка заказа. */
+.sbrd-hint { font-size: 12px; color: var(--text-light); margin: -4px 0 10px; }
+.sbrd-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.sbrd-stat { background: var(--card-bg, #fff); border: 1px solid var(--border); border-radius: 12px;
+  padding: 8px 14px; min-width: 104px; }
+.sbrd-stat b { display: block; font-size: 18px; font-weight: 800; color: var(--text-dark);
+  font-variant-numeric: tabular-nums; line-height: 1.15; }
+.sbrd-stat span { font-size: 11px; color: var(--text-light); }
+.sbrd-chips { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+.sbrd-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+  background: var(--card-bg, #fff); color: var(--text-dark); border-radius: 99px;
+  padding: 6px 13px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.sbrd-chip span { background: #EDF1F7; border-radius: 99px; padding: 1px 7px; font-size: 11px;
+  font-weight: 700; color: var(--text-light); }
+.sbrd-chip:hover { border-color: var(--brand); }
+.sbrd-chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.sbrd-chip.on span { background: rgba(255, 255, 255, .25); color: #fff; }
+
+.sbrd-t .lgc-hd { gap: 10px; }
+.sbrd-ava { width: 32px; height: 32px; border-radius: 9px; background: rgba(255, 255, 255, .2);
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  font-size: 12.5px; font-weight: 800; letter-spacing: .5px; }
+.sbrd-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sbrd-t .lgc-bd { padding: 10px 11px; display: flex; flex-direction: column; gap: 8px; }
+
+.sbrd-o { border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  background: var(--surface, #fff); }
+.sbrd-o.trip { border-color: #BFD3F2; background: #F6F9FF; }
+.sbrd-o-hd { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; }
+.sbrd-o-hd:hover { background: rgba(15, 30, 60, .03); }
+.sbrd-o-t { flex: 1; min-width: 0; }
+.sbrd-o-num { display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  font-size: 13.5px; font-weight: 800; color: var(--text-dark); }
+.sbrd-paid, .sbrd-trip { display: inline-flex; align-items: center; gap: 3px; border-radius: 99px;
+  padding: 1px 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .2px; }
+.sbrd-paid { background: var(--success-bg, #E8F5EC); color: var(--success, #1F7B3F); }
+.sbrd-trip { background: #E6EEFC; color: #1D4ED8; }
+.sbrd-o-sub { font-size: 11.5px; color: var(--text-light); margin-top: 2px;
+  font-variant-numeric: tabular-nums; }
+.sbrd-o-trip { font-size: 11.5px; color: #1D4ED8; margin-top: 3px; display: flex;
+  align-items: center; gap: 4px; }
+.sbrd-o-chev { color: var(--text-faint); transition: transform .15s ease; flex: none; }
+.sbrd-o.open .sbrd-o-chev { transform: rotate(180deg); }
+.sbrd-o-bd { display: none; padding: 0 12px 11px; border-top: 1px solid var(--border); }
+.sbrd-o.open .sbrd-o-bd { display: block; }
+.sbrd-items { list-style: none; margin: 9px 0 0; padding: 0; }
+.sbrd-items li { display: flex; gap: 10px; align-items: baseline; padding: 4px 0;
+  font-size: 12.5px; border-bottom: 1px dashed var(--border); }
+.sbrd-items li:last-child { border-bottom: none; }
+.sbrd-items .nm { flex: 1; min-width: 0; color: var(--text-dark); }
+.sbrd-items .qt { color: var(--text-light); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sbrd-noitems { font-size: 12px; color: var(--text-faint); padding: 9px 0 0; }
+.sbrd-o-act { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.sbrd-open { color: var(--brand); font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.sbrd-open:hover { text-decoration: underline; }
+.sbrd-take { margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--success, #1F7B3F); background: var(--success-bg, #E8F5EC);
+  color: var(--success, #1F7B3F); border-radius: 9px; padding: 6px 12px;
+  font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.sbrd-take:hover { background: var(--success, #1F7B3F); color: #fff; }
+
+@media (max-width: 900px) {
+  .sbrd-stat { flex: 1 1 calc(50% - 5px); min-width: 0; }
+  .sbrd-take { margin-left: 0; width: 100%; justify-content: center; }
+}

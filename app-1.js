@@ -6218,7 +6218,7 @@ function goHome() {
 
 function refreshCurrentScreen() {
   const s = state.currentScreen;
-  if (s === 'home-dashboard') { cache.homeKpi = null; cache.cbrRates = null; cache.myTasks = null; cache.upcomingShipments = null; cache.recentActivity = null; }   // ЭТАП 16Б+В+Г
+  if (s === 'home-dashboard') { cache.homeKpi = null; cache.cbrRates = null; cache.myTasks = null; cache.upcomingShipments = null; cache.recentActivity = null; cache.supplyBoard = null; }   // ЭТАП 16Б+В+Г
   if (s === 'dashboard') cache.dashboard = null;
   if (s === 'history') cache.history = {};
   if (s === 'summary') cache.summary = {};
@@ -6302,7 +6302,7 @@ function softRefreshCurrentScreen() {
 
 // Сброс кэшей текущего экрана БЕЗ перерисовки (тело старого refreshCurrentScreen).
 function refreshCurrentScreenCachesOnly(s) {
-  if (s === 'home-dashboard') { cache.homeKpi = null; cache.cbrRates = null; cache.myTasks = null; cache.upcomingShipments = null; cache.recentActivity = null; }
+  if (s === 'home-dashboard') { cache.homeKpi = null; cache.cbrRates = null; cache.myTasks = null; cache.upcomingShipments = null; cache.recentActivity = null; cache.supplyBoard = null; }
   if (s === 'dashboard') cache.dashboard = null;
   if (s === 'history') cache.history = {};
   if (s === 'summary') cache.summary = {};
