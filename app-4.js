@@ -24054,6 +24054,8 @@ async function loadSitesDashboard() {
   };
   h += '<div class="st-grid">' + list('Откуда приходят', sm.sources || [], 'source', 'visits', 'зах.') + list('Из каких городов', sm.cities || [], 'city', 'visits', 'зах.') + list('Какие страницы смотрят', sm.pages || [], 'page', 'views', 'просм.') + list('С каких устройств', sm.devices || [], 'device', 'visits', 'зах.') + '</div>';
   if (!p.visits) h += '<div class="st-hint"><i class="ti ti-info-circle"></i> Данных нет: сайт ещё не подключён. Нажмите «Код для сайта» в меню слева — там ключ и строка для вставки.</div>';
+  // v2.46.231: роботы, которые грузят страницу и уходят, ничего не тронув, в счёт не идут
+  if (sm.bot_visits) h += '<div class="st-hint"><i class="ti ti-robot"></i> Роботов отсеяно за период: ' + sm.bot_visits + '. Это автоматические заходы по ссылкам — в цифрах выше их нет.</div>';
   // v2.46.219: наши адреса (офис, VPN) — заходы с них не считаем
   h += '<div class="st-card" id="sites-own-ips"><div class="st-card-h">Наши адреса — не считаем в статистике' + (sm.own_visits ? ' <small>(за период отфильтровано наших заходов: ' + sm.own_visits + ')</small>' : '') + '</div><div class="st-empty">Загружаем…</div></div>';
   el.innerHTML = h;
