@@ -24080,9 +24080,17 @@ async function loadSitesLeads() {
       '<div class="st-lead-top"><span class="ich-chip ' + (cls[l.status] || '') + '">' + escapeHtml(l.status_label) + '</span><b>№' + l.id + '</b> · ' + escapeHtml(l.scenario_label || '') + (l.equipment ? ' · ' + escapeHtml(l.equipment) : '') + '<span class="st-lead-when">' + _sWhen(l.created_at) + '</span></div>' +
       '<div class="st-lead-contact"><i class="ti ' + (l.contact_method === 'email' ? 'ti-mail' : l.contact_method === 'telegram' ? 'ti-brand-telegram' : l.contact_method === 'whatsapp' ? 'ti-brand-whatsapp' : 'ti-phone') + '"></i> ' + escapeHtml(l.contact || '') + (l.name ? ' · ' + escapeHtml(l.name) : '') + (l.company ? ' · ' + escapeHtml(l.company) : '') + '</div>' +
       (l.comment ? '<div class="st-lead-comment">' + escapeHtml(l.comment.slice(0, 160)) + (l.comment.length > 160 ? '…' : '') + '</div>' : '') +
-      '<div class="st-lead-meta">' + [l.params && l.params.volume_m3 ? l.params.volume_m3 + ' м³' : '', l.source ? 'пришёл: ' + l.source : '', l.page ? 'страница: ' + l.page : '', l.source_button ? l.source_button : '', l.assignee ? 'ведёт: ' + l.assignee : ''].filter(Boolean).map(escapeHtml).join(' · ') + '</div>' +
+      '<div class="st-lead-meta">' + [_sAudienceLabel(l.params, true), l.params && l.params.volume_m3 ? l.params.volume_m3 + ' м³' : '', l.source ? 'пришёл: ' + l.source : '', l.page ? 'страница: ' + l.page : '', l.source_button ? l.source_button : '', l.assignee ? 'ведёт: ' + l.assignee : ''].filter(Boolean).map(escapeHtml).join(' · ') + '</div>' +
       '</div>';
   }).join('') + '</div>';
+}
+// v2.46.232: сегмент клиента с сайта (params.audience). Название присылает сервер
+// (audience_label из своего справочника), справочник здесь — запасной вариант.
+const _S_AUDIENCES = { 'dairy-plant': 'Для молочных заводов', craft: 'Для крафтовых сыроварен', home: 'Для домашних сыроварен', undecided: 'Пока не определился' };
+function _sAudienceLabel(p, skipUndecided) {
+  if (!p || !p.audience) return '';
+  if (skipUndecided && p.audience === 'undecided') return '';
+  return String(p.audience_label || _S_AUDIENCES[p.audience] || p.audience);
 }
 function _sParamsHtml(p) {
   if (!p || !Object.keys(p).length) return '<div class="st-empty">Параметры камеры не указаны</div>';
@@ -24100,9 +24108,12 @@ function _sParamsHtml(p) {
   if (temp != null && temp !== '') rows.push(['Температура', temp + ' °C']);
   const humidity = p.humidity_percent != null ? p.humidity_percent : p.humidity;
   if (humidity != null && humidity !== '') rows.push(['Влажность', humidity + ' %']);
-  if (p.article) rows.push(['Статья', p.article]);
+  const audience = _sAudienceLabel(p);
+  if (audience) rows.push(['Сегмент', audience]);
+  if (p.article || p.article_title) rows.push(['Статья', p.article_title ? String(p.article_title) + (p.article ? ' (' + p.article + ')' : '') : String(p.article)]);
+  if (p.form_place) rows.push(['Место формы', String(p.form_place)]);
   if (p.project_id) rows.push(['Проект', p.project_id]);
-  const known = ['dims', 'volume_m3', 'dims_unknown', 'cheeses', 'cheese', 'walls', 'wall', 'panel_thickness_mm', 'wall_mm', 'placement', 'location', 'city', 'cheese_load_kg', 'load_kg', 'temperature_c', 'temp', 'humidity_percent', 'humidity', 'article', 'project_id', 'submitted_at', 'landing_page', 'utm'];
+  const known = ['dims', 'volume_m3', 'dims_unknown', 'cheeses', 'cheese', 'walls', 'wall', 'panel_thickness_mm', 'wall_mm', 'placement', 'location', 'city', 'cheese_load_kg', 'load_kg', 'temperature_c', 'temp', 'humidity_percent', 'humidity', 'article', 'article_title', 'form_place', 'audience', 'audience_label', 'project_id', 'submitted_at', 'landing_page', 'utm'];
   Object.keys(p).forEach(function (k) { if (known.indexOf(k) < 0) rows.push([k, typeof p[k] === 'object' ? JSON.stringify(p[k]) : String(p[k])]); });
   return '<table class="st-params">' + rows.map(function (r) { return '<tr><td>' + escapeHtml(r[0]) + '</td><td>' + escapeHtml(r[1]) + '</td></tr>'; }).join('') + '</table>';
 }
