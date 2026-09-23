@@ -3354,21 +3354,8 @@ function renderTaskDetail(t) {
     html += '<div class="task-detail-description">' + escapeHtml(t.description).replace(/\n/g, '<br>') + '</div>';
   }
 
-  // v2.45.662: файлы задачи (прикреплённые через MAX-бота)
-  if (t.files && t.files.length) {
-    html += '<div class="task-files"><div class="task-files-t"><i class="ti ti-paperclip"></i> Файлы <span class="cnt">' + t.files.length + '</span></div>';
-    t.files.forEach(f => {
-      const kb = Math.round((f.size || 0) / 1024);
-      const isImg = String(f.content_type || '').indexOf('image/') === 0;
-      html += '<a class="task-file-row" href="' + API_BASE + f.url + '" target="_blank">' +
-        '<span class="tf-ic"><i class="ti ' + (isImg ? 'ti-photo' : 'ti-file') + '"></i></span>' +
-        '<span class="tf-nm">' + escapeHtml(f.name || 'файл') + '</span>' +
-        (kb ? '<span class="tf-sz">' + kb + ' КБ</span>' : '') +
-        '<i class="ti ti-external-link tf-open"></i>' +
-      '</a>';
-    });
-    html += '</div>';
-  }
+  // v2.45.662: файлы задачи (MAX-бот); v2.46.223: и из карточки — скрепка, перетаскивание, вставка
+  html += renderTaskFiles(t);
 
   // v2.46.134: обсуждение — главный инструмент, живёт в широкой колонке
   html += renderTaskDiscussion(t);
@@ -3501,21 +3488,118 @@ function _taskDiscItemHtml(c) {
     '</div><div class="task-disc-text">' + escapeHtml(c.text).replace(/\n/g, '<br>') + '</div></div>';
 }
 
+function renderTaskFiles(t) {
+  const files = t.files || [];
+  let h = '<div class="task-files" id="task-files"' + (files.length ? '' : ' style="display:none"') + '>';
+  h += '<div class="task-files-t"><i class="ti ti-paperclip"></i> Файлы <span class="cnt" id="task-files-cnt">' + files.length + '</span></div>';
+  files.forEach(f => { h += _taskFileRowHtml(f); });
+  h += '</div>';
+  return h;
+}
+
+function _taskFileRowHtml(f) {
+  const kb = Math.round((f.size || 0) / 1024);
+  const ct = String(f.content_type || '');
+  const ic = ct.indexOf('image/') === 0 ? 'ti-photo' : ct.indexOf('video/') === 0 ? 'ti-video' : ct.indexOf('pdf') >= 0 ? 'ti-file-type-pdf' : 'ti-file';
+  return '<div class="task-file-row" data-fid="' + f.id + '">' +
+    '<a class="tf-link" href="' + API_BASE + f.url + '" target="_blank" rel="noopener">' +
+      '<span class="tf-ic"><i class="ti ' + ic + '"></i></span>' +
+      '<span class="tf-nm">' + escapeHtml(f.name || 'файл') + '</span>' +
+      (kb ? '<span class="tf-sz">' + (kb >= 1024 ? (kb / 1024).toFixed(1) + ' МБ' : kb + ' КБ') + '</span>' : '') +
+      '<i class="ti ti-external-link tf-open"></i>' +
+    '</a>' +
+    (f.can_delete ? '<button type="button" class="tf-del" onclick="deleteTaskFile(' + f.id + ')" title="Удалить файл"><i class="ti ti-x"></i></button>' : '') +
+  '</div>';
+}
+
+// v2.46.223: загрузка файлов к задаче — скрепка, перетаскивание на ленту, вставка из буфера
+async function uploadTaskFiles(fileList) {
+  const files = Array.from(fileList || []).filter(f => f && f.size > 0);
+  if (!files.length || !state.currentTaskId) return;
+  if (files.length > 5) { showToast('Не более 5 файлов за раз', 'error'); return; }
+  const btn = document.getElementById('task-disc-attach');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i>'; }
+  try {
+    const fd = new FormData();
+    files.forEach((f, i) => fd.append('file_' + (i + 1), f, f.name || ('файл_' + (i + 1))));
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/tasks/' + state.currentTaskId + '/files', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.message || 'Не удалось загрузить');
+    const box = document.getElementById('task-files');
+    if (box) {
+      box.style.display = '';
+      (d.files || []).forEach(f => box.insertAdjacentHTML('beforeend', _taskFileRowHtml(f)));
+      const cnt = document.getElementById('task-files-cnt');
+      if (cnt) cnt.textContent = String(box.querySelectorAll('.task-file-row').length);
+    }
+    const feed = document.getElementById('task-disc-feed');
+    const empty = document.getElementById('task-disc-empty');
+    if (empty) empty.remove();
+    if (feed) {
+      const names = (d.files || []).map(f => f.name).join(', ');
+      feed.insertAdjacentHTML('beforeend', _taskDiscItemHtml({ kind: 'event', text: 'прикрепил ' + ((d.files || []).length === 1 ? 'файл' : 'файлы') + ': ' + names, created_at: new Date().toISOString().slice(0, 19).replace('T', ' ') }));
+      feed.scrollTop = feed.scrollHeight;
+    }
+    showToast((d.files || []).length === 1 ? 'Файл прикреплён' : 'Файлов прикреплено: ' + (d.files || []).length, 'success');
+  } catch (e) {
+    showToast('Файл не загружен: ' + (e.message || e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-paperclip"></i>'; }
+  }
+}
+
+async function deleteTaskFile(fid) {
+  if (!confirm('Удалить файл из задачи?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/tasks/files/' + fid, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) throw new Error('Не удалось удалить');
+    const row = document.querySelector('.task-file-row[data-fid="' + fid + '"]');
+    if (row) row.remove();
+    const box = document.getElementById('task-files');
+    const n = box ? box.querySelectorAll('.task-file-row').length : 0;
+    const cnt = document.getElementById('task-files-cnt');
+    if (cnt) cnt.textContent = String(n);
+    if (box && !n) box.style.display = 'none';
+  } catch (e) { showToast(String(e.message || e), 'error'); }
+}
+
+function _taskDiscDrop(e) {
+  e.preventDefault();
+  const feed = document.getElementById('task-disc-feed');
+  if (feed) feed.classList.remove('is-dragover');
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) uploadTaskFiles(e.dataTransfer.files);
+}
+function _taskDiscDrag(e, on) {
+  e.preventDefault();
+  const feed = document.getElementById('task-disc-feed');
+  if (feed) feed.classList.toggle('is-dragover', !!on);
+}
+function _taskDiscPaste(e) {
+  const items = (e.clipboardData && e.clipboardData.files) || [];
+  if (items.length) { e.preventDefault(); uploadTaskFiles(items); }
+}
+
 function renderTaskDiscussion(t) {
   const items = t.comments || [];
   const live = items.filter(c => c.kind !== 'event').length;
   let h = '<div class="task-disc">';
   h += '<div class="task-disc-t"><i class="ti ti-messages"></i> Обсуждение' +
        '<span class="cnt" id="task-disc-cnt"' + (live ? '' : ' style="display:none"') + '>' + live + '</span></div>';
-  h += '<div class="task-disc-feed" id="task-disc-feed">';
+  h += '<div class="task-disc-feed" id="task-disc-feed" ondragover="_taskDiscDrag(event,true)" ondragleave="_taskDiscDrag(event,false)" ondrop="_taskDiscDrop(event)">';
   if (!items.length) {
     h += '<div class="task-disc-empty" id="task-disc-empty">Пока тихо. Напиши первым — исполнители и постановщик получат уведомление.</div>';
   }
   items.forEach(c => { h += _taskDiscItemHtml(c); });
   h += '</div>';
   h += '<div class="task-disc-input">' +
-    '<textarea id="task-disc-inp" rows="1" maxlength="2000" placeholder="Написать комментарий…" ' +
-      'oninput="_taskDiscGrow(this)" onkeydown="_taskDiscKey(event)"></textarea>' +
+    '<input type="file" id="task-disc-file" multiple style="display:none" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.dwg,.dxf,.step,.stp,.zip" onchange="uploadTaskFiles(this.files); this.value=\'\'">' +
+    '<button type="button" class="task-disc-attach" id="task-disc-attach" onclick="document.getElementById(\'task-disc-file\').click()" title="Прикрепить файл: фото, PDF, чертёж, архив. Можно перетащить в ленту или вставить из буфера"><i class="ti ti-paperclip"></i></button>' +
+    '<textarea id="task-disc-inp" rows="1" maxlength="2000" placeholder="Написать комментарий… (файл — скрепкой, перетащить или Ctrl+V)" ' +
+      'oninput="_taskDiscGrow(this)" onkeydown="_taskDiscKey(event)" onpaste="_taskDiscPaste(event)"></textarea>' +
     '<button class="task-disc-send" id="task-disc-send" onclick="sendTaskComment()" title="Отправить (Enter)">' +
       '<i class="ti ti-send"></i></button></div>';
   h += '</div>';

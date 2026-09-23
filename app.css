@@ -21606,6 +21606,15 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .task-disc-input textarea:focus { border-color: var(--brand); }
 .task-disc-send { flex: none; width: 40px; height: 38px; border: none; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; font-size: 15px; }
 .task-disc-send:disabled { opacity: .5; cursor: default; }
+.task-disc-attach { flex: none; width: 40px; height: 38px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); color: var(--text-mid); cursor: pointer; font-size: 16px; }
+.task-disc-attach:hover { border-color: var(--brand); color: var(--brand); }
+.task-disc-attach:disabled { opacity: .6; cursor: default; }
+.task-disc-attach .spin { display: inline-block; animation: taskSpin 1s linear infinite; }
+@keyframes taskSpin { to { transform: rotate(360deg); } }
+.task-disc-feed.is-dragover { outline: 2px dashed var(--brand); outline-offset: -4px; background: var(--brand-bg); border-radius: 10px; }
+.task-file-row .tf-link { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; text-decoration: none; color: inherit; }
+.tf-del { flex: none; width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; color: var(--text-light); cursor: pointer; }
+.tf-del:hover { background: #FDE8E6; color: #dc4c3f; }
 .tkr-tag.cmt { color: var(--brand); }
 /* v2.46.139: поток «Автоматика» — правки щитов */
 .tkr-tag.auto { color: var(--warning); background: var(--warning-bg); border-radius: 8px; }
