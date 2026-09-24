@@ -23,6 +23,7 @@
       media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.34.0/tabler-icons.min.css"></noscript>
 <link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/prospects.css">
 
 <!-- Three.js грузится только при открытии STEP-модели. Import map нужен
      OrbitControls: основной модуль и дополнения обязаны быть одной версии. -->
@@ -768,6 +769,9 @@
         <!-- v2.45.223: опросные листы (анкеты клиентов) -->
         <button class="nav-item" data-nav="sales-surveys" onclick="selectSidebarItem('sales-surveys')">
           <i class="ti ti-clipboard-text"></i><span>Опросные листы</span>
+        </button>
+        <button class="nav-item" data-nav="sales-prospects" onclick="selectSidebarItem('sales-prospects')">
+          <i class="ti ti-building-factory-2"></i><span>Заводы и сыроварни</span>
         </button>
         <!-- Ежедневные отчёты менеджеров (KPI) -->
         <button class="nav-item" data-nav="sales-reports" onclick="selectSidebarItem('sales-reports')">
@@ -2068,6 +2072,37 @@
         </div>
         <div class="content-inner" id="scf-content">
           <!-- Форма наполняется через initContractForm() -->
+        </div>
+      </div>
+
+      <div class="screen" data-screen="sales-prospects" data-section="sales">
+        <div class="screen-header"><h2>Заводы и сыроварни</h2></div>
+        <div class="page-header"><div><h1>Заводы и сыроварни</h1><div class="page-subtitle">Потенциальные заказчики климатического оборудования</div></div>
+          <div class="page-actions"><button class="btn btn-secondary" id="prospects-import-button" onclick="prospectsShowImport()"><i class="ti ti-upload"></i> Импорт Excel</button><button class="icon-btn" onclick="loadProspects()" title="Обновить базу"><i class="ti ti-refresh"></i></button></div>
+        </div>
+        <div class="content-inner prospects">
+          <div id="prospects-overview">
+            <div class="prospect-kpis" id="prospects-kpis"></div>
+            <div class="prospect-import" id="prospects-import-panel" hidden>
+              <b>Добавить производства из Excel</b><p>Лист «База CRM», первая строка — заголовки исходной базы. Сначала проверим файл и покажем количество новых записей. Уже добавленные карточки сохранятся вместе с заметками и этапами работы.</p>
+              <input type="file" accept=".xlsx" aria-label="Файл базы Excel" onchange="prospectsChooseImport(this)">
+              <div class="prospect-toolbar"><button class="btn btn-secondary" onclick="prospectsImport(true)">Проверить файл</button><button class="btn btn-primary" id="prospects-import-apply" onclick="prospectsImport(false)" hidden>Добавить записи</button><button class="btn btn-secondary" onclick="document.getElementById('prospects-import-panel').hidden=true">Закрыть</button></div>
+              <div class="prospect-import-result" id="prospects-import-result" role="status"></div>
+            </div>
+            <div class="prospect-filters" id="prospects-filters">
+              <label>Поиск<input data-filter="q" placeholder="Название, ИНН, телефон или почта" oninput="prospectsSearch()"></label>
+              <label>Тип производства<select data-filter="segment" data-empty="Все типы" onchange="prospectsFilter()"><option value="">Все типы</option></select></label>
+              <label>Регион<select data-filter="region" data-empty="Все регионы" onchange="prospectsFilter()"><option value="">Все регионы</option></select></label>
+              <label>Этап<select data-filter="stage" data-empty="Все этапы" onchange="prospectsFilter()"><option value="">Все этапы</option></select></label>
+              <label>Ответственный<select data-filter="owner" data-empty="Все сотрудники" onchange="prospectsFilter()"><option value="">Все сотрудники</option></select></label>
+              <label>Почта<select data-filter="has_email" onchange="prospectsFilter()"><option value="">Любое состояние</option><option value="yes">Есть email</option><option value="no">Нет email</option></select></label>
+              <label>Телефон<select data-filter="has_phone" onchange="prospectsFilter()"><option value="">Любое состояние</option><option value="yes">Есть телефон</option><option value="no">Нет телефона</option></select></label>
+              <label>Следующий контакт<select data-filter="due" onchange="prospectsFilter()"><option value="">Все даты</option><option value="yes">Сегодня и просроченные</option></select></label>
+            </div>
+            <div class="prospect-toolbar"><span id="prospects-count">Загружаем базу…</span><button class="btn btn-secondary" onclick="prospectsReset()">Сбросить фильтры</button></div>
+            <div id="prospects-list"></div><div class="prospect-pagination" id="prospects-pagination"></div>
+          </div>
+          <div id="prospects-detail" hidden></div>
         </div>
       </div>
 
@@ -3882,6 +3917,7 @@
 <script src="/app-2.js"></script>
 <script src="/app-3.js"></script>
 <script src="/app-4.js"></script>
+<script src="/prospects.js"></script>
 <script src="/klava-pick.js"></script>
 <script>
 // v2.46.161: «Показать Клаве» — метки прямо на экране CRM уходят в чат идей
