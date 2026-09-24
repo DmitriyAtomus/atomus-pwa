@@ -102,3 +102,16 @@ test('progress separates sent, queued, returned and failed mail', () => {
   assert.match(ctx.campaignsProgress({status:'completed',recipients:[]}),/завершена/);
   assert.match(ctx.campaignsProgress({status:'running',scheduled_at:Date.now()/1000+3600,recipients:[]}),/запланирована/);
 });
+
+
+test('daily quota waiting displays automatic retry without overriding pause', () => {
+  const {ctx}=harness();
+  const campaign={status:'running',quota:{used:100,limit:100,remaining:0,next_at:Date.now()/1000+3600},recipients:[{state:'queued',events:[]}]};
+  const result=ctx.campaignsProgress(campaign);
+  assert.match(result,/Ожидаем доступный лимит/);
+  assert.match(result,/Автоматическая повторная попытка/);
+  assert.match(result,/100 из 100 писем/);
+  assert.doesNotMatch(result,/Идёт отправка/);
+  assert.match(ctx.campaignsProgress({...campaign,status:'paused'}),/Отправка на паузе/);
+  assert.doesNotMatch(ctx.campaignsProgress({...campaign,status:'paused'}),/Автоматическая повторная попытка/);
+});
