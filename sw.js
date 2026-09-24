@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.234';
+const CACHE_VERSION = 'atomus-v1.8.234-campaigns-1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -21,6 +21,8 @@ const STATIC_ASSETS = [
   '/app-4.js',
   '/prospects.js',
   '/prospects.css',
+  '/campaigns.js',
+  '/campaigns.css',
   '/klava-pick.js',
   '/manifest.json',
   '/icons/icon-192.png',
@@ -105,6 +107,12 @@ self.addEventListener('fetch', (event) => {
 
   // Только GET запросы кэшируем
   if (req.method !== 'GET') return;
+
+  // Campaign recipient data and tokenized forms must never fall back to stale API cache.
+  if (url.pathname.startsWith('/api/sales/campaigns') || url.pathname.startsWith('/api/public/campaigns')) {
+    event.respondWith(fetch(req));
+    return;
+  }
 
   // Запросы к backend: прямой Railway (старые вкладки) или same-origin proxy
   // через Vercel (текущая версия) — стратегия network-first.

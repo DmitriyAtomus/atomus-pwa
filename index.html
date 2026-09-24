@@ -24,6 +24,7 @@
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.34.0/tabler-icons.min.css"></noscript>
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="/prospects.css">
+<link rel="stylesheet" href="/campaigns.css">
 
 <!-- Three.js грузится только при открытии STEP-модели. Import map нужен
      OrbitControls: основной модуль и дополнения обязаны быть одной версии. -->
@@ -2100,9 +2101,17 @@
               <label>Следующий контакт<select data-filter="due" onchange="prospectsFilter()"><option value="">Все даты</option><option value="yes">Сегодня и просроченные</option></select></label>
             </div>
             <div class="prospect-toolbar"><span id="prospects-count">Загружаем базу…</span><button class="btn btn-secondary" onclick="prospectsReset()">Сбросить фильтры</button></div>
+            <div class="campaign-toolbar" id="campaigns-selection-toolbar" hidden>
+              <span id="campaigns-selected">Выбрано: 0</span>
+              <button class="btn btn-secondary" onclick="campaignsSelectFiltered()">Выбрать по фильтру</button>
+              <button class="btn btn-secondary" onclick="campaignsClearSelection()">Снять выбор</button>
+              <button class="btn btn-primary" onclick="campaignsNew()">Создать рассылку</button>
+              <button class="btn btn-secondary" onclick="campaignsList()">Все рассылки</button>
+            </div>
             <div id="prospects-list"></div><div class="prospect-pagination" id="prospects-pagination"></div>
           </div>
           <div id="prospects-detail" hidden></div>
+          <div id="campaigns-panel" hidden></div>
         </div>
       </div>
 
@@ -3918,6 +3927,7 @@
 <script src="/app-3.js"></script>
 <script src="/app-4.js"></script>
 <script src="/prospects.js"></script>
+<script src="/campaigns.js"></script>
 <script src="/klava-pick.js"></script>
 <script>
 // v2.46.161: «Показать Клаве» — метки прямо на экране CRM уходят в чат идей

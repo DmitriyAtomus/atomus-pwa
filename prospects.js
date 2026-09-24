@@ -1,4 +1,4 @@
-/* Dairy manufacturers — server-backed records; all outbound communication stays manual. */
+/* Dairy manufacturers — server-backed records; campaigns require an explicit launch. */
 var _prospects = { page: 1, request: 0, detailRequest: 0, current: null, dict: null, file: null, preview: false };
 var PROSPECT_LABELS = { stage: 'Этап', owner: 'Ответственный', contact_person: 'Контактный специалист',
   contact_role: 'Должность', need: 'Задача клиента', next_action: 'Следующий шаг', next_date: 'Дата контакта',
@@ -40,6 +40,8 @@ async function loadProspects() {
   root.setAttribute('aria-busy', 'true');
   const importButton = document.getElementById('prospects-import-button');
   if (importButton) importButton.hidden = !canManageSales();
+  const campaignToolbar = document.getElementById('campaigns-selection-toolbar');
+  if (campaignToolbar) campaignToolbar.hidden = !canManageSales();
   try {
     const result = await apiGet('/api/sales/prospects?' + params.toString());
     if (seq !== _prospects.request) return;
@@ -56,10 +58,10 @@ async function loadProspects() {
     });
     document.getElementById('prospects-count').textContent = 'Найдено: ' + result.total.toLocaleString('ru-RU');
     if (!result.rows.length) root.innerHTML = '<div class="empty-block">По этим условиям производств нет. Измените фильтры.</div>';
-    else root.innerHTML = '<div class="prospect-table-wrap"><table class="prospect-table"><thead><tr><th>Производство</th><th>Контакты</th><th>Этап / ответственный</th><th>Следующий шаг</th></tr></thead><tbody>' +
+    else root.innerHTML = '<div class="prospect-table-wrap"><table class="prospect-table"><thead><tr>' + (canManageSales() ? '<th>Выбор</th>' : '') + '<th>Производство</th><th>Контакты</th><th>Этап / ответственный</th><th>Следующий шаг</th></tr></thead><tbody>' +
       result.rows.map(function (r) {
         const site = prospectsUrl(r.site); const firstPhone = (r.phone || '').split(';')[0].trim();
-        return '<tr><td><button class="prospect-name" onclick="prospectsOpen(\'' + r.id + '\')">' + prospectsEscape(r.name) + '</button>' +
+        return '<tr>' + (canManageSales() ? '<td><input class="campaign-select" type="checkbox" data-campaign-select="' + r.id + '" aria-label="Выбрать ' + prospectsEscape(r.name) + '"' + (typeof _campaigns !== 'undefined' && _campaigns.selected.has(r.id) ? ' checked' : '') + ' onchange="campaignsToggle(\'' + r.id + '\',this.checked)"></td>' : '') + '<td><button class="prospect-name" onclick="prospectsOpen(\'' + r.id + '\')">' + prospectsEscape(r.name) + '</button>' +
           '<div class="prospect-meta">' + prospectsEscape(r.segment) + '</div><div class="prospect-meta">' + prospectsEscape([r.region, r.city].filter(Boolean).join(' · ')) + '</div></td>' +
           '<td><div>' + (r.email ? prospectsEscape(r.email) : '<span class="prospect-missing">Почта не найдена</span>') + '</div><div>' +
           (/^\+\d{11,15}$/.test(firstPhone) ? '<a href="tel:' + firstPhone + '">' + prospectsEscape(firstPhone) + '</a>' : prospectsEscape(firstPhone || 'Телефон не найден')) + '</div>' +
@@ -125,7 +127,8 @@ async function prospectsOpen(id) {
           const label = key === 'stage' ? dict.stages[value] : key === 'consent' ? dict.consents[value] : key === 'qualification' ? PROSPECT_QUALIFICATIONS[value] : value;
           return prospectsEscape(PROSPECT_LABELS[key] || key) + ': ' + prospectsEscape(label || '—');
         }).join('<br>') + '</p>';
-      }).join('') : '<p>Пока нет изменений</p>') + '</details>';
+      }).join('') : '<p>Пока нет изменений</p>') + '</details><div id="prospect-campaign-history"></div>';
+    if (typeof campaignsLoadHistory === 'function') campaignsLoadHistory(id, seq);
   } catch (e) { if (seq === _prospects.detailRequest) root.innerHTML = '<button class="btn btn-secondary" onclick="prospectsClose()">← К базе</button><p>' + prospectsEscape(e.message) + '</p>'; }
 }
 async function prospectsSave(event) {
