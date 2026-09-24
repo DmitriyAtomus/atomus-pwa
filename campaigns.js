@@ -12,6 +12,51 @@ var CAMPAIGN_TEMPLATES = {
   followup: { label: 'Повторное обращение — если нет ответа', subject: 'Актуален ли для вас расчёт климата для камеры созревания?', body: 'Добрый день, {{contact}}!\n\nВозвращаюсь к предложению по климатическому оборудованию для камеры созревания.\n\nПодскажите, пожалуйста, что для вас сейчас актуальнее: новая камера, модернизация существующей или пока нет такой задачи?\n\nЕсли вопрос ведёт другой специалист, буду благодарен, если подскажете, к кому обратиться.' }
 };
 
+var _campaignPollTimer = null;
+function campaignsStopPolling() { clearTimeout(_campaignPollTimer); _campaignPollTimer = null; }
+function campaignsPollLater() {
+  campaignsStopPolling();
+  if (!_campaigns.current) return;
+  const id = _campaigns.current.id, seq = _campaigns.seq;
+  _campaignPollTimer = setTimeout(() => campaignsPoll(id, seq), 10000);
+}
+async function campaignsPoll(id, seq) {
+  const panel = document.getElementById('campaigns-panel');
+  if (seq !== _campaigns.seq || !_campaigns.current || _campaigns.current.id !== id || !panel || panel.hidden) return;
+  try {
+    if (_campaigns.busy || document.hidden || (document.activeElement && document.activeElement.tagName === 'SELECT' && panel.contains(document.activeElement))) return;
+    const c = await campaignsRequest('/' + id);
+    if (seq !== _campaigns.seq || !_campaigns.current || _campaigns.current.id !== id || panel.hidden) return;
+    // Never replace edits in a draft. A server-side launch must switch stale editors to the report.
+    if (c.status !== 'draft') {
+      const changed = _campaigns.draft || JSON.stringify(c) !== JSON.stringify(_campaigns.current);
+      _campaigns.current = c; _campaigns.draft = null;
+      if (changed) campaignsReport(c);
+    }
+    const status = document.getElementById('campaign-live-update');
+    if (status) status.textContent = 'Обновлено ' + new Date().toLocaleTimeString('ru-RU') + ' · обновляем каждые 10 секунд';
+  } catch (_) {
+    if (seq !== _campaigns.seq || !_campaigns.current || _campaigns.current.id !== id || panel.hidden) return;
+    const status = document.getElementById('campaign-live-update');
+    if (status) status.textContent = 'Не удалось обновить статус. Повторим автоматически; отправка продолжается на сервере.';
+  } finally {
+    if (seq === _campaigns.seq && _campaigns.current && _campaigns.current.id === id && !panel.hidden) campaignsPollLater();
+  }
+}
+function campaignsProgress(c) {
+  const r = c.recipients || [], total = r.length;
+  const queued = r.filter(v => v.state === 'queued').length;
+  const sending = r.filter(v => v.state === 'sending').length;
+  const sent = r.filter(v => v.provider_id).length;
+  const failed = r.filter(v => ['failed', 'unknown'].includes(v.state)).length;
+  const delivered = r.filter(v => v.events.includes('delivered')).length;
+  const bounced = r.filter(v => v.events.includes('bounced')).length;
+  const done = total - queued - sending;
+  const scheduled = c.status === 'running' && c.scheduled_at * 1000 > Date.now();
+  const title = scheduled ? 'Отправка запланирована' : ({running:'Идёт отправка',paused:'Отправка на паузе',completed:'Отправка завершена',cancelled:'Рассылка остановлена'}[c.status] || 'Статус рассылки');
+  return '<div class="campaign-progress" role="status" aria-live="polite"><div class="campaign-progress-top"><strong>' + title + '</strong><span>' + sent + ' из ' + total + ' передано сервису</span></div><progress max="' + Math.max(1,total) + '" value="' + done + '" aria-label="Обработано писем"></progress><p>В очереди: <b>' + queued + '</b> · Отправляется: <b>' + sending + '</b> · Доставлено: <b>' + delivered + '</b> · Возвраты: <b>' + bounced + '</b> · Ошибки / нужна проверка: <b>' + failed + '</b></p><small>' + (scheduled ? 'Начало: ' + new Date(c.scheduled_at * 1000).toLocaleString('ru-RU') : c.status === 'running' ? 'Можно закрыть страницу — отправка продолжится на сервере.' : 'Статусы доставки могут поступать позже.') + '</small><small id="campaign-live-update">Обновляем статус каждые 10 секунд</small></div>';
+}
+
 function campaignsEscape(v) { return escapeHtml(String(v == null ? '' : v)); }
 async function campaignsRequest(path, method, body) {
   const headers = { Authorization: 'Bearer ' + localStorage.getItem(TOKEN_KEY) };
@@ -65,13 +110,13 @@ function campaignsPanel() {
 function campaignsClose() {
   if (_campaigns.busy) return;
   if (_campaigns.draft && !confirm('Закрыть редактор? Несохранённые изменения будут потеряны.')) return;
-  ++_campaigns.seq; _campaigns.draft = null;
+  campaignsStopPolling(); ++_campaigns.seq; _campaigns.draft = null;
   document.getElementById('campaigns-panel').hidden = true;
   document.getElementById('prospects-overview').hidden = false;
 }
 async function campaignsList() {
   if (_campaigns.draft && !confirm('Перейти к списку? Несохранённые изменения будут потеряны.')) return;
-  const seq = ++_campaigns.seq; const panel = campaignsPanel();
+  campaignsStopPolling(); const seq = ++_campaigns.seq; const panel = campaignsPanel();
   panel.innerHTML = '<p>Загружаем рассылки…</p>';
   try {
     const data = await campaignsRequest(''); if (seq !== _campaigns.seq) return;
@@ -87,14 +132,14 @@ async function campaignsNew() {
   if (_campaigns.draft && !confirm('Открыть новый черновик? Несохранённые изменения будут потеряны.')) return;
   await campaignsRun(async function () {
     const data = await campaignsRequest(''); _campaigns.materials = data.materials; _campaigns.config = data;
-    _campaigns.current = null;
+    campaignsStopPolling(); ++_campaigns.seq; _campaigns.current = null;
     _campaigns.draft = { name: 'Сыроварни — ' + new Date().toLocaleDateString('ru-RU'), subject: CAMPAIGN_TEMPLATES.new.subject, body: CAMPAIGN_TEMPLATES.new.body, signature: CAMPAIGN_SIGNATURE, recipient_ids: [..._campaigns.selected], materials: [] };
     _campaigns.step = 0; campaignsEditor();
   });
 }
 async function campaignsOpen(id) {
   if (_campaigns.draft && !confirm('Открыть рассылку? Несохранённые изменения будут потеряны.')) return;
-  const seq = ++_campaigns.seq;
+  campaignsStopPolling(); const seq = ++_campaigns.seq;
   const panel = campaignsPanel(); panel.innerHTML = '<p>Загружаем…</p>';
   try {
     const result = await Promise.all([campaignsRequest('/' + id), campaignsRequest('')]);
@@ -102,6 +147,7 @@ async function campaignsOpen(id) {
     const c = result[0]; _campaigns.current = c; _campaigns.config = result[1]; _campaigns.materials = result[1].materials;
     if (c.status === 'draft' && canManageSales()) { _campaigns.draft = JSON.parse(JSON.stringify(c.draft)); _campaigns.step = 0; campaignsEditor(); }
     else { _campaigns.draft = null; campaignsReport(c); }
+    campaignsPollLater();
   } catch (e) { panel.innerHTML = '<button class="btn btn-secondary" onclick="campaignsList()">К рассылкам</button><p>' + campaignsEscape(e.message) + '</p>'; }
 }
 function campaignsEditor() {
@@ -184,6 +230,7 @@ async function campaignsSave() {
   // Editing local draft must never mutate the saved comparison snapshot.
   _campaigns.draft = JSON.parse(JSON.stringify(_campaigns.current.draft));
   const el = document.getElementById('campaign-save-status'); if (el) el.textContent = 'Черновик сохранён';
+  campaignsPollLater();
   return _campaigns.current;
 }
 async function campaignsTest() {
@@ -208,7 +255,7 @@ async function campaignsLaunch() {
 function campaignsReport(c) {
   const r = c.recipients;
   const metrics = [[r.length, 'получателей'], [r.filter(v => v.provider_id).length, 'передано сервису'], [r.filter(v => v.events.includes('delivered')).length, 'доставлено'], [r.filter(v => v.events.includes('opened')).length, 'открытия ≈'], [r.filter(v => v.events.includes('clicked')).length, 'переходы ≈'], [r.filter(v => v.events.includes('downloaded')).length, 'скачали буклет ≈'], [r.filter(v => v.lead_contact).length, 'заявки'], [r.filter(v => v.outcome === 'won').length, 'заказы']];
-  campaignsPanel().innerHTML = '<div class="campaign-head"><div><h2>' + campaignsEscape(c.draft.name) + '</h2><p>' + CAMPAIGN_STATES[c.status] + (c.scheduled_at ? ' · ' + new Date(c.scheduled_at * 1000).toLocaleString('ru-RU') : '') + '</p></div><button class="btn btn-secondary" onclick="campaignsList()">К рассылкам</button></div><div class="campaign-toolbar"><button class="btn btn-secondary" onclick="campaignsOpen(\'' + c.id + '\')">Обновить результаты</button>' + (canManageSales() ? ((c.status === 'running' ? '<button class="btn btn-secondary" onclick="campaignsAction(\'pause\')">Пауза</button>' : '') + (c.status === 'paused' ? '<button class="btn btn-primary" onclick="campaignsAction(\'resume\')">Продолжить</button>' : '') + (['running', 'paused'].includes(c.status) ? '<button class="btn btn-secondary" onclick="campaignsAction(\'cancel\')">Остановить оставшиеся</button>' : '')) : '') + '</div><div class="campaign-kpis">' + metrics.map(v => '<div class="prospect-kpi"><b>' + v[0] + '</b><span>' + v[1] + '</span></div>').join('') + '</div><p class="campaign-muted">Доставка означает приём почтовым сервером. Открытия, переходы и скачивания учитываются CRM и могут включать автоматические проверки. Блокировка изображений скрывает часть открытий. Ответы, КП и заказы отмечаются менеджером; заявки из формы — автоматически. Пауза не отзывает письмо, уже переданное сервису.</p><div class="campaign-audience-scroll"><table class="prospect-table"><thead><tr><th>Предприятие</th><th>Письмо</th><th>Заявка / результат</th></tr></thead><tbody>' + r.map(v => '<tr><td><b>' + campaignsEscape(v.name) + '</b><br>' + campaignsEscape(v.email) + '</td><td>' + campaignsEscape(CAMPAIGN_MESSAGE_STATES[v.state]) + '<br><small>' + campaignsEscape(v.events.map(x => ({ delivered: 'Доставлено', opened: 'Открытие ≈', clicked: 'Переход ≈', downloaded: 'Скачивание буклета ≈', bounced: 'Возврат', complained: 'Жалоба', failed: 'Ошибка', sent: 'Отправлено', delivery_delayed: 'Задержка', suppressed: 'Заблокировано' }[x] || x)).join(' · ')) + '</small><br>' + campaignsEscape(v.error) + '</td><td>' + (v.lead_contact ? '<b>Заявка: ' + campaignsEscape(v.lead_need) + '</b><p>' + campaignsEscape([v.lead_contact, v.dimensions, v.climate].filter(Boolean).join(' · ')) + '</p>' + (v.filename ? '<button class="btn btn-secondary" onclick="campaignsDownload(\'' + v.id + '\')">Скачать файл</button>' : '') + '<small>' + campaignsEscape(v.task_id ? 'Задача №' + v.task_id : v.task_error || 'Создаём задачу…') + '</small>' : '') + (canManageSales() ? '<select aria-label="Результат по ' + campaignsEscape(v.name) + '" onchange="campaignsOutcome(\'' + v.id + '\',this.value)">' + Object.keys(CAMPAIGN_OUTCOMES).map(k => '<option value="' + k + '"' + (k === v.outcome ? ' selected' : '') + '>' + CAMPAIGN_OUTCOMES[k] + '</option>').join('') + '</select>' : campaignsEscape(CAMPAIGN_OUTCOMES[v.outcome])) + '</td></tr>').join('') + '</tbody></table></div>';
+  campaignsPanel().innerHTML = '<div class="campaign-head"><div><h2>' + campaignsEscape(c.draft.name) + '</h2><p>' + CAMPAIGN_STATES[c.status] + (c.scheduled_at ? ' · ' + new Date(c.scheduled_at * 1000).toLocaleString('ru-RU') : '') + '</p></div><button class="btn btn-secondary" onclick="campaignsList()">К рассылкам</button></div><div class="campaign-toolbar"><button class="btn btn-secondary" onclick="campaignsOpen(\'' + c.id + '\')">Обновить результаты</button>' + (canManageSales() ? ((c.status === 'running' ? '<button class="btn btn-secondary" onclick="campaignsAction(\'pause\')">Пауза</button>' : '') + (c.status === 'paused' ? '<button class="btn btn-primary" onclick="campaignsAction(\'resume\')">Продолжить</button>' : '') + (['running', 'paused'].includes(c.status) ? '<button class="btn btn-secondary" onclick="campaignsAction(\'cancel\')">Остановить оставшиеся</button>' : '')) : '') + '</div>' + campaignsProgress(c) + '<div class="campaign-kpis">' + metrics.map(v => '<div class="prospect-kpi"><b>' + v[0] + '</b><span>' + v[1] + '</span></div>').join('') + '</div><p class="campaign-muted">Доставка означает приём почтовым сервером. Открытия, переходы и скачивания учитываются CRM и могут включать автоматические проверки. Блокировка изображений скрывает часть открытий. Ответы, КП и заказы отмечаются менеджером; заявки из формы — автоматически. Пауза не отзывает письмо, уже переданное сервису.</p><div class="campaign-audience-scroll"><table class="prospect-table"><thead><tr><th>Предприятие</th><th>Письмо</th><th>Заявка / результат</th></tr></thead><tbody>' + r.map(v => '<tr><td><b>' + campaignsEscape(v.name) + '</b><br>' + campaignsEscape(v.email) + '</td><td>' + campaignsEscape(CAMPAIGN_MESSAGE_STATES[v.state]) + '<br><small>' + campaignsEscape(v.events.map(x => ({ delivered: 'Доставлено', opened: 'Открытие ≈', clicked: 'Переход ≈', downloaded: 'Скачивание буклета ≈', bounced: 'Возврат', complained: 'Жалоба', failed: 'Ошибка', sent: 'Отправлено', delivery_delayed: 'Задержка', suppressed: 'Заблокировано' }[x] || x)).join(' · ')) + '</small><br>' + campaignsEscape(v.error) + '</td><td>' + (v.lead_contact ? '<b>Заявка: ' + campaignsEscape(v.lead_need) + '</b><p>' + campaignsEscape([v.lead_contact, v.dimensions, v.climate].filter(Boolean).join(' · ')) + '</p>' + (v.filename ? '<button class="btn btn-secondary" onclick="campaignsDownload(\'' + v.id + '\')">Скачать файл</button>' : '') + '<small>' + campaignsEscape(v.task_id ? 'Задача №' + v.task_id : v.task_error || 'Создаём задачу…') + '</small>' : '') + (canManageSales() ? '<select aria-label="Результат по ' + campaignsEscape(v.name) + '" onchange="campaignsOutcome(\'' + v.id + '\',this.value)">' + Object.keys(CAMPAIGN_OUTCOMES).map(k => '<option value="' + k + '"' + (k === v.outcome ? ' selected' : '') + '>' + CAMPAIGN_OUTCOMES[k] + '</option>').join('') + '</select>' : campaignsEscape(CAMPAIGN_OUTCOMES[v.outcome])) + '</td></tr>').join('') + '</tbody></table></div>';
 }
 async function campaignsAction(action) {
   await campaignsRun(async function () {

@@ -14,7 +14,7 @@ function harness() {
     window: { addEventListener() {} }, document: { getElementById: node, querySelectorAll: () => [] },
     escapeHtml: v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
     localStorage: { getItem: () => 'test-token' }, API_BASE: '', TOKEN_KEY: 'token',
-    URL, URLSearchParams, FormData, setTimeout, confirm: () => true, canManageSales: () => true, showToast() {},
+    URL, URLSearchParams, FormData, setTimeout: () => 1, clearTimeout() {}, confirm: () => true, canManageSales: () => true, showToast() {},
   });
   vm.runInContext(source, ctx);
   return { ctx, node };
@@ -65,4 +65,40 @@ test('failed API response is surfaced and authorization accompanies requests', a
   ctx.fetch=async(url,opts)=>{options=opts;return {ok:false,text:async()=>JSON.stringify({message:'Нет прав'})}};
   await assert.rejects(ctx.campaignsRequest('/preview','POST',draft()),/Нет прав/);
   assert.equal(options.headers.Authorization,'Bearer test-token');assert.equal(options.cache,'no-store');
+});
+
+test('poll transitions launched draft to report without sending and preserves unsent edits', async () => {
+  const {ctx}=harness();
+  ctx._campaigns.current={id:'a',status:'draft',draft:draft()};ctx._campaigns.draft=draft();
+  ctx._campaigns.draft.body='unsaved edit';
+  let rendered=0;ctx.campaignsReport=()=>rendered++;
+  ctx.campaignsRequest=async(path,method)=>{assert.equal(method,undefined);return {id:'a',status:'draft',draft:draft()};};
+  await ctx.campaignsPoll('a',0);
+  assert.equal(ctx._campaigns.draft.body,'unsaved edit');assert.equal(rendered,0);
+  ctx.campaignsRequest=async()=>({id:'a',status:'running',recipients:[]});
+  await ctx.campaignsPoll('a',0);
+  assert.equal(ctx._campaigns.draft,null);assert.equal(rendered,1);
+});
+
+test('late polling result cannot reopen a closed report', async () => {
+  const {ctx,node}=harness();ctx._campaigns.current={id:'a'};
+  let resolve;ctx.campaignsRequest=()=>new Promise(r=>resolve=r);
+  let rendered=false;ctx.campaignsReport=()=>{rendered=true};
+  const pending=ctx.campaignsPoll('a',0);ctx.campaignsClose();
+  resolve({id:'a',status:'running'});await pending;
+  assert.equal(rendered,false);assert.equal(node('campaigns-panel').hidden,true);
+});
+
+test('progress separates sent, queued, returned and failed mail', () => {
+  const {ctx}=harness();
+  const result=ctx.campaignsProgress({status:'running',recipients:[
+    {state:'sent',provider_id:'one',events:['sent','bounced']},
+    {state:'queued',events:[]},{state:'failed',events:[]}
+  ]});
+  assert.match(result,/Идёт отправка/);assert.match(result,/1 из 3/);
+  assert.match(result,/В очереди: <b>1/);assert.match(result,/Возвраты: <b>1/);
+  assert.match(result,/Ошибки \/ нужна проверка: <b>1/);
+  assert.match(ctx.campaignsProgress({status:'paused',recipients:[]}),/на паузе/);
+  assert.match(ctx.campaignsProgress({status:'completed',recipients:[]}),/завершена/);
+  assert.match(ctx.campaignsProgress({status:'running',scheduled_at:Date.now()/1000+3600,recipients:[]}),/запланирована/);
 });
