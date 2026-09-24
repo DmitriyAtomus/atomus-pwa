@@ -109,7 +109,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.233";
+const APP_VERSION = "v2.46.234";
 const APP_VERSION_DATE = "16.09.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -365,6 +365,15 @@ function formatApiErrorMessage(value, fallback) {
   return fallback === undefined ? 'Ошибка' : String(fallback);
 }
 
+let _sessionGoneShown = false;
+function sessionGone() {
+  if (_sessionGoneShown) return;
+  _sessionGoneShown = true;
+  try { showToast('Сессия закончилась — войдите заново', 'error'); } catch (e) {}
+  setTimeout(() => { _sessionGoneShown = false; }, 5000);
+  if (typeof logout === 'function') logout();
+}
+
 async function apiPost(path, body) {
   const token = localStorage.getItem(TOKEN_KEY);
   const headers = { 'Content-Type': 'application/json' };
@@ -378,7 +387,7 @@ async function apiPost(path, body) {
 // v2.19.1: PATCH-хелпер — возвращает чистый JSON-объект (как apiGet) для удобства
 async function apiPatch(path, body) {
   const token = localStorage.getItem(TOKEN_KEY);
-  if (!token) throw new Error('Нет токена');
+  if (!token) { sessionGone(); throw new Error('Сессия закончилась'); }
   const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
   const response = await fetch(API_BASE + path, {
     method: 'PATCH', headers, body: JSON.stringify(body || {}),
@@ -400,7 +409,7 @@ async function apiPatch(path, body) {
 
 async function apiGet(path) {
   const token = localStorage.getItem(TOKEN_KEY);
-  if (!token) throw new Error('Нет токена');
+  if (!token) { sessionGone(); throw new Error('Сессия закончилась'); }
   // v2.43.21: cache: 'no-store' обходит браузерный/SW кэш без дополнительных
   // заголовков (которые ломали CORS preflight).
   const response = await fetch(API_BASE + path, {
@@ -420,7 +429,7 @@ async function apiGet(path) {
 
 async function apiDelete(path, body) {
   const token = localStorage.getItem(TOKEN_KEY);
-  if (!token) throw new Error('Нет токена');
+  if (!token) { sessionGone(); throw new Error('Сессия закончилась'); }
   const opts = {
     method: 'DELETE',
     headers: { 'Authorization': 'Bearer ' + token },
@@ -709,6 +718,56 @@ async function testAlerts() {
     showToast('Ошибка отправки', 'error');
   }
 }
+
+// ============ СЕССИЯ: живёт, пока ею пользуются (v2.46.234) ============
+// Токен выдавался на 30 дней от входа и умирал молча: человек сидел в CRM,
+// а первый же запрос падал «Нет токена». Теперь токен продлевается сам,
+// а вкладки договариваются между собой — зомби-вкладок без токена не остаётся.
+const SESSION_RENEW_MS = 6 * 60 * 60 * 1000;   // раз в 6 часов достаточно
+let _sessionRenewTimer = null;
+
+async function renewSession() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return false;
+  try {
+    const response = await fetch(API_BASE + '/api/auth/refresh', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!response.ok) return false;
+    const data = await response.json().catch(() => ({}));
+    if (data && data.token) {
+      localStorage.setItem(TOKEN_KEY, data.token);
+      if (data.user) state.user = data.user;
+      return true;
+    }
+  } catch (e) { /* нет сети — просто пробуем позже */ }
+  return false;
+}
+
+function startSessionRenew() {
+  if (_sessionRenewTimer) return;
+  renewSession();
+  _sessionRenewTimer = setInterval(renewSession, SESSION_RENEW_MS);
+  // вернулись к вкладке после ночи — продлеваем сразу, не дожидаясь таймера
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) renewSession();
+  });
+}
+
+// Токен один на все вкладки: вышел в одной — остальные не должны
+// притворяться работающими; вошёл в одной — остальные подхватывают.
+window.addEventListener('storage', (event) => {
+  if (event.key !== TOKEN_KEY) return;
+  const appVisible = document.getElementById('app')?.style.display !== 'none';
+  if (!event.newValue && appVisible) {
+    showToast('Сессия закрыта в другой вкладке', 'info');
+    logout();
+  } else if (event.newValue && !appVisible) {
+    location.reload();
+  }
+});
 
 function logout() {
   localStorage.removeItem(TOKEN_KEY);
@@ -1309,6 +1368,7 @@ function showApp() {
       _showWelcomeIfFresh();
       startNotifPolling();  // v2.19.0
       startAutoRefresh();   // v1.8.763
+      startSessionRenew();  // v2.46.234
       setTimeout(function () { if (typeof _maybeMorningProgress === 'function') _maybeMorningProgress(); }, 800);  // v2.45.358
     })
       .catch(() => logout());
@@ -1319,6 +1379,7 @@ function showApp() {
     _showWelcomeIfFresh();
     startNotifPolling();  // v2.19.0
     startAutoRefresh();   // v1.8.763
+    startSessionRenew();  // v2.46.234
     setTimeout(function () { if (typeof _maybeMorningProgress === 'function') _maybeMorningProgress(); }, 800);  // v2.45.358
   }
 }
