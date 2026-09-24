@@ -24595,6 +24595,9 @@ function _adsSettingsHtml(st, collapsible) {
     '<label class="ads-f"><span>OAuth-токен Яндекса</span>' +
       (st.token_set ? '<small class="ads-ok">токен сохранён ✓ — чтобы заменить, вставьте новый</small>' : '<small>доступ к Директу и Метрике; после сохранения токен не показывается</small>') +
       '<input type="password" class="form-input" id="ads-token" autocomplete="new-password" spellcheck="false" placeholder="' + (st.token_set ? 'новый токен (необязательно)' : 'вставьте токен') + '"></label>' +
+    '<label class="ads-f"><span>OAuth-токен Яндекс Вебмастера</span>' +
+      (st.webmaster_token_set ? '<small class="ads-ok">токен сохранён ✓ — чтобы заменить, вставьте новый</small>' : '<small>нужен, чтобы в утренней и вечерней сводке были показы и места сайта в поиске; выпускается под аккаунтом, где сайт добавлен в Вебмастер</small>') +
+      '<input type="password" class="form-input" id="ads-wm-token" autocomplete="new-password" spellcheck="false" placeholder="' + (st.webmaster_token_set ? 'новый токен (необязательно)' : 'вставьте токен Вебмастера') + '"></label>' +
     '<label class="ads-f"><span>Логин клиента в Директе</span><small>для агентского аккаунта, необязательно</small>' +
       '<input type="text" class="form-input" id="ads-login" autocomplete="off" value="' + _adsAttr(st.client_login || '') + '"></label>' +
     // auto_apply по умолчанию true: галка «спрашивать» — обратная, стоит только при auto_apply === false
@@ -24612,6 +24615,8 @@ async function adsSaveSettings() {
   const body = {};
   const tok = g('ads-token') ? g('ads-token').value.trim() : '';
   if (tok) body.token = tok;
+  const wmTok = g('ads-wm-token') ? g('ads-wm-token').value.trim() : '';
+  if (wmTok) body.webmaster_token = wmTok;
   if (g('ads-login')) body.client_login = g('ads-login').value.trim();
   if (g('ads-ask')) body.auto_apply = !g('ads-ask').checked;
   if (g('ads-suspend') && g('ads-suspend').value !== '') { const n = parseInt(g('ads-suspend').value, 10); if (!isNaN(n) && n >= 0) body.suspend_spend_rub = n; }
@@ -24622,7 +24627,8 @@ async function adsSaveSettings() {
   if (btn) btn.disabled = false;
   if (r.ok && r.data.ok) {
     if (g('ads-token')) g('ads-token').value = '';
-    showToast(tok ? 'Токен сохранён' : 'Настройки сохранены', 'success');
+    if (g('ads-wm-token')) g('ads-wm-token').value = '';
+    showToast((tok || wmTok) ? 'Токен сохранён' : 'Настройки сохранены', 'success');
     if (_ads.data && r.data.settings) _ads.data.settings = r.data.settings;
     _ads.settingsOpen = true;
     loadSitesAds();   // после токена меняется configured — перерисовываем всё
