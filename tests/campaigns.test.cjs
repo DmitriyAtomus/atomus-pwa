@@ -115,3 +115,21 @@ test('daily quota waiting displays automatic retry without overriding pause', ()
   assert.match(ctx.campaignsProgress({...campaign,status:'paused'}),/Отправка на паузе/);
   assert.doesNotMatch(ctx.campaignsProgress({...campaign,status:'paused'}),/Автоматическая повторная попытка/);
 });
+
+
+test('bulk consent records current selection then refreshes audience without sending', async () => {
+  const {ctx,node}=harness();ctx._campaigns.draft=draft();
+  node('campaign-consent-basis').value='При встрече согласились';node('campaign-consent-date').value='2026-01-01';
+  let refreshed=0,requests=0;ctx.campaignsAudience=async()=>refreshed++;
+  ctx.campaignsRequest=async(path,method,body)=>{
+    requests++;assert.equal(path,'/bulk-consent');assert.equal(method,'POST');
+    assert.deepEqual(Array.from(body.recipient_ids),['ATM-ONE']);
+    assert.equal(body.basis,'При встрече согласились');assert.equal(body.date,'2026-01-01');
+    return {updated:1,skipped:0};
+  };
+  await ctx.campaignsBulkConsent();
+  assert.equal(requests,1);assert.equal(refreshed,1);assert.equal(node('campaign-consent').hidden,true);
+  assert.match(node('campaign-consent-result').textContent,/зафиксировано: 1/);
+  node('campaign-consent-basis').value='';
+  await assert.rejects(ctx.campaignsBulkConsent(),/основание и дату/);assert.equal(requests,1);
+});
