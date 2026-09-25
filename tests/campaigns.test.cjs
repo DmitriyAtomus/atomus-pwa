@@ -133,3 +133,30 @@ test('bulk consent records current selection then refreshes audience without sen
   node('campaign-consent-basis').value='';
   await assert.rejects(ctx.campaignsBulkConsent(),/основание и дату/);assert.equal(requests,1);
 });
+
+
+test('launch uses visible confirmation even when browser dialogs are blocked', async () => {
+  const {ctx,node}=harness();ctx.confirm=()=>{throw Error('Native confirm must not be used')};
+  ctx._campaigns.draft=draft();ctx._campaigns.config={blockers:[],sender:'orders@example.org'};
+  ctx._campaigns.preview={included:[{email:'one@example.org'}]};
+  ctx.campaignsSave=async()=>({id:'a',revision:1,tested_revision:1});ctx.campaignsAudience=async()=>{};
+  let launches=0,opened=0;ctx.campaignsOpen=async()=>opened++;
+  ctx.campaignsRequest=async(path,method,body)=>{assert.equal(path,'/a/launch');assert.equal(body.confirm,true);launches++};
+  await ctx.campaignsLaunch();assert.equal(launches,0);assert.equal(node('campaign-launch-confirm').hidden,false);
+  assert.match(node('campaign-launch-confirm').innerHTML,/Запустить рассылку/);
+  await ctx.campaignsConfirmLaunch();assert.equal(launches,1);assert.equal(opened,1);
+});
+
+test('changed audience requires fresh visible confirmation and errors persist', async () => {
+  const {ctx,node}=harness();ctx._campaigns.draft=draft();ctx._campaigns.config={blockers:[],sender:'orders@example.org'};
+  ctx._campaigns.preview={included:[{email:'one@example.org'}]};
+  ctx.campaignsSave=async()=>({id:'a',revision:1,tested_revision:1});ctx.campaignsAudience=async()=>{};
+  let launches=0;ctx.campaignsRequest=async()=>launches++;
+  await ctx.campaignsLaunch();ctx._campaigns.preview.included.push({email:'two@example.org'});
+  await ctx.campaignsConfirmLaunch();assert.equal(launches,0);
+  assert.match(node('campaign-launch-confirm').innerHTML,/2 адресов/);
+  ctx.campaignsSave=async()=>{throw Error('Сервер недоступен')};
+  await ctx.campaignsRun(ctx.campaignsConfirmLaunch);
+  assert.equal(node('campaign-launch-status').textContent,'Сервер недоступен');
+  assert.equal(ctx._campaigns.busy,false);
+});
