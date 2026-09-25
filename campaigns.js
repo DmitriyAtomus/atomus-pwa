@@ -72,7 +72,12 @@ async function campaignsRequest(path, method, body) {
   }
   return response.json();
 }
-function campaignsError(e) { showToast(e.message || 'Ошибка рассылки', 'error'); }
+function campaignsError(e) {
+  const message = e.message || 'Ошибка рассылки';
+  const status = document.getElementById('campaign-launch-status');
+  if (status) status.textContent = message;
+  showToast(message, 'error');
+}
 async function campaignsRun(fn) {
   if (_campaigns.busy) return;
   _campaigns.busy = true;
@@ -160,7 +165,7 @@ function campaignsEditor() {
     '<section data-campaign-step="0"><h3>Выбрано производств: ' + d.recipient_ids.length + '</h3><p>Проверим адреса, дубли, согласие и предыдущие отказы. На одно предприятие — один основной адрес.</p><button class="btn btn-secondary" onclick="campaignsRun(campaignsAudience)">Проверить получателей</button><button class="btn btn-secondary" type="button" onclick="campaignsConsentToggle()">Массовое действие</button><div id="campaign-consent" class="campaign-notice" hidden><h3>Зафиксировать согласие для выбранных</h3><p>Укажите общее основание только для предприятий, которые согласились получать ваши письма. Уже записанные согласия, отказы и отписки не изменятся.</p><label for="campaign-consent-basis">Основание согласия</label><textarea id="campaign-consent-basis" class="form-input" rows="3" maxlength="5000" placeholder="Например: при встрече согласились получить буклет и предложение по email"></textarea><label for="campaign-consent-date">Дата согласия</label><input id="campaign-consent-date" class="form-input" type="date"><p>Если точная дата общения неизвестна, укажите дату фиксации и поясните это в основании.</p><button type="button" class="btn btn-primary" onclick="campaignsRun(campaignsBulkConsent)">Зафиксировать для выбранных</button><button type="button" class="btn btn-secondary" onclick="campaignsConsentToggle()">Закрыть</button></div><p id="campaign-consent-result" role="status"></p><div id="campaign-audience"></div></section>' +
     '<section data-campaign-step="1" hidden><h3>Материалы</h3><p>PDF до 5 МБ. До трёх материалов в одном письме.</p><label class="campaign-upload">Загрузить PDF<input type="file" accept="application/pdf,.pdf" onchange="campaignsUpload(this)"></label><div id="campaign-materials"></div></section>' +
     '<section data-campaign-step="2" hidden><div class="campaign-section-heading"><h3>Письмо для ваших клиентов</h3><p>Выберите готовый шаблон и адаптируйте его под задачу получателей.</p></div><div class="campaign-fields"><label>Название рассылки<input id="campaign-name" maxlength="150" value="' + campaignsEscape(d.name) + '"></label><label>Шаблон<select onchange="campaignsTemplate(this.value)"><option value="">Выбрать шаблон…</option>' + Object.keys(CAMPAIGN_TEMPLATES).map(k => '<option value="' + k + '">' + CAMPAIGN_TEMPLATES[k].label + '</option>').join('') + '</select></label><label class="wide">Тема<input id="campaign-subject" maxlength="200" value="' + campaignsEscape(d.subject) + '"></label><label class="wide">Текст письма<textarea id="campaign-body" rows="11" maxlength="10000">' + campaignsEscape(d.body) + '</textarea></label><label class="wide">Подпись<textarea id="campaign-signature" rows="5" maxlength="1000">' + campaignsEscape(d.signature) + '</textarea></label></div><p class="campaign-muted">Подстановки: {{company}} — предприятие, {{contact}} — контактное лицо (или «коллеги»). Кнопка расчёта и отказ от рассылки добавляются автоматически.</p></section>' +
-    '<section data-campaign-step="3" hidden><div class="campaign-notice">Отправитель: ' + campaignsEscape(_campaigns.config.sender) + '<br>Ответы: ' + campaignsEscape(_campaigns.config.reply_to) + '</div><div id="campaign-review"></div><div class="campaign-fields"><label>Адрес для теста<input id="campaign-test-to" type="email" value="' + campaignsEscape(_campaigns.config.reply_to) + '"></label><label>Отправить по расписанию (ваше местное время)<input id="campaign-schedule" type="datetime-local"></label></div><p>Пустая дата — отправить после запуска. Письма уходят последовательно; запуск требует тестового письма для текущей версии.</p><div class="campaign-toolbar"><button class="btn btn-secondary" onclick="campaignsRun(campaignsTest)">Отправить тест</button><button class="btn btn-primary" onclick="campaignsRun(campaignsLaunch)">Проверить и запустить</button></div><p id="campaign-test-status" role="status"></p></section>' +
+    '<section data-campaign-step="3" hidden><div class="campaign-notice">Отправитель: ' + campaignsEscape(_campaigns.config.sender) + '<br>Ответы: ' + campaignsEscape(_campaigns.config.reply_to) + '</div><div id="campaign-review"></div><div class="campaign-fields"><label>Адрес для теста<input id="campaign-test-to" type="email" value="' + campaignsEscape(_campaigns.config.reply_to) + '"></label><label>Отправить по расписанию (ваше местное время)<input id="campaign-schedule" type="datetime-local"></label></div><p>Пустая дата — отправить после запуска. Письма уходят последовательно; запуск требует тестового письма для текущей версии.</p><div class="campaign-toolbar"><button class="btn btn-secondary" onclick="campaignsRun(campaignsTest)">Отправить тест</button><button class="btn btn-primary" onclick="campaignsRun(campaignsLaunch)">Проверить и запустить</button></div><p id="campaign-test-status" role="status"></p><p id="campaign-launch-status" role="status" aria-live="polite"></p><div id="campaign-launch-confirm" class="campaign-notice" hidden></div></section>' +
     '<div class="campaign-footer"><button class="btn btn-secondary" onclick="campaignsRun(campaignsSave)">Сохранить черновик</button><button id="campaign-next" class="btn btn-primary" onclick="campaignsStep(Math.min(3,_campaigns.step+1))">Следующий шаг →</button><span id="campaign-save-status" role="status"></span></div>';
   campaignsMaterialList(); campaignsShowStep();
   panel.querySelectorAll('#campaign-name,#campaign-subject,#campaign-body,#campaign-signature').forEach(el => el.addEventListener('input', campaignsSync));
@@ -257,7 +262,11 @@ async function campaignsTest() {
   _campaigns.current = await campaignsRequest('/' + c.id);
   document.getElementById('campaign-test-status').textContent = 'Тест передан почтовому сервису. Проверьте письмо в своём ящике.';
 }
-async function campaignsLaunch() {
+async function campaignsLaunch(approved) {
+  const status = document.getElementById('campaign-launch-status');
+  const confirmation = document.getElementById('campaign-launch-confirm');
+  status.textContent = 'Проверяем письмо и получателей…';
+  confirmation.hidden = true;
   const c = await campaignsSave(); await campaignsAudience();
   if (c.tested_revision !== c.revision) throw new Error('Сначала отправьте тест текущей версии письма');
   if (_campaigns.config.blockers.length) throw new Error(_campaigns.config.blockers.join('; '));
@@ -266,10 +275,21 @@ async function campaignsLaunch() {
   const date = document.getElementById('campaign-schedule').value;
   const when = date ? new Date(date).getTime() / 1000 : null;
   if (date && (!Number.isFinite(when) || when < Date.now() / 1000)) throw new Error('Укажите будущую дату отправки');
-  if (!confirm('Запустить рассылку «' + _campaigns.draft.name + '»?\nПолучателей: ' + recipients.length + '\nОтправитель: ' + _campaigns.config.sender + '\nВремя: ' + (date ? new Date(date).toLocaleString('ru-RU') : 'сейчас') + '\n\nПодтверждаю, что тестовое письмо проверено.')) return;
+  const snapshot = JSON.stringify({id:c.id, revision:c.revision, emails:recipients.map(r => r.email), when:when});
+  if (approved !== true || _campaigns.launchSnapshot !== snapshot) {
+    _campaigns.launchSnapshot = snapshot;
+    status.textContent = 'Проверка завершена. Подтвердите запуск ниже.';
+    confirmation.innerHTML = '<h3>Готово к отправке: ' + recipients.length + ' адресов</h3><p>Рассылка: ' + campaignsEscape(_campaigns.draft.name) + '<br>Отправитель: ' + campaignsEscape(_campaigns.config.sender) + '<br>Начало: ' + campaignsEscape(date ? new Date(date).toLocaleString('ru-RU') : 'сейчас, с учётом дневного лимита') + '</p><p>Нажимая кнопку, подтверждаете, что тестовое письмо проверено.</p><button type="button" class="btn btn-primary" onclick="campaignsRun(campaignsConfirmLaunch)">Запустить рассылку</button>';
+    confirmation.hidden = false;
+    if (confirmation.scrollIntoView) confirmation.scrollIntoView({block:'nearest',behavior:'smooth'});
+    return;
+  }
+  _campaigns.launchSnapshot = null;
+  status.textContent = 'Запускаем рассылку… Ожидаем ответ сервера.';
   await campaignsRequest('/' + c.id + '/launch', 'POST', { revision: c.revision, confirm: true, emails: recipients.map(r => r.email), scheduled_at: when });
   _campaigns.draft = null; await campaignsOpen(c.id);
 }
+async function campaignsConfirmLaunch() { await campaignsLaunch(true); }
 function campaignsReport(c) {
   const r = c.recipients;
   const metrics = [[r.length, 'получателей'], [r.filter(v => v.provider_id).length, 'передано сервису'], [r.filter(v => v.events.includes('delivered')).length, 'доставлено'], [r.filter(v => v.events.includes('opened')).length, 'открытия ≈'], [r.filter(v => v.events.includes('clicked')).length, 'переходы ≈'], [r.filter(v => v.events.includes('downloaded')).length, 'скачали буклет ≈'], [r.filter(v => v.lead_contact).length, 'заявки'], [r.filter(v => v.outcome === 'won').length, 'заказы']];
