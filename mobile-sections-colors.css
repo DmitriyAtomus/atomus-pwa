@@ -35,6 +35,7 @@
   text-transform: uppercase;
   letter-spacing: .35px;
 }
+/* По классам (когда JS добавит s-*) */
 .mobile-section-tile.s-home         { --ms-c: #2563EB; --ms-bg: #DBEAFE; }
 .mobile-section-tile.s-production   { --ms-c: #1E40AF; --ms-bg: #E0E7FF; }
 .mobile-section-tile.s-sales        { --ms-c: #7C3AED; --ms-bg: #F3E8FF; }
@@ -47,6 +48,19 @@
 .mobile-section-tile.s-installation { --ms-c: #EA580C; --ms-bg: #FFEDD5; }
 .mobile-section-tile.s-hr           { --ms-c: #2563EB; --ms-bg: #DBEAFE; }
 .mobile-section-tile.s-help         { --ms-c: #64748B; --ms-bg: #F1F5F9; }
+/* Fallback по порядку (если классы ещё не добавлены) */
+.mobile-sections-grid > .mobile-section-tile:nth-child(1)  { --ms-c: #2563EB; --ms-bg: #DBEAFE; }
+.mobile-sections-grid > .mobile-section-tile:nth-child(2)  { --ms-c: #1E40AF; --ms-bg: #E0E7FF; }
+.mobile-sections-grid > .mobile-section-tile:nth-child(3)  { --ms-c: #7C3AED; --ms-bg: #F3E8FF; }
+.mobile-sections-grid > .mobile-section-tile:nth-child(4)  { --ms-c: #16A34A; --ms-bg: #DCFCE7; }
+.mobile-sections-grid > .mobile-section-tile:nth-child(5)  { --ms-c: #0891B2; --ms-bg: #CFFAFE; }
+.mobile-sections-grid > .mobile-section-tile:nth-child(6)  { --ms-c: #0284C7; --ms-bg: #E0F2FE; }
+.mobile-sections-grid > .mobile-section-tile:nth-child(7)  { --ms-c: #475569; --ms-bg: #F1F5F9; }
+.mobile-sections-grid > .mobile-section-tile:nth-child(8)  { --ms-c: #6366F1; --ms-bg: #E0E7FF; }
+.mobile-sections-grid > .mobile-section-tile:nth-child(9)  { --ms-c: #0D9488; --ms-bg: #CCFBF1; }
+.mobile-sections-grid > .mobile-section-tile:nth-child(10) { --ms-c: #EA580C; --ms-bg: #FFEDD5; }
+.mobile-sections-grid > .mobile-section-tile:nth-child(11) { --ms-c: #2563EB; --ms-bg: #DBEAFE; }
+.mobile-sections-grid > .mobile-section-tile:nth-child(12) { --ms-c: #64748B; --ms-bg: #F1F5F9; }
 .mobile-section-tile.active {
   border-color: #60A5FA;
   background: #F0F7FF;
