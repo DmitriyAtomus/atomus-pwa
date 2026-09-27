@@ -1,0 +1,16 @@
+/* site-fix 2026-09-27: header phone + cases + mobile offer */
+.nav-phone a{
+  color:#f3e6c4;
+  font-weight:600;
+  white-space:nowrap;
+}
+.hero-lead--second{opacity:.92}
+.cases{padding:72px 0}
+.cases-grid{display:grid;gap:16px;grid-template-columns:repeat(3,minmax(0,1fr))}
+.case-card{background:#102033;border:1px solid rgba(243,230,196,.16);border-radius:16px;padding:20px}
+@media (max-width:900px){
+  .cases-grid{grid-template-columns:1fr}
+  .hero-offer{overflow:visible}
+  .hero-actions{display:flex;flex-wrap:wrap;gap:10px}
+  .hero-actions .button{flex:1 1 160px}
+}
