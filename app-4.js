@@ -14560,8 +14560,8 @@ function renderSupplyInvoiceDetail(data) {
     html +=   '<div class="si-reco-header">';
     html +=     '<div class="si-reco-icon-big"><i class="ti ti-sparkles"></i></div>';
     html +=     '<div>';
-    html +=       '<div class="si-reco-title">Claude анализирует накладную</div>';
-    html +=       '<div class="si-reco-sub">обычно 15–30 секунд · экран обновится автоматически</div>';
+    html +=       '<div class="si-reco-title">Распознаём документ</div>';
+    html +=       '<div class="si-reco-sub">Время зависит от размера документа · экран обновится автоматически</div>';
     html +=     '</div>';
     html +=   '</div>';
     html +=   '<div class="si-reco-stages">';
