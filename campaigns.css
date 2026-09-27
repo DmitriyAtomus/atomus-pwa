@@ -117,33 +117,64 @@
 }
 .mobile-section-tile:active { transform: scale(.96); }
 
-/* v25.2: редизайн мобильного drawer (шторка раздела)
-   Скоуп только mobile + .drawer-mode. padding-top из app.css не трогаем. */
+/* v25.2.1: редизайн drawer — фикс наложения ленты/поиска на «Обзор».
+   .drw-x — контейнер инжекта (лента + поиск + «Сегодня»), НЕ кнопка закрытия. */
 .app.mobile-layout .sidebar.drawer-mode {
   padding-left: 12px;
   padding-right: 12px;
   padding-bottom: max(22px, env(safe-area-inset-bottom));
 }
-.app.mobile-layout .sidebar.drawer-mode .drawer-close-btn,
-.app.mobile-layout .sidebar.drawer-mode .drw-x {
+.app.mobile-layout .sidebar.drawer-mode .drawer-close-btn {
   width: 36px;
   height: 36px;
   border-radius: 50%;
   background: rgba(255,255,255,.14);
   color: #E8EEF6;
 }
+.app.mobile-layout .sidebar.drawer-mode .drw-x,
+.app.mobile-layout .sidebar.drawer-mode .drw-top {
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+}
+.app.mobile-layout .sidebar.drawer-mode .drw-top {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 4px 12px;
+}
 .app.mobile-layout .sidebar.drawer-mode .drw-secs {
+  display: flex;
   gap: 8px;
-  padding: 4px 44px 12px 0;
+  overflow-x: auto;
+  padding: 2px 44px 8px 0;
+  scrollbar-width: none;
 }
 .app.mobile-layout .sidebar.drawer-mode .drw-sec {
-  width: auto;
-  min-width: 62px;
-  min-height: 36px;
-  padding: 8px 12px 7px;
-  border-radius: 14px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 60px;
+  min-width: 60px;
+  min-height: 0;
+  padding: 8px 2px;
+  border-radius: 12px;
   background: rgba(255,255,255,.08);
   color: #C5D4E6;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+}
+.app.mobile-layout .sidebar.drawer-mode .drw-sec .ti {
+  font-size: 17px;
+  width: auto;
+  height: auto;
+  background: none;
+  border-radius: 0;
 }
 .app.mobile-layout .sidebar.drawer-mode .drw-sec.on {
   background: #fff;
@@ -151,12 +182,26 @@
   box-shadow: 0 2px 8px rgba(0,0,0,.16);
 }
 .app.mobile-layout .sidebar.drawer-mode .drw-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
   background: rgba(255,255,255,.12);
   border: 1px solid rgba(255,255,255,.16);
   border-radius: 14px;
   padding: 11px 14px;
+  color: #8FA6C0;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+.app.mobile-layout .sidebar.drawer-mode .drw-search .ti {
+  width: auto;
+  height: auto;
+  background: none;
+  border-radius: 0;
+  font-size: 14px;
+  color: #8FA6C0;
 }
 .app.mobile-layout .sidebar.drawer-mode .sidebar-title,
 .app.mobile-layout .sidebar.drawer-mode .nav-section-label {
