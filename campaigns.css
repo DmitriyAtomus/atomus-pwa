@@ -116,3 +116,106 @@
   color: #fff;
 }
 .mobile-section-tile:active { transform: scale(.96); }
+
+/* v25.2: редизайн мобильного drawer (шторка раздела)
+   Скоуп только mobile + .drawer-mode. padding-top из app.css не трогаем. */
+.app.mobile-layout .sidebar.drawer-mode {
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-bottom: max(22px, env(safe-area-inset-bottom));
+}
+.app.mobile-layout .sidebar.drawer-mode .drawer-close-btn,
+.app.mobile-layout .sidebar.drawer-mode .drw-x {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.14);
+  color: #E8EEF6;
+}
+.app.mobile-layout .sidebar.drawer-mode .drw-secs {
+  gap: 8px;
+  padding: 4px 44px 12px 0;
+}
+.app.mobile-layout .sidebar.drawer-mode .drw-sec {
+  width: auto;
+  min-width: 62px;
+  min-height: 36px;
+  padding: 8px 12px 7px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.08);
+  color: #C5D4E6;
+}
+.app.mobile-layout .sidebar.drawer-mode .drw-sec.on {
+  background: #fff;
+  color: #1E3A5F;
+  box-shadow: 0 2px 8px rgba(0,0,0,.16);
+}
+.app.mobile-layout .sidebar.drawer-mode .drw-search {
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 14px;
+  padding: 11px 14px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.app.mobile-layout .sidebar.drawer-mode .sidebar-title,
+.app.mobile-layout .sidebar.drawer-mode .nav-section-label {
+  padding: 16px 10px 8px;
+  letter-spacing: .7px;
+}
+.app.mobile-layout .sidebar.drawer-mode .nav-item {
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  border-radius: 12px;
+}
+.app.mobile-layout .sidebar.drawer-mode .nav-item > i:not(.ext-arrow) {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  font-size: 15px;
+  opacity: 1;
+  background: rgba(91,156,255,.16);
+  color: #93C5FD;
+}
+.app.mobile-layout .sidebar.drawer-mode .nav-item[data-nav="home-dashboard"] > i,
+.app.mobile-layout .sidebar.drawer-mode .nav-item[data-nav="dashboard"] > i { background: rgba(59,130,246,.22); color: #93C5FD; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item[data-nav="home-calendar"] > i { background: rgba(139,92,246,.20); color: #C4B5FD; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item[data-nav="planerka"] > i { background: rgba(20,184,166,.18); color: #5EEAD4; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item[data-nav="ideas"] > i { background: rgba(167,139,250,.20); color: #DDD6FE; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item[data-nav="sitechat"] > i { background: rgba(37,99,235,.20); color: #93C5FD; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item[data-nav="devchat"] > i { background: rgba(129,140,248,.20); color: #C7D2FE; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item[data-nav="codex"] > i { background: rgba(6,182,212,.18); color: #67E8F9; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item[data-nav="security"] > i { background: rgba(59,130,246,.18); color: #93C5FD; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item.nav-radio-btn > i { background: rgba(34,197,94,.18); color: #86EFAC; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item .ti-calculator { background: rgba(14,165,233,.18); color: #7DD3FC; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item .ti-message-circle-2 { background: rgba(99,102,241,.18); color: #A5B4FC; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item .ti-mail { background: rgba(234,179,8,.18); color: #FDE68A; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item .ti-cloud { background: rgba(56,189,248,.18); color: #7DD3FC; }
+.app.mobile-layout .sidebar.drawer-mode .nav-item.active {
+  background: rgba(91,156,255,.16);
+  color: #fff;
+  box-shadow: inset 3px 0 0 #5B9CFF;
+}
+.app.mobile-layout .sidebar.drawer-mode .nav-item.active > i:not(.ext-arrow) {
+  background: rgba(91,156,255,.32);
+  color: #BFDBFE;
+}
+.app.mobile-layout .sidebar.drawer-mode .nav-pay-highlight {
+  background: rgba(245,158,11,.12) !important;
+  border: none !important;
+  box-shadow: inset 3px 0 0 #F59E0B;
+  color: #FBBF24 !important;
+  font-weight: 700;
+}
+.app.mobile-layout .sidebar.drawer-mode .nav-pay-highlight > i {
+  background: rgba(245,158,11,.22) !important;
+  color: #FBBF24 !important;
+}
+.app.mobile-layout .sidebar.drawer-mode .nav-item.ext-link .ext-arrow {
+  opacity: .45;
+}
