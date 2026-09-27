@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>АГ.РД-018/26 — каркасник 8×8 Мечникова 51 — 3D</title>
+<style>
+  html,body{margin:0;height:100%;background:#1b1e22;color:#eee;font-family:Segoe UI,system-ui,sans-serif;overflow:hidden}
+  #c{position:fixed;inset:0}
+  #ui{position:fixed;left:12px;top:12px;z-index:5;background:rgba(18,20,24,.88);backdrop-filter:blur(8px);
+      border:1px solid #3a4048;border-radius:10px;padding:12px 14px;width:280px;max-height:calc(100vh - 24px);overflow:auto}
+  #ui h1{font-size:14px;margin:0 0 4px;font-weight:650}
+  #ui .sub{font-size:11px;color:#9aa3ad;margin-bottom:10px;line-height:1.35}
+  label{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0;cursor:pointer}
+  label input{accent-color:#c4a36a}
+  .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  button{background:#2a3038;color:#eee;border:1px solid #4a525c;border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer}
+  button:hover{background:#3a424c}
+  #hint{position:fixed;right:12px;bottom:12px;font-size:12px;color:#c5ccd3;background:rgba(18,20,24,.8);
+        padding:8px 10px;border-radius:8px;border:1px solid #3a4048;line-height:1.4}
+  #badge{position:fixed;left:12px;bottom:12px;font-size:11px;color:#8b939c}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <h1>Каркасник 8000×8000</h1>
+  <div class="sub">Мечникова 51, Миасс · АГ.РД-018/26<br>СП 31-105-2002 · кровля 25° · 24 сваи 89×8</div>
+  <label><input type="checkbox" data-layer="piles" checked> Сваи СВ-89.8 + оголовки</label>
+  <label><input type="checkbox" data-layer="grillage" checked> Обвязка 150×200 + лаги</label>
+  <label><input type="checkbox" data-layer="walls" checked> Каркас наружных стен</label>
+  <label><input type="checkbox" data-layer="braces" checked> Укосины 25×100</label>
+  <label><input type="checkbox" data-layer="parts" checked> Перегородки 50×100</label>
+  <label><input type="checkbox" data-layer="openings" checked> Окна и дверь Д-1</label>
+  <label><input type="checkbox" data-layer="roofframe" checked> Стропила + конёк</label>
+  <label><input type="checkbox" data-layer="roof" checked> Кровля RAL 8017</label>
+  <label><input type="checkbox" data-layer="sip" checked> Дом СИП + переход</label>
+  <label><input type="checkbox" data-layer="ground" checked> Планировка / земля</label>
+  <label><input type="checkbox" data-layer="labels" checked> Подписи помещений</label>
+  <div class="row">
+    <button data-view="sw">Юго-запад</button>
+    <button data-view="se">Юго-восток</button>
+    <button data-view="ne">Северо-восток</button>
+    <button data-view="top">Сверху</button>
+    <button data-view="south">Юг</button>
+  </div>
+</div>
+<div id="hint">ЛКМ — крутить · ПКМ — панорама · колесо — зум<br>Это визуализация по РД, не замена kark8.html</div>
+<div id="badge">ООО «Атомус Групп» · стадия Р · сентябрь 2026</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="./karkas8x8_orbit.js"></script>
+</body>
+</html>
