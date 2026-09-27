@@ -1,1 +1,37 @@
-PLACEHOLDER
+/* Campaign workspace */
+#campaigns-panel{padding:4px 0 28px;color:var(--text-dark,#1b2030)}
+.campaign-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.campaign-head h2{margin:0 0 8px;font-size:23px;letter-spacing:-.4px}
+.campaign-head p,.campaign-muted{color:var(--text-light,#6e7689);font-size:13px;line-height:1.6}
+.campaign-head p{margin:0}
+.campaign-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:24px 0;padding:6px;border:1px solid var(--border,#e5e9f0);border-radius:14px;background:#eaf0f6}
+.campaign-steps .btn{display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:52px;padding:10px 12px;border:1px solid transparent;border-radius:10px;background:transparent;text-align:left;white-space:normal;line-height:1.35;color:#526579;box-shadow:none}
+.campaign-step-number{display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;height:28px;border-radius:50%;background:#dce5ef;color:#526579;font-size:12px;font-weight:700}
+.campaign-steps .btn:hover{background:#f5f8fb}
+.campaign-steps .btn[aria-current=step]{background:#fff;color:#176b70;border-color:#c6dfdf;box-shadow:0 2px 6px #203c5310}
+.campaign-steps [aria-current=step] .campaign-step-number{background:#187d83;color:#fff}
+#campaigns-panel section[data-campaign-step]{padding:26px;border:1px solid var(--border,#e5e9f0);border-radius:16px;background:#fff;box-shadow:0 3px 14px #213c5505}
+.campaign-section-heading{margin-bottom:24px}
+.campaign-section-heading h3{margin:0 0 6px;font-size:18px}
+.campaign-section-heading p{margin:0;color:var(--text-light,#6e7689);font-size:13px;line-height:1.6}
+.campaign-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px 20px}
+.campaign-fields label{display:flex;flex-direction:column;gap:9px;min-width:0;color:#435468;font-size:13px;font-weight:600}
+.campaign-fields .wide{grid-column:1/-1}
+.campaign-fields input,.campaign-fields textarea,.campaign-fields select,.campaign-material select,#campaigns-panel td select{width:100%;min-height:44px;font:inherit;font-weight:400;border:1px solid #d5dee9;border-radius:9px;padding:11px 13px;background:#fff;color:#253c53;max-width:100%;box-sizing:border-box;transition:border-color .15s,box-shadow .15s}
+.campaign-fields textarea{resize:vertical;line-height:1.75}
+.campaign-fields input:focus,.campaign-fields textarea:focus,.campaign-fields select:focus{outline:0;border-color:#248b91;box-shadow:0 0 0 3px #248b9118}
+#campaigns-panel table{width:100%;border-collapse:separate;border-spacing:0;margin-top:8px}
+#campaigns-panel th,#campaigns-panel td{padding:14px 13px;border-bottom:1px solid #e7edf4;text-align:left;vertical-align:middle;font-size:13px}
+#campaigns-panel th{color:#6a7789;font-size:12px;font-weight:700;background:#f7f9fc}
+#campaigns-panel tbody tr:hover{background:#f8fafc}
+.campaign-material{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.campaign-material select{min-width:180px}
+.campaign-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.campaign-actions .btn{min-height:42px}
+.campaign-empty{padding:28px;border:1px dashed #cfd9e6;border-radius:14px;background:#f8fafc;color:#617186;text-align:center;line-height:1.7}
+.campaign-progress{margin-top:18px;padding:16px 18px;border-radius:12px;background:#eef7f6;color:#2d5554}
+.campaign-progress progress{width:100%;height:10px;border-radius:999px;overflow:hidden}
+.campaign-progress progress::-webkit-progress-bar{background:#d8e8e5}
+.campaign-progress progress::-webkit-progress-value{background:#187d83}
+.campaign-progress p{font-size:14px;line-height:1.8;margin:0 0 10px}
+.campaign-progress small{display:block;line-height:1.6;color:#50706f}
