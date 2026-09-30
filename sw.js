@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.234-campaigns-9';
+const CACHE_VERSION = 'atomus-v1.8.234-planerka-actions-10';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -102,6 +102,12 @@ self.addEventListener('fetch', (event) => {
       } catch (e) { /* не валим редирект */ }
       return Response.redirect('/?share=invoice', 303);
     })());
+    return;
+  }
+
+  // Планёрка управляет живой встречей: старый ответ скрывает сохранённые изменения.
+  if (url.pathname === '/api/planerka' || url.pathname.startsWith('/api/planerka/')) {
+    event.respondWith(fetch(req));
     return;
   }
 

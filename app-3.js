@@ -7752,6 +7752,33 @@ async function calcToOffer(id) {
 // ============ ПЛАНЁРКА — ежедневная встреча с настраиваемым временем ============
 var _pl = null;
 var _plLoadPromise = null;
+var _plRevision = 0;
+var _plPending = new Set();
+// Подтверждённые изменения показываем сразу; старый GET не может их затереть.
+async function _plWrite(path, body, apply, message) {
+  if (_plPending.has(path)) return false;
+  _plPending.add(path);
+  const timer = setTimeout(() => showToast('Сохранение ещё идёт. Дождитесь ответа сервера.', 'info'), 5000);
+  try {
+    const r = await apiPost(path, body);
+    if (!r || !r.ok || !r.data || r.data.ok === false) {
+      throw new Error(formatApiErrorMessage(r && r.data, 'Не удалось сохранить (HTTP ' + (r && r.status) + ')'));
+    }
+    _plRevision += 1;
+    if (apply) apply(r.data);
+    renderPlanerka();
+    showToast(message, 'success');
+    _plLoadPromise = null;
+    loadPlanerka();
+    return true;
+  } catch (e) {
+    showToast(String(e && e.message || 'Ошибка соединения'), 'error');
+    return false;
+  } finally {
+    clearTimeout(timer);
+    _plPending.delete(path);
+  }
+}
 function loadPlanerka() {
   const box = document.getElementById('planerka-content');
   if (!box) return Promise.resolve(null);
@@ -7766,7 +7793,9 @@ function loadPlanerka() {
     ? ensureEmployeesLoaded().catch(function () {})
     : Promise.resolve();
 
-  const request = apiGet('/api/planerka').then(function (data) {
+  const revision = _plRevision;
+  const request = apiGet('/api/planerka?_fresh=' + Date.now()).then(function (data) {
+    if (revision !== _plRevision) return null;
     _pl = data;
     renderPlanerka();
     employeesLoad.then(function () {
@@ -7774,7 +7803,12 @@ function loadPlanerka() {
     });
     return data;
   }).catch(function (e) {
+    if (revision !== _plRevision) return null;
     const reason = String(e && e.message || e || 'Сервер не ответил');
+    if (_pl) {
+      showToast('Не удалось обновить планёрку: ' + reason + '. Показаны последние полученные данные.', 'error');
+      return null;
+    }
     box.innerHTML = '<div class="logi-empty"><i class="ti ti-alert-triangle"></i>' +
       '<div>Не удалось загрузить планёрку<br><small>' + escapeHtml(reason) + '</small></div>' +
       '<button type="button" class="pl-btn pri" onclick="loadPlanerka()">Повторить</button></div>';
@@ -7810,6 +7844,10 @@ function plPreviewReminder(value) {
   if (klava) klava.textContent = value || '11:15';
 }
 function renderPlanerka() {
+  const drafts = ['pl-note-inp', 'pl-q-inp'].map(id => {
+    const el = document.getElementById(id);
+    return [id, el ? el.value : ''];
+  });
   const box = document.getElementById('planerka-content');
   if (!box || !_pl) return;
   const m = _pl.meeting;
@@ -8031,6 +8069,7 @@ function renderPlanerka() {
     h += '</div>';   // конец карточки истории
   }
   box.innerHTML = h;
+  drafts.forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.value = value; });
 }
 async function plAtt(empId, present) {
   try {
@@ -8041,14 +8080,13 @@ async function plAtt(empId, present) {
 }
 async function plNoteAdd() {
   const inp = document.getElementById('pl-note-inp');
-  const v = inp ? inp.value.trim() : '';
-  if (!v) return;
-  try {
-    const r = await apiPost('/api/planerka/notes', { text: v });
-    if (r && r.ok) showToast('Записано', 'success');
-    else showToast(((r && r.data) || {}).message || 'Не удалось', 'error');
-  } catch (e) { showToast('Ошибка соединения', 'error'); }
-  loadPlanerka();
+  const text = inp ? inp.value.trim() : '';
+  if (!text) return;
+  await _plWrite('/api/planerka/notes', { text }, function (j) {
+    const current = document.getElementById('pl-note-inp');
+    if (current && current.value.trim() === text) current.value = '';
+    if (_pl) (_pl.notes || (_pl.notes = [])).push({ id: j.id, text, day: _pl.day });
+  }, 'Записано');
 }
 async function plNoteDel(id) {
   if (!confirm('Удалить заметку?')) return;
@@ -8124,18 +8162,16 @@ async function plNoteTaskGo(noteId) {
   const emp = document.getElementById('pl-nt-emp');
   const due = document.getElementById('pl-nt-due');
   const title = document.getElementById('pl-nt-title');
-  try {
-    const r = await apiPost('/api/planerka/notes/' + noteId + '/task',
+  const ok = await _plWrite('/api/planerka/notes/' + noteId + '/task',
       { assignee_id: emp ? parseInt(emp.value, 10) : null,
         deadline: (due && due.value) || null,
-        title: (title && title.value.trim()) || null });
-    const j = (r && r.data) || {};
-    if (r && r.ok) showToast('Задача поставлена', 'success');
-    else showToast(j.message || 'Не удалось', 'error');
-  } catch (e) { showToast('Ошибка соединения', 'error'); }
+        title: (title && title.value.trim()) || null }, function (j) {
+    const entry = ((_pl && _pl.notes) || []).find(x => x.id === noteId);
+    if (entry) { entry.task_id = j.task_id; entry.task_assignee_short = emp && emp.selectedOptions && emp.selectedOptions[0] ? emp.selectedOptions[0].textContent : ''; }
+  }, 'Задача поставлена');
+  if (!ok) return;
   const m = document.getElementById('pl-task-modal');
   if (m) m.remove();
-  loadPlanerka();
 }
 // чип «кому поставлена задача · выполнено/нет» для заметки (история планёрок)
 function _plNoteTaskChip(n) {
@@ -8204,7 +8240,11 @@ async function plAddQ() {
   if (!v) return;
   try {
     const r = await apiPost('/api/planerka/questions', { text: v });
-    if (r && r.ok) showToast('Вопрос добавлен в повестку', 'success');
+    if (r && r.ok) {
+      const current = document.getElementById('pl-q-inp');
+      if (current && current.value.trim() === v) current.value = '';
+      showToast('Вопрос добавлен в повестку', 'success');
+    }
     else showToast(((r && r.data) || {}).message || 'Не удалось', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
   loadPlanerka();
@@ -8245,13 +8285,11 @@ async function plCarry(id) {
   loadPlanerka();
 }
 async function plStart() {
-  try { await apiPost('/api/planerka/start', {}); } catch (e) {}
-  loadPlanerka();
+  await _plWrite('/api/planerka/start', {}, j => { if (_pl) _pl.meeting = j.meeting; }, 'Планёрка началась');
 }
 async function plFinish() {
   if (!confirm('Завершить планёрку? Итог уйдёт в историю.')) return;
-  try { await apiPost('/api/planerka/finish', {}); } catch (e) {}
-  loadPlanerka();
+  await _plWrite('/api/planerka/finish', {}, j => { if (_pl) _pl.meeting = j.meeting; }, 'Планёрка завершена');
 }
 // «→ Задача»: мини-форма — кому и до какого срока
 async function plTaskOpen(itemId) {
@@ -8282,16 +8320,14 @@ async function plTaskOpen(itemId) {
 async function plTaskGo(itemId) {
   const emp = document.getElementById('pl-t-emp');
   const due = document.getElementById('pl-t-due');
-  try {
-    const r = await apiPost('/api/planerka/items/' + itemId + '/task',
-      { assignee_id: emp ? parseInt(emp.value, 10) : null, deadline: (due && due.value) || null });
-    const j = (r && r.data) || {};
-    if (r && r.ok) showToast('Задача поставлена', 'success');
-    else showToast(j.message || 'Не удалось', 'error');
-  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  const ok = await _plWrite('/api/planerka/items/' + itemId + '/task',
+      { assignee_id: emp ? parseInt(emp.value, 10) : null, deadline: (due && due.value) || null }, function (j) {
+    const entry = ((_pl && _pl.items) || []).find(x => x.id === itemId);
+    if (entry) { entry.task_id = j.task_id; entry.status = 'done'; entry.task_assignee = emp && emp.selectedOptions && emp.selectedOptions[0] ? emp.selectedOptions[0].textContent : ''; }
+  }, 'Задача поставлена');
+  if (!ok) return;
   const m = document.getElementById('pl-task-modal');
   if (m) m.remove();
-  loadPlanerka();
 }
 
 // ============ v2.45.831: Логистика — карточки перевозчиков ============
