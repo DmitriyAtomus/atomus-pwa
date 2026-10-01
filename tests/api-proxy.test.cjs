@@ -144,3 +144,37 @@ test('Service Worker не подменяет API устаревшим стати
   assert.match(serviceWorker, /url\.pathname\.startsWith\('\/static\/'\)/);
   assert.match(serviceWorker, /event\.respondWith\(networkFirst\(req\)\)/);
 });
+
+test('планёрка сохраняется по подтвердившему чтение прямому маршруту', async () => {
+  const calls=[];
+  const direct='https://worker-production-9b70.up.railway.app';
+  const ok={...fakeResponse(200,'application/json',{ok:true}),url:direct+'/api/planerka'};
+  const fetch=loadFetchProxy(async(url,init)=>{
+    calls.push({url:String(url),method:init?.method||'GET'});
+    if(calls.length===1) return new Promise(()=>{});
+    return ok;
+  });
+  await fetch('/api/planerka');
+  await fetch('/api/planerka/start',{method:'POST',body:'{}'});
+  assert.equal(calls.length,3);
+  assert.deepEqual(calls[2],{url:direct+'/api/planerka/start',method:'POST'});
+});
+test('сбой прямой записи не повторяет POST через прокси', async () => {
+  const direct='https://worker-production-9b70.up.railway.app';
+  const ok={...fakeResponse(200,'application/json',{ok:true}),url:direct+'/api/planerka'};
+  let posts=0;
+  const fetch=loadFetchProxy(async(url,init)=>{
+    if(init?.method==='POST') {posts++;throw Error('connection lost');}
+    return ok;
+  });
+  await fetch('/api/planerka');
+  await assert.rejects(fetch('/api/planerka/start',{method:'POST'}),/connection lost/);
+  assert.equal(posts,1);
+});
+test('быстрый прокси остаётся маршрутом сохранения планёрки', async () => {
+  const calls=[];
+  const ok={...fakeResponse(200,'application/json',{ok:true}),url:'https://atomus-pwa.vercel.app/api/planerka'};
+  const fetch=loadFetchProxy(async(url)=>{calls.push(url);return ok;});
+  await fetch('/api/planerka');await fetch('/api/planerka/start',{method:'POST'});
+  assert.deepEqual(calls,['/api/planerka','/api/planerka/start']);
+});

@@ -7758,6 +7758,10 @@ var _plPending = new Set();
 async function _plWrite(path, body, apply, message) {
   if (_plPending.has(path)) return false;
   _plPending.add(path);
+  const buttons = Array.from(document.querySelectorAll('#planerka-content button, #pl-task-modal button'));
+  const trigger = buttons.find(btn => btn === document.activeElement);
+  const label = trigger ? trigger.innerHTML : '';
+  if (trigger) { trigger.disabled = true; trigger.textContent = 'Сохраняем…'; }
   const timer = setTimeout(() => showToast('Сохранение ещё идёт. Дождитесь ответа сервера.', 'info'), 5000);
   try {
     const r = await apiPost(path, body);
@@ -7777,6 +7781,7 @@ async function _plWrite(path, body, apply, message) {
   } finally {
     clearTimeout(timer);
     _plPending.delete(path);
+    if (trigger && trigger.isConnected) { trigger.disabled = false; trigger.innerHTML = label; }
   }
 }
 function loadPlanerka() {
