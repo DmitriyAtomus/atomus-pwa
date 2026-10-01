@@ -9,6 +9,9 @@ const _atomusNativeFetch = window.fetch.bind(window);
 // нормальный ответ. Изменяющие запросы (POST/PATCH/DELETE) не дублируем.
 const API_GET_HEDGE_DELAY_MS = 450;
 const API_GET_TIMEOUT_MS = 12000;
+// Планёрка пишет по тому же маршруту, который уже успешно обслужил её чтение.
+// Это не повтор POST: при потере ответа запись автоматически не дублируется.
+let _planerkaDirectRouteUntil = 0;
 
 async function _isVercelSecurityResponse(response) {
   const contentType = response.headers.get('content-type') || '';
@@ -94,11 +97,21 @@ window.fetch = async function atomusApiFetch(input, init) {
       }
       return response;
     });
-    return _firstApiResponse(primary, function () {
+    const result = await _firstApiResponse(primary, function () {
       return _atomusNativeFetch(fallbackUrl, init);
     });
+    if (requestUrl.pathname === '/api/planerka' && result.status >= 200 && result.status < 300 &&
+        (result.headers.get('content-type') || '').includes('application/json')) {
+      _planerkaDirectRouteUntil = result.url && new URL(result.url).origin === API_DIRECT_FALLBACK
+        ? Date.now() + 60000 : 0;
+    }
+    return result;
   }
 
+  if (isProxiedApi && requestUrl.pathname.startsWith('/api/planerka/') &&
+      method !== 'GET' && _planerkaDirectRouteUntil > Date.now()) {
+    return _atomusNativeFetch(fallbackUrl, init);
+  }
   const response = await _atomusNativeFetch(input, init);
   if (!isProxiedApi || response.status !== 403 ||
       !(await _isVercelSecurityResponse(response))) {

@@ -7,7 +7,7 @@ function part(a,b) { return src.slice(src.indexOf(a),src.indexOf(b,src.indexOf(a
 function setup(post) {
  const inputs = {'pl-note-inp':{value:'Черновик'}, 'pl-t-emp':{value:'7'},'pl-t-due':{value:'2026-10-02'}};
  const modal = {removed:false,remove(){this.removed=true;}}; inputs['pl-task-modal']=modal;
- const c = {Set,Date,Promise,apiPost:post,document:{getElementById:id=>inputs[id]||null},
+ const c = {Set,Date,Promise,apiPost:post,document:{querySelectorAll:()=>[],getElementById:id=>inputs[id]||null},
   setTimeout:()=>1,clearTimeout:()=>{},showToast:(text,kind)=>c.toasts.push({text,kind}),
   formatApiErrorMessage:(data,fallback)=>data?.message||fallback,renderPlanerka:()=>c.renders++,
   toasts:[],renders:0,state:{currentScreen:"planerka"}};
@@ -58,4 +58,13 @@ test('service worker never replays cached meeting data',()=>{
  const sw=fs.readFileSync('sw.js','utf8');
  const handler=sw.slice(sw.indexOf("if (url.pathname === '/api/planerka'"));
  assert.match(handler,/event\.respondWith\(fetch\(req\)\);\s*return;/);
+});
+
+test('clicked save button immediately shows pending and is restored on failure',async()=>{
+ let resolve;const {c}=setup(()=>new Promise(r=>resolve=r));
+ const btn={innerHTML:'Начать планёрку',disabled:false,isConnected:true};
+ c.document.querySelectorAll=()=>[btn];c.document.activeElement=btn;
+ const pending=c.plStart();assert.equal(btn.disabled,true);assert.equal(btn.textContent,'Сохраняем…');
+ resolve({ok:false,status:503,data:{message:'Сервер занят'}});await pending;
+ assert.equal(btn.disabled,false);assert.equal(btn.innerHTML,'Начать планёрку');
 });
