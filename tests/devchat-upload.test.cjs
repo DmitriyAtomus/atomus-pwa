@@ -232,7 +232,11 @@ test('JSON 403 backend не повторяется в обход сервера'
 
   await ctx.send();
 
-  assert.equal(ctx.calls.length, 1);
+  assert.equal(ctx.calls.length, 2, 'JSON 403 also retries through the direct API');
+  assert.deepEqual(ctx.calls.map((call) => call.url), [
+    'https://api/api/dev-chat/send',
+    'https://railway/api/dev-chat/send',
+  ]);
   assert.match(ctx.toasts[0].msg, /Личный чат владельца/);
 });
 

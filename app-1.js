@@ -13,20 +13,6 @@ const API_GET_TIMEOUT_MS = 12000;
 // Это не повтор POST: при потере ответа запись автоматически не дублируется.
 let _planerkaDirectRouteUntil = 0;
 
-async function _isVercelSecurityResponse(response) {
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('text/html')) return true;
-  if (!contentType.includes('application/json')) return false;
-  try {
-    const payload = await response.clone().json();
-    // Наш API всегда отдаёт error строкой. Объект здесь присылает защитный
-    // слой Vercel, и такой ответ нужно повторить напрямую в Railway.
-    return !!(payload && typeof payload.error === 'object');
-  } catch (_) {
-    return false;
-  }
-}
-
 // v2.46.028: Vercel Security Checkpoint может отвечать HTML или JSON 403 на
 // API-запросы, когда компьютер работает через VPN. В этом случае повторяем
 // запрос напрямую в Railway. Без VPN основной same-origin прокси остаётся
@@ -92,8 +78,10 @@ window.fetch = async function atomusApiFetch(input, init) {
   if (isProxiedApi && method === 'GET') {
     const primary = _atomusNativeFetch(input, init).then(async function (response) {
       // HTML/служебный JSON от защиты Vercel — не ответ нашего API.
-      if (response.status === 403 && await _isVercelSecurityResponse(response)) {
-        throw new Error('Vercel security checkpoint');
+      // A same-origin 403 may be Vercel's Security Checkpoint, not the API response.
+      // Reject it so the direct tunnel wins instead of exposing the checkpoint to CRM.
+      if (response.status === 403) {
+        throw new Error('same-origin API 403');
       }
       return response;
     });
@@ -112,12 +100,17 @@ window.fetch = async function atomusApiFetch(input, init) {
       method !== 'GET' && _planerkaDirectRouteUntil > Date.now()) {
     return _atomusNativeFetch(fallbackUrl, init);
   }
-  const response = await _atomusNativeFetch(input, init);
-  if (!isProxiedApi || response.status !== 403 ||
-      !(await _isVercelSecurityResponse(response))) {
-    return response;
+  let response;
+  try {
+    response = await _atomusNativeFetch(input, init);
+  } catch (_) {
+    // A network error from the Vercel edge should use the direct API immediately.
+    if (isProxiedApi) return _atomusNativeFetch(fallbackUrl, init);
+    throw _;
   }
+  if (!isProxiedApi || response.status !== 403) return response;
 
+  // Never expose a same-origin 403 to CRM: retry it through the direct API.
   return _atomusNativeFetch(fallbackUrl, init);
 };
 const TOKEN_KEY = "atomus_token";
@@ -5232,9 +5225,9 @@ function _devChatPost(url, form, onProgress) {
   const viaVercel = url.indexOf(API_BASE + '/api/') === 0;
   const direct = viaVercel ? API_DIRECT_FALLBACK + url.slice(API_BASE.length) : '';
   return _devChatPostOnce(url, form, onProgress).then(function (result) {
-    const html403 = result.status === 403 &&
-      String(result.contentType || '').toLowerCase().indexOf('text/html') >= 0;
-    if (!direct || !html403) return result;
+    // A same-origin 403 can be a Vercel checkpoint even when its content type is JSON.
+    const edge403 = result.status === 403;
+    if (!direct || !edge403) return result;
     return _devChatPostOnce(direct, form, onProgress);
   }, function (err) {
     if (!direct || (err && err.sent > DEVCHAT_EDGE_REJECT)) throw err;
