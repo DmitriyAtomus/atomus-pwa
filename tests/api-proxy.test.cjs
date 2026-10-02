@@ -20,11 +20,11 @@ test('CRM распознаёт HTML 403 от Vercel VPN-защиты', () => {
   const app = read('app-1.js');
   assert.match(
     app,
-    /const API_DIRECT_FALLBACK = 'https:\/\/worker-production-9b70\.up\.railway\.app'/
+    /const API_DIRECT_FALLBACK = 'https:\/\/entry-encyclopedia-gmbh-career\.trycloudflare\.com'/
   );
   assert.match(app, /response\.status !== 403/);
-  assert.match(app, /if \(contentType\.includes\('text\/html'\)\) return true/);
-  assert.match(app, /await _isVercelSecurityResponse\(response\)/);
+  assert.match(app, /if \(response\.status === 403\)/);
+  assert.match(app, /catch \(_\)/);
   assert.match(app, /_atomusNativeFetch\(fallbackUrl, init\)/);
 });
 
@@ -71,14 +71,14 @@ test('JSON-объект защиты Vercel повторяется напрям�
   assert.equal(response, ok);
   assert.deepEqual(calls, [
     '/api/auth/password',
-    'https://worker-production-9b70.up.railway.app/api/auth/password',
+    'https://entry-encyclopedia-gmbh-career.trycloudflare.com/api/auth/password',
   ]);
 });
 
-test('обычный неправильный пароль не отправляется второй раз', async () => {
+test('same-origin API 403 retries through the direct fallback', async () => {
   const calls = [];
   const denied = fakeResponse(403, 'application/json', {
-    error: 'invalid_password', message: 'Неверный пароль',
+    error: 'invalid_password', message: 'backend forbidden',
   });
   const fetch = loadFetchProxy(async (url) => {
     calls.push(String(url));
@@ -88,9 +88,48 @@ test('обычный неправильный пароль не отправля
   const response = await fetch('/api/auth/password', { method: 'POST' });
 
   assert.equal(response, denied);
-  assert.deepEqual(calls, ['/api/auth/password']);
+  assert.deepEqual(calls, [
+    '/api/auth/password',
+    'https://entry-encyclopedia-gmbh-career.trycloudflare.com/api/auth/password',
+  ]);
 });
 
+test('same-origin API network failure retries non-GET through the direct fallback', async () => {
+  const calls = [];
+  const ok = fakeResponse(200, 'application/json', { ok: true });
+  const fetch = loadFetchProxy(async (url) => {
+    calls.push(String(url));
+    if (calls.length === 1) throw new Error('edge unavailable');
+    return ok;
+  });
+
+  const response = await fetch('/api/auth/password', { method: 'POST', body: '{}' });
+
+  assert.equal(response, ok);
+  assert.deepEqual(calls, [
+    '/api/auth/password',
+    'https://entry-encyclopedia-gmbh-career.trycloudflare.com/api/auth/password',
+  ]);
+});
+
+
+test('GET JSON 403 is never returned as a same-origin CRM response', async () => {
+  const calls = [];
+  const blocked = fakeResponse(403, 'application/json', { error: 'forbidden' });
+  const ok = fakeResponse(200, 'application/json', { ok: true });
+  const fetch = loadFetchProxy(async (url) => {
+    calls.push(String(url));
+    return calls.length === 1 ? blocked : ok;
+  });
+
+  const response = await fetch('/api/me');
+
+  assert.equal(response, ok);
+  assert.deepEqual(calls, [
+    '/api/me',
+    'https://entry-encyclopedia-gmbh-career.trycloudflare.com/api/me',
+  ]);
+});
 test('медленный GET страхуется прямым запросом и не ждёт Vercel', async () => {
   const calls = [];
   const ok = fakeResponse(200, 'application/json', { ok: true });
@@ -105,7 +144,7 @@ test('медленный GET страхуется прямым запросом 
   assert.equal(response, ok);
   assert.deepEqual(calls, [
     '/api/contracts?limit=200',
-    'https://worker-production-9b70.up.railway.app/api/contracts?limit=200',
+    'https://entry-encyclopedia-gmbh-career.trycloudflare.com/api/contracts?limit=200',
   ]);
 });
 
@@ -130,11 +169,11 @@ test('Vercel проксирует API и серверные файлы в Railwa
 
   assert.equal(
     rewrites.get('/api/:path*'),
-    'https://worker-production-9b70.up.railway.app/api/:path*'
+    'https://entry-encyclopedia-gmbh-career.trycloudflare.com/api/:path*'
   );
   assert.equal(
     rewrites.get('/static/:path*'),
-    'https://worker-production-9b70.up.railway.app/static/:path*'
+    'https://entry-encyclopedia-gmbh-career.trycloudflare.com/static/:path*'
   );
 });
 
@@ -147,7 +186,7 @@ test('Service Worker не подменяет API устаревшим стати
 
 test('планёрка сохраняется по подтвердившему чтение прямому маршруту', async () => {
   const calls=[];
-  const direct='https://worker-production-9b70.up.railway.app';
+  const direct='https://entry-encyclopedia-gmbh-career.trycloudflare.com';
   const ok={...fakeResponse(200,'application/json',{ok:true}),url:direct+'/api/planerka'};
   const fetch=loadFetchProxy(async(url,init)=>{
     calls.push({url:String(url),method:init?.method||'GET'});
@@ -160,7 +199,7 @@ test('планёрка сохраняется по подтвердившему 
   assert.deepEqual(calls[2],{url:direct+'/api/planerka/start',method:'POST'});
 });
 test('сбой прямой записи не повторяет POST через прокси', async () => {
-  const direct='https://worker-production-9b70.up.railway.app';
+  const direct='https://entry-encyclopedia-gmbh-career.trycloudflare.com';
   const ok={...fakeResponse(200,'application/json',{ok:true}),url:direct+'/api/planerka'};
   let posts=0;
   const fetch=loadFetchProxy(async(url,init)=>{
