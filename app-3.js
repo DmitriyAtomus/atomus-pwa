@@ -29276,3 +29276,425 @@ async function utmMarkDone(id, undo) {
     else showToast('Не удалось', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
+
+// ============ v2.46.235: СЧЕТА НА ОПЛАТУ И РУЧНОЙ АВАНС =====================
+// Аванс живёт без заказа. Кнопку видят директор и зам (коммерческий директор).
+// Бухгалтер переводит запись в «Оплачен» тем же паролем, что и обычный счёт.
+
+const _payListState = {
+  tab: 'to_pay',
+  q: '',
+  supplier_id: '',
+  type: '',
+  only_advances: false,
+  mine: false,
+};
+let _payListTimer = null;
+let _payListItems = [];
+let _payListCanCreate = false;
+
+function canCreateSupplierAdvance() {
+  const roles = (state.user && state.user.roles) || [];
+  return roles.includes('director') || roles.includes('zam');
+}
+
+function canMarkPayListPaid() {
+  const roles = (state.user && state.user.roles) || [];
+  return roles.some(r => ['director', 'zam', 'manager', 'accountant'].includes(r));
+}
+
+function syncAdvanceCreateButton() {
+  const btn = document.getElementById('pay-list-advance-btn');
+  if (!btn) return;
+  btn.style.display = (canCreateSupplierAdvance() && _payListCanCreate !== false) ? '' : 'none';
+  if (!canCreateSupplierAdvance()) btn.style.display = 'none';
+}
+
+function _payListMoney(n) {
+  const x = Number(n);
+  if (!isFinite(x)) return '—';
+  return x.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₽';
+}
+
+function _payListDate(s) {
+  const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '—';
+  return m[3] + '.' + m[2] + '.' + m[1];
+}
+
+function _payListToday() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
+function setPayListTab(tab) {
+  _payListState.tab = tab || 'to_pay';
+  document.querySelectorAll('[data-pay-tab]').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-pay-tab') === _payListState.tab);
+  });
+  loadPayList();
+}
+
+function onPayListSearch(value) {
+  _payListState.q = value || '';
+  clearTimeout(_payListTimer);
+  _payListTimer = setTimeout(loadPayList, 300);
+}
+
+function onPayListSupplier(value) {
+  _payListState.supplier_id = value || '';
+  loadPayList();
+}
+
+function onPayListType(value) {
+  _payListState.type = value || '';
+  _payListState.only_advances = value === 'advance';
+  const box = document.getElementById('pay-list-only-adv');
+  if (box) box.checked = _payListState.only_advances;
+  loadPayList();
+}
+
+function onPayListOnlyAdv(checked) {
+  _payListState.only_advances = !!checked;
+  const sel = document.getElementById('pay-list-type');
+  if (checked) {
+    _payListState.type = 'advance';
+    if (sel) sel.value = 'advance';
+  } else if (_payListState.type === 'advance') {
+    _payListState.type = '';
+    if (sel) sel.value = '';
+  }
+  loadPayList();
+}
+
+function onPayListMine(checked) {
+  _payListState.mine = !!checked;
+  loadPayList();
+}
+
+async function _payListSupplierOptions() {
+  if (!cache.suppliers || !cache.suppliers.length) {
+    try {
+      const d = await apiGet('/api/suppliers');
+      cache.suppliers = d.suppliers || [];
+    } catch (e) { cache.suppliers = cache.suppliers || []; }
+  }
+  return (cache.suppliers || []).filter(s => s.is_active !== 0 && (s.name || '').trim());
+}
+
+function _fillPayListSupplierSelect(list) {
+  const sel = document.getElementById('pay-list-supplier');
+  if (!sel || sel.dataset.ready === '1' || !list.length) return;
+  const current = _payListState.supplier_id || '';
+  sel.innerHTML = '<option value="">Все поставщики</option>' +
+    list.map(s => '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>').join('');
+  sel.value = current;
+  sel.dataset.ready = '1';
+}
+
+async function loadPayList() {
+  const box = document.getElementById('pay-list-body');
+  if (!box) return;
+  const btn = document.getElementById('pay-list-advance-btn');
+  if (btn) btn.style.display = canCreateSupplierAdvance() ? '' : 'none';
+  const suppliers = await _payListSupplierOptions();
+  _fillPayListSupplierSelect(suppliers);
+  const st = _payListState;
+  const p = new URLSearchParams();
+  p.set('tab', st.tab || 'to_pay');
+  if ((st.q || '').trim()) p.set('q', st.q.trim());
+  if (st.supplier_id) p.set('supplier_id', st.supplier_id);
+  if (st.only_advances) p.set('only_advances', '1');
+  else if (st.type) p.set('type', st.type);
+  if (st.mine) p.set('mine', '1');
+  try {
+    const d = await apiGet('/api/pay-list?' + p.toString());
+    _payListItems = d.items || [];
+    _payListCanCreate = !!d.can_create_advance;
+    syncAdvanceCreateButton();
+    const counts = d.counts || {};
+    document.querySelectorAll('[data-pay-count]').forEach(el => {
+      const key = el.getAttribute('data-pay-count');
+      el.textContent = counts[key] != null ? counts[key] : 0;
+    });
+    renderPayList();
+  } catch (e) {
+    box.innerHTML = '<div class="pay-list-empty">Не удалось загрузить список</div>';
+  }
+}
+
+function renderPayList() {
+  const box = document.getElementById('pay-list-body');
+  if (!box) return;
+  const list = _payListItems || [];
+  if (!list.length) {
+    box.innerHTML = '<div class="pay-list-empty">В этом списке пока пусто</div>';
+    return;
+  }
+  const canPay = canMarkPayListPaid();
+  let html = '<table class="pay-list-table"><thead><tr>' +
+    '<th>Дата</th><th>Тип</th><th>Поставщик</th><th>Назначение платежа</th>' +
+    '<th>Сумма</th><th>Кто внёс</th><th>Статус</th><th></th></tr></thead><tbody>';
+  list.forEach(row => {
+    const advance = row.kind === 'advance';
+    const tag = advance
+      ? '<span class="pay-list-tag advance">Аванс</span>'
+      : '<span class="pay-list-tag invoice">Счёт</span>';
+    const orderLine = advance
+      ? '<span class="pay-list-order">без заказа</span>'
+      : '<span class="pay-list-order">' + escapeHtml(row.order_label || ('ORD-' + row.order_id)) + '</span>';
+    const paid = row.status === 'paid';
+    const status = '<span class="pay-list-status"><span class="pay-list-dot ' + (paid ? 'paid' : 'to_pay') + '"></span>' +
+      (paid ? 'Оплачен' : 'На оплату') + '</span>';
+    const payBtn = (!paid && canPay)
+      ? '<button class="btn btn-primary btn-small" style="margin-right:6px;" onclick="payListMarkPaid(\'' + row.kind + '\',' + row.id + ', this)">Оплатил</button>'
+      : '';
+    html += '<tr>' +
+      '<td>' + escapeHtml(_payListDate(row.date)) + '</td>' +
+      '<td>' + tag + '</td>' +
+      '<td>' + escapeHtml(row.supplier_name || '—') + orderLine + '</td>' +
+      '<td>' + escapeHtml(row.purpose || '—') + '</td>' +
+      '<td style="white-space:nowrap;font-weight:700;">' + _payListMoney(row.amount) + '</td>' +
+      '<td>' + escapeHtml(row.author_name || '—') + '</td>' +
+      '<td>' + status + '</td>' +
+      '<td style="white-space:nowrap;">' + payBtn +
+        '<button class="btn btn-secondary btn-small" onclick="openPayListRow(\'' + row.kind + '\',' + row.id + ')">Открыть</button></td>' +
+    '</tr>';
+  });
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+
+function openPayListRow(kind, id) {
+  if (kind === 'invoice') {
+    state.currentSupplyOrderId = id;
+    selectSidebarItem('supply-order-detail');
+    return;
+  }
+  openSupplierAdvanceCard(id);
+}
+
+function _payListFind(kind, id) {
+  return (_payListItems || []).find(row => row.kind === kind && Number(row.id) === Number(id)) || null;
+}
+
+async function openSupplierAdvanceModal() {
+  if (!canCreateSupplierAdvance()) {
+    showToast('Аванс вносят директор и коммерческий директор', 'error');
+    return;
+  }
+  const old = document.getElementById('pay-adv-modal');
+  if (old) old.remove();
+  const suppliers = await _payListSupplierOptions();
+  if (!suppliers.length) {
+    showToast('В справочнике нет поставщиков', 'error');
+    return;
+  }
+  const me = state.user || {};
+  const who = me.short_name || me.full_name || me.name || 'Вы';
+  const today = _payListToday();
+  const inp = 'width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:white;color:var(--text-dark);box-sizing:border-box;';
+  const lbl = 'display:block;font-size:12.5px;color:var(--text-mid);margin-bottom:4px;';
+  const overlay = document.createElement('div');
+  overlay.id = 'pay-adv-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:480px;" onclick="event.stopPropagation()">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-cash"></i> Аванс поставщику</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'pay-adv-modal\').remove()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div style="font-size:13px;color:var(--text-mid);margin-bottom:12px;">Запись попадёт в «На оплату» с тегом «Аванс» и без привязки к заказу.</div>' +
+        '<div><label style="' + lbl + '">Поставщик</label>' +
+          '<select id="pay-adv-supplier" style="' + inp + '"><option value="">Выберите поставщика</option>' +
+            suppliers.map(s => '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>').join('') +
+          '</select></div>' +
+        '<div style="margin-top:10px;"><label style="' + lbl + '">Сумма, ₽</label>' +
+          '<input id="pay-adv-amount" inputmode="decimal" placeholder="0,00" style="' + inp + '"></div>' +
+        '<div style="margin-top:10px;"><label style="' + lbl + '">Дата платежа</label>' +
+          '<input id="pay-adv-date" type="date" value="' + today + '" style="' + inp + '"></div>' +
+        '<div style="margin-top:10px;"><label style="' + lbl + '">Назначение платежа</label>' +
+          '<textarea id="pay-adv-purpose" rows="3" placeholder="На что платёж" style="' + inp + '"></textarea></div>' +
+        '<div class="pay-adv-meta">Вносит ' + escapeHtml(who) + ' · ' + escapeHtml(_payListDate(today)) +
+          '<br>Статус после сохранения: <b>На оплату</b></div>' +
+        '<div id="pay-adv-err" style="display:none;color:#B5260C;font-size:13px;margin-top:8px;"></div>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'pay-adv-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-primary" id="pay-adv-save" onclick="saveSupplierAdvance()">Сохранить аванс</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
+function _payAdvError(text) {
+  const el = document.getElementById('pay-adv-err');
+  if (!el) { showToast(text, 'error'); return; }
+  el.style.display = '';
+  el.textContent = text;
+}
+
+async function saveSupplierAdvance() {
+  const supplier = document.getElementById('pay-adv-supplier');
+  const amountEl = document.getElementById('pay-adv-amount');
+  const dateEl = document.getElementById('pay-adv-date');
+  const purposeEl = document.getElementById('pay-adv-purpose');
+  const supplierId = supplier ? supplier.value : '';
+  const purpose = purposeEl ? purposeEl.value.trim() : '';
+  const rawAmount = amountEl ? String(amountEl.value || '').trim() : '';
+  const amount = Number(rawAmount.replace(/\s/g, '').replace(',', '.'));
+  if (!supplierId) { _payAdvError('Выберите поставщика'); return; }
+  if (!rawAmount || !isFinite(amount) || amount <= 0) { _payAdvError('Укажите сумму'); return; }
+  if (!purpose) { _payAdvError('Укажите назначение платежа'); return; }
+  const saveBtn = document.getElementById('pay-adv-save');
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    const r = await apiPost('/api/supplier-advances', {
+      supplier_id: Number(supplierId),
+      amount: amount,
+      payment_date: dateEl && dateEl.value ? dateEl.value : _payListToday(),
+      purpose: purpose,
+    });
+    if (!r.ok) {
+      _payAdvError((r.data && r.data.message) || 'Не удалось сохранить');
+      if (saveBtn) saveBtn.disabled = false;
+      return;
+    }
+    const modal = document.getElementById('pay-adv-modal');
+    if (modal) modal.remove();
+    showToast('Аванс в списке «На оплату»', 'success');
+    _payListState.tab = 'to_pay';
+    document.querySelectorAll('[data-pay-tab]').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-pay-tab') === 'to_pay');
+    });
+    const sel = document.getElementById('pay-list-supplier');
+    if (sel) delete sel.dataset.ready;
+    loadPayList();
+    if (typeof _fillPayDueBlock === 'function') _fillPayDueBlock();
+    if (typeof _updateSupplyPayBadge === 'function') _updateSupplyPayBadge();
+  } catch (e) {
+    _payAdvError('Ошибка сети');
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
+function openSupplierAdvanceCard(id) {
+  const row = _payListFind('advance', id);
+  const draw = function (item) {
+    const old = document.getElementById('pay-adv-card');
+    if (old) old.remove();
+    const paid = item.status === 'paid';
+    const payBtn = (!paid && canMarkPayListPaid())
+      ? '<button class="btn btn-primary" onclick="payAdvanceMarkPaid(' + item.id + ', this)">Оплатил</button>'
+      : '';
+    const overlay = document.createElement('div');
+    overlay.id = 'pay-adv-card';
+    overlay.className = 'modal-overlay visible';
+    overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
+    overlay.innerHTML =
+      '<div class="modal" style="max-width:460px;" onclick="event.stopPropagation()">' +
+        '<div class="modal-header"><h3>Аванс · ' + escapeHtml(item.supplier_name || '—') + '</h3>' +
+          '<button class="icon-btn" onclick="document.getElementById(\'pay-adv-card\').remove()"><i class="ti ti-x"></i></button></div>' +
+        '<div class="modal-body" style="font-size:14px;line-height:1.5;">' +
+          '<div><span class="pay-list-tag advance">Аванс</span> <span class="pay-list-order">без заказа</span></div>' +
+          '<div style="margin-top:10px;"><b>' + _payListMoney(item.amount) + '</b> · ' + escapeHtml(_payListDate(item.date)) + '</div>' +
+          '<div style="margin-top:8px;">' + escapeHtml(item.purpose || '—') + '</div>' +
+          '<div class="pay-adv-meta">Внёс ' + escapeHtml(item.author_name || '—') +
+            '<br>Статус: <b>' + (paid ? 'Оплачен' : 'На оплату') + '</b></div>' +
+        '</div>' +
+        '<div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;">' +
+          payBtn +
+          '<button class="btn btn-secondary" onclick="document.getElementById(\'pay-adv-card\').remove()">Закрыть</button>' +
+        '</div></div>';
+    document.body.appendChild(overlay);
+  };
+  if (row) { draw(row); return; }
+  apiGet('/api/pay-list?tab=all&type=advance').then(d => {
+    const item = (d.items || []).find(a => Number(a.id) === Number(id));
+    if (!item) { showToast('Аванс не найден', 'error'); return; }
+    _payListItems = _payListItems.concat([item]);
+    draw(item);
+  }).catch(() => showToast('Не удалось открыть аванс', 'error'));
+}
+
+async function _advancePayReq(id, password) {
+  const body = {};
+  if (password != null) body.password = password;
+  const r = await apiPost('/api/supplier-advances/' + id + '/pay', body);
+  const j = r.data || {};
+  return { ok: r.ok, status: r.status, error: j.error, message: j.message, data: j };
+}
+
+async function _advancePayConfirmed(id) {
+  let password = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await _advancePayReq(id, password);
+    if (res.ok) return res;
+    if (res.status === 401 && res.error === 'password_required') {
+      const pw = prompt('Подтвердите оплату — введите ваш пароль от Atom:');
+      if (pw === null) return { ok: false, cancelled: true };
+      password = (pw || '').trim();
+      continue;
+    }
+    if (res.status === 403 && res.error === 'wrong_password') {
+      const pw = prompt('Неверный пароль. Введите ещё раз:');
+      if (pw === null) return { ok: false, cancelled: true };
+      password = (pw || '').trim();
+      continue;
+    }
+    return res;
+  }
+  return { ok: false, message: 'Слишком много попыток ввода пароля' };
+}
+
+async function payAdvanceMarkPaid(id, btn) {
+  if (!confirm('Отметить аванс оплаченным?')) return;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i>'; }
+  try {
+    const res = await _advancePayConfirmed(id);
+    if (res.cancelled) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-cash"></i> Оплатил'; }
+      return;
+    }
+    if (!res.ok) {
+      showToast(res.message || 'Не удалось отметить оплату', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-cash"></i> Оплатил'; }
+      return;
+    }
+    showToast('Оплачено ✓', 'success');
+    const card = document.getElementById('pay-adv-card');
+    if (card) card.remove();
+    if (document.getElementById('pay-list-body')) loadPayList();
+    if (typeof _fillPayDueBlock === 'function') _fillPayDueBlock();
+    if (typeof _updateSupplyPayBadge === 'function') _updateSupplyPayBadge();
+  } catch (e) {
+    showToast('Ошибка сети', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-cash"></i> Оплатил'; }
+  }
+}
+
+async function payListMarkPaid(kind, id, btn) {
+  if (kind === 'advance') return payAdvanceMarkPaid(id, btn);
+  const row = _payListFind('invoice', id) || {};
+  if (typeof dupPayConfirmed === 'function' && !dupPayConfirmed(row)) return;
+  if (!(row.duplicate || (typeof supOrdDup === 'function' && supOrdDup(row))) && !confirm('Отметить счёт оплаченным?')) return;
+  if (btn) { btn.disabled = true; }
+  try {
+    const res = await supplyOrderTransitionConfirmed(id, 'paid');
+    if (res.cancelled) { if (btn) btn.disabled = false; return; }
+    if (!res.ok) {
+      showToast(res.message || 'Не удалось отметить оплату', 'error');
+      if (btn) btn.disabled = false;
+      return;
+    }
+    showToast('Оплачено ✓', 'success');
+    loadPayList();
+    if (typeof _fillPayDueBlock === 'function') _fillPayDueBlock();
+  } catch (e) {
+    showToast('Ошибка сети', 'error');
+    if (btn) btn.disabled = false;
+  }
+}

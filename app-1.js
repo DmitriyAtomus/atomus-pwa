@@ -122,8 +122,8 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.234";
-const APP_VERSION_DATE = "24.09.2026";
+const APP_VERSION = "v2.46.235";
+const APP_VERSION_DATE = "02.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -2053,6 +2053,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'supply-shopping')     loadSupplyShopping();
   if (screenName === 'supply-requests')     loadSupplyRequests();
   if (screenName === 'supply-orders')       loadSupplyOrders();
+  if (screenName === 'supply-pay' && typeof loadPayList === 'function') loadPayList();
   if (screenName === 'supply-order-detail') loadSupplyOrderDetail();
   if (screenName === 'supply-receipts')     loadSupplyReceipts();
   // ЭТАП 52.3 (v2.45.0): входящие счета от поставщиков (IMAP-робот)
@@ -6663,23 +6664,29 @@ async function muteBusyVoice() {
   } catch (e) { showToast('Ошибка сети', 'error'); }
 }
 
-// v2.45.272: пункт «На оплате» в левой колонке — открывает Заказы с фильтром «К оплате»
+// v2.46.235: пункт «На оплату» открывает общий список счетов и ручных авансов
 function openSupplyPayList() {
-  selectSidebarItem('supply-orders');
-  setTimeout(() => {
-    try { setSupplyOrdFilter('to_pay'); } catch (_) {}
-  }, 150);
+  selectSidebarItem('supply-pay');
 }
 
-// v2.45.272: бейдж количества «к оплате» на пункте меню
+// v2.45.272: бейдж количества «к оплате» на пункте меню.
+// v2.46.235: вместе со счетами считаем авансы без заказа.
 async function _updateSupplyPayBadge() {
-  const badge = document.getElementById('supply-pay-badge');
-  if (!badge) return;
+  const badges = ['supply-pay-badge', 'home-pay-badge']
+    .map(id => document.getElementById(id)).filter(Boolean);
+  if (!badges.length) return;
   try {
-    const d = await apiGet('/api/supply-orders?status=to_pay');
-    const n = (d.counts && d.counts.to_pay) || (d.orders || []).length || 0;
-    badge.textContent = n;
-    badge.style.display = n ? '' : 'none';
+    const [d, adv] = await Promise.all([
+      apiGet('/api/supply-orders?status=to_pay'),
+      apiGet('/api/pay-list?tab=to_pay&type=advance').catch(() => ({})),
+    ]);
+    const orders = (d.counts && d.counts.to_pay) || (d.orders || []).length || 0;
+    const advances = (adv.counts && adv.counts.to_pay) || (adv.items || []).length || 0;
+    const n = orders + advances;
+    badges.forEach(badge => {
+      badge.textContent = n;
+      badge.style.display = n ? '' : 'none';
+    });
   } catch (_) {}
 }
 
@@ -6698,12 +6705,18 @@ async function _fillPayDueBlock() {
     ]);
     const recvList = dRecv.orders || dRecv.items || [];
     const payList  = dPay.orders  || dPay.items  || [];
-    // бейджи «На оплате» в меню — по числу заказов to_pay
+    let advList = [];
+    try {
+      const dAdv = await apiGet('/api/pay-list?tab=to_pay&type=advance');
+      advList = (dAdv.items || []).filter(a => a && a.kind === 'advance' && a.status === 'to_pay');
+    } catch (_) {}
+    const dueCount = payList.length + advList.length;
+    // бейджи «На оплате» — счета к оплате и авансы без заказа
     ['supply-pay-badge', 'home-pay-badge'].forEach(id => {
       const badge = document.getElementById(id);
       if (badge) {
-        badge.textContent = payList.length;
-        badge.style.display = payList.length ? '' : 'none';
+        badge.textContent = dueCount;
+        badge.style.display = dueCount ? '' : 'none';
       }
     });
     let h = '';
@@ -6711,6 +6724,24 @@ async function _fillPayDueBlock() {
       o => '<button class="btn btn-primary btn-small" style="white-space:nowrap;" onclick="payQueueToPay(' + o.id + ', this)"><i class="ti ti-wallet"></i> На оплату</button>');
     h += _payBlockHtml(payList, 'На оплате', '#9A3412', 'ti-wallet',
       o => '<button class="btn btn-primary btn-small" style="white-space:nowrap;" onclick="payDueMarkPaid(' + o.id + ', this)"><i class="ti ti-cash"></i> Оплатил</button>');
+    if (advList.length) {
+      h += '<div class="section" style="margin-bottom:16px;">' +
+        '<h3 class="section-title" style="color:#1E4E79;"><i class="ti ti-cash"></i> Авансы без счёта (' + advList.length + ') ' +
+        '<a style="cursor:pointer;color:var(--brand);font-size:13px;" onclick="openSupplyPayList()">все счета →</a></h3>' +
+        '<div class="card" style="padding:4px 12px;">';
+      advList.forEach(a => {
+        const sum = Number(a.amount || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽';
+        h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border);">' +
+          '<div style="flex:1;min-width:0;cursor:pointer;" onclick="openSupplierAdvanceCard(' + a.id + ')">' +
+            '<div style="font-size:13.5px;font-weight:600;">Аванс · ' + escapeHtml(a.supplier_name || '—') + '</div>' +
+            '<div style="font-size:12px;color:var(--text-light);">' + escapeHtml(a.purpose || '') +
+              ' · <b style="color:#1E4E79;">' + sum + '</b></div>' +
+          '</div>' +
+          '<button class="btn btn-primary btn-small" style="white-space:nowrap;" onclick="payAdvanceMarkPaid(' + a.id + ', this)"><i class="ti ti-cash"></i> Оплатил</button>' +
+        '</div>';
+      });
+      h += '</div></div>';
+    }
     box.innerHTML = h;
   } catch (e) { box.innerHTML = ''; }
 }

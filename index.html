@@ -2807,6 +2807,55 @@
         </button>
       </div>
 
+      <!-- СЧЕТА НА ОПЛАТУ: счета по заказам и ручные авансы без заказа -->
+      <div class="screen" data-screen="supply-pay" data-section="supply">
+        <div class="content-inner" style="max-width: 100%;">
+          <div class="page-header">
+            <div class="page-header-title">
+              <i class="ti ti-wallet"></i>
+              <h1>Счета на оплату</h1>
+            </div>
+            <div class="pay-list-actions">
+              <button class="btn btn-secondary" id="pay-list-upload-btn" onclick="openUploadInvoiceToPay()">
+                <i class="ti ti-cloud-upload"></i> Загрузить счёт
+              </button>
+              <button class="btn btn-primary" id="pay-list-advance-btn" onclick="openSupplierAdvanceModal()" style="display:none;">
+                <i class="ti ti-plus"></i> Аванс поставщику
+              </button>
+            </div>
+          </div>
+          <div class="page-subtitle" id="pay-list-subtitle">Счета от поставщиков и ручные авансы без счёта</div>
+          <div class="desktop-layout">
+            <div class="filter-row">
+              <div class="filter-tabs" id="pay-list-tabs">
+                <button class="filter-tab active" data-pay-tab="to_pay" onclick="setPayListTab('to_pay')">На оплату <span class="pay-list-count" data-pay-count="to_pay">0</span></button>
+                <button class="filter-tab" data-pay-tab="paid" onclick="setPayListTab('paid')">Оплаченные <span class="pay-list-count" data-pay-count="paid">0</span></button>
+                <button class="filter-tab" data-pay-tab="all" onclick="setPayListTab('all')">Все <span class="pay-list-count" data-pay-count="all">0</span></button>
+              </div>
+            </div>
+          </div>
+          <div class="pay-list-filters">
+            <div class="pay-list-search">
+              <i class="ti ti-search"></i>
+              <input type="search" id="pay-list-q" autocomplete="off" placeholder="Поиск: поставщик, назначение, сумма, кто внёс" oninput="onPayListSearch(this.value)">
+            </div>
+            <select id="pay-list-supplier" onchange="onPayListSupplier(this.value)">
+              <option value="">Все поставщики</option>
+            </select>
+            <select id="pay-list-type" onchange="onPayListType(this.value)">
+              <option value="">Тип: все</option>
+              <option value="invoice">Тип: счёт по заказу</option>
+              <option value="advance">Тип: аванс без счёта</option>
+            </select>
+            <label class="pay-list-check"><input type="checkbox" id="pay-list-only-adv" onchange="onPayListOnlyAdv(this.checked)"> Только авансы</label>
+            <label class="pay-list-check"><input type="checkbox" id="pay-list-mine" onchange="onPayListMine(this.checked)"> Мои записи</label>
+          </div>
+          <div id="pay-list-body" class="pay-list-wrap">
+            <div class="loading-block">Загружаем счета…</div>
+          </div>
+        </div>
+      </div>
+
       <!-- КАРТОЧКА ЗАКАЗА -->
       <div class="screen" data-screen="supply-order-detail" data-section="supply">
         <div class="content-inner" style="max-width: 100%;" id="sup-ord-detail">
