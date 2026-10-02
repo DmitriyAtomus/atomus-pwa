@@ -27092,3 +27092,36 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
 .ads-spin { display: inline-block; animation: ads-spin 1s linear infinite; }
 @keyframes ads-spin { to { transform: rotate(360deg); } }
 @media (max-width: 760px) { .ads-table th:nth-child(4), .ads-table td:nth-child(4) { display: table-cell; } }
+
+/* v2.46.235: экран «Счета на оплату» — счета по заказам и авансы без счёта */
+.pay-list-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pay-list-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0 12px; }
+.pay-list-search { position: relative; flex: 1 1 240px; min-width: 180px; max-width: 420px; }
+.pay-list-search i { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-light); pointer-events: none; }
+.pay-list-search input, .pay-list-filters select {
+  width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--border);
+  border-radius: 10px; font-size: 14px; background: var(--bg); color: var(--text-dark);
+}
+.pay-list-search input { padding-left: 34px; }
+.pay-list-filters select { width: auto; max-width: 100%; }
+.pay-list-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-mid); cursor: pointer; user-select: none; }
+.pay-list-check input { width: 16px; height: 16px; margin: 0; }
+.pay-list-count { margin-left: 4px; opacity: 0.75; font-weight: 600; }
+.pay-list-wrap { overflow-x: auto; }
+.pay-list-table { width: 100%; border-collapse: collapse; min-width: 760px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.pay-list-table th { text-align: left; font-size: 12px; font-weight: 650; color: var(--text-light); padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.pay-list-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 13.5px; }
+.pay-list-table tr:last-child td { border-bottom: none; }
+.pay-list-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.pay-list-tag.advance { background: #EAF2FA; color: #1E4E79; }
+.pay-list-tag.invoice { background: #F4F6FA; color: #3A4154; }
+.pay-list-order { display: block; margin-top: 2px; font-size: 12px; color: var(--text-light); }
+.pay-list-status { display: inline-flex; align-items: center; gap: 6px; font-weight: 650; white-space: nowrap; }
+.pay-list-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.pay-list-dot.to_pay { background: #C2410C; }
+.pay-list-dot.paid { background: #1F7B3F; }
+.pay-list-empty { padding: 28px 8px; color: var(--text-light); text-align: center; }
+.pay-adv-meta { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--bg); color: var(--text-mid); font-size: 13px; line-height: 1.45; }
+@media (max-width: 720px) {
+  .pay-list-filters select, .pay-list-search { flex: 1 1 100%; max-width: none; }
+}
