@@ -180,3 +180,11 @@ async function prospectsImport(preview) {
   } catch (e) { _prospects.preview = false; document.getElementById('prospects-import-apply').hidden = true; output.textContent = e.message || 'Не удалось прочитать ответ сервера'; }
   finally { buttons.forEach(function (b) { b.disabled = false; }); }
 }
+
+/* v2026-10-02: защита create task от двойного клика / таймаута */
+(function () {
+  var s = document.createElement('script');
+  s.src = '/task-form-guard.js';
+  s.async = false;
+  document.head.appendChild(s);
+})();
