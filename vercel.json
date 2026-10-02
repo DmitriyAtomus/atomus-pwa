@@ -2,15 +2,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://entry-encyclopedia-gmbh-career.trycloudflare.com/api/:path*"
+      "destination": "https://api.atomuscrm.ru/api/:path*"
     },
     {
       "source": "/static/:path*",
-      "destination": "https://entry-encyclopedia-gmbh-career.trycloudflare.com/static/:path*"
+      "destination": "https://api.atomuscrm.ru/static/:path*"
     },
     {
       "source": "/kp/:path*",
-      "destination": "https://entry-encyclopedia-gmbh-career.trycloudflare.com/kp/:path*"
+      "destination": "https://api.atomuscrm.ru/kp/:path*"
     },
     {
       "source": "/a/:token",
