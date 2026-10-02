@@ -1,7 +1,7 @@
 // Backend requests go through the Vercel origin. This keeps CRM available on
 // networks where Railway's public edge IPs are unreachable.
 const API_BASE = window.location.origin;
-const API_DIRECT_FALLBACK = 'https://worker-production-9b70.up.railway.app';
+const API_DIRECT_FALLBACK = 'https://entry-encyclopedia-gmbh-career.trycloudflare.com';
 const _atomusNativeFetch = window.fetch.bind(window);
 // Через VPN/защитный экран Vercel обычный GET иногда уже дошёл до backend,
 // но ответ держится на прокси много секунд. Для чтения это безопасно: если
