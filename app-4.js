@@ -18261,11 +18261,16 @@ function _renderTeamMessageFiles(files) {
   if (!files || !files.length) return '';
   let html = '<div class="cchat-msg-files">';
   files.forEach(f => {
-    const url = API_BASE + (f.url || '/api/team-chats/messages/files/' + f.id);
+    // v2.46.237: вложения — напрямую через api.atomuscrm.ru (ссылка подписана e/s,
+    // заголовок не нужен). <img>/<video> не проходят через fetch-фолбэк, и когда
+    // Vercel Security Checkpoint отвечает 403 на same-origin /api, файлы в чате
+    // не грузились вовсе. Заодно минус лишний хоп через Vercel.
+    const url = (typeof API_DIRECT_FALLBACK !== 'undefined' ? API_DIRECT_FALLBACK : API_BASE)
+      + (f.url || '/api/team-chats/messages/files/' + f.id);
     if (f.kind === 'photo') {
-      html += '<a href="' + url + '" target="_blank" class="cchat-file-img"><img src="' + url + '" alt=""></a>';
+      html += '<a href="' + url + '" target="_blank" class="cchat-file-img"><img src="' + url + '" alt="" loading="lazy" decoding="async"></a>';
     } else if (f.kind === 'video') {
-      html += '<video controls class="cchat-file-video"><source src="' + url + '" type="' + escapeHtml(f.content_type || '') + '"></video>';
+      html += '<video controls preload="metadata" class="cchat-file-video"><source src="' + url + '" type="' + escapeHtml(f.content_type || '') + '"></video>';
     } else {
       const name = f.original_name || ('Файл #' + f.id);
       const sz = f.file_size ? Math.round(f.file_size / 1024) + ' КБ' : '';
