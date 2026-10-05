@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "include": ["/api", "/api/*", "/static/*", "/kp/*", "/a/*", "/b/*", "/c/*", "/d/*", "/u/*", "/dev/*", "/feedback", "/feedback/"],
+  "exclude": []
+}
