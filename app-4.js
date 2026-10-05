@@ -16132,15 +16132,24 @@ async function saveSalesReport() {
   });
   const btn = document.getElementById('sr-save-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Сохраняю…'; }
+  // v2.46.238: отдельно ошибка apiPost и успех; сбой перезагрузки ≠ «Не удалось сохранить»
+  let res;
   try {
-    const res = await apiPost('/api/sales/reports', body);
+    res = await apiPost('/api/sales/reports', body);
     if (!res.ok) throw new Error((res.data && res.data.message) || 'HTTP ' + res.status);
-    showToast('Отчёт сохранён', 'success');
-    _srState.month = rdate.slice(0, 7);  // показать месяц сохранённого отчёта
-    await loadSalesReports();
   } catch (e) {
     showToast('Не удалось сохранить: ' + (e.message || ''), 'error');
     if (btn) { btn.disabled = false; _srPrefillFromDate(); }
+    return;
+  }
+  showToast('Отчёт сохранён', 'success');
+  _srState.month = rdate.slice(0, 7);  // показать месяц сохранённого отчёта
+  try {
+    await loadSalesReports();
+  } catch (e) {
+    if (typeof showToast === 'function') {
+      showToast('Сохранено, но список не обновился', 'error');
+    }
   }
 }
 
@@ -16195,17 +16204,19 @@ function _srReportToText(name, position, r) {
   let s = (name || 'Менеджер') + '\n' +
     'Дата ' + _srFmtDateRu(r.report_date) + '\n';
   if (position) s += 'Должность: ' + position + '\n';
+  // v2.46.238: закрываем * для Telegram bold; заявки (new_leads) в итогах
   s += 'Звонков: ' + (r.calls || 0) + '\n' +
     'Дозвоны: ' + (r.connects || 0) + '\n' +
     'Новых заявок: ' + (r.new_leads || 0) + '\n' +
     'КП выставлено: ' + (r.offers || 0) + '\n' +
     'Сделок заключено: ' + (r.deals || 0) + '\n' +
     'Выручка: ' + (r.revenue || 0) + '\n' +
-    '*итого: звонков = ' + (c.calls || 0) + '\n' +
-    '*итого: дозвоны = ' + (c.connects || 0) + '\n' +
-    '*итого: КП = ' + (c.offers || 0) + '\n' +
-    '*итого: сделок = ' + (c.deals || 0) + '\n' +
-    '*итого: выручка = ' + (c.revenue || 0);
+    '*итого: звонков = ' + (c.calls || 0) + '*\n' +
+    '*итого: дозвоны = ' + (c.connects || 0) + '*\n' +
+    '*итого: заявок = ' + (c.new_leads || 0) + '*\n' +
+    '*итого: КП = ' + (c.offers || 0) + '*\n' +
+    '*итого: сделок = ' + (c.deals || 0) + '*\n' +
+    '*итого: выручка = ' + (c.revenue || 0) + '*';
   return s;
 }
 

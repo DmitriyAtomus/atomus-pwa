@@ -9,9 +9,12 @@ const _atomusNativeFetch = window.fetch.bind(window);
 // нормальный ответ. Изменяющие запросы (POST/PATCH/DELETE) не дублируем.
 const API_GET_HEDGE_DELAY_MS = 450;
 const API_GET_TIMEOUT_MS = 12000;
-// Планёрка пишет по тому же маршруту, который уже успешно обслужил её чтение.
-// Это не повтор POST: при потере ответа запись автоматически не дублируется.
-let _planerkaDirectRouteUntil = 0;
+// Мутации: same-origin прокси может висеть без 403 — ждём ~3.5с, abort, затем direct.
+const API_MUTATION_PRIMARY_TIMEOUT_MS = 3500;
+const API_DIRECT_STICKY_MS = 60000;
+// Sticky: если чтение (или мутация после таймаута/403) ушло на прямой API —
+// следующие мутации сразу туда ~60с. POST не дублируем: primary abort перед direct.
+let _apiDirectRouteUntil = 0;
 
 // v2.46.028: Vercel Security Checkpoint может отвечать HTML или JSON 403 на
 // API-запросы, когда компьютер работает через VPN. В этом случае повторяем
@@ -61,6 +64,22 @@ function _firstApiResponse(primary, fallbackFactory) {
   });
 }
 
+function _apiMarkDirectSticky() {
+  _apiDirectRouteUntil = Date.now() + API_DIRECT_STICKY_MS;
+}
+
+function _apiMergeAbortSignal(init, input, controller) {
+  const primaryInit = Object.assign({}, init || {});
+  const existingSignal = primaryInit.signal ||
+    (input && typeof input === 'object' && input.signal) || null;
+  if (existingSignal) {
+    if (existingSignal.aborted) controller.abort();
+    else existingSignal.addEventListener('abort', function () { controller.abort(); });
+  }
+  primaryInit.signal = controller.signal;
+  return primaryInit;
+}
+
 window.fetch = async function atomusApiFetch(input, init) {
   const requestUrl = new URL(
     typeof input === 'string' ? input : input.url,
@@ -88,34 +107,44 @@ window.fetch = async function atomusApiFetch(input, init) {
     const result = await _firstApiResponse(primary, function () {
       return _atomusNativeFetch(fallbackUrl, init);
     });
-    if (requestUrl.pathname === '/api/planerka' && result.status >= 200 && result.status < 300 &&
-        (result.headers.get('content-type') || '').includes('application/json')) {
-      _planerkaDirectRouteUntil = result.url && new URL(result.url).origin === API_DIRECT_FALLBACK
-        ? Date.now() + 60000 : 0;
+    // Успешный GET с прямого API → мутации тоже туда ~60с (как planerka sticky).
+    if (result.status >= 200 && result.status < 300 &&
+        result.url && new URL(result.url).origin === API_DIRECT_FALLBACK) {
+      _apiMarkDirectSticky();
     }
     return result;
   }
 
-  if (isProxiedApi && requestUrl.pathname.startsWith('/api/planerka/') &&
-      method !== 'GET' && _planerkaDirectRouteUntil > Date.now()) {
-    return _atomusNativeFetch(fallbackUrl, init);
+  // POST/PATCH/DELETE /api/*: sticky → сразу direct; иначе primary с таймаутом,
+  // при abort/network/403 → abort primary (без дубля) и direct + sticky.
+  if (isProxiedApi && method !== 'GET') {
+    if (_apiDirectRouteUntil > Date.now()) {
+      return _atomusNativeFetch(fallbackUrl, init);
+    }
+    const controller = new AbortController();
+    const primaryInit = _apiMergeAbortSignal(init, input, controller);
+    const timeoutId = setTimeout(function () { controller.abort(); }, API_MUTATION_PRIMARY_TIMEOUT_MS);
+    try {
+      const response = await _atomusNativeFetch(input, primaryInit);
+      clearTimeout(timeoutId);
+      if (response.status === 403) {
+        _apiMarkDirectSticky();
+        return _atomusNativeFetch(fallbackUrl, init);
+      }
+      return response;
+    } catch (_) {
+      clearTimeout(timeoutId);
+      // Abort/network: primary уже прерван — повтор только через direct.
+      _apiMarkDirectSticky();
+      return _atomusNativeFetch(fallbackUrl, init);
+    }
   }
-  let response;
-  try {
-    response = await _atomusNativeFetch(input, init);
-  } catch (_) {
-    // A network error from the Vercel edge should use the direct API immediately.
-    if (isProxiedApi) return _atomusNativeFetch(fallbackUrl, init);
-    throw _;
-  }
-  if (!isProxiedApi || response.status !== 403) return response;
 
-  // Never expose a same-origin 403 to CRM: retry it through the direct API.
-  return _atomusNativeFetch(fallbackUrl, init);
+  return _atomusNativeFetch(input, init);
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.237";
+const APP_VERSION = "v2.46.238";
 const APP_VERSION_DATE = "05.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -19519,6 +19548,10 @@ function renderSalesMore() {
       '<div class="ui-roles">' + escapeHtml(document.getElementById('top-userrole').textContent || 'без роли') + '</div>' +
     '</div></div>';
 
+  // v2.46.238: на телефоне «Отчёты» только в drawer — дублируем в Продажи → Ещё
+  html += '<div class="more-menu-grid"><div class="more-menu-card" onclick="selectSidebarItem(\'sales-reports\')">' +
+    '<div class="mmc-icon"><i class="ti ti-chart-bar"></i></div><div class="mmc-title">Отчёты</div>' +
+    '<div class="mmc-desc">Ежедневные KPI: звонки, заявки, КП</div></div></div>';
   html += '<div class="more-menu-grid"><div class="more-menu-card" onclick="selectSidebarItem(\'sales-prospects\')">' +
     '<div class="mmc-icon"><i class="ti ti-building-factory-2"></i></div><div class="mmc-title">Заводы и сыроварни</div>' +
     '<div class="mmc-desc">База потенциальных заказчиков</div></div></div>';
