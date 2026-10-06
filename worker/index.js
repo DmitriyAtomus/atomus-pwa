@@ -52,6 +52,14 @@ export default {
       return proxy(request, url);
     }
 
+    // /index.html: serve the root document directly (no 307 to "/"), like Vercel did.
+    // sw.js precaches '/index.html' and uses it as the offline navigation fallback;
+    // a redirected cached response would be rejected for navigations.
+    if (p === '/index.html') {
+      const idx = await env.ASSETS.fetch(new Request(new URL('/', url).toString(), { method: request.method, headers: request.headers }));
+      return withRobots(idx);
+    }
+
     // Token / feedback deep links -> index.html (SPA)
     if (SPA_ROUTES.test(p)) {
       const idx = await env.ASSETS.fetch(new Request(new URL('/', url).toString(), { headers: request.headers }));

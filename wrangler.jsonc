@@ -14,7 +14,7 @@
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
     "run_worker_first": [
-      "/api", "/api/*", "/static/*", "/kp/*",
+      "/api", "/api/*", "/static/*", "/kp/*", "/index.html",
       "/a/*", "/b/*", "/c/*", "/d/*", "/u/*", "/dev/*",
       "/feedback", "/feedback/"
     ]
