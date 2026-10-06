@@ -46,3 +46,7 @@
 @media(max-width:600px){.pres-grid{grid-template-columns:1fr}.pres-actions .btn{flex:1;justify-content:center}}
 .pres-progress[hidden],.pres-form [hidden]{display:none!important}
 @media(max-width:600px){#pres-body{padding-left:12px;padding-right:12px}}
+
+/* v2.46.242 */
+#pres-refresh-btn.is-loading i{animation:pres-spin .8s linear infinite}
+@keyframes pres-spin{to{transform:rotate(360deg)}}

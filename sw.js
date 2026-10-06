@@ -5,7 +5,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.241';
+const CACHE_VERSION = 'atomus-v1.8.242';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -110,6 +110,15 @@ self.addEventListener('fetch', (event) => {
 
   // Планёрка управляет живой встречей: старый ответ скрывает сохранённые изменения.
   if (url.pathname === '/api/planerka' || url.pathname.startsWith('/api/planerka/')) {
+    event.respondWith(fetch(req));
+    return;
+  }
+
+  // v2.46.242: «Презентации» — только сеть, никакого кэша: иначе удалённая
+  // презентация «висит» из старого ответа, когда прокси Vercel недоступен.
+  if (url.pathname.startsWith('/api/presentations') ||
+      url.pathname.startsWith('/api/public/presentations') ||
+      url.pathname.startsWith('/pres/')) {
     event.respondWith(fetch(req));
     return;
   }
@@ -242,7 +251,8 @@ self.addEventListener('notificationclick', (event) => {
 async function networkFirst(req) {
   try {
     const res = await fetch(req);
-    if (res && res.ok) {
+    const cc = (res && res.headers.get('Cache-Control')) || '';
+    if (res && res.ok && !/no-store/i.test(cc)) {   // v2.46.242: no-store не кладём в кэш
       // Кэшируем успешные GET-ответы API (только если есть Authorization,
       // чтобы кэш привязывался к пользователю — но мы не различаем по токену
       // в Cache API, поэтому просто кэшируем; если другой пользователь зайдёт,

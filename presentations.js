@@ -5,7 +5,7 @@
    4,5 МБ. Каждая часть — отдельный запрос с процентами, таймаутом и повтором,
    поэтому обрыв связи не молчит и не начинает загрузку заново. */
 var _pres = { items: [], categories: [], used: [], canUpload: false, maxSize: 100 * 1048576,
-  allowed: [], cat: '', q: '', file: null, uploading: null, editId: null, loadedOnce: false };
+  allowed: [], cat: '', q: '', file: null, uploading: null, editId: null, loadedOnce: false, loading: false, loadedAt: 0 };
 var PRES_PART_TIMEOUT_MS = 120000;
 var PRES_PART_RETRIES = 3;
 
@@ -36,12 +36,31 @@ function _presErr(d, status) {
   return (d && (d.message || d.error)) || ('HTTP ' + status);
 }
 
-async function loadPresentations() {
+// v2.46.242: список всегда свежий. Перечитываем при каждом входе в раздел, после
+// любого изменения, по кнопке «Обновить», при возврате во вкладку и раз в минуту,
+// пока раздел открыт. «?_=время» — чтобы ни один кэш (в т.ч. старый service
+// worker) не подсунул прошлый ответ, где удалённая презентация ещё есть.
+function _presVisible() {
+  const box = document.getElementById('pres-body');
+  return !!(box && box.offsetParent !== null && document.visibilityState === 'visible');
+}
+function _presAutoRefresh() {
+  if (_presVisible() && !_pres.loading && Date.now() - (_pres.loadedAt || 0) > 5000) loadPresentations();
+}
+document.addEventListener('visibilitychange', _presAutoRefresh);
+window.addEventListener('focus', _presAutoRefresh);
+setInterval(function () { if (_presVisible() && Date.now() - (_pres.loadedAt || 0) > 55000) _presAutoRefresh(); }, 60000);
+
+async function loadPresentations(manual) {
   const box = document.getElementById('pres-body');
   if (!box) return;
   if (!_pres.loadedOnce) box.innerHTML = '<div class="loading-block">Загружаем…</div>';
+  const rb = document.getElementById('pres-refresh-btn');
+  if (rb) rb.classList.add('is-loading');
+  _pres.loading = true;
   try {
-    const d = await apiGet('/api/presentations');
+    const d = await apiGet('/api/presentations?_=' + Date.now());
+    _pres.loadedAt = Date.now();
     _pres.items = d.items || [];
     _pres.categories = d.categories || [];
     _pres.used = d.used_categories || [];
@@ -53,10 +72,23 @@ async function loadPresentations() {
     const up = document.getElementById('pres-upload-btn');
     if (up) up.style.display = _pres.canUpload ? '' : 'none';
     renderPresentations();
+    if (manual) showToast('Список обновлён', 'success');
   } catch (e) {
+    if (manual && _pres.loadedOnce) { showToast('Не удалось обновить: ' + _presE(e.serverMessage || e.message || e), 'error'); return; }
     box.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить презентации: ' +
-      _presE(e.message || e) + '<br><button class="btn btn-secondary" style="margin-top:12px" onclick="loadPresentations()">Повторить</button></div>';
+      _presE(e.message || e) + '<br><button class="btn btn-secondary" style="margin-top:12px" onclick="loadPresentations(true)">Повторить</button></div>';
+  } finally {
+    _pres.loading = false;
+    if (rb) rb.classList.remove('is-loading');
   }
+}
+
+// Презентацию уже удалили (на сервере 404) — убираем из списка и говорим об этом.
+function _presGone(id) {
+  _pres.items = _pres.items.filter(function (x) { return x.id !== id; });
+  renderPresentations();
+  showToast('Презентация удалена', 'error');
+  loadPresentations();
 }
 
 function presSetCat(c) { _pres.cat = c; renderPresentations(); }
@@ -148,7 +180,7 @@ async function presOpen(id, download) {
   // Окно открываем сразу (в обработчике клика), иначе браузер заблокирует всплывающее
   const w = download ? null : window.open('about:blank', '_blank');
   try {
-    const d = await apiGet('/api/presentations/' + id + '/link' + (download ? '?download=1' : ''));
+    const d = await apiGet('/api/presentations/' + id + '/link?' + (download ? 'download=1&' : '') + '_=' + Date.now());
     if (!d.url) throw new Error('сервер не вернул ссылку');
     if (w) { w.location.href = d.url; return; }
     const a = document.createElement('a');
@@ -157,7 +189,8 @@ async function presOpen(id, download) {
     showToast('Скачивание началось', 'success');
   } catch (e) {
     if (w) try { w.close(); } catch (_) {}
-    showToast('Не удалось открыть файл: ' + (e.message || e), 'error');
+    if (e && e.status === 404) { _presGone(id); return; }
+    showToast('Не удалось открыть файл: ' + (e.serverMessage || e.message || e), 'error');
   }
 }
 
@@ -165,6 +198,12 @@ async function presCopyLink(id) {
   const it = _presById(id);
   if (!it) return;
   const url = it.share_url;
+  // v2.46.242: не раздаём клиентам ссылку на уже удалённую презентацию
+  try {
+    await apiGet('/api/presentations/' + id + '/link?_=' + Date.now());
+  } catch (e) {
+    if (e && e.status === 404) { _presGone(id); return; }
+  }
   try {
     await navigator.clipboard.writeText(url);
     showToast('Ссылка скопирована — её можно отправить клиенту', 'success');
@@ -179,6 +218,8 @@ async function presDelete(id) {
   if (!confirm('Удалить презентацию «' + it.title + '»?\nСсылки, отправленные клиентам, перестанут открываться.')) return;
   try {
     await apiDelete('/api/presentations/' + id);
+    _pres.items = _pres.items.filter(function (x) { return x.id !== id; });
+    renderPresentations();
     showToast('Презентация удалена', 'success');
     loadPresentations();
   } catch (e) {

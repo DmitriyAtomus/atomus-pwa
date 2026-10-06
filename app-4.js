@@ -16491,6 +16491,14 @@ function _showUpdateBanner() {
     });
 }
 
+// v2.46.242: активировать новую версию без вопроса, если терять нечего.
+function _swAutoApplyIfSafe(reg) {
+  if (!reg || !reg.waiting || _swReloadingNow) return false;
+  if (typeof hasUnsavedChanges === 'function' && hasUnsavedChanges()) return false;
+  reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+  return true;
+}
+
 function applySWUpdate() {
   // Если есть несохранённые черновики — спрашиваем подтверждение
   if (typeof hasUnsavedChanges === 'function' && hasUnsavedChanges()) {
@@ -16521,7 +16529,8 @@ if ('serviceWorker' in navigator) {
       .then((reg) => {
         // Если есть уже ожидающий SW при загрузке (мы его пропустили в прошлый раз)
         if (reg.waiting && navigator.serviceWorker.controller) {
-          _showUpdateBanner();
+          // v2.46.242: при открытии приложения формы ещё пусты — ставим сразу
+          if (!_swAutoApplyIfSafe(reg)) _showUpdateBanner();
         }
         // Слушаем установку нового SW
         reg.addEventListener('updatefound', () => {
@@ -16529,7 +16538,7 @@ if ('serviceWorker' in navigator) {
           if (!newWorker) return;
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              _showUpdateBanner();
+              if (!(document.visibilityState === 'hidden' && _swAutoApplyIfSafe(reg))) _showUpdateBanner();
             }
           });
         });
@@ -16539,6 +16548,12 @@ if ('serviceWorker' in navigator) {
             reg.update().catch(() => {});
           }
         }, 60 * 1000);
+        // v2.46.242: ушли со вкладки — тихо ставим ожидающее обновление (если нет
+        // несохранённых форм); вернулись — проверяем, не вышла ли новая версия.
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'hidden') _swAutoApplyIfSafe(reg);
+          else reg.update().catch(() => {});
+        });
       })
       .catch((err) => console.warn('SW registration failed:', err));
 
