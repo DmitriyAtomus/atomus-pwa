@@ -176,6 +176,9 @@
   if (/[?&]sentry_test=1\b/.test(location.search)) {
     setTimeout(function () {
       try {
+        // Verification-only identity (not a real employee)
+        window.Sentry.setUser({ id: 'sentry-test', username: 'sentry-test' });
+        window.Sentry.setTag('role', 'test');
         window.Sentry.setTag('section', _section || 'login');
         window.Sentry.captureException(new Error('Atom CRM Sentry test event (' + env + ', v2.46.245)'));
       } catch (e) {}
