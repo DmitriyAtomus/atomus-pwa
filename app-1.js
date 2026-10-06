@@ -144,8 +144,8 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.239";
-const APP_VERSION_DATE = "05.10.2026";
+const APP_VERSION = "v2.46.240";
+const APP_VERSION_DATE = "06.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -2056,6 +2056,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'sales-surveys') loadSurveys();
   // Ежедневные отчёты менеджеров (KPI)
   if (screenName === 'sales-reports') loadSalesReports();
+  if (screenName === 'sales-presentations' && typeof loadPresentations === 'function') loadPresentations();  // v2.46.240
   if (screenName === 'sales-offer-detail') loadCurrentOffer();
   // ЭТАП 18 → 28.1: склад — единый дашборд с табами
   if (screenName === 'warehouse-stock')      switchWarehouseTab('stock');
@@ -19552,6 +19553,9 @@ function renderSalesMore() {
   html += '<div class="more-menu-grid"><div class="more-menu-card" onclick="selectSidebarItem(\'sales-reports\')">' +
     '<div class="mmc-icon"><i class="ti ti-chart-bar"></i></div><div class="mmc-title">Отчёты</div>' +
     '<div class="mmc-desc">Ежедневные KPI: звонки, заявки, КП</div></div></div>';
+  html += '<div class="more-menu-grid"><div class="more-menu-card" onclick="selectSidebarItem(\'sales-presentations\')">' +
+    '<div class="mmc-icon"><i class="ti ti-presentation"></i></div><div class="mmc-title">Презентации</div>' +
+    '<div class="mmc-desc">Для клиентов по отраслям</div></div></div>';
   html += '<div class="more-menu-grid"><div class="more-menu-card" onclick="selectSidebarItem(\'sales-prospects\')">' +
     '<div class="mmc-icon"><i class="ti ti-building-factory-2"></i></div><div class="mmc-title">Заводы и сыроварни</div>' +
     '<div class="mmc-desc">База потенциальных заказчиков</div></div></div>';

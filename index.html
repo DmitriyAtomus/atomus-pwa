@@ -25,6 +25,7 @@
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="/prospects.css">
 <link rel="stylesheet" href="/campaigns.css">
+<link rel="stylesheet" href="/presentations.css">
 
 <!-- Three.js грузится только при открытии STEP-модели. Import map нужен
      OrbitControls: основной модуль и дополнения обязаны быть одной версии. -->
@@ -770,6 +771,10 @@
         <!-- v2.45.223: опросные листы (анкеты клиентов) -->
         <button class="nav-item" data-nav="sales-surveys" onclick="selectSidebarItem('sales-surveys')">
           <i class="ti ti-clipboard-text"></i><span>Опросные листы</span>
+        </button>
+        <!-- v2.46.240: продажные презентации (по отраслям) -->
+        <button class="nav-item" data-nav="sales-presentations" onclick="selectSidebarItem('sales-presentations')">
+          <i class="ti ti-presentation"></i><span>Презентации</span>
         </button>
         <button class="nav-item" data-nav="sales-prospects" onclick="selectSidebarItem('sales-prospects')">
           <i class="ti ti-building-factory-2"></i><span>Заводы и сыроварни</span>
@@ -2181,6 +2186,27 @@
           </div>
         </div>
         <div class="content-inner" id="surveys-list">
+          <div class="loading-block">Загружаем…</div>
+        </div>
+      </div>
+
+      <!-- v2.46.240: ПРЕЗЕНТАЦИИ для клиентов -->
+      <div class="screen" data-screen="sales-presentations" data-section="sales">
+        <div class="screen-header">
+          <h2>Презентации</h2>
+          <button class="icon-btn" onclick="presOpenUpload()" title="Загрузить"><i class="ti ti-plus"></i></button>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>Презентации</h1>
+            <div class="page-subtitle">Продажные презентации по отраслям — откройте, скачайте или отправьте клиенту ссылку</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" id="pres-upload-btn" onclick="presOpenUpload()" style="display:none"><i class="ti ti-upload"></i> Загрузить</button>
+            <button class="icon-btn" onclick="loadPresentations()" title="Обновить"><i class="ti ti-refresh"></i></button>
+          </div>
+        </div>
+        <div class="content-inner" id="pres-body">
           <div class="loading-block">Загружаем…</div>
         </div>
       </div>
@@ -3721,6 +3747,38 @@
 </div>
 <!-- ============ /КОМАНДНЫЙ ЧАТ ============ -->
 
+<!-- v2.46.240: загрузка / правка презентации -->
+<div class="modal-overlay" id="pres-modal" onclick="if(event.target===this) presCloseModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="ti ti-presentation"></i> <span id="pres-m-title">Новая презентация</span></h3>
+      <button class="modal-close" onclick="presCloseModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="pres-form">
+      <div id="pres-f-file-row">
+        <label class="pres-file">
+          <input type="file" id="pres-f-file" accept=".pdf,.pptx,.ppt,.key,.docx,.jpg,.jpeg,.png,.webp,.gif,.heic" onchange="presFileChosen(this)">
+          <b><i class="ti ti-file-upload"></i> Выбрать файл</b>
+          <span id="pres-f-file-info"></span>
+        </label>
+      </div>
+      <label>Название<input type="text" id="pres-f-title" maxlength="200" placeholder="Например: Холодильные камеры для ресторанов"></label>
+      <label>Отрасль / категория<input type="text" id="pres-f-cat" maxlength="60" list="pres-cat-list" placeholder="Рестораны, Сыроварни, Чиллеры…"></label>
+      <datalist id="pres-cat-list"></datalist>
+      <label>Описание (необязательно)<textarea id="pres-f-desc" maxlength="2000" placeholder="Кому и когда отправлять"></textarea></label>
+      <div class="pres-progress" id="pres-progress" hidden>
+        <div class="pres-bar"><i></i></div>
+        <div class="pres-progress-row"><span class="pres-progress-text"></span><button type="button" onclick="presCancelUpload()">Отменить</button></div>
+      </div>
+      <div id="pres-f-error"></div>
+    </div>
+    <div class="pres-footer">
+      <button class="btn btn-secondary" onclick="presCloseModal()">Закрыть</button>
+      <button class="btn btn-primary" id="pres-f-submit" onclick="presSubmit()"><i class="ti ti-upload"></i> Загрузить</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="model-modal">
   <div class="modal">
     <div class="modal-header">
@@ -3978,6 +4036,7 @@
 <script src="/app-4.js"></script>
 <script src="/prospects.js"></script>
 <script src="/campaigns.js"></script>
+<script src="/presentations.js"></script>
 <script src="/klava-pick.js"></script>
 <script>
 // v2.46.161: «Показать Клаве» — метки прямо на экране CRM уходят в чат идей
