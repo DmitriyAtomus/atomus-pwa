@@ -1,0 +1,11 @@
+.git
+.gitignore
+.assetsignore
+.wrangler
+.vercel
+node_modules
+wrangler.jsonc
+worker
+functions
+_routes.json
+vercel.json
