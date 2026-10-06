@@ -89,6 +89,17 @@ window.fetch = async function atomusApiFetch(input, init) {
     requestUrl.origin === window.location.origin &&
     requestUrl.pathname.startsWith('/api/');
 
+  // v2.46.245: прокидываем текущий раздел CRM в API (для бэкенд-Sentry tag section)
+  if (isProxiedApi) {
+    var _secH = _sentrySectionHeader();
+    if (_secH) {
+      init = init ? Object.assign({}, init) : {};
+      var _hdrs = new Headers((init && init.headers) || (input && typeof input === 'object' && input.headers) || {});
+      if (!_hdrs.has('X-Atomus-Section')) _hdrs.set('X-Atomus-Section', _secH);
+      init.headers = _hdrs;
+    }
+  }
+
   const method = String((init && init.method) ||
     (input && typeof input === 'object' && input.method) || 'GET').toUpperCase();
   const fallbackUrl =
@@ -143,8 +154,53 @@ window.fetch = async function atomusApiFetch(input, init) {
   return _atomusNativeFetch(input, init);
 };
 const TOKEN_KEY = "atomus_token";
+
+// v2.46.245: Sentry helpers (AtomusSentry from sentry-init.js)
+function _sentrySectionHeader() {
+  try {
+    if (window.AtomusSentry && typeof window.AtomusSentry.getSection === 'function') {
+      return window.AtomusSentry.getSection() || '';
+    }
+  } catch (e) {}
+  return '';
+}
+function _sentrySetNav(sectionName, screenName) {
+  try {
+    if (!window.AtomusSentry) return;
+    var sec = window.AtomusSentry.sectionFromNav(sectionName, screenName);
+    window.AtomusSentry.setSection(sec);
+  } catch (e) {}
+}
+function _sentryBindUser(me) {
+  try { if (window.AtomusSentry) window.AtomusSentry.setUserFromMe(me || null); } catch (e) {}
+}
+function _sentryApiFail(method, path, errOrStatus, kind) {
+  try {
+    if (!window.AtomusSentry || typeof window.AtomusSentry.captureApiFailure !== 'function') return;
+    var status = null;
+    var k = kind || 'http_error';
+    if (typeof errOrStatus === 'number') status = errOrStatus;
+    else if (errOrStatus && typeof errOrStatus === 'object') {
+      if (errOrStatus.name === 'AbortError' || /timeout|aborted|не ответил вовремя/i.test(String(errOrStatus.message || ''))) k = 'timeout';
+      else if (errOrStatus instanceof TypeError || /Failed to fetch|NetworkError|network|соединен/i.test(String(errOrStatus.message || ''))) k = 'network';
+      else if (errOrStatus.status) status = errOrStatus.status;
+    }
+    if (status != null && status < 500 && k === 'http_error') return;
+    window.AtomusSentry.captureApiFailure({ method: method, path: path, status: status, kind: k });
+  } catch (e) {}
+}
+function _sentryUiSpan(op, name, fn) {
+  try {
+    if (window.AtomusSentry && typeof window.AtomusSentry.startUiSpan === 'function') {
+      return window.AtomusSentry.startUiSpan(op, name, fn);
+    }
+  } catch (e) {}
+  return typeof fn === 'function' ? fn() : undefined;
+}
+
+
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.244";
+const APP_VERSION = "v2.46.245";
 const APP_VERSION_DATE = "06.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -404,9 +460,18 @@ async function apiPost(path, body) {
   const token = localStorage.getItem(TOKEN_KEY);
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
-  const response = await fetch(API_BASE + path, {
-    method: 'POST', headers, body: JSON.stringify(body),
-  });
+  var _sec = _sentrySectionHeader();
+  if (_sec) headers['X-Atomus-Section'] = _sec;
+  var response;
+  try {
+    response = await fetch(API_BASE + path, {
+      method: 'POST', headers, body: JSON.stringify(body),
+    });
+  } catch (e) {
+    _sentryApiFail('POST', path, e);
+    throw e;
+  }
+  if (response.status >= 500) _sentryApiFail('POST', path, response.status, 'http_error');
   return { ok: response.ok, status: response.status, data: await response.json() };
 }
 
@@ -415,9 +480,18 @@ async function apiPatch(path, body) {
   const token = localStorage.getItem(TOKEN_KEY);
   if (!token) throw new Error('Нет токена');
   const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
-  const response = await fetch(API_BASE + path, {
-    method: 'PATCH', headers, body: JSON.stringify(body || {}),
-  });
+  var _sec = _sentrySectionHeader();
+  if (_sec) headers['X-Atomus-Section'] = _sec;
+  var response;
+  try {
+    response = await fetch(API_BASE + path, {
+      method: 'PATCH', headers, body: JSON.stringify(body || {}),
+    });
+  } catch (e) {
+    _sentryApiFail('PATCH', path, e);
+    throw e;
+  }
+  if (response.status >= 500) _sentryApiFail('PATCH', path, response.status, 'http_error');
   // v2.45.194: только 401 (нет/истёк токен) разлогинивает. 403 (доступ запрещён
   // по роли) — НЕ выкидывает из системы: сессия валидна, просто нет прав на
   // конкретный запрос. Раньше мастер «вылетал» из договоров из-за 403.
@@ -438,10 +512,20 @@ async function apiGet(path) {
   if (!token) throw new Error('Нет токена');
   // v2.43.21: cache: 'no-store' обходит браузерный/SW кэш без дополнительных
   // заголовков (которые ломали CORS preflight).
-  const response = await fetch(API_BASE + path, {
-    headers: { 'Authorization': 'Bearer ' + token },
-    cache: 'no-store',
-  });
+  // v2.46.245: X-Atomus-Section + capture 5xx/network/timeout в Sentry
+  var _headers = { 'Authorization': 'Bearer ' + token };
+  var _sec = _sentrySectionHeader();
+  if (_sec) _headers['X-Atomus-Section'] = _sec;
+  var response;
+  try {
+    response = await fetch(API_BASE + path, {
+      headers: _headers,
+      cache: 'no-store',
+    });
+  } catch (e) {
+    _sentryApiFail('GET', path, e);
+    throw e;
+  }
   // v2.45.194: только 401 (нет/истёк токен) разлогинивает. 403 (доступ запрещён
   // по роли) — НЕ выкидывает из системы: сессия валидна, просто нет прав на
   // конкретный запрос. Раньше мастер «вылетал» из договоров из-за 403.
@@ -450,6 +534,7 @@ async function apiGet(path) {
     throw new Error('Сессия истекла');
   }
   if (!response.ok) {
+    if (response.status >= 500) _sentryApiFail('GET', path, response.status, 'http_error');
     // v2.46.241: текст ошибки сервера («Вы не участник этого чата») — в err.serverMessage,
     // чтобы экраны показывали причину, а не голое «HTTP 403». message прежний.
     const err = new Error('HTTP ' + response.status);
@@ -479,11 +564,20 @@ async function apiDelete(path, body) {
     method: 'DELETE',
     headers: { 'Authorization': 'Bearer ' + token },
   };
+  var _sec = _sentrySectionHeader();
+  if (_sec) opts.headers['X-Atomus-Section'] = _sec;
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
   }
-  const response = await fetch(API_BASE + path, opts);
+  var response;
+  try {
+    response = await fetch(API_BASE + path, opts);
+  } catch (e) {
+    _sentryApiFail('DELETE', path, e);
+    throw e;
+  }
+  if (response.status >= 500) _sentryApiFail('DELETE', path, response.status, 'http_error');
   // v2.45.194: только 401 (нет/истёк токен) разлогинивает. 403 (доступ запрещён
   // по роли) — НЕ выкидывает из системы: сессия валидна, просто нет прав на
   // конкретный запрос. Раньше мастер «вылетал» из договоров из-за 403.
@@ -586,6 +680,7 @@ async function submitCode() {
     }
     localStorage.setItem(TOKEN_KEY, r.data.token);
     state.user = r.data.user;
+    _sentryBindUser(r.data.user);
     setStatus('Готово!', 'success');
     // ЭТАП 28: приветствие после входа
     state._loginWelcome = r.data.user;
@@ -637,6 +732,7 @@ async function submitPassword() {
     }
     localStorage.setItem(TOKEN_KEY, r.data.token);
     state.user = r.data.user;
+    _sentryBindUser(r.data.user);
     setStatus('Готово!', 'success');
     state._loginWelcome = r.data.user;
     setTimeout(showApp, 300);
@@ -771,6 +867,7 @@ function logout() {
   // v2.45.117: при выходе сбрасываем кеш пароля
   if (typeof _clearCachedPassword === 'function') _clearCachedPassword();
   state.user = null;
+  _sentryBindUser(null);
   if (window.KlavaPick && typeof window.KlavaPick.syncVisibility === 'function') window.KlavaPick.syncVisibility();
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
@@ -1376,6 +1473,7 @@ function _loadMeAndStart() {
     if (_meRetryTimer) { clearTimeout(_meRetryTimer); _meRetryTimer = null; }
     _netBanner(false);
     state.user = me;
+    _sentryBindUser(me);
     if (window.KlavaPick && typeof window.KlavaPick.syncVisibility === 'function') window.KlavaPick.syncVisibility();
     renderProfile();
     applyPermissionsToUI();
@@ -1902,6 +2000,7 @@ function selectSection(sectionName) {
   if (!config) return;
 
   state.currentSection = sectionName;
+  _sentrySetNav(sectionName, null);
   // v2.45.646: обновляем рельсу разделов (активный + свежие счётчики из кэшей)
   try { renderSectionRail(); } catch (e) {}
 
@@ -1949,6 +2048,7 @@ function selectSection(sectionName) {
 
 function selectSidebarItem(screenName) {
   state.currentScreen = screenName;
+  _sentrySetNav(state.currentSection, screenName);
   // v2.39.0: если уходим с карточки заявки — глушим polling чата
   if (screenName !== 'defects-detail') {
     try { _stopDefectChatPolling && _stopDefectChatPolling(); } catch (_) {}
@@ -2091,7 +2191,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'planerka' && typeof loadPlanerka === 'function') loadPlanerka();  // v2.45.721
   if (screenName === 'sales-calcs' && typeof loadSalesCalcs === 'function') loadSalesCalcs();  // v2.45.725
   // ЭТАП 16В: задачи
-  if (screenName === 'tasks-list') loadTasksList();
+  if (screenName === 'tasks-list') _sentryUiSpan('ui.load', 'crm.open.tasks', function () { return loadTasksList(); });
   if (screenName === 'long-tasks') loadLongTasks();
   if (screenName === 'tasks-auto') loadTasksAuto();
   if (screenName === 'tasks-mine') loadTasksMine();
@@ -2130,7 +2230,7 @@ function runScreenLoader(screenName) {
   // v2.45.223: опросные листы
   if (screenName === 'sales-surveys') loadSurveys();
   // Ежедневные отчёты менеджеров (KPI)
-  if (screenName === 'sales-reports') loadSalesReports();
+  if (screenName === 'sales-reports') _sentryUiSpan('ui.load', 'crm.open.reports', function () { return loadSalesReports(); });
   if (screenName === 'sales-presentations' && typeof loadPresentations === 'function') loadPresentations();  // v2.46.240
   if (screenName === 'sales-offer-detail') loadCurrentOffer();
   // ЭТАП 18 → 28.1: склад — единый дашборд с табами
@@ -2191,7 +2291,7 @@ function runScreenLoader(screenName) {
   if (screenName === 'defects-list-resolved') { state.defectsFilter = 'resolved';    loadDefectsList(); }
   if (screenName === 'defects-list-rejected') { state.defectsFilter = 'rejected';    loadDefectsList(); }
   // v2.45.523: командные чаты (свободные группы)
-  if (screenName === 'defects-chats') loadTeamChats();
+  if (screenName === 'defects-chats') _sentryUiSpan('ui.load', 'crm.open.chats_list', function () { return loadTeamChats(); });
   // v2.45.346: Монтаж
   if (screenName === 'installation-list')         { state.installFilter = 'all';     loadInstallationList(); }
   if (screenName === 'installation-list-active')  { state.installFilter = 'active';  loadInstallationList(); }

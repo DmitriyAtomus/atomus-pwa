@@ -18177,6 +18177,7 @@ async function refreshTeamChatsBadge() {
 
 // ---------- Открытие чата ----------
 async function openTeamChat(cid) {
+  const _run = async () => {
   _tchatCurrentId = cid;
   _tchatPendingFiles = [];
   _tchatLastSig = '';
@@ -18199,6 +18200,14 @@ async function openTeamChat(cid) {
     else { clearInterval(_tchatRefreshTimer); _tchatRefreshTimer = null; }
   }, 6000);
   setTimeout(() => { const i = document.getElementById('tchat-input'); if (i) i.focus(); }, 150);
+
+  };
+  try {
+    if (window.AtomusSentry && typeof window.AtomusSentry.startUiSpan === 'function') {
+      return await window.AtomusSentry.startUiSpan('ui.load', 'crm.open.chat', _run);
+    }
+  } catch (_) {}
+  return await _run();
 }
 
 function closeTeamChat() {
