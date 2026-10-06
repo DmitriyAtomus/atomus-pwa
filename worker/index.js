@@ -33,10 +33,39 @@ async function proxy(request, url) {
   return r;
 }
 
+// Sentry tunnel (v2.46.244): the browser SDK posts envelopes to /sentry-tunnel,
+// we forward them to Sentry ingest. Only our org/projects are accepted.
+const SENTRY_HOST = 'o4512209219616768.ingest.de.sentry.io';
+const SENTRY_PROJECTS = new Set(['4512209395843152']); // atomus-crm-frontend
+
+async function sentryTunnel(request) {
+  if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+  const body = await request.arrayBuffer();
+  if (body.byteLength > 1024 * 1024) return new Response('Payload Too Large', { status: 413 });
+  const head = new TextDecoder().decode(body.slice(0, Math.min(body.byteLength, 4096))).split('\n')[0];
+  let dsn;
+  try { dsn = new URL(JSON.parse(head).dsn); } catch (e) { return new Response('Bad envelope', { status: 400 }); }
+  const projectId = dsn.pathname.replace(/^\/+|\/+$/g, '');
+  if (dsn.hostname !== SENTRY_HOST || !SENTRY_PROJECTS.has(projectId)) {
+    return new Response('Forbidden', { status: 403 });
+  }
+  const resp = await fetch(`https://${SENTRY_HOST}/api/${projectId}/envelope/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-sentry-envelope' },
+    body,
+  });
+  return new Response(resp.body, {
+    status: resp.status,
+    headers: { 'Content-Type': resp.headers.get('Content-Type') || 'application/json', 'Cache-Control': 'no-store', 'X-Robots-Tag': ROBOTS },
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const p = url.pathname;
+
+    if (p === '/sentry-tunnel') return sentryTunnel(request);
 
     // /api/*, /static/* -> API (no such dirs in the repo)
     if (p === '/api' || p.startsWith('/api/') || p.startsWith('/static/')) {

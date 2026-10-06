@@ -7,7 +7,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.243';
+const CACHE_VERSION = 'atomus-v1.8.244';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 // v2.46.243: данные API больше НЕ кэшируются. Кэш только для файлов /static/*.
 const FILES_CACHE = `${CACHE_VERSION}-files`;
@@ -30,6 +30,9 @@ const STATIC_ASSETS = [
   '/presentations.js',
   '/presentations.css',
   '/klava-pick.js',
+  // v2.46.244: Sentry
+  '/vendor/sentry-11.4.0.bundle.tracing.min.js',
+  '/sentry-init.js',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

@@ -1,0 +1,4 @@
+worker/
+wrangler.jsonc
+.assetsignore
+functions/
