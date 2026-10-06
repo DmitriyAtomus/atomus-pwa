@@ -1,0 +1,22 @@
+{
+  // Atomus CRM frontend: Cloudflare Worker + static assets.
+  // Deploy: npx wrangler deploy   (Node >= 22; needs Workers Scripts:Edit via `wrangler login` or a token).
+  // API-only deploy (e.g. Cloudflare MCP): node worker/assets-manifest.mjs <out> -> assets-upload-session -> upload -> PUT script.
+  // Local test: `wrangler dev` with directory "." keeps reloading; copy assets to a dist dir for local runs.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "atomus-crm",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+    "run_worker_first": [
+      "/api", "/api/*", "/static/*", "/kp/*",
+      "/a/*", "/b/*", "/c/*", "/d/*", "/u/*", "/dev/*",
+      "/feedback", "/feedback/"
+    ]
+  }
+}
