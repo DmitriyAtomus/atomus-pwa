@@ -144,7 +144,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.242";
+const APP_VERSION = "v2.46.243";
 const APP_VERSION_DATE = "06.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1354,18 +1354,7 @@ function showApp() {
   if (window.KlavaPick && typeof window.KlavaPick.syncVisibility === 'function') window.KlavaPick.syncVisibility();
   applyLayout();
   if (!state.user) {
-    apiGet('/api/me').then(me => {
-      state.user = me;
-      if (window.KlavaPick && typeof window.KlavaPick.syncVisibility === 'function') window.KlavaPick.syncVisibility();
-      renderProfile();
-      applyPermissionsToUI();
-      _restoreLastView();
-      _showWelcomeIfFresh();
-      startNotifPolling();  // v2.19.0
-      startAutoRefresh();   // v1.8.763
-      setTimeout(function () { if (typeof _maybeMorningProgress === 'function') _maybeMorningProgress(); }, 800);  // v2.45.358
-    })
-      .catch(() => logout());
+    _loadMeAndStart();
   } else {
     renderProfile();
     applyPermissionsToUI();
@@ -1376,6 +1365,63 @@ function showApp() {
     setTimeout(function () { if (typeof _maybeMorningProgress === 'function') _maybeMorningProgress(); }, 800);  // v2.45.358
   }
 }
+
+// v2.46.243: раньше любая ошибка /api/me (даже «нет сети») выкидывала из CRM —
+// оффлайн это скрывал старый ответ из кэша service worker. Кэша данных больше
+// нет, поэтому: 401 → выход (делает apiGet), нет связи → видимая плашка
+// «Нет связи с сервером» и повтор, токен НЕ стираем.
+let _meRetryTimer = null;
+function _loadMeAndStart() {
+  apiGet('/api/me').then(me => {
+    if (_meRetryTimer) { clearTimeout(_meRetryTimer); _meRetryTimer = null; }
+    _netBanner(false);
+    state.user = me;
+    if (window.KlavaPick && typeof window.KlavaPick.syncVisibility === 'function') window.KlavaPick.syncVisibility();
+    renderProfile();
+    applyPermissionsToUI();
+    _restoreLastView();
+    _showWelcomeIfFresh();
+    startNotifPolling();  // v2.19.0
+    startAutoRefresh();   // v1.8.763
+    setTimeout(function () { if (typeof _maybeMorningProgress === 'function') _maybeMorningProgress(); }, 800);  // v2.45.358
+  }).catch((e) => {
+    if (!localStorage.getItem(TOKEN_KEY)) return;          // 401: apiGet уже вышел
+    if (e && (e.status === 401)) { logout(); return; }
+    if (e && e.status && e.status < 500 && e.status !== 403 && e.status !== 408 && e.status !== 429) { logout(); return; }
+    _netBanner(true, 'Нет связи с сервером — данные не загружены. Повторяем…', _loadMeAndStart);
+    if (_meRetryTimer) clearTimeout(_meRetryTimer);
+    _meRetryTimer = setTimeout(_loadMeAndStart, 10000);
+  });
+}
+
+// Видимая плашка «Нет связи» (вместо молча показанных старых данных).
+function _netBanner(show, text, retry) {
+  let el = document.getElementById('net-offline-banner');
+  if (!show) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'net-offline-banner';
+    el.setAttribute('role', 'alert');
+    el.style.cssText = 'position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:100000;' +
+      'background:#B91C1C;color:#fff;padding:10px 14px;border-radius:10px;font-size:14px;' +
+      'box-shadow:0 6px 20px rgba(0,0,0,.25);display:flex;gap:12px;align-items:center;max-width:92vw';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = '<i class="ti ti-wifi-off"></i><span></span>' +
+    '<button style="background:#fff;color:#B91C1C;border:0;border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:600">Повторить</button>';
+  el.querySelector('span').textContent = text || 'Нет связи с сервером';
+  el.querySelector('button').onclick = function () { if (typeof retry === 'function') retry(); else location.reload(); };
+}
+window.addEventListener('offline', function () {
+  _netBanner(true, 'Нет интернета — данные на экране могут быть неактуальны', function () { softRefreshCurrentScreen(); });
+});
+window.addEventListener('online', function () {
+  const el = document.getElementById('net-offline-banner');
+  if (!el) return;
+  _netBanner(false);
+  if (!state.user && localStorage.getItem(TOKEN_KEY)) _loadMeAndStart();
+  else try { softRefreshCurrentScreen(); } catch (_) {}
+});
 
 // v2.8.2: восстановление последнего открытого экрана при F5/перезагрузке
 /* v2.46.122: прямая ссылка на запись голоса — .../?voice=1 открывает чат с
@@ -2000,8 +2046,18 @@ function selectSidebarItem(screenName) {
 
   window.scrollTo({ top: 0, behavior: 'instant' });
 
+  // v2.46.243: вход в раздел = свежие данные. Списки кэшируются в памяти
+  // (cache.*) и раньше показывались из неё, пока не нажмёшь «Обновить».
+  // Повторный вход в течение 20 с берёт кэш — чтобы не долбить сервер.
+  try {
+    const now = Date.now();
+    if (now - (_screenLoadedAt[screenName] || 0) > SCREEN_CACHE_TTL_MS) refreshCurrentScreenCachesOnly(screenName);
+    _screenLoadedAt[screenName] = now;
+  } catch (_) {}
   runScreenLoader(screenName);
 }
+var SCREEN_CACHE_TTL_MS = 20000;
+var _screenLoadedAt = {};
 
 // v1.8.763: загрузка данных экрана, вынесенная из selectSidebarItem.
 // Нужна отдельно для автообновления: selectSidebarItem попутно прячет/показывает
@@ -6411,14 +6467,25 @@ function stopAutoRefresh() {
   if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; }
 }
 
+var _hiddenSince = 0;
 // Вернулись на вкладку/в окно — проверяем сразу, не дожидаясь тика.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
+    _hiddenSince = Date.now();
     _devChatSpeechStop();
     return;
   }
   if (document.visibilityState === 'visible') {
     checkForChanges();
+    // v2.46.243: вкладка была скрыта больше минуты — перечитываем текущий экран
+    // безусловно (лента изменений знает не про всё). Формы/занятость уважаются.
+    if (_hiddenSince && Date.now() - _hiddenSince > 60000) {
+      try { softRefreshCurrentScreen(); } catch (_) {}
+      if (state.currentScreen === 'defects-chats' && typeof _silentRefreshTeamChats === 'function') {
+        try { _silentRefreshTeamChats(); } catch (_) {}
+      }
+    }
+    _hiddenSince = 0;
     // Фоновые вкладки не опрашивают сервер. Вернувшаяся вкладка сразу
     // догоняет только нужные ей счётчики и открытую переписку.
     try { if (typeof refreshNotifBadge === 'function') refreshNotifBadge(); } catch (_) {}

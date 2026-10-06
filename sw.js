@@ -1,13 +1,16 @@
 /* Atomus PWA Service Worker
    Стратегия:
    - HTML/CSS/иконки → кэш-first (берём из кэша, в фоне обновляем)
-   - API → network-first (всегда свежие данные, кэш только как fallback при оффлайне)
+   - API (/api/*) → только сеть, БЕЗ кэша (v2.46.243): при сбое прокси Vercel
+     раньше молча отдавался старый ответ; теперь запрос падает, и страница
+     сразу уходит на прямой api.atomuscrm.ru или честно пишет «Нет связи»
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v1.8.242';
+const CACHE_VERSION = 'atomus-v1.8.243';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
-const API_CACHE = `${CACHE_VERSION}-api`;
+// v2.46.243: данные API больше НЕ кэшируются. Кэш только для файлов /static/*.
+const FILES_CACHE = `${CACHE_VERSION}-files`;
 
 // Файлы, которые нужно закэшировать сразу при установке SW
 const STATIC_ASSETS = [
@@ -69,7 +72,8 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         keys
           // v2.45.222: atomus-share-intake — буфер «Поделиться», не трогаем
-          .filter((key) => !key.startsWith(CACHE_VERSION) && key !== 'atomus-share-intake')
+          // v2.46.243: и любые старые кэши данных API (…-api) — тоже под снос
+          .filter((key) => (!key.startsWith(CACHE_VERSION) || /-api$/.test(key)) && key !== 'atomus-share-intake')
           .map((key) => caches.delete(key))
       );
     }).then(() => self.clients.claim())
@@ -108,39 +112,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Планёрка управляет живой встречей: старый ответ скрывает сохранённые изменения.
-  if (url.pathname === '/api/planerka' || url.pathname.startsWith('/api/planerka/')) {
-    event.respondWith(fetch(req));
+  // v2.46.243: ВСЕ запросы к данным (/api/*, любые методы, свои и старый
+  // railway.app) идут мимо service worker — браузер шлёт их сам, без кэша.
+  // Так ошибка прокси видна странице сразу и побеждает прямой api.atomuscrm.ru
+  // (fallback в app-1.js), а не сохранённый когда-то ответ.
+  if ((url.origin === self.location.origin &&
+       (url.pathname === '/api' || url.pathname.startsWith('/api/'))) ||
+      url.hostname.includes('railway.app') ||
+      url.hostname === 'api.atomuscrm.ru') {
     return;
   }
 
-  // v2.46.242: «Презентации» — только сеть, никакого кэша: иначе удалённая
-  // презентация «висит» из старого ответа, когда прокси Vercel недоступен.
-  if (url.pathname.startsWith('/api/presentations') ||
-      url.pathname.startsWith('/api/public/presentations') ||
-      url.pathname.startsWith('/pres/')) {
-    event.respondWith(fetch(req));
+  // v2.46.242: публичные ссылки на презентации — только сеть
+  if (url.pathname.startsWith('/pres/')) {
     return;
   }
 
   // Только GET запросы кэшируем
   if (req.method !== 'GET') return;
 
-  // Campaign recipient data and tokenized forms must never fall back to stale API cache.
-  if (url.pathname.startsWith('/api/sales/campaigns') || url.pathname.startsWith('/api/public/campaigns')) {
-    event.respondWith(fetch(req));
-    return;
-  }
-
-  // Запросы к backend: прямой Railway (старые вкладки) или same-origin proxy
-  // через Vercel (текущая версия) — стратегия network-first.
-  const isBackendProxyRequest =
-    url.origin === self.location.origin &&
-    (url.pathname === '/api' ||
-     url.pathname.startsWith('/api/') ||
-     url.pathname === '/static' ||
-     url.pathname.startsWith('/static/'));
-  if (url.hostname.includes('railway.app') || isBackendProxyRequest) {
+  // Файлы backend (/static/*: фото, вложения) — network-first с кэшем файлов,
+  // чтобы уже открытые фото были видны и без сети. Это не списки данных.
+  if (url.origin === self.location.origin &&
+      (url.pathname === '/static' || url.pathname.startsWith('/static/'))) {
     event.respondWith(networkFirst(req));
     return;
   }
@@ -208,8 +202,12 @@ async function cacheFirst(req, cacheName) {
     return res;
   } catch (err) {
     // Если нет сети и кэша нет — отдаём что есть (например, корневой index.html)
-    const fallback = await caches.match('/index.html');
-    if (fallback) return fallback;
+    // v2.46.243: index.html — только вместо страницы, не вместо скрипта/картинки
+    // (иначе оффлайн внешняя библиотека падала «Unexpected token '<'»)
+    if (req.mode === 'navigate') {
+      const fallback = (await caches.match('/index.html')) || (await caches.match('/'));
+      if (fallback) return fallback;
+    }
     throw err;
   }
 }
@@ -257,7 +255,7 @@ async function networkFirst(req) {
       // чтобы кэш привязывался к пользователю — но мы не различаем по токену
       // в Cache API, поэтому просто кэшируем; если другой пользователь зайдёт,
       // он получит свежее сразу как только сеть появится)
-      const cache = await caches.open(API_CACHE);
+      const cache = await caches.open(FILES_CACHE);
       cache.put(req, res.clone());
     }
     return res;
