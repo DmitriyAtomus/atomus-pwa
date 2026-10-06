@@ -7372,7 +7372,11 @@ async function _calcChatLoad(calcId, chatId) {
     }).join('') : '<div style="text-align:center;color:var(--text-faint);font-size:12px;padding:16px;">Сообщений пока нет</div>';
     boxEl.scrollTop = boxEl.scrollHeight;
   } catch (e) {
-    boxEl.innerHTML = '<div class="empty-block" style="font-size:12px;">Чат доступен участникам расчёта.<br>Передай себе мяч — и ты в чате.</div>';
+    boxEl.innerHTML = '<div class="empty-block" style="font-size:12px;">' +
+      (e && e.status === 403 ? 'Чат доступен участникам расчёта.<br>Передай себе мяч — и ты в чате.'
+        : 'Чат не загрузился: ' + escapeHtml(apiErrorText(e)) +
+          '<br><button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="_calcChatLoad(' + Number(calcId) + ',' + Number(chatId) + ')">Повторить</button>') +
+      '</div>';
   }
 }
 

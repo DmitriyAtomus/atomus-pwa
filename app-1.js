@@ -144,7 +144,7 @@ window.fetch = async function atomusApiFetch(input, init) {
 };
 const TOKEN_KEY = "atomus_token";
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.240";
+const APP_VERSION = "v2.46.241";
 const APP_VERSION_DATE = "06.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -449,8 +449,27 @@ async function apiGet(path) {
     logout();
     throw new Error('Сессия истекла');
   }
-  if (!response.ok) throw new Error('HTTP ' + response.status);
+  if (!response.ok) {
+    // v2.46.241: текст ошибки сервера («Вы не участник этого чата») — в err.serverMessage,
+    // чтобы экраны показывали причину, а не голое «HTTP 403». message прежний.
+    const err = new Error('HTTP ' + response.status);
+    err.status = response.status;
+    try { const d = await response.json(); err.serverMessage = (d && (d.message || d.error)) || ''; } catch (_) {}
+    throw err;
+  }
   return response.json();
+}
+
+// v2.46.241: понятная причина сбоя загрузки для пользователя
+function apiErrorText(e) {
+  if (!e) return 'неизвестная ошибка';
+  if (e.serverMessage) return e.serverMessage;
+  const m = String(e.message || e);
+  if (/Failed to fetch|NetworkError|Load failed|Нет связи|не ответил/i.test(m)) {
+    return 'нет связи с сервером' + (location.hostname.indexOf('vercel.app') >= 0
+      ? ' — если на этом компьютере не открывается vercel.app, зайдите через crm.atomuscrm.ru' : '');
+  }
+  return m;
 }
 
 async function apiDelete(path, body) {

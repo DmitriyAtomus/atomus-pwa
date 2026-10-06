@@ -17875,7 +17875,10 @@ async function loadTeamChats() {
     renderTeamChatList(chats);
     _updateTeamChatsBadge(chats);
   } catch (e) {
-    box.innerHTML = '<div class="empty-block">Не удалось загрузить чаты</div>';
+    // v2.46.241: причина + повтор, а не немое «Не удалось»
+    box.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить чаты: ' +
+      escapeHtml(apiErrorText(e)) +
+      '<br><button class="btn btn-secondary" style="margin-top:12px" onclick="loadTeamChats()">Повторить</button></div>';
   }
   _stopTeamChatsPolling();
   _teamChatsPollTimer = setInterval(() => {
@@ -18206,7 +18209,10 @@ async function loadTeamChatMeta(cid) {
     // карандаш-переименование — только владельцу
     const rb = document.getElementById('tchat-rename-btn');
     if (rb) rb.style.display = r.is_owner ? '' : 'none';
-  } catch (e) {}
+  } catch (e) {
+    const st = document.getElementById('tchat-subtitle');
+    if (st) st.textContent = apiErrorText(e);
+  }
 }
 
 async function loadTeamChat(cid, silent) {
@@ -18219,7 +18225,9 @@ async function loadTeamChat(cid, silent) {
     _tchatLastSig = sig;
     _renderTeamChatMessages(r);
   } catch (e) {
-    if (!silent) box.innerHTML = '<div class="empty-block">Ошибка загрузки</div>';
+    if (!silent) box.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось открыть чат: ' +
+      escapeHtml(apiErrorText(e)) +
+      '<br><button class="btn btn-secondary" style="margin-top:12px" onclick="loadTeamChat(' + Number(cid) + ')">Повторить</button></div>';
   }
 }
 
