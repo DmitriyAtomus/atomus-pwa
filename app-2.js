@@ -3288,7 +3288,9 @@ function renderTaskDetail(t) {
   const container = document.getElementById('task-detail-content');
   const canEdit = canManageTasks(t.category);
   const myChatId = state.user && state.user.chat_id;
-  const myEmpId = state.user && state.user.employee_id;
+  // v2.46.239: /api/me исторически отдавал id сотрудника как `id` (без employee_id) —
+  // исполнитель не узнавался и переключатель статуса у него не показывался
+  const myEmpId = state.user && (state.user.employee_id != null ? state.user.employee_id : state.user.id);
   const isCreator = t.creator_chat_id === myChatId;
   const isAssignee = taskAssignees.some(emp => Number(emp.id) === Number(myEmpId));
   const canChangeStatus = canEdit || isCreator || isAssignee;
@@ -3680,28 +3682,93 @@ function formatTaskDateTime(iso) {
   } catch (e) { return iso; }
 }
 
+// v2.46.239: смена статуса задачи. Раньше, если запрос «висел» (прокси Vercel /
+// туннель не отвечал), fetch не завершался никогда — ни ошибки, ни изменения:
+// клик по «Готово» выглядел как «ничего не происходит». Теперь: кнопки сразу
+// блокируются и показывают «Сохраняем…», таймаут 15 с с понятной ошибкой,
+// после таймаута/ошибки перечитываем задачу (статус мог всё же сохраниться),
+// при успехе карточка перерисовывается из ответа PATCH без лишнего GET.
+const TASK_STATUS_TIMEOUT_MS = 15000;
+let _taskStatusBusy = null;
+function _taskStatusButtons() {
+  return Array.prototype.slice.call(document.querySelectorAll('.task-detail-status-btn'));
+}
+function _taskStatusSetBusy(newStatus, busy) {
+  _taskStatusButtons().forEach(function (b) {
+    b.disabled = !!busy;
+    b.style.opacity = busy ? '0.6' : '';
+    if (busy && (b.getAttribute('onclick') || '').indexOf("'" + newStatus + "'") >= 0) {
+      if (!b.dataset.label) b.dataset.label = b.textContent;
+      b.innerHTML = '<i class="ti ti-loader"></i> Сохраняем…';
+      b.style.opacity = '1';
+    } else if (!busy && b.dataset.label) {
+      b.textContent = b.dataset.label;
+      delete b.dataset.label;
+    }
+  });
+}
+function _taskStatusInvalidate() {
+  cache.tasks = {};
+  cache.myTasks = null;
+  cache.homeKpi = null;
+  cache.contractTasks = {};                          // ЭТАП 16В-2
+}
 async function changeTaskStatus(taskId, newStatus) {
+  if (_taskStatusBusy) {
+    showToast('Сохраняем статус — подождите…', 'info');
+    return;
+  }
+  const label = ((TASK_STATUSES.find(s => s.code === newStatus) || {}).label) || newStatus;
+  _taskStatusBusy = taskId + ':' + newStatus;
+  _taskStatusSetBusy(newStatus, true);
+  const ac = new AbortController();
+  const timer = setTimeout(function () { try { ac.abort(); } catch (_) {} }, TASK_STATUS_TIMEOUT_MS);
+  let updated = null;
+  let errMsg = '';
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/tasks/' + taskId, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({ status: newStatus }),
+      signal: ac.signal,
     });
+    const d = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const d = await r.json().catch(() => ({}));
-      showToast(d.message || 'Не удалось изменить статус', 'error');
+      errMsg = r.status === 401 ? 'Сессия истекла — войдите заново'
+        : (d.message || d.error || ('HTTP ' + r.status));
+    } else {
+      updated = d;
+    }
+  } catch (e) {
+    const aborted = (e && e.name === 'AbortError') || ac.signal.aborted;
+    errMsg = aborted ? 'Сервер не ответил за ' + Math.round(TASK_STATUS_TIMEOUT_MS / 1000) + ' с'
+      : 'Ошибка соединения: ' + String((e && e.message) || e);
+  } finally {
+    clearTimeout(timer);
+    _taskStatusBusy = null;
+  }
+  _taskStatusInvalidate();
+  const onCard = state.currentScreen === 'task-detail' && Number(state.currentTaskId) === Number(taskId);
+  if (updated && updated.id) {
+    showToast('Статус: ' + label, 'success');
+    if (onCard) {
+      try { renderTaskDetail(updated); } catch (_) { loadTaskDetail(); }
+    }
+    return;
+  }
+  _taskStatusSetBusy(newStatus, false);
+  // Ошибка/таймаут: запрос мог дойти до сервера — проверяем реальный статус.
+  try {
+    const t = await apiGet('/api/tasks/' + taskId);
+    if (t && t.status === newStatus) {
+      showToast('Статус «' + label + '» сохранён (ответ сервера задержался)', 'success');
+      if (onCard) renderTaskDetail(t);
       return;
     }
-    showToast('Статус изменён', 'success');
-    cache.tasks = {};
-    cache.myTasks = null;
-    cache.homeKpi = null;
-    cache.contractTasks = {};                          // ЭТАП 16В-2
-    if (state.currentScreen === 'task-detail') loadTaskDetail();
-  } catch (e) {
-    showToast('Ошибка соединения', 'error');
-  }
+    if (onCard && t && t.id) renderTaskDetail(t);
+  } catch (_) {}
+  showToast('Не удалось изменить статус на «' + label + '»: ' + errMsg + '. Попробуйте ещё раз.', 'error');
 }
 
 async function deleteCurrentTask() {
@@ -4148,7 +4215,7 @@ function renderTaskAssigneePicker() {
      Кнопка «Я» ставит текущего пользователя одним нажатием. */
   const list = cache.activeEmployees || [];
   const selectedIds = (state.taskForm && state.taskForm.assignee_ids || []).map(Number);
-  const meId = state.user && Number(state.user.employee_id);
+  const meId = state.user && Number(state.user.employee_id != null ? state.user.employee_id : state.user.id);
   const ini = n => String(n || '').split(/[\s.]+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || '·';
   let html = '<div class="ta2">';
   if (!list.length) return html + '<div class="ta2-empty">Активные сотрудники не найдены</div></div>';
