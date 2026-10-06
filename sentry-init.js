@@ -60,6 +60,9 @@
     sendDefaultPii: false,
     integrations: [window.Sentry.browserTracingIntegration()],
     tracesSampleRate: 0.05,
+    // SDK 11 по умолчанию стримит спаны и игнорирует beforeSendTransaction;
+    // 'static' — классические транзакции, чтобы чистка токенов (clean) работала и для них.
+    traceLifecycle: 'static',
     // trace-заголовки только в свой /api (через прокси Worker). На прямой
     // api.atomuscrm.ru НЕ шлём: его CORS не разрешает sentry-trace/baggage.
     tracePropagationTargets: [/^\/api\//, /^https:\/\/crm\.atomuscrm\.ru\/api\//],
