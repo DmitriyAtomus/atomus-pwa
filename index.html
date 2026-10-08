@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" translate="no" class="notranslate">
 <head>
 <meta charset="UTF-8">
+<meta name="google" content="notranslate">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#2D5F8B">
@@ -43,6 +44,27 @@
 <!-- html5-qrcode (~150KB) грузится лениво, только при первом нажатии «Скан». -->
 </head>
 <body>
+
+<!-- v2.46.247: сразу видимый splash, чтобы не было «белого экрана» до JS -->
+<div id="boot-splash" style="position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:linear-gradient(135deg,#FFFFFF 0%,#EAF2FA 100%);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1e293b;">
+  <div style="width:42px;height:42px;border:3px solid #cbd5e1;border-top-color:#2D5F8B;border-radius:50%;animation:bootspin .8s linear infinite"></div>
+  <div id="boot-splash-text" style="font-size:15px;font-weight:600;">Загрузка…</div>
+  <style>@keyframes bootspin{to{transform:rotate(360deg)}}</style>
+</div>
+<script>
+window.__hideBootSplash = function () {
+  var el = document.getElementById('boot-splash');
+  if (el) el.remove();
+};
+// страховка: если JS приложений упал — через 25с покажем подсказку, splash не прячем
+setTimeout(function () {
+  var el = document.getElementById('boot-splash');
+  if (!el) return;
+  var t = document.getElementById('boot-splash-text');
+  if (t) t.textContent = 'Долго грузится. Откройте crm.atomuscrm.ru/?reset=1';
+}, 25000);
+</script>
+
 
 <!-- ============ ЛОГИН с полным логотипом Atomus group ============ -->
 <!-- ============ ЭТАП 21: Публичная страница (показывается ДО логина по URL /a/{token} или /c/{token}) ============ -->

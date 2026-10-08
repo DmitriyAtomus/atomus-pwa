@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.248";
+const APP_VERSION = "v2.46.250";
 const APP_VERSION_DATE = "08.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -517,15 +517,27 @@ async function apiGet(path) {
   var _sec = _sentrySectionHeader();
   if (_sec) _headers['X-Atomus-Section'] = _sec;
   var response;
+  // v2.46.246: таймаут GET — иначе /api/me без ответа держит серый «Загрузка…» вечно
+  var _getCtrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var _getTo = _getCtrl ? setTimeout(function () { try { _getCtrl.abort(); } catch (_) {} }, 20000) : null;
   try {
     response = await fetch(API_BASE + path, {
       headers: _headers,
       cache: 'no-store',
+      signal: _getCtrl ? _getCtrl.signal : undefined,
     });
   } catch (e) {
+    if (_getTo) clearTimeout(_getTo);
+    if (e && e.name === 'AbortError') {
+      var te = new Error('Сервер не ответил вовремя');
+      te.status = 408;
+      _sentryApiFail('GET', path, te, 'timeout');
+      throw te;
+    }
     _sentryApiFail('GET', path, e);
     throw e;
   }
+  if (_getTo) clearTimeout(_getTo);
   // v2.45.194: только 401 (нет/истёк токен) разлогинивает. 403 (доступ запрещён
   // по роли) — НЕ выкидывает из системы: сессия валидна, просто нет прав на
   // конкретный запрос. Раньше мастер «вылетал» из договоров из-за 403.
@@ -868,6 +880,7 @@ function logout() {
   if (typeof _clearCachedPassword === 'function') _clearCachedPassword();
   state.user = null;
   _sentryBindUser(null);
+  try { _bootOverlay(false); _bootSplashHide(); } catch (e) {}
   if (window.KlavaPick && typeof window.KlavaPick.syncVisibility === 'function') window.KlavaPick.syncVisibility();
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
@@ -1445,14 +1458,38 @@ function manuallyOpenNotifModal() {
 // ============ КОНЕЦ ЭТАПА 39 (v2.19.0) — УВЕДОМЛЕНИЯ ============
 
 
+
+// v2.46.247: явный boot-splash / overlay — без «белого экрана» пока /api/me
+function _bootSplashHide() {
+  try { if (typeof window.__hideBootSplash === 'function') window.__hideBootSplash(); } catch (_) {}
+  var el = document.getElementById('boot-splash');
+  if (el) el.remove();
+}
+function _bootOverlay(show, text) {
+  var el = document.getElementById('boot-me-overlay');
+  if (!show) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'boot-me-overlay';
+    el.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:#F8FAFC;font:600 15px system-ui,sans-serif;color:#1e293b;';
+    el.innerHTML = '<div style="width:36px;height:36px;border:3px solid #cbd5e1;border-top-color:#2D5F8B;border-radius:50%;animation:bootspin .8s linear infinite"></div><div id="boot-me-text"></div>';
+    document.body.appendChild(el);
+  }
+  var t = document.getElementById('boot-me-text');
+  if (t) t.textContent = text || 'Загрузка кабинета…';
+}
+
 function showApp() {
+  _bootSplashHide();
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   if (window.KlavaPick && typeof window.KlavaPick.syncVisibility === 'function') window.KlavaPick.syncVisibility();
   applyLayout();
   if (!state.user) {
+    _bootOverlay(true, 'Загрузка кабинета…');
     _loadMeAndStart();
   } else {
+    _bootOverlay(false);
     renderProfile();
     applyPermissionsToUI();
     _restoreLastView();
@@ -1471,6 +1508,7 @@ let _meRetryTimer = null;
 function _loadMeAndStart() {
   apiGet('/api/me').then(me => {
     if (_meRetryTimer) { clearTimeout(_meRetryTimer); _meRetryTimer = null; }
+    _bootOverlay(false);
     _netBanner(false);
     state.user = me;
     _sentryBindUser(me);
@@ -1483,9 +1521,10 @@ function _loadMeAndStart() {
     startAutoRefresh();   // v1.8.763
     setTimeout(function () { if (typeof _maybeMorningProgress === 'function') _maybeMorningProgress(); }, 800);  // v2.45.358
   }).catch((e) => {
-    if (!localStorage.getItem(TOKEN_KEY)) return;          // 401: apiGet уже вышел
+    if (!localStorage.getItem(TOKEN_KEY)) { try { _bootOverlay(false); } catch(_){} return; }          // 401: apiGet уже вышел
     if (e && (e.status === 401)) { logout(); return; }
     if (e && e.status && e.status < 500 && e.status !== 403 && e.status !== 408 && e.status !== 429) { logout(); return; }
+    try { _bootOverlay(true, 'Нет связи с сервером — повторяем…'); } catch(_){}
     _netBanner(true, 'Нет связи с сервером — данные не загружены. Повторяем…', _loadMeAndStart);
     if (_meRetryTimer) clearTimeout(_meRetryTimer);
     _meRetryTimer = setTimeout(_loadMeAndStart, 10000);
