@@ -15894,6 +15894,7 @@ function _srShiftMonth(ym, delta) {
 async function loadSalesReports() {
   const box = document.getElementById('sales-reports-body');
   if (!box) return;
+  if (_srGetTab() === 'base') return loadSalesBaseReports();  // v2.46.248
   const month = _srCurMonth();
   box.innerHTML = '<div class="loading-block">Загружаем…</div>';
   try {
@@ -15902,7 +15903,7 @@ async function loadSalesReports() {
     _srState.data = d;
     _srRender(box, d);
   } catch (e) {
-    box.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить отчёты</div>';
+    box.innerHTML = _srTabsHtml() + '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить отчёты</div>';
   }
 }
 
@@ -15914,7 +15915,7 @@ function _srNavMonth(delta) {
 function _srRender(box, d) {
   window.SR_V2 = (localStorage.getItem('srV2') !== '0');
   const toggle = _sr2ToggleBar();
-  box.innerHTML = toggle + (window.SR_V2 ? _sr2Body(d) : _srOldBody(d));
+  box.innerHTML = _srTabsHtml() + toggle + (window.SR_V2 ? _sr2Body(d) : _srOldBody(d));
   const dateInput = document.getElementById('sr-date');
   if (dateInput) {
     dateInput.addEventListener('change', _srPrefillFromDate);
@@ -16237,6 +16238,359 @@ async function deleteSalesReport(id) {
     await apiDelete('/api/sales/reports/' + id);
     showToast('Удалено', 'success');
     loadSalesReports();
+  } catch (e) { showToast('Не удалось удалить: ' + (e.message || ''), 'error'); }
+}
+
+// ============ ОТЧЁТ ПО БАЗЕ ЗАВОДОВ (v2.46.248) ============
+// Вкладка «По базе заводов» в Продажи → Отчёты. Менеджер обзванивает новую
+// молочную базу (молочные заводы, крафт/сыроварни, сыродельные заводы) в amoCRM,
+// а итог дня пишет сюда. Только суть: 5 цифр + необязательный комментарий.
+// API: GET/POST /api/sales/base-reports, DELETE /api/sales/base-reports/{id}.
+
+var _sbrState = { month: null, data: null, period: 'month', week: null };
+
+var _SBR_FIELDS = [
+  { key: 'calls',         label: 'Звонков',               short: 'звонков',     em: '📞', ccls: 'c-call' },
+  { key: 'connects',      label: 'Дозвонились',           short: 'дозвоны',     em: '✅', ccls: 'c-conn' },
+  { key: 'interested',    label: 'Интерес есть',          short: 'интерес',     em: '🔥', ccls: 'c-lead' },
+  { key: 'presentations', label: 'Отправлено презентаций', short: 'презентаций', fshort: 'презент.', em: '📨', ccls: 'c-kp' },
+  { key: 'refusals',      label: 'Отказы',                short: 'отказы',      em: '✖️', ccls: 'c-refuse' },
+];
+
+function _srGetTab() {
+  try { return localStorage.getItem('srTab') === 'base' ? 'base' : 'general'; } catch (_) { return 'general'; }
+}
+
+function _srSetTab(tab) {
+  try { localStorage.setItem('srTab', tab === 'base' ? 'base' : 'general'); } catch (_) {}
+  loadSalesReports();
+}
+
+function _srTabsHtml() {
+  const tab = _srGetTab();
+  const btn = (key, label) => '<button class="sr-tab' + (tab === key ? ' active' : '') + '" onclick="_srSetTab(\'' + key + '\')">' + label + '</button>';
+  return '<div class="sr-tabs" role="tablist">' + btn('general', 'Общий отчёт') + btn('base', 'По базе заводов') + '</div>';
+}
+
+function _sbrCurMonth() { return _sbrState.month || _srTodayIso().slice(0, 7); }
+
+async function loadSalesBaseReports() {
+  const box = document.getElementById('sales-reports-body');
+  if (!box) return;
+  const month = _sbrCurMonth();
+  box.innerHTML = _srTabsHtml() + '<div class="loading-block">Загружаем…</div>';
+  try {
+    const d = await apiGet('/api/sales/base-reports?month=' + encodeURIComponent(month));
+    if (_sbrState.month !== (d.month || month)) _sbrState.week = null;
+    _sbrState.month = d.month || month;
+    _sbrState.data = d;
+    _sbrRender(box, d);
+  } catch (e) {
+    box.innerHTML = _srTabsHtml() + '<div class="empty-block"><i class="ti ti-alert-triangle"></i>Не удалось загрузить отчёты по базе</div>';
+  }
+}
+
+function _sbrNavMonth(delta) {
+  _sbrState.month = _srShiftMonth(_sbrCurMonth(), delta);
+  _sbrState.week = null;
+  loadSalesBaseReports();
+}
+
+// Недели месяца (пн–вс), обрезанные границами месяца: [{start, end, label}]
+function _sbrWeeks(ym) {
+  const p = (ym || '').split('-');
+  const y = parseInt(p[0], 10), m = parseInt(p[1], 10);
+  if (!y || !m) return [];
+  const pad = n => (n < 10 ? '0' + n : '' + n);
+  const last = new Date(y, m, 0).getDate();
+  const weeks = [];
+  let day = 1;
+  while (day <= last) {
+    const dow = (new Date(y, m - 1, day).getDay() + 6) % 7; // 0 = пн
+    const end = Math.min(last, day + (6 - dow));
+    weeks.push({
+      start: ym + '-' + pad(day),
+      end: ym + '-' + pad(end),
+      label: pad(day) + (end !== day ? '–' + pad(end) : '') + '.' + pad(m),
+    });
+    day = end + 1;
+  }
+  return weeks;
+}
+
+function _sbrSetPeriod(period) {
+  _sbrState.period = period === 'week' ? 'week' : 'month';
+  const box = document.getElementById('sales-reports-body');
+  if (box && _sbrState.data) _sbrRender(box, _sbrState.data);
+}
+
+function _sbrSetWeek(i) {
+  _sbrState.week = i;
+  const box = document.getElementById('sales-reports-body');
+  if (box && _sbrState.data) _sbrRender(box, _sbrState.data);
+}
+
+// Выбранная неделя (по умолчанию — текущая, если она в этом месяце, иначе последняя)
+function _sbrActiveWeek(d) {
+  const weeks = _sbrWeeks(d.month);
+  if (!weeks.length) return null;
+  if (_sbrState.week == null || !weeks[_sbrState.week]) {
+    const today = d.today || _srTodayIso();
+    let idx = weeks.findIndex(w => today >= w.start && today <= w.end);
+    if (idx < 0) idx = today < weeks[0].start ? 0 : weeks.length - 1;
+    _sbrState.week = idx;
+  }
+  return weeks[_sbrState.week];
+}
+
+// Менеджеры с отчётами только за выбранный период и пересчитанными итогами
+function _sbrPeriodManagers(d) {
+  const mgrs = d.managers || [];
+  if (_sbrState.period !== 'week') return mgrs;
+  const w = _sbrActiveWeek(d);
+  if (!w) return mgrs;
+  return mgrs.map(m => {
+    const reps = (m.reports || []).filter(r => r.report_date >= w.start && r.report_date <= w.end);
+    const totals = {};
+    _SBR_FIELDS.forEach(f => { totals[f.key] = reps.reduce((s, r) => s + (Number(r[f.key]) || 0), 0); });
+    return Object.assign({}, m, { reports: reps, totals: totals });
+  }).filter(m => m.reports.length);
+}
+
+function _sbrRender(box, d) {
+  const isWeek = _sbrState.period === 'week';
+  let html = _srTabsHtml();
+  html += '<div class="sr2-mnav-row sbr-nav-row">' +
+      '<div class="sbr-period">' +
+        '<button class="' + (!isWeek ? 'active' : '') + '" onclick="_sbrSetPeriod(\'month\')">Месяц</button>' +
+        '<button class="' + (isWeek ? 'active' : '') + '" onclick="_sbrSetPeriod(\'week\')">Неделя</button>' +
+      '</div>' +
+      '<div class="sr2-mnav">' +
+        '<button onclick="_sbrNavMonth(-1)" title="Предыдущий месяц">‹</button>' +
+        '<span class="sr2-m">' + escapeHtml(_srMonthLabel(d.month)) + '</span>' +
+        '<button onclick="_sbrNavMonth(1)" title="Следующий месяц">›</button>' +
+      '</div>' +
+    '</div>';
+  if (isWeek) {
+    const active = _sbrActiveWeek(d);
+    html += '<div class="sbr-weeks">' + _sbrWeeks(d.month).map((w, i) =>
+      '<button class="' + (active && active.start === w.start ? 'active' : '') + '" onclick="_sbrSetWeek(' + i + ')">' + escapeHtml(w.label) + '</button>').join('') + '</div>';
+  }
+
+  if (d.can_edit) html += _sbrFormHtml(d);
+
+  const mgrs = _sbrPeriodManagers(d);
+  const periodLbl = isWeek ? ('неделю ' + ((_sbrActiveWeek(d) || {}).label || '')) : _srMonthLabel(d.month).toLowerCase();
+  if (!mgrs.length) {
+    html += '<div class="empty-block"><i class="ti ti-building-factory-2"></i>За ' + escapeHtml(periodLbl) + ' отчётов по базе пока нет.' +
+      (d.can_edit ? '<br><span style="font-size:13px;color:var(--text-light);">Заполни форму выше и нажми «Сохранить».</span>' : '') + '</div>';
+  } else {
+    html += _sbrSummaryHtml(mgrs, periodLbl);
+    html += '<div class="sr2-sec"><span class="em">👥</span> По менеджерам</div>';
+    mgrs.forEach((m, idx) => { html += _sbrManagerCardHtml(m, idx, d); });
+  }
+  box.innerHTML = html;
+  const dateInput = document.getElementById('sbr-date');
+  if (dateInput) {
+    dateInput.addEventListener('change', _sbrPrefillFromDate);
+    _sbrPrefillFromDate();
+  }
+}
+
+function _sbrSumTotals(mgrs) {
+  const sum = {};
+  _SBR_FIELDS.forEach(f => { sum[f.key] = 0; });
+  mgrs.forEach(m => { const t = m.totals || {}; _SBR_FIELDS.forEach(f => { sum[f.key] += (Number(t[f.key]) || 0); }); });
+  return sum;
+}
+
+function _sbrSummaryHtml(mgrs, periodLbl) {
+  const sum = _sbrSumTotals(mgrs);
+  let tiles = '';
+  _SBR_FIELDS.forEach(f => {
+    tiles += '<div class="sr2-kpi' + (f.key === 'refusals' ? ' sbr-refuse' : '') + '">' +
+        '<div class="sr2-kpi-ic ' + f.ccls + '"><span class="em">' + f.em + '</span></div>' +
+        '<div class="sr2-kpi-num">' + _srFmtNum(sum[f.key]) + '</div>' +
+        '<div class="sr2-kpi-lbl">' + escapeHtml(f.short) + '</div>' +
+      '</div>';
+  });
+  return '<div class="sr2-sec"><span class="em">📊</span> Итого за ' + escapeHtml(periodLbl) + (mgrs.length > 1 ? ' · все менеджеры' : '') + '</div>' +
+    '<div class="sr2-kpis sbr-kpis">' + tiles + '</div>' + _sbrFunnel(sum);
+}
+
+function _sbrFormHtml(d) {
+  const today = d.today || _srTodayIso();
+  let inputs = '';
+  _SBR_FIELDS.forEach(f => {
+    inputs += '<div class="sr2-fld">' +
+        '<label for="sbr-' + f.key + '"><span class="em">' + f.em + '</span> ' + escapeHtml(f.fshort || f.short) + '</label>' +
+        '<input type="number" inputmode="numeric" min="0" step="1" id="sbr-' + f.key + '" value="0" onfocus="this.select()" title="' + escapeHtml(f.label) + '">' +
+      '</div>';
+  });
+  return '<div class="sr2-form sbr-form">' +
+      '<div class="sbr-form-head"><span class="sbr-form-title">✏️ Отчёт по базе за день</span>' +
+        '<input type="date" id="sbr-date" value="' + today + '" max="' + today + '" aria-label="Дата отчёта"></div>' +
+      '<div class="sbr-grid">' + inputs + '</div>' +
+      '<textarea id="sbr-comment" class="sbr-comment" rows="2" maxlength="2000" placeholder="Комментарий (необязательно): главное за день, кто заинтересовался"></textarea>' +
+      '<div class="sbr-actions">' +
+        '<span class="sr2-form-hint" id="sbr-form-hint"></span>' +
+        '<button class="btn btn-primary" id="sbr-save-btn" onclick="saveSalesBaseReport()"><i class="ti ti-device-floppy"></i> Сохранить</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function _sbrPrefillFromDate() {
+  const d = _sbrState.data;
+  const dateInput = document.getElementById('sbr-date');
+  if (!d || !dateInput) return;
+  const my = (d.my_reports || {})[dateInput.value];
+  _SBR_FIELDS.forEach(f => {
+    const el = document.getElementById('sbr-' + f.key);
+    if (el) el.value = my ? (my[f.key] || 0) : 0;
+  });
+  const c = document.getElementById('sbr-comment');
+  if (c) c.value = my ? (my.comment || '') : '';
+  const hint = document.getElementById('sbr-form-hint');
+  const btn = document.getElementById('sbr-save-btn');
+  if (my) {
+    if (hint) hint.textContent = 'За эту дату отчёт уже есть — сохранение обновит его.';
+    if (btn) btn.innerHTML = '<i class="ti ti-refresh"></i> Обновить';
+  } else {
+    if (hint) hint.textContent = '';
+    if (btn) btn.innerHTML = '<i class="ti ti-device-floppy"></i> Сохранить';
+  }
+}
+
+async function saveSalesBaseReport() {
+  const dateInput = document.getElementById('sbr-date');
+  const rdate = dateInput ? dateInput.value : _srTodayIso();
+  if (!rdate) { showToast('Укажите дату', 'error'); return; }
+  const body = { date: rdate };
+  _SBR_FIELDS.forEach(f => {
+    const v = parseInt((document.getElementById('sbr-' + f.key) || {}).value, 10);
+    body[f.key] = (isNaN(v) || v < 0) ? 0 : v;
+  });
+  body.comment = ((document.getElementById('sbr-comment') || {}).value || '').trim();
+  if (body.connects > body.calls && body.calls > 0) {
+    if (!confirm('Дозвонов больше, чем звонков. Сохранить так?')) return;
+  }
+  const btn = document.getElementById('sbr-save-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Сохраняю…'; }
+  let res;
+  try {
+    res = await apiPost('/api/sales/base-reports', body);
+    if (!res.ok) throw new Error((res.data && res.data.message) || 'HTTP ' + res.status);
+  } catch (e) {
+    showToast('Не удалось сохранить: ' + (e.message || ''), 'error');
+    if (btn) { btn.disabled = false; _sbrPrefillFromDate(); }
+    return;
+  }
+  showToast('Отчёт по базе сохранён', 'success');
+  _sbrState.month = rdate.slice(0, 7);
+  try {
+    await loadSalesBaseReports();
+  } catch (e) {
+    showToast('Сохранено, но список не обновился', 'error');
+  }
+}
+
+// Воронка: звонки → дозвоны → интерес → презентации; отказы — отдельно
+function _sbrFunnel(t) {
+  const calls = Number(t.calls) || 0, conn = Number(t.connects) || 0,
+    inter = Number(t.interested) || 0, pres = Number(t.presentations) || 0, ref = Number(t.refusals) || 0;
+  if (!calls && !conn && !inter && !pres && !ref) return '';
+  const pct = (part, whole) => whole > 0 ? Math.round(part / whole * 100) : 0;
+  const node = (val, word) => '<span class="sr2-fn-node"><b>' + _srFmtNum(val) + '</b> ' + word + '</span>';
+  const arrow = (p, cls) => '<span class="sr2-fn-pct' + (cls ? ' ' + cls : '') + '">' + p + '%</span>';
+  return '<div class="sr2-funnel">' +
+    node(calls, 'звонков') + arrow(pct(conn, calls)) +
+    node(conn, 'дозвонов') + arrow(pct(inter, conn)) +
+    node(inter, 'с интересом') + arrow(pct(pres, inter), 'warn') +
+    node(pres, 'презентаций') +
+    '<span class="sbr-fn-refuse">отказы: <b>' + _srFmtNum(ref) + '</b>' + (conn > 0 ? ' · ' + pct(ref, conn) + '% дозвонов' : '') + '</span>' +
+  '</div>';
+}
+
+function _sbrManagerCardHtml(m, idx, d) {
+  const t = m.totals || {};
+  const isWeek = _sbrState.period === 'week';
+  let tiles = '';
+  _SBR_FIELDS.forEach(f => {
+    tiles += '<div class="sr2-tile' + (f.key === 'refusals' ? ' sbr-refuse' : '') + '"><div class="v">' + _srFmtNum(t[f.key]) + '</div><div class="l">' + escapeHtml(f.short) + '</div></div>';
+  });
+  const head = '<tr><th>Дата</th>' + _SBR_FIELDS.map(f => '<th>' + escapeHtml(f.short) + '</th>').join('') + '<th></th></tr>';
+  const rows = (m.reports || []).map(r => {
+    const cum = r.cum || {};
+    const cells = _SBR_FIELDS.map(f =>
+      '<td>' + (r[f.key] || 0) + (isWeek ? '' : '<span class="cum">' + (cum[f.key] || 0) + '</span>') + '</td>').join('');
+    const act = '<button class="sr2-ibtn" title="Скопировать для Telegram" onclick="_sbrCopyReport(' + r.id + ')"><i class="ti ti-copy"></i></button>' +
+      (d.can_edit ? '<button class="sr2-ibtn" title="Удалить" onclick="deleteSalesBaseReport(' + r.id + ')"><i class="ti ti-trash"></i></button>' : '');
+    let tr = '<tr><td>' + escapeHtml(_srFmtDateRu(r.report_date)) + '</td>' + cells + '<td class="sr2-tact-cell">' + act + '</td></tr>';
+    if (r.comment) {
+      tr += '<tr class="sbr-comment-row"><td colspan="' + (_SBR_FIELDS.length + 2) + '">💬 ' + escapeHtml(r.comment) + '</td></tr>';
+    }
+    return tr;
+  }).join('');
+  const cnt = (m.reports || []).length;
+  const daily = cnt ?
+    '<div class="sr2-daily open" id="sbr-daily-' + idx + '">' +
+      '<button class="sr2-daily-toggle" onclick="document.getElementById(\'sbr-daily-' + idx + '\').classList.toggle(\'open\')"><span class="em">📅</span> По дням (' + cnt + ') <span class="sr2-caret em">▾</span></button>' +
+      '<div class="sr2-daily-body"><div class="sr2-table-wrap"><table class="sr2-table"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>' +
+        (isWeek ? '' : '<div class="sr2-table-note">маленькое число снизу — нарастающий итог с начала месяца</div>') + '</div></div>' +
+    '</div>' : '';
+  return '<div class="sr2-mgr">' +
+      '<div class="sr2-mgr-head">' +
+        '<div class="sr2-ava">' + escapeHtml(getInitials(m.name)) + '</div>' +
+        '<div class="sr2-mgr-id"><div class="sr2-mgr-name">' + escapeHtml(m.name || '—') + '</div>' +
+          (m.position ? '<div class="sr2-mgr-pos">' + escapeHtml(m.position) + '</div>' : '') + '</div>' +
+        '<div class="sr2-mgr-period">Итого<br>за ' + (isWeek ? 'неделю' : escapeHtml((_srMonthLabel(d.month).split(' ')[0] || '').toLowerCase())) + '</div>' +
+      '</div>' +
+      '<div class="sr2-tiles sbr-tiles">' + tiles + '</div>' +
+      _sbrFunnel(t) +
+      daily +
+    '</div>';
+}
+
+// Текст для Telegram (как у «Общего отчёта»: цифры дня + итого с начала месяца)
+function _sbrReportToText(name, position, r) {
+  const c = r.cum || {};
+  let s = (name || 'Менеджер') + '\n' +
+    'Отчёт по базе заводов\n' +
+    'Дата ' + _srFmtDateRu(r.report_date) + '\n';
+  if (position) s += 'Должность: ' + position + '\n';
+  s += 'Звонков: ' + (r.calls || 0) + '\n' +
+    'Дозвонились: ' + (r.connects || 0) + '\n' +
+    'Интерес есть: ' + (r.interested || 0) + '\n' +
+    'Отправлено презентаций: ' + (r.presentations || 0) + '\n' +
+    'Отказы: ' + (r.refusals || 0) + '\n';
+  if (r.comment) s += 'Комментарий: ' + r.comment + '\n';
+  s += '*итого: звонков = ' + (c.calls || 0) + '*\n' +
+    '*итого: дозвоны = ' + (c.connects || 0) + '*\n' +
+    '*итого: интерес = ' + (c.interested || 0) + '*\n' +
+    '*итого: презентаций = ' + (c.presentations || 0) + '*\n' +
+    '*итого: отказов = ' + (c.refusals || 0) + '*';
+  return s;
+}
+
+function _sbrCopyReport(id) {
+  const d = _sbrState.data;
+  let mgr = null, rep = null;
+  ((d && d.managers) || []).forEach(m => {
+    (m.reports || []).forEach(r => { if (r.id === id) { mgr = m; rep = r; } });
+  });
+  if (!rep) return;
+  const text = _sbrReportToText(mgr.name, mgr.position, rep);
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => {
+    showToast('Скопировано — можно вставить в Telegram', 'success');
+  }).catch(() => { prompt('Скопируйте текст:', text); });
+}
+
+async function deleteSalesBaseReport(id) {
+  if (!confirm('Удалить этот отчёт по базе?')) return;
+  try {
+    await apiDelete('/api/sales/base-reports/' + id);
+    showToast('Удалено', 'success');
+    loadSalesBaseReports();
   } catch (e) { showToast('Не удалось удалить: ' + (e.message || ''), 'error'); }
 }
 
