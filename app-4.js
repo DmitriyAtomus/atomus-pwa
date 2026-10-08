@@ -11167,30 +11167,108 @@ document.addEventListener('click', function(e) {
 // Главный мобильный таб (sections/search/notifications/account)
 state.currentMainTab = 'sections';
 
+
+function _mobileNotifCount() {
+  try { return ((state.notif && state.notif.unread) || []).length || 0; }
+  catch (e) { return 0; }
+}
+
+function _mobileTabVisible(code) {
+  return _mobileMainTabCodes().indexOf(code) >= 0;
+}
+
+function _mobileMainTabCodes() {
+  if (typeof _isPureInstaller === 'function' && _isPureInstaller()) {
+    return ['installation', 'help', 'more'];
+  }
+  if (typeof _isShevelevMaster === 'function' && state.user && _isShevelevMaster()) {
+    return ['home', 'production', 'tasks', 'more'];
+  }
+  return ['home', 'sales', 'tasks', 'mail', 'more'];
+}
+
+function _mobileApplyTabVisibility() {
+  const codes = _mobileMainTabCodes();
+  const map = {
+    home: { code: 'home', icon: 'ti-smart-home', label: 'Главная' },
+    sales: { code: 'sales', icon: 'ti-report-money', label: 'Продажи' },
+    tasks: { code: 'tasks', icon: 'ti-list-check', label: 'Задачи' },
+    mail: { code: 'mail', icon: 'ti-mail', label: 'Почта' },
+    production: { code: 'production', icon: 'ti-building-factory-2', label: 'Производ.' },
+    installation: { code: 'installation', icon: 'ti-crane', label: 'Монтаж' },
+    help: { code: 'help', icon: 'ti-help-circle', label: 'Помощь' },
+    more: { code: 'more', icon: 'ti-dots', label: 'Ещё' }
+  };
+  const bar = document.getElementById('tab-bar-main');
+  if (!bar) return;
+  const primary = codes.filter(c => c !== 'more').slice(0, 4);
+  while (primary.length < 4) primary.push(null);
+  const slots = primary.concat(['more']);
+  const badgeIds = { tasks: 'tasks25-badge', mail: 'mail25-badge', more: 'more25-badge' };
+  bar.innerHTML = slots.map((code) => {
+    if (!code) return '<button class="tab25" hidden aria-hidden="true"></button>';
+    const m = map[code] || { code: code, icon: 'ti-circle', label: code };
+    const badge = badgeIds[code] ? '<span class="tab25-badge" id="' + badgeIds[code] + '" style="display:none;">0</span>' : '';
+    return '<button class="tab25" data-main-tab="' + m.code + '" onclick="switchMainTab(\'' + m.code + '\')">' +
+      '<i class="ti ' + m.icon + '"></i><span>' + m.label + '</span>' + badge + '</button>';
+  }).join('');
+  if (typeof syncMainTabFromSection === 'function') {
+    syncMainTabFromSection(state.currentSection, state.currentScreen);
+  }
+  try { if (typeof updateNotifBadge === 'function') updateNotifBadge(_mobileNotifCount()); } catch (e) {}
+}
+
 function showMobileContent() {
-  state.currentMainTab = 'sections';
-  const app = document.getElementById('app');
-  if (app) app.dataset.mainTab = 'sections';
-  document.querySelectorAll('#tab-bar-main .tab25[data-main-tab]').forEach(b => b.classList.remove('active'));
-  const tab = document.querySelector('#tab-bar-main .tab25[data-main-tab="sections"]');
-  if (tab) tab.classList.add('active');
   const so = document.getElementById('search25-screen');
   const no = document.getElementById('notif25-screen');
   if (so) so.style.display = 'none';
   if (no) no.style.display = 'none';
+  if (typeof syncMainTabFromSection === 'function') {
+    syncMainTabFromSection(state.currentSection, state.currentScreen);
+  }
 }
 
 function openMobileSections() {
+  // v2.46.253: «Ещё» — разделы + бывшие пункты нижней панели + инструменты шапки
   const overlay = document.getElementById('mobile-sections-overlay');
   const grid = document.getElementById('mobile-sections-grid');
   if (!overlay || !grid) return;
-  showMobileContent();
-  grid.innerHTML = _mobileAvailableSections().map(s =>
+  const title = document.getElementById('mobile-sections-title');
+  if (title) title.textContent = 'Ещё';
+  state.currentMainTab = 'more';
+  const app = document.getElementById('app');
+  if (app) app.dataset.mainTab = 'more';
+  document.querySelectorAll('#tab-bar-main .tab25[data-main-tab]').forEach(b => b.classList.remove('active'));
+  const moreBtn = document.querySelector('#tab-bar-main .tab25[data-main-tab="more"]');
+  if (moreBtn) moreBtn.classList.add('active');
+
+  const sections = _mobileAvailableSections();
+  let html = '';
+  html += '<div class="more-sheet-block"><div class="more-sheet-label">Быстрые действия</div><div class="more-sheet-actions">';
+  html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ switchMainTab(\'search\'); }, 40)"><i class="ti ti-search"></i><span>Поиск</span></button>';
+  html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ mobilePlusAction(); }, 40)"><i class="ti ti-plus"></i><span>Создать</span></button>';
+  html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ switchMainTab(\'notifications\'); }, 40)"><i class="ti ti-bell"></i><span>Уведомления</span>' +
+    ((_mobileNotifCount() > 0) ? '<b class="more-badge">' + _mobileNotifCount() + '</b>' : '') + '</button>';
+  html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ switchMainTab(\'account\'); }, 40)"><i class="ti ti-user"></i><span>Аккаунт</span></button>';
+  html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ try{openSupplyInvoiceCameraDirect();}catch(e){} }, 40)"><i class="ti ti-camera"></i><span>Фото УПД</span></button>';
+  html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ try{openQrScanner();}catch(e){} }, 40)"><i class="ti ti-scan"></i><span>QR</span></button>';
+  html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ try{openTeamChatsScreen();}catch(e){} }, 40)"><i class="ti ti-messages"></i><span>Чаты</span></button>';
+  const tv = document.getElementById('tv-cast-top-btn');
+  if (tv && tv.style.display !== 'none') {
+    html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ try{toggleTvScreenCast();}catch(e){} }, 40)"><i class="ti ti-device-tv"></i><span>Экран на ТВ</span></button>';
+  }
+  html += '</div></div>';
+
+  html += '<div class="more-sheet-block"><div class="more-sheet-label">Разделы</div><div class="more-sheet-grid">';
+  html += sections.map(s =>
     '<button type="button" class="mobile-section-tile' + (s.code === state.currentSection ? ' active' : '') + '" ' +
       'onclick="mobileGoSection(\'' + s.code + '\')"' + (s.code === state.currentSection ? ' aria-current="page"' : '') + '>' +
       '<i class="ti ' + s.icon + '"></i><span>' + escapeHtml(s.full || s.label) + '</span>' +
       (s.code === state.currentSection ? '<b>Открыт</b>' : '') + '</button>'
   ).join('');
+  html += '</div></div>';
+
+  grid.innerHTML = html;
   overlay.classList.add('visible');
   overlay.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
@@ -11222,35 +11300,46 @@ document.addEventListener('keydown', e => {
  * sections/account — переходят на соответствующие existing screens.
  * search/notifications — открывают overlay поверх контента.
  */
+function mobileHeaderSearch() {
+  if (document.querySelector('.app.mobile-layout')) {
+    try { switchMainTab('search'); return; } catch (e) {}
+  }
+  try { openDesktopSearch(); } catch (e) {}
+}
+
 function switchMainTab(name) {
+  // v2.46.253: Главная / Продажи / Задачи / Почта / Ещё (+ legacy search/notifications/account)
   state.currentMainTab = name;
   const app = document.getElementById('app');
   if (app) app.dataset.mainTab = name;
 
-  // Подсветка кнопок
   document.querySelectorAll('#tab-bar-main .tab25[data-main-tab]').forEach(b => b.classList.remove('active'));
   const btn = document.querySelector('#tab-bar-main .tab25[data-main-tab="' + name + '"]');
   if (btn) btn.classList.add('active');
 
-  // Закрыть все overlay'и
   const so = document.getElementById('search25-screen');
   const no = document.getElementById('notif25-screen');
   if (so) so.style.display = 'none';
   if (no) no.style.display = 'none';
 
-  if (name === 'sections') {
+  if (name === 'more' || name === 'sections') {
     openMobileSections();
+  } else if (name === 'home' || name === 'sales' || name === 'tasks' || name === 'mail' || name === 'production' || name === 'installation' || name === 'help') {
+    closeMobileSections();
+    try { selectSection(name); } catch (e) { console.error(e); }
   } else if (name === 'account') {
-    // Аккаунт — это экран внутри Производства в текущей архитектуре
+    closeMobileSections();
     selectSection('production');
     setTimeout(() => selectSidebarItem('account'), 30);
   } else if (name === 'search') {
+    closeMobileSections();
     if (so) so.style.display = 'block';
     setTimeout(() => {
       const inp = document.getElementById('search25-input');
       if (inp) inp.focus();
     }, 100);
   } else if (name === 'notifications') {
+    closeMobileSections();
     if (no) no.style.display = 'block';
     renderNotifications25();
   }
@@ -11263,9 +11352,17 @@ function switchMainTab(name) {
  * нижнего tab-bar (кроме sections/account которые имеют соответствие).
  */
 function syncMainTabFromSection(sectionName, screenName) {
-  // Любой рабочий экран относится к общей кнопке «Разделы»; поиск,
-  // уведомления и аккаунт по-прежнему имеют собственные кнопки.
-  let mainTab = screenName === 'account' ? 'account' : 'sections';
+  // v2.46.253: подсветка Главная/Продажи/Задачи/Почта; остальное → Ещё
+  let mainTab = 'more';
+  if (screenName === 'account') mainTab = 'more';
+  else if (sectionName === 'home') mainTab = 'home';
+  else if (sectionName === 'sales') mainTab = 'sales';
+  else if (sectionName === 'tasks') mainTab = 'tasks';
+  else if (sectionName === 'mail') mainTab = 'mail';
+  else if (sectionName === 'production') mainTab = (typeof _mobileTabVisible === 'function' && _mobileTabVisible('production')) ? 'production' : 'more';
+  else if (sectionName === 'installation') mainTab = (typeof _mobileTabVisible === 'function' && _mobileTabVisible('installation')) ? 'installation' : 'more';
+  else if (sectionName === 'help') mainTab = (typeof _mobileTabVisible === 'function' && _mobileTabVisible('help')) ? 'help' : 'more';
+  if (typeof _mobileTabVisible === 'function' && mainTab !== 'more' && !_mobileTabVisible(mainTab)) mainTab = 'more';
 
   state.currentMainTab = mainTab;
   const app = document.getElementById('app');
@@ -11273,8 +11370,8 @@ function syncMainTabFromSection(sectionName, screenName) {
 
   document.querySelectorAll('#tab-bar-main .tab25[data-main-tab]').forEach(b => b.classList.remove('active'));
   if (mainTab) {
-    const btn = document.querySelector('#tab-bar-main .tab25[data-main-tab="' + mainTab + '"]');
-    if (btn) btn.classList.add('active');
+    const b2 = document.querySelector('#tab-bar-main .tab25[data-main-tab="' + mainTab + '"]');
+    if (b2) b2.classList.add('active');
   }
 }
 
