@@ -1344,6 +1344,19 @@ setTimeout(function () {
               <div class="ui-roles" id="profile-roles">—</div>
             </div>
           </div>
+          <div class="section-label">Рабочий телефон</div>
+          <div class="menu-item call-device-card" id="call-device-card">
+            <div class="menu-icon" style="background:#E8F5EE; color:#1F7B3F;"><i class="ti ti-device-mobile"></i></div>
+            <div class="menu-body" style="flex:1">
+              <div class="menu-title">Звонки с ПК на этот телефон</div>
+              <div class="menu-meta" id="call-device-status">Проверяем…</div>
+              <div class="call-device-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+                <button type="button" class="btn btn-primary" id="call-device-link-btn" onclick="event.stopPropagation();registerCallDevice()">Сделать этот телефон рабочим</button>
+                <button type="button" class="btn btn-secondary" id="call-device-test-btn" hidden onclick="event.stopPropagation();testCallDevice()">Проверить</button>
+                <button type="button" class="btn btn-secondary" id="call-device-unlink-btn" hidden onclick="event.stopPropagation();unlinkCallDevice()">Отвязать</button>
+              </div>
+            </div>
+          </div>
           <div class="section-label">Управление</div>
           <div class="menu-item" onclick="testAlerts()">
             <div class="menu-icon" style="background:#FEF3C7; color:#B45309;"><i class="ti ti-bell-exclamation"></i></div>
@@ -3592,6 +3605,7 @@ setTimeout(function () {
   </nav>
 
   <!-- ============ ЭТАП 25.0: ЕДИНЫЙ TAB-BAR (мобильный) ============ -->
+  <!-- v2.46.254: call-on-phone / vCard -->
   <!-- v2.46.253: нижняя панель разделов CRM -->
   <nav class="tab-bar" id="tab-bar-main" aria-label="Основные разделы">
     <button class="tab25 active" data-main-tab="home" onclick="switchMainTab('home')">

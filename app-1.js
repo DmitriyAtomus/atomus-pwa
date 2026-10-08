@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.253";
+const APP_VERSION = "v2.46.254";
 const APP_VERSION_DATE = "08.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1389,11 +1389,81 @@ async function syncPushSubscription() {
     });
     _markPushEnabledUI();
     state._pushSynced = true;
+    try { if (typeof prospectsLoadCallDevice === "function") prospectsLoadCallDevice(); } catch (_) {}
   } catch (e) { /* тихо — не мешаем работе приложения */ }
 }
 
 // v2.45.158: тестовый пуш по кнопке — отправляет уведомление на телефоны,
 // где включён пуш (📱). Если подписок нет — подсказывает нажать 📱.
+
+// v2.46.254: рабочий телефон для звонков с ПК
+async function registerCallDevice() {
+  let step = 'старт';
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      alert('На этом устройстве Web Push недоступен. Нужен Chrome на Android с Google-сервисами, CRM добавлена на домашний экран.');
+      return;
+    }
+    step = 'разрешение';
+    let perm = Notification.permission;
+    if (perm === 'default') perm = await Notification.requestPermission();
+    if (perm !== 'granted') { alert('Разрешите уведомления для CRM в настройках Chrome.'); return; }
+    step = 'VAPID';
+    const token = localStorage.getItem(TOKEN_KEY);
+    const kr = await fetch(API_BASE + '/api/push/vapid-key', { headers: { Authorization: 'Bearer ' + token } });
+    const kd = await kr.json().catch(() => ({}));
+    if (!kd.available || !kd.key) { alert('Сервер: пуш недоступен'); return; }
+    step = 'subscribe';
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: _urlB64ToUint8Array(kd.key) });
+    }
+    step = 'call-device';
+    const body = Object.assign({}, sub.toJSON(), {
+      call_device: true,
+      label: (navigator.userAgentData && navigator.userAgentData.platform) || ( /Android/i.test(navigator.userAgent) ? 'Android' : 'Телефон'),
+      user_agent: navigator.userAgent || '',
+    });
+    const sr = await fetch(API_BASE + '/api/push/call-device', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    const sd = await sr.json().catch(() => ({}));
+    if (!sr.ok) { alert('Не удалось привязать: ' + (sd.message || sd.error || sr.status)); return; }
+    showToast('📱 Этот телефон — рабочий для звонков', 'success');
+    try { await prospectsLoadCallDevice(true); } catch (_) {}
+    try {
+      await fetch(API_BASE + '/api/push/call-device/test', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+    } catch (_) {}
+  } catch (e) {
+    alert('Не привязался на шаге «' + step + '»: ' + (e && e.message));
+  }
+}
+async function unlinkCallDevice() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  try {
+    await fetch(API_BASE + '/api/push/call-device', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ clear: true }),
+    });
+    showToast('Рабочий телефон отвязан', 'info');
+    try { await prospectsLoadCallDevice(true); } catch (_) {}
+  } catch (e) { showToast('Не удалось отвязать', 'error'); }
+}
+async function testCallDevice() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  try {
+    showToast('Шлю тест на рабочий телефон…', 'info');
+    const tr = await fetch(API_BASE + '/api/push/call-device/test', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+    const td = await tr.json().catch(() => ({}));
+    if (td.sent > 0) showToast('✅ Тест ушёл — смотри уведомление на телефоне', 'success');
+    else showToast(td.message || 'Пуш не доставлен (sent=0)', 'error');
+  } catch (e) { showToast('Ошибка теста', 'error'); }
+}
+
 async function sendTestPush() {
   const token = localStorage.getItem(TOKEN_KEY);
   if (!token) { showToast('Нет сессии', 'error'); return; }

@@ -157,3 +157,30 @@ html.prospect-drawer-open{overflow:hidden}html.prospect-drawer-open .toast{z-ind
   .prospects { padding:0 0 88px; max-width:none; }
   .prospect-pagination { padding-bottom:12px; }
 }
+
+/* v2.46.254: call-on-phone + dial overlay + vcard */
+.prospect-call-phone-btn { white-space: nowrap; }
+.pdw-callrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.prospect-dial-full {
+  position: fixed; inset: 0; z-index: 2000; background: rgba(15, 23, 42, .72);
+  display: grid; place-items: center; padding: 24px;
+}
+.prospect-dial-card {
+  background: #fff; border-radius: 20px; padding: 24px 20px; width: min(420px, 100%);
+  display: flex; flex-direction: column; gap: 14px; align-items: stretch;
+  box-shadow: 0 20px 50px rgba(0,0,0,.35);
+}
+.prospect-dial-label { font-size: 13px; font-weight: 700; color: #6E7689; text-transform: uppercase; letter-spacing: .04em; text-align: center; }
+.prospect-dial-btn {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  min-height: 64px; border-radius: 16px; background: #1F7B3F; color: #fff !important;
+  font-weight: 800; font-size: 18px; text-decoration: none !important;
+  box-shadow: 0 8px 18px rgba(31,123,63,.28);
+}
+.prospect-qr-box { display: flex; justify-content: center; padding: 12px; }
+.prospect-qr-box img { border-radius: 12px; background: #fff; }
+.call-device-card { align-items: flex-start !important; cursor: default; }
+@media (max-width: 759px) {
+  .pdw-callrow .prospect-call-phone-btn { width: 100%; min-height: 48px; }
+  .pdw-callrow .prospect-vcard-btn { width: 100%; min-height: 48px; }
+}

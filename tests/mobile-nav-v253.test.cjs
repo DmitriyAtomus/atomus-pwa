@@ -8,13 +8,13 @@ const root = path.join(__dirname, '..');
 const load = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 const eqJson = (a, b) => assert.equal(JSON.stringify(a), JSON.stringify(b));
 
-describe('v2.46.253 mobile nav + prospects', () => {
+describe('v2.46.254 mobile nav + prospects', () => {
   it('release: version, cache, version.json and changelog stay in sync', () => {
     const ver = JSON.parse(load('version.json'));
-    assert.equal(ver.version, 'v2.46.253');
-    assert.match(load('app-1.js'), /APP_VERSION\s*=\s*"v2\.46\.253"/);
-    assert.match(load('sw.js'), /CACHE_VERSION\s*=\s*'atomus-v2\.46\.253'/);
-    assert.match(load('app-3.js'), /version:'v2\.46\.253'/);
+    assert.equal(ver.version, 'v2.46.254');
+    assert.match(load('app-1.js'), /APP_VERSION\s*=\s*"v2\.46\.254"/);
+    assert.match(load('sw.js'), /CACHE_VERSION\s*=\s*'atomus-v2\.46\.254'/);
+    assert.match(load('app-3.js'), /version:'v2\.46\.254'/);
     assert.match(load('.assetsignore'), /^tests$/m);
   });
 
