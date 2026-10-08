@@ -1,5 +1,5 @@
 /* Dairy manufacturers — server-backed records; campaigns require an explicit launch. */
-var _prospects = { page: 1, request: 0, detailRequest: 0, current: null, dict: null, file: null, preview: false, view: 'table', direction: 'chillers', rows: [] };
+var _prospects = { page: 1, request: 0, detailRequest: 0, current: null, total: 0, pages: 1, dirty: new Set(), drawerOpen: false, openingId: null, navAnchor: -1, pendingOpen: null, pushedHash: false, dict: null, file: null, preview: false, view: 'table', direction: 'chillers', rows: [] };
 var PROSPECT_DIRECTIONS = {chillers:'Чиллеры', cheese:'Сыроварни', dairy:'Молочные заводы'};
 var PROSPECT_LABELS = { direction: 'Направление', next_time: 'Время (Екатеринбург)', annual_units: 'Подтверждённая потребность, шт./год', close_reason: 'Причина переноса / отказа', stage: 'Этап', owner: 'Ответственный', contact_person: 'Контактный специалист',
   contact_role: 'Должность', need: 'Задача клиента', next_action: 'Следующий шаг', next_date: 'Дата контакта',
@@ -111,10 +111,18 @@ async function prospectsCallSubmit(id, scope, result) {
     await prospectsPost('/api/sales/prospects/' + encodeURIComponent(id) + '/calls', body);
     showToast('Звонок записан: ' + PROSPECT_CALL_RESULTS[result], 'success');
     _prospects.quick = null;
-    await prospectsAfterQuick(id);
+    if (scope === 'card') {
+      if (_prospects.dirty) _prospects.dirty.delete('call_note');
+      await prospectsRefreshCard(id, result);
+      _prospects.posting = false;
+      await prospectsAfterCall(id, result);
+    } else await prospectsAfterQuick(id);
   } catch (e) {
     if (status) status.textContent = e.message || 'Не удалось записать звонок';
-    if (prospectsConflict(e)) { showToast('Карточку уже изменили — обновили данные, повторите', 'info'); await prospectsAfterQuick(id); }
+    if (prospectsConflict(e)) {
+      showToast('Карточку уже изменили — обновили данные, повторите', 'info');
+      if (scope === 'card') await prospectsRefreshCard(id); else await prospectsAfterQuick(id);
+    }
   } finally { _prospects.posting = false; }
 }
 async function prospectsQuickComment(id) {
@@ -205,6 +213,12 @@ async function loadProspects() {
     const result = await apiGet('/api/sales/prospects?' + params.toString());
     if (seq !== _prospects.request) return;
     _prospects.dict = result; _prospects.page = result.page; _prospects.rows = result.rows;
+    _prospects.total = result.total; _prospects.pages = result.pages;
+    // Перерисовка таблицы (после звонка/сохранения) не сбрасывает её прокрутку, если выборка та же.
+    const listKey = params.toString() + '|' + _prospects.view;
+    const oldWrap = root.querySelector ? root.querySelector('.prospect-table-wrap') : null;
+    const keepScroll = oldWrap && _prospects.listKey === listKey ? [oldWrap.scrollTop, oldWrap.scrollLeft] : null;
+    _prospects.listKey = listKey;
     const newButton = document.getElementById('prospects-new-button'); if (newButton) newButton.hidden = !canManageSales();
     const s = result.stats;
     document.getElementById('prospects-kpis').innerHTML = [[s.total, 'производств'], [s.email || 0, 'с почтой'], [s.phone || 0, 'с телефоном'], [s.working || 0, 'в работе'], [s.due || 0, 'контакт сегодня / просрочен']].map(function (v) {
@@ -222,7 +236,7 @@ async function loadProspects() {
     else root.innerHTML = '<div class="prospect-table-wrap"><table class="prospect-table"><thead><tr>' + (canManageSales() ? '<th>Выбор</th>' : '') + '<th>Производство</th><th>Контакты</th><th>Этап / ответственный</th><th>Следующий шаг</th>' + (canManageSales() ? '<th>Действия</th>' : '') + '</tr></thead><tbody>' +
       result.rows.map(function (r) {
         const site = prospectsUrl(r.site); const id = prospectsEscape(r.id);
-        return '<tr class="prospect-row" data-prospect-id="' + id + '" onclick="prospectsRowClick(event,\'' + id + '\')" title="Открыть карточку">' + (canManageSales() ? '<td><input class="campaign-select" type="checkbox" data-campaign-select="' + id + '" aria-label="Выбрать ' + prospectsEscape(r.name) + '"' + (typeof _campaigns !== 'undefined' && _campaigns.selected.has(r.id) ? ' checked' : '') + ' onchange="campaignsToggle(\'' + id + '\',this.checked)"></td>' : '') + '<td><button class="prospect-name" onclick="prospectsOpen(\'' + id + '\')">' + prospectsEscape(r.name) + '</button>' +
+        return '<tr class="prospect-row" data-prospect-id="' + id + '" onclick="prospectsRowClick(event,\'' + id + '\')" title="Открыть карточку">' + (canManageSales() ? '<td><input class="campaign-select" type="checkbox" data-campaign-select="' + id + '" aria-label="Выбрать ' + prospectsEscape(r.name) + '"' + (typeof _campaigns !== 'undefined' && _campaigns.selected.has(r.id) ? ' checked' : '') + ' onchange="campaignsToggle(\'' + id + '\',this.checked)"></td>' : '') + '<td class="prospect-col-name"><button class="prospect-name" onclick="prospectsOpen(\'' + id + '\')">' + prospectsEscape(r.name) + '</button>' +
           '<div class="prospect-meta">' + prospectsEscape(r.segment) + (r.priority ? ' · Приоритет ' + prospectsEscape(r.priority) : '') + '</div><div class="prospect-meta">' + prospectsEscape([r.region, r.city].filter(Boolean).join(' · ')) + '</div></td>' +
           '<td><div>' + (r.email ? prospectsEscape(r.email) : '<span class="prospect-missing">Почта не найдена</span>') + '</div><div>' +
           (r.phone ? prospectsPhoneLinks(r.phone, 2) : '<span class="prospect-missing">Телефон не найден</span>') + '</div>' +
@@ -232,17 +246,262 @@ async function loadProspects() {
           '<td><div>' + prospectsEscape(r.next_action || 'Уточнить профиль и нужного специалиста') + '</div><div class="prospect-meta">' + prospectsEscape(prospectsDate(r.next_date) + ' ' + (r.next_time || '')) + '</div></td>' +
           (canManageSales() ? '<td class="prospect-actions"><button class="icon-btn" title="Записать звонок" aria-label="Записать звонок" onclick="prospectsQuick(event,\'' + id + '\',\'call\')"><i class="ti ti-phone"></i></button><button class="icon-btn" title="Комментарий" aria-label="Комментарий" onclick="prospectsQuick(event,\'' + id + '\',\'comment\')"><i class="ti ti-message"></i></button></td>' : '') + '</tr>';
       }).join('') + '</tbody></table></div>';
+    if (keepScroll && root.querySelector) { const w = root.querySelector('.prospect-table-wrap'); if (w) { w.scrollTop = keepScroll[0]; w.scrollLeft = keepScroll[1]; } }
+    if (_prospects.drawerOpen) prospectsRenderNav();
+    if (_prospects.pendingOpen) { const pending = _prospects.pendingOpen; _prospects.pendingOpen = null; prospectsOpen(pending, { fromHash: true }); }
     document.getElementById('prospects-pagination').innerHTML = '<button class="btn btn-secondary" onclick="prospectsPage(-1)"' + (result.page <= 1 ? ' disabled' : '') + '>← Назад</button><span>' + result.page + ' / ' + result.pages + '</span><button class="btn btn-secondary" onclick="prospectsPage(1)"' + (result.page >= result.pages ? ' disabled' : '') + '>Далее →</button>';
   } catch (e) {
     if (seq === _prospects.request) root.innerHTML = '<div class="empty-block">' + prospectsEscape(e.message || 'Не удалось загрузить базу') + '<br><button class="btn btn-secondary" onclick="loadProspects()">Повторить</button></div>';
   } finally { if (seq === _prospects.request) root.removeAttribute('aria-busy'); }
 }
 
-function prospectsClose() {
-  ++_prospects.detailRequest; _prospects.current = null;
-  document.getElementById('prospects-detail').hidden = true;
-  document.getElementById('prospects-overview').hidden = false;
-  document.querySelector('.prospects').classList.remove('prospect-split');
+/* ===== v2.46.252: карточка поверх таблицы, ←/→ по выборке, ссылка #prospects/<id>, защита несохранённого ===== */
+var PROSPECT_HASH_RE = /^#prospects\/([^\/?#]+)$/;
+var PROSPECT_PER_PAGE = 50;
+function prospectsHashId(hash) {
+  const m = PROSPECT_HASH_RE.exec(String(hash || ''));
+  if (!m) return '';
+  try { return decodeURIComponent(m[1]); } catch (_) { return ''; }
+}
+function prospectsHashFor(id) { return '#prospects/' + encodeURIComponent(id); }
+// Соседи в текущей (отфильтрованной и отсортированной сервером) выдаче. anchor — прежнее место карточки,
+// если после звонка она выпала из выборки (например, «Перезвонить» убрал её из «На сегодня»).
+function prospectsNavInfo(rows, id, anchor, page, total, perPage) {
+  rows = rows || []; perPage = perPage || PROSPECT_PER_PAGE; page = Math.max(1, page || 1);
+  total = typeof total === 'number' ? total : rows.length;
+  const base = (page - 1) * perPage, more = base + rows.length < total;
+  let index = -1;
+  for (let i = 0; i < rows.length; i++) if (rows[i].id === id) { index = i; break; }
+  if (index >= 0) {
+    return { index: index, inList: true, position: base + index + 1, total: total,
+      prev: index > 0 ? rows[index - 1].id : null, next: index < rows.length - 1 ? rows[index + 1].id : null,
+      prevPage: index === 0 && page > 1, nextPage: index === rows.length - 1 && more };
+  }
+  if (typeof anchor === 'number' && anchor >= 0) {
+    const at = Math.min(anchor, rows.length);
+    return { index: -1, inList: false, position: 0, total: total,
+      prev: at > 0 ? rows[at - 1].id : null, next: at < rows.length ? rows[at].id : null,
+      prevPage: at === 0 && page > 1, nextPage: at >= rows.length && more };
+  }
+  return { index: -1, inList: false, position: 0, total: total, prev: null, next: null, prevPage: false, nextPage: false };
+}
+function prospectsNavCurrent() {
+  const id = _prospects.current ? _prospects.current.id : _prospects.openingId;
+  return prospectsNavInfo(_prospects.rows, id, _prospects.navAnchor, _prospects.page, _prospects.total);
+}
+function prospectsNavLabel(nav) {
+  return nav.inList ? nav.position + ' из ' + nav.total : 'вне текущей выборки';
+}
+function prospectsRenderNav() {
+  const nav = prospectsNavCurrent();
+  const pos = document.getElementById('prospect-pos'); if (pos) pos.textContent = prospectsNavLabel(nav);
+  const prev = document.getElementById('prospect-prev'); if (prev) prev.disabled = !(nav.prev || nav.prevPage);
+  const next = document.getElementById('prospect-next'); if (next) next.disabled = !(nav.next || nav.nextPage);
+  const after = document.getElementById('prospect-after-next'); if (after) after.disabled = !(nav.next || nav.nextPage);
+  return nav;
+}
+
+/* --- несохранённые изменения --- */
+function prospectsIsDirty() { return !!(_prospects.dirty && _prospects.dirty.size); }
+function prospectsDirtyKey(el) {
+  if (!el) return '';
+  const id = el.id || '';
+  if (id.indexOf('prospect-field-') === 0) return id.slice(15);
+  if (id === 'prospect-note') return 'note';
+  if (id.indexOf('prospect-call-note-card-') === 0) return 'call_note';
+  if (el.closest && el.closest('.prospect-extra-contact')) return 'contacts_json';
+  return '';
+}
+function prospectsDirtyBadge() {
+  const el = document.getElementById('prospect-dirty'); if (el) el.hidden = !prospectsIsDirty();
+}
+function prospectsMarkDirty(event) {
+  const key = prospectsDirtyKey(event && event.target);
+  if (!key) return;
+  if (!_prospects.dirty) _prospects.dirty = new Set();
+  _prospects.dirty.add(key); prospectsDirtyBadge();
+}
+function prospectsMarkContacts() {
+  if (!_prospects.dirty) _prospects.dirty = new Set();
+  _prospects.dirty.add('contacts_json'); prospectsDirtyBadge();
+}
+function prospectsConfirmLeave() {
+  if (!prospectsIsDirty()) return true;
+  const ok = typeof confirm === 'function' ? confirm('В карточке есть несохранённые изменения. Уйти без сохранения?') : true;
+  if (ok) { _prospects.dirty.clear(); prospectsDirtyBadge(); }
+  return ok;
+}
+// Снимок изменённых, но не сохранённых полей — чтобы перерисовка карточки (после звонка) их не теряла.
+function prospectsSnapshot(skip) {
+  const snap = {};
+  (_prospects.dirty ? Array.from(_prospects.dirty) : []).forEach(function (key) {
+    if ((skip || []).indexOf(key) >= 0) return;
+    if (key === 'contacts_json') { snap[key] = JSON.stringify(prospectsReadContacts()); return; }
+    const el = document.getElementById(key === 'note' ? 'prospect-note' : key === 'call_note' ? 'prospect-call-note-card-' + (_prospects.current ? _prospects.current.id : '') : 'prospect-field-' + key);
+    if (el) snap[key] = el.value;
+  });
+  return snap;
+}
+function prospectsRestore(snap) {
+  _prospects.dirty = new Set();
+  Object.keys(snap || {}).forEach(function (key) {
+    if (key === 'contacts_json') {
+      const root = document.getElementById('prospect-contacts');
+      if (root) root.innerHTML = prospectsContacts(snap[key]);
+    } else {
+      const el = document.getElementById(key === 'note' ? 'prospect-note' : key === 'call_note' ? 'prospect-call-note-card-' + (_prospects.current ? _prospects.current.id : '') : 'prospect-field-' + key);
+      if (!el) return;
+      el.value = snap[key];
+    }
+    _prospects.dirty.add(key);
+  });
+  if (Object.keys(snap || {}).some(function (k) { return ['contact_person', 'contact_role', 'email', 'phone', 'site', 'qualification', 'need', 'comment', 'consent', 'consent_date', 'consent_basis', 'contacts_json'].indexOf(k) >= 0; })) {
+    const d = document.getElementById('prospect-edit-contacts'); if (d) d.open = true;
+  }
+  prospectsDirtyBadge();
+}
+
+/* --- адрес страницы --- */
+function prospectsHasHistory() { return typeof history !== 'undefined' && typeof location !== 'undefined' && !!history.replaceState; }
+function prospectsSetHash(id, replace) {
+  if (!prospectsHasHistory()) return;
+  const want = prospectsHashFor(id);
+  if (location.hash === want) return;
+  const url = location.pathname + location.search + want;
+  if (replace || prospectsHashId(location.hash)) history.replaceState({ prospect: id }, '', url);
+  else { history.pushState({ prospect: id }, '', url); _prospects.pushedHash = true; }
+}
+function prospectsClearHash() {
+  if (!prospectsHasHistory() || !prospectsHashId(location.hash)) return;
+  if (_prospects.pushedHash) { _prospects.pushedHash = false; history.back(); }
+  else history.replaceState(null, '', location.pathname + location.search);
+}
+function prospectsOnHash() {
+  if (typeof location === 'undefined') return;
+  const id = prospectsHashId(location.hash);
+  const openId = _prospects.current ? _prospects.current.id : _prospects.openingId;
+  if (!id) {
+    if (!_prospects.drawerOpen) return;
+    if (!prospectsConfirmLeave()) {  // «Назад» при несохранённых правках — остаёмся в карточке
+      if (openId && prospectsHasHistory()) { history.pushState({ prospect: openId }, '', location.pathname + location.search + prospectsHashFor(openId)); _prospects.pushedHash = true; }
+      return;
+    }
+    prospectsClose({ force: true, fromHash: true });
+    return;
+  }
+  if (_prospects.drawerOpen && id === openId) return;
+  if (typeof state !== 'undefined' && state && state.currentScreen !== 'sales-prospects') { prospectsDeepLink(); return; }
+  prospectsOpen(id, { fromHash: true });
+}
+// Прямая ссылка …/#prospects/<id>: открыть «Базу предприятий» и карточку после загрузки списка.
+function prospectsDeepLink() {
+  const id = typeof location !== 'undefined' ? prospectsHashId(location.hash) : '';
+  if (!id) return false;
+  _prospects.pendingOpen = id;
+  try { if (typeof selectSection === 'function') selectSection('sales'); } catch (_) {}
+  if (typeof selectSidebarItem === 'function') selectSidebarItem('sales-prospects');
+  return true;
+}
+
+/* --- выдвижная панель --- */
+function prospectsDrawer() {
+  const root = document.getElementById('prospects-detail');
+  if (root && !root._drawerReady && document.body && document.body.appendChild) {
+    // Переносим в <body>: панель поверх таблицы, таблица не сжимается и сохраняет прокрутку.
+    document.body.appendChild(root);
+    root.classList.add('prospects', 'prospect-drawer');
+    root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', 'Карточка предприятия');
+    const backdrop = document.createElement('div');
+    backdrop.id = 'prospects-backdrop'; backdrop.className = 'prospect-backdrop'; backdrop.hidden = true;
+    backdrop.addEventListener('click', function () { prospectsClose(); });
+    document.body.appendChild(backdrop);
+    root._drawerReady = true;
+  }
+  return root;
+}
+function prospectsShowDrawer(on) {
+  const root = prospectsDrawer(); if (!root) return;
+  root.hidden = !on; _prospects.drawerOpen = !!on;
+  const backdrop = document.getElementById('prospects-backdrop'); if (backdrop) backdrop.hidden = !on;
+  const html = document.documentElement;
+  if (html && html.classList) html.classList[on ? 'add' : 'remove']('prospect-drawer-open');
+  if (on && html && html.style && document.querySelectorAll) {
+    let gap = 0;
+    document.querySelectorAll('.sidebar').forEach(function (sb) {
+      const rc = sb.getBoundingClientRect ? sb.getBoundingClientRect() : null;
+      if (rc && rc.width > 0 && rc.height > 0) gap = Math.max(gap, rc.right);
+    });
+    html.style.setProperty('--prospect-drawer-gap', gap + 'px');
+  }
+}
+function prospectsJump(sectionId) {
+  const el = document.getElementById(sectionId);
+  if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function prospectsStep(delta) {
+  if (!_prospects.current) return;
+  if (!prospectsConfirmLeave()) return;
+  const nav = prospectsNavCurrent();
+  let target = delta < 0 ? nav.prev : nav.next;
+  if (!target && (delta < 0 ? nav.prevPage : nav.nextPage)) {
+    _prospects.page += delta < 0 ? -1 : 1;
+    await loadProspects();
+    const rows = _prospects.rows || [];
+    target = rows.length ? (delta < 0 ? rows[rows.length - 1].id : rows[0].id) : null;
+  }
+  if (!target) { showToast(delta < 0 ? 'Это первое предприятие в выборке' : 'Это последнее предприятие в выборке', 'info'); return; }
+  await prospectsOpen(target, { replace: true });
+}
+function prospectsAutoNext(value) {
+  try {
+    if (typeof value === 'boolean') localStorage.setItem('atomus_prospects_autonext', value ? '1' : '0');
+    return localStorage.getItem('atomus_prospects_autonext') === '1';
+  } catch (_) { return false; }
+}
+// После записи звонка из карточки: предложить «Следующее →» (или перейти сразу, если включено).
+async function prospectsAfterCall(id, result) {
+  const box = document.getElementById('prospect-after-call');
+  if (box) {
+    box.hidden = false;
+    box.innerHTML = '<i class="ti ti-circle-check"></i> Записано: ' + prospectsEscape(PROSPECT_CALL_RESULTS[result] || result) +
+      ' <button type="button" class="btn btn-primary" id="prospect-after-next" onclick="prospectsStep(1)">Следующее →</button>';
+    prospectsRenderNav();
+  }
+  if (prospectsAutoNext() && _prospects.current && _prospects.current.id === id) await prospectsStep(1);
+}
+function prospectsKey(e) {
+  if (!_prospects.drawerOpen || !e) return;
+  if (e.key === 'Escape') { if (e.preventDefault) e.preventDefault(); prospectsClose(); return; }
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  const t = e.target, tag = t && t.tagName ? String(t.tagName).toLowerCase() : '';
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || (t && t.isContentEditable)) return;
+  const k = e.key;
+  // J/K (и о/л на русской раскладке) — как в почте: J — следующее, K — предыдущее.
+  if (k === 'ArrowRight' || k === 'j' || k === 'J' || k === 'о' || k === 'О') { if (e.preventDefault) e.preventDefault(); prospectsStep(1); }
+  else if (k === 'ArrowLeft' || k === 'k' || k === 'K' || k === 'л' || k === 'Л') { if (e.preventDefault) e.preventDefault(); prospectsStep(-1); }
+}
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('hashchange', prospectsOnHash);
+  window.addEventListener('keydown', prospectsKey);
+  window.addEventListener('beforeunload', function (e) { if (prospectsIsDirty()) { e.preventDefault(); e.returnValue = ''; } });
+}
+
+function prospectsClose(opts) {
+  opts = opts || {};
+  if (!opts.force && !prospectsConfirmLeave()) return false;
+  if (_prospects.dirty) _prospects.dirty.clear();
+  const lastId = _prospects.current ? _prospects.current.id : _prospects.openingId;
+  ++_prospects.detailRequest; _prospects.current = null; _prospects.openingId = null;
+  const root = document.getElementById('prospects-detail'); if (root) root.hidden = true;
+  const overview = document.getElementById('prospects-overview'); if (overview) overview.hidden = false;
+  prospectsShowDrawer(false);
+  if (!opts.fromHash) prospectsClearHash(); else _prospects.pushedHash = false;
+  // Возвращаем взгляд на строку, с которой работали.
+  if (lastId && document.querySelector) {
+    const row = document.querySelector('tr[data-prospect-id="' + String(lastId).replace(/["\\]/g, '') + '"]');
+    if (row && row.scrollIntoView) { row.scrollIntoView({ block: 'nearest' }); if (row.classList) { document.querySelectorAll('.prospect-row-last').forEach(function (el) { el.classList.remove('prospect-row-last'); }); row.classList.add('prospect-row-last'); } }
+  }
+  return true;
 }
 function prospectsField(key, value, options, area) {
   const id = 'prospect-field-' + key;
@@ -252,59 +511,127 @@ function prospectsField(key, value, options, area) {
   else control = '<input id="' + id + '" type="' + (key === 'next_time' ? 'time' : key.endsWith('_date') ? 'date' : 'text') + '" maxlength="5000" value="' + prospectsEscape(value) + '">';
   return '<label class="prospect-field' + (area ? ' wide' : '') + '"><span>' + PROSPECT_LABELS[key] + '</span>' + control + '</label>';
 }
-async function prospectsOpen(id) {
+function prospectsHeadHtml(r, stages) {
+  const phones = prospectsPhones(r.phone), main = phones.find(function (p) { return p.tel; }) || phones[0];
+  const stage = r.stage ? '<span class="prospect-stage">' + prospectsEscape((stages || {})[r.stage] || r.stage) + '</span>' : '';
+  return '<header class="pdw-head">' +
+    '<div class="pdw-toprow"><button type="button" class="btn btn-secondary pdw-back" onclick="prospectsClose()">← К базе</button>' +
+    '<div class="pdw-nav"><button type="button" class="icon-btn" id="prospect-prev" onclick="prospectsStep(-1)" title="Предыдущее (← или K)" aria-label="Предыдущее предприятие"><i class="ti ti-chevron-left"></i></button>' +
+    '<span class="pdw-pos" id="prospect-pos" aria-live="polite">…</span>' +
+    '<button type="button" class="icon-btn" id="prospect-next" onclick="prospectsStep(1)" title="Следующее (→ или J)" aria-label="Следующее предприятие"><i class="ti ti-chevron-right"></i></button></div>' +
+    '<span class="pdw-dirty" id="prospect-dirty" hidden>● не сохранено</span>' +
+    '<button type="button" class="icon-btn pdw-close" onclick="prospectsClose()" title="Закрыть (Esc)" aria-label="Закрыть карточку"><i class="ti ti-x"></i></button></div>' +
+    '<h2 class="pdw-title">' + prospectsEscape(r.name || 'Предприятие') + '</h2>' +
+    '<div class="pdw-sub">' + prospectsEscape([r.region, r.city].filter(Boolean).join(' · ')) + (r.direction ? ' · ' + prospectsEscape(PROSPECT_DIRECTIONS[r.direction] || r.direction) : '') + ' ' + stage +
+    (r.owner ? ' <span class="prospect-meta">' + prospectsEscape(r.owner) + '</span>' : '') + '</div>' +
+    '<div class="pdw-callrow">' + (main && main.tel ? '<a class="btn btn-primary prospect-call-btn" href="tel:' + main.tel + '"><i class="ti ti-phone"></i> Позвонить</a><a class="pdw-mainphone" href="tel:' + main.tel + '">' + prospectsEscape(main.raw) + '</a>' :
+      '<span class="prospect-missing">' + (main ? prospectsEscape(main.raw) + ' — номер не распознан' : 'Телефон не указан') + '</span>') +
+    ' ' + prospectsCallSummary(r) + '</div>' +
+    '<nav class="pdw-tabs" aria-label="Разделы карточки"><button type="button" onclick="prospectsJump(\'pdw-contacts\')">Контакты</button><button type="button" onclick="prospectsJump(\'pdw-call\')">Звонок</button><button type="button" onclick="prospectsJump(\'pdw-work\')">Работа</button><button type="button" onclick="prospectsJump(\'pdw-history\')">История</button></nav>' +
+    '</header>';
+}
+function prospectsContactsView(r) {
+  let extra = []; try { extra = JSON.parse(r.contacts_json || '[]'); } catch (_) {}
+  const site = prospectsUrl(r.site);
+  const emails = String(r.email || '').split(/[;,\s]+/).filter(function (v) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v); });
+  const rows = [
+    ['Телефоны', r.phone ? prospectsPhoneLinks(r.phone) : '<span class="prospect-missing">не указаны</span>'],
+    ['Почта', emails.length ? emails.map(function (m) { return '<a href="mailto:' + prospectsEscape(m) + '">' + prospectsEscape(m) + '</a>'; }).join('<br>') : (r.email ? prospectsEscape(r.email) : '<span class="prospect-missing">не найдена</span>')],
+    ['Сайт', site ? '<a href="' + prospectsEscape(site) + '" target="_blank" rel="noopener noreferrer">' + prospectsEscape(r.site) + ' ↗</a>' : (r.site ? prospectsEscape(r.site) : '—')],
+    ['Контактное лицо', r.contact_person ? prospectsEscape(r.contact_person) + (r.contact_role ? ' <span class="prospect-meta">' + prospectsEscape(r.contact_role) + '</span>' : '') : '<span class="prospect-meta">не указано — уточните при звонке</span>']
+  ];
+  if (extra.length) rows.push(['Другие сотрудники', extra.map(function (c) {
+    return [c.name ? '<b>' + prospectsEscape(c.name) + '</b>' : '', c.role ? prospectsEscape(c.role) : '', c.phone ? prospectsPhoneLinks(c.phone) : '', c.email ? prospectsEscape(c.email) : ''].filter(Boolean).join(' · ');
+  }).join('<br>')]);
+  rows.push(['Отрасль', prospectsEscape(r.segment || '—')], ['Адрес', prospectsEscape(r.address || 'не найден')]);
+  if (r.inn) rows.push(['ИНН', prospectsEscape(r.inn)]);
+  return '<dl class="pdw-contacts">' + rows.map(function (v) { return '<dt>' + v[0] + '</dt><dd>' + v[1] + '</dd>'; }).join('') + '</dl>';
+}
+function prospectsCardHtml(r, employees, dict) {
+  const source = r.source_data || {};
+  const sources = ['source', 'email_source', 'phone_source', 'site_pages'].map(function (k) { return source[k] || ''; }).join(' ');
+  const urls = [...new Set(sources.match(/https?:\/\/[^\s;|]+/g) || [])];
+  const analysis = [['Факты', source.fact], ['Применение — гипотеза', source.use], ['Подбор', source.fit], ['Серийность — оценка', source.repeat], ['Барьеры', source.risk], ['Кого попросить', source.role], ['Вопрос', source.ask], ['Следующий шаг', source.next], ['Маршрут', source.route]].filter(function (v) { return v[1]; });
+  const manage = canManageSales();
+  return prospectsHeadHtml(r, dict.stages) + '<div class="pdw-body" id="prospect-body">' +
+    '<section class="pdw-section" id="pdw-contacts"><h3>Контакты</h3>' + prospectsContactsView(r) +
+    '<div class="prospect-note">' + (r.direction === 'chillers' ? 'Чиллеры 1,5–50 кВт: вода от +5 °C, пропиленгликоль от −10 °C. Холодопроизводительность уточняется при рабочем режиме.' : 'Климатическое оборудование под продукт, помещение и загрузку.') + '</div></section>' +
+    (analysis.length ? '<section class="pdw-section"><details class="prospect-source" open><summary>Анализ и вопросы для звонка</summary><dl>' + analysis.map(function (v) { return '<dt>' + v[0] + '</dt><dd>' + prospectsEscape(v[1]) + '</dd>'; }).join('') + '</dl></details></section>' : '') +
+    '<section class="pdw-section" id="pdw-call" oninput="prospectsMarkDirty(event)"><h3>Результат звонка</h3>' +
+    (manage ? prospectsCallBox(r.id, 'card') + '<div class="pdw-after-call" id="prospect-after-call" hidden></div>' +
+      '<label class="pdw-autonext"><input type="checkbox" id="prospect-autonext"' + (prospectsAutoNext() ? ' checked' : '') + ' onchange="prospectsAutoNext(this.checked)"> После записи звонка сразу открывать следующее предприятие</label>' :
+      '<p class="prospect-meta">Записывать звонки могут директор, заместитель и менеджеры.</p>') + '</section>' +
+    '<section class="pdw-section" id="pdw-work"><h3>Работа с предприятием</h3>' +
+    '<form id="prospect-form" onsubmit="prospectsSave(event)" oninput="prospectsMarkDirty(event)" onchange="prospectsMarkDirty(event)"><fieldset' + (!manage ? ' disabled' : '') + '><div class="prospect-fields">' +
+    prospectsField('stage', r.stage, dict.stages) + prospectsOwnerControl(r.owner, employees) +
+    prospectsField('next_action', r.next_action) + prospectsField('next_date', r.next_date) + prospectsField('next_time', r.next_time) +
+    prospectsField('direction', r.direction || 'dairy', PROSPECT_DIRECTIONS) + prospectsField('annual_units', r.annual_units) +
+    prospectsField('close_reason', r.close_reason) + '</div>' +
+    '<label class="prospect-field prospect-comment"><span>Новый комментарий</span><textarea id="prospect-note" rows="3" maxlength="5000" placeholder="С кем говорили, что обсудили, о чём договорились…"></textarea></label>' +
+    '<div class="prospect-save-row"><button class="btn btn-primary" type="submit" id="prospect-save">Сохранить</button><button type="button" class="btn btn-secondary" onclick="prospectsOffer()"' + (!manage ? ' disabled' : '') + '>Создать КП</button><span id="prospect-save-result" role="status"></span></div>' +
+    '<details class="prospect-source" id="prospect-edit-contacts"><summary>Изменить контакты и сведения</summary><div class="prospect-fields">' +
+    prospectsField('contact_person', r.contact_person) + prospectsField('contact_role', r.contact_role) +
+    prospectsField('email', r.email) + prospectsField('phone', r.phone) + prospectsField('site', r.site) +
+    prospectsField('qualification', r.qualification, PROSPECT_QUALIFICATIONS) + prospectsField('need', r.need, null, true) +
+    prospectsField('comment', r.comment, null, true) + prospectsField('consent', r.consent, dict.consents) +
+    prospectsField('consent_date', r.consent_date) + prospectsField('consent_basis', r.consent_basis, null, true) +
+    '</div><h4>Другие сотрудники предприятия</h4><div id="prospect-contacts">' + prospectsContacts(r.contacts_json) +
+    '</div><button type="button" class="btn btn-secondary" onclick="prospectsAddContact()">+ Контакт</button></details></fieldset></form></section>' +
+    '<section class="pdw-section" id="pdw-history"><h3>История комментариев и звонков</h3><div id="prospect-events">' + prospectsHistory(r.events || [], dict) +
+    '</div><button class="btn btn-secondary" id="prospect-more-history" onclick="prospectsMoreHistory()"' + ((r.events || []).length >= (r.events_total || 0) ? ' hidden' : '') + '>Показать ещё</button></section>' +
+    '<section class="pdw-section"><details class="prospect-source"><summary>Источники и исходные контакты</summary><dl>' +
+    [['Проверка', source.verification], ['Дата сбора', prospectsDate(source.checked)], ['Исходный email', source.email_raw || source.email],
+     ['Исходный телефон', source.phone_raw || source.phone], ['Email со страницы сайта', source.site_emails], ['Примечание', source.notes],
+     ['Тип адреса', source.address_type || 'Как указан в источнике'], ['Период данных источника', source.origin_period || 'Не указан']].map(function (v) { return '<dt>' + v[0] + '</dt><dd>' + prospectsEscape(v[1] || '—') + '</dd>'; }).join('') +
+    '</dl><div class="prospect-source-links">' + urls.map(prospectsLinks).join('<br>') + '</div></details>' +
+    ((r.contractors || []).length ? '<div class="prospect-source"><b>Контрагенты с тем же ИНН</b>' + r.contractors.map(function (c) { return '<p><button class="prospect-name" onclick="prospectsContractor(' + Number(c.id) + ')">' + prospectsEscape(c.name) + '</button> ' + prospectsEscape(c.address || '') + '</p>'; }).join('') + '</div>' : '') +
+    '<div id="prospect-campaign-history"></div></section></div>';
+}
+async function prospectsOpen(id, opts) {
+  opts = opts || {};
+  if (!id) return;
+  const openId = _prospects.current ? _prospects.current.id : null;
+  if (openId && openId !== id && !prospectsConfirmLeave()) return;
   const seq = ++_prospects.detailRequest;
-  const root = document.getElementById('prospects-detail');
-  document.getElementById('prospects-overview').hidden = false; root.hidden = false;
-  document.querySelector('.prospects').classList.add('prospect-split');
-  root.innerHTML = '<button class="btn btn-secondary" onclick="prospectsClose()">← К базе</button><div class="loading-block">Загружаем карточку…</div>';
+  const root = prospectsDrawer();
+  const wasOpen = !!_prospects.drawerOpen;
+  prospectsShowDrawer(true);
+  _prospects.openingId = id;
+  if (!opts.fromHash) prospectsSetHash(id, opts.replace || wasOpen);
+  const known = (_prospects.rows || []).find(function (row) { return row.id === id; });
+  const body0 = document.getElementById('prospect-body');
+  const keepTop = opts.refresh && body0 ? body0.scrollTop : 0;
+  if (!opts.refresh) {
+    root.innerHTML = prospectsHeadHtml(known || { name: 'Загружаем карточку…' }, _prospects.dict && _prospects.dict.stages) + '<div class="pdw-body" id="prospect-body"><div class="loading-block">Загружаем карточку…</div></div>';
+    prospectsRenderNav();
+  }
   try {
     const r = await apiGet('/api/sales/prospects/' + encodeURIComponent(id));
     if (seq !== _prospects.detailRequest) return;
-    _prospects.current = r;
-    const source = r.source_data || {}, dict = _prospects.dict;
+    const dict = _prospects.dict;
     if (!dict) throw new Error('Сначала загрузите список производств');
-    const sources = ['source', 'email_source', 'phone_source', 'site_pages'].map(function (k) { return source[k] || ''; }).join(' ');
-    const urls = [...new Set(sources.match(/https?:\/\/[^\s;|]+/g) || [])];
-    const firstTel = (prospectsPhones(r.phone).find(function (p) { return p.tel; }) || {}).tel || '';
     const employees = await prospectsEmployees();
     if (seq !== _prospects.detailRequest) return;
-    root.innerHTML = '<button class="btn btn-secondary" onclick="prospectsClose()">← К базе</button>' +
-      '<div class="prospect-detail-heading"><h2>' + prospectsEscape(r.name) + '</h2><p>' + prospectsEscape([r.segment, r.region, r.city].filter(Boolean).join(' · ')) + '</p><p>' + prospectsEscape(r.address || 'Адрес не найден') + '</p>' +
-      (r.inn ? '<p>ИНН: ' + prospectsEscape(r.inn) + '</p>' : '') + '</div>' +
-      '<div class="prospect-call-panel"><div class="prospect-toolbar"><div class="prospect-phones">' + (r.phone ? prospectsPhoneLinks(r.phone) : '<span class="prospect-missing">Телефон не указан</span>') + '</div><span>' + prospectsEscape(r.email || 'Почта не указана') + '</span></div>' +
-      (firstTel ? '<a class="btn btn-primary prospect-call-btn" href="tel:' + firstTel + '"><i class="ti ti-phone"></i> Позвонить</a> ' : '') + prospectsCallSummary(r) +
-      (canManageSales() ? '<h4>Результат звонка</h4>' + prospectsCallBox(r.id, 'card') : '') + '</div>' +
-      '<div class="prospect-note">' + (r.direction === 'chillers' ? 'Чиллеры 1,5–50 кВт: вода от +5 °C, пропиленгликоль от −10 °C. Холодопроизводительность уточняется при рабочем режиме.' : 'Климатическое оборудование под продукт, помещение и загрузку.') + '</div>' +
-      '<div class="prospect-toolbar"><button class="btn btn-secondary" onclick="prospectsOffer()"' + (!canManageSales() ? ' disabled' : '') + '>Создать КП</button></div>' +
-      '<form id="prospect-form" onsubmit="prospectsSave(event)"><fieldset' + (!canManageSales() ? ' disabled' : '') + '><div class="prospect-fields">' +
-      prospectsField('stage', r.stage, dict.stages) + prospectsOwnerControl(r.owner, employees) +
-      prospectsField('direction', r.direction || 'dairy', PROSPECT_DIRECTIONS) + prospectsField('annual_units', r.annual_units) +
-      prospectsField('next_action', r.next_action) + prospectsField('next_date', r.next_date) + prospectsField('next_time', r.next_time) +
-      prospectsField('close_reason', r.close_reason) + '</div>' +
-      '<label class="prospect-field prospect-comment"><span>Новый комментарий / результат звонка</span><textarea id="prospect-note" rows="4" maxlength="5000" placeholder="С кем говорили, что обсудили, о чём договорились…"></textarea></label>' +
-      '<div class="prospect-save-row"><button class="btn btn-primary" type="submit" id="prospect-save">Сохранить результат</button><span id="prospect-save-result" role="status"></span></div>' +
-      '<details class="prospect-source"><summary>Контакты и дополнительные сведения</summary><div class="prospect-fields">' +
-      prospectsField('contact_person', r.contact_person) + prospectsField('contact_role', r.contact_role) +
-      prospectsField('email', r.email) + prospectsField('phone', r.phone) + prospectsField('site', r.site) +
-      prospectsField('qualification', r.qualification, PROSPECT_QUALIFICATIONS) + prospectsField('need', r.need, null, true) +
-      prospectsField('comment', r.comment, null, true) + prospectsField('consent', r.consent, dict.consents) +
-      prospectsField('consent_date', r.consent_date) + prospectsField('consent_basis', r.consent_basis, null, true) +
-      '</div><h4>Другие сотрудники предприятия</h4><div id="prospect-contacts">' + prospectsContacts(r.contacts_json) +
-      '</div><button type="button" class="btn btn-secondary" onclick="prospectsAddContact()">+ Контакт</button></details></fieldset></form>' +
-      '<div class="prospect-source"><h3>История комментариев и изменений</h3><div id="prospect-events">' + prospectsHistory(r.events, dict) +
-      '</div><button class="btn btn-secondary" id="prospect-more-history" onclick="prospectsMoreHistory()"' + (r.events.length >= r.events_total ? ' hidden' : '') + '>Показать ещё</button></div>' +
-      '<details class="prospect-source" open><summary>Анализ и вопросы для звонка</summary><dl>' +
-      [['Факты',source.fact],['Применение — гипотеза',source.use],['Подбор',source.fit],['Серийность — оценка',source.repeat],['Барьеры',source.risk],['Кого попросить',source.role],['Вопрос',source.ask],['Следующий шаг',source.next],['Маршрут',source.route]].map(function(v){return '<dt>'+v[0]+'</dt><dd>'+prospectsEscape(v[1] || '—')+'</dd>';}).join('') + '</dl></details>' +
-      '<details class="prospect-source"><summary>Источники и исходные контакты</summary><dl>' +
-      [['Проверка', source.verification], ['Дата сбора', prospectsDate(source.checked)], ['Исходный email', source.email_raw || source.email],
-       ['Исходный телефон', source.phone_raw || source.phone], ['Email со страницы сайта', source.site_emails], ['Примечание', source.notes],
-       ['Тип адреса', source.address_type || 'Как указан в источнике'], ['Период данных источника', source.origin_period || 'Не указан']].map(function (v) { return '<dt>' + v[0] + '</dt><dd>' + prospectsEscape(v[1] || '—') + '</dd>'; }).join('') +
-      '</dl><div class="prospect-source-links">' + urls.map(prospectsLinks).join('<br>') + '</div></details>' +
-      (r.contractors.length ? '<div class="prospect-source"><b>Контрагенты с тем же ИНН</b>' + r.contractors.map(function (c) { return '<p><button class="prospect-name" onclick="prospectsContractor(' + Number(c.id) + ')">' + prospectsEscape(c.name) + '</button> ' + prospectsEscape(c.address || '') + '</p>'; }).join('') + '</div>' : '') +
-      '<div id="prospect-campaign-history"></div>';
+    _prospects.current = r;
+    const nav = prospectsNavInfo(_prospects.rows, id, _prospects.navAnchor, _prospects.page, _prospects.total);
+    if (nav.inList) _prospects.navAnchor = nav.index;
+    if (!opts.keepDirty) _prospects.dirty = new Set();
+    root.innerHTML = prospectsCardHtml(r, employees, dict);
+    prospectsRenderNav(); prospectsDirtyBadge();
+    const body = document.getElementById('prospect-body');
+    if (body) body.scrollTop = keepTop;
     if (typeof campaignsLoadHistory === 'function') campaignsLoadHistory(id, seq);
-  } catch (e) { if (seq === _prospects.detailRequest) root.innerHTML = '<button class="btn btn-secondary" onclick="prospectsClose()">← К базе</button><p>' + prospectsEscape(e.message) + '</p>'; }
+  } catch (e) {
+    if (seq === _prospects.detailRequest) root.innerHTML = prospectsHeadHtml(known || { name: 'Карточка не открылась' }, _prospects.dict && _prospects.dict.stages) + '<div class="pdw-body" id="prospect-body"><p>' + prospectsEscape(e.message) + '</p></div>';
+  }
+}
+// Перечитать карточку после звонка/конфликта, не теряя несохранённые правки формы.
+async function prospectsRefreshCard(id, callResult) {
+  const keep = prospectsSnapshot(callResult === 'callback' ? ['next_date', 'next_time', 'next_action', 'call_note'] : ['call_note']);
+  await loadProspects();
+  if (!_prospects.current || _prospects.current.id !== id) return;
+  await prospectsOpen(id, { refresh: true, keepDirty: true, replace: true });
+  prospectsRestore(keep);
 }
 async function prospectsSave(event) {
   event.preventDefault(); if (!_prospects.current || !canManageSales()) return;
@@ -318,8 +645,10 @@ async function prospectsSave(event) {
   try {
     await apiPatch('/api/sales/prospects/' + encodeURIComponent(id), body);
     showToast('Карточка сохранена', 'success');
+    const keepCall = prospectsSnapshot(['stage', 'owner', 'direction', 'annual_units', 'next_action', 'next_date', 'next_time', 'close_reason', 'note', 'contacts_json', 'contact_person', 'contact_role', 'email', 'phone', 'site', 'qualification', 'need', 'comment', 'consent', 'consent_date', 'consent_basis']);
+    _prospects.dirty = new Set();
     await loadProspects();
-    if (_prospects.current && _prospects.current.id === id) await prospectsOpen(id);
+    if (_prospects.current && _prospects.current.id === id) { await prospectsOpen(id, { refresh: true, replace: true }); prospectsRestore(keepCall); }
   } catch (e) { result.textContent = e.message || 'Не удалось сохранить'; button.disabled = false; }
 }
 
@@ -405,9 +734,9 @@ async function prospectsMoreHistory() {
     row.events.push.apply(row.events,r.events);document.getElementById('prospect-events').innerHTML=prospectsHistory(row.events,_prospects.dict);button.hidden=!r.events.length||row.events.length>=row.events_total;
   }catch(e){showToast(e.message,'error');}finally{button.disabled=false;}
 }
-function prospectsContactFields(c) {return '<div class="prospect-extra-contact">'+[['name','ФИО'],['role','Должность'],['phone','Телефон'],['email','Почта']].map(function(pair){return '<label>'+pair[1]+'<input data-contact="'+pair[0]+'" maxlength="500" value="'+prospectsEscape(c[pair[0]]||'')+'"></label>';}).join('')+'<button type="button" class="btn btn-secondary" onclick="this.parentElement.remove()">Удалить контакт</button></div>';}
+function prospectsContactFields(c) {return '<div class="prospect-extra-contact">'+[['name','ФИО'],['role','Должность'],['phone','Телефон'],['email','Почта']].map(function(pair){return '<label>'+pair[1]+'<input data-contact="'+pair[0]+'" maxlength="500" value="'+prospectsEscape(c[pair[0]]||'')+'"></label>';}).join('')+'<button type="button" class="btn btn-secondary" onclick="this.parentElement.remove();prospectsMarkContacts()">Удалить контакт</button></div>';}
 function prospectsContacts(raw) {let rows=[];try{rows=JSON.parse(raw||'[]');}catch(_){}return rows.map(prospectsContactFields).join('');}
-function prospectsAddContact(){const root=document.getElementById('prospect-contacts');if(root.children.length>=20){showToast('Не более 20 контактов','error');return;}root.insertAdjacentHTML('beforeend',prospectsContactFields({}));}
+function prospectsAddContact(){const root=document.getElementById('prospect-contacts');if(root.children.length>=20){showToast('Не более 20 контактов','error');return;}root.insertAdjacentHTML('beforeend',prospectsContactFields({}));prospectsMarkContacts();}
 function prospectsReadContacts(){return Array.from(document.querySelectorAll('.prospect-extra-contact')).map(function(el){const c={};el.querySelectorAll('[data-contact]').forEach(function(i){c[i.dataset.contact]=i.value.trim();});return c;}).filter(function(c){return Object.values(c).some(Boolean);});}
 function prospectsOffer(){
   if(!_prospects.current||!canManageSales())return;const r=_prospects.current;
@@ -419,8 +748,8 @@ function prospectsOffer(){
   renderOfferForm();
 }
 function prospectsNew(){
-  if(!canManageSales())return;prospectsClose();const root=document.getElementById('prospects-detail');root.hidden=false;document.querySelector('.prospects').classList.add('prospect-split');
-  root.innerHTML='<button class="btn btn-secondary" onclick="prospectsClose()">Закрыть</button><h2>Новое предприятие</h2><form onsubmit="prospectsCreate(event)"><div class="prospect-fields">'+[['name','Название *'],['city','Город'],['region','Регион'],['segment','Отрасль'],['phone','Телефон'],['email','Почта'],['site','Сайт'],['inn','ИНН'],['address','Адрес площадки']].map(function(p){return '<label class="prospect-field">'+p[1]+'<input name="'+p[0]+'" maxlength="500"'+(p[0]==='name'?' required':'')+'></label>';}).join('')+'<label class="prospect-field">Направление<select name="direction">'+prospectsOptions(PROSPECT_DIRECTIONS,_prospects.direction||'chillers')+'</select></label></div><div class="prospect-save-row"><button class="btn btn-primary" type="submit">Создать</button><span role="status"></span></div></form>';
+  if(!canManageSales())return;if(!prospectsClose())return;const root=prospectsDrawer();prospectsShowDrawer(true);
+  root.innerHTML='<header class="pdw-head"><div class="pdw-toprow"><button type="button" class="btn btn-secondary pdw-back" onclick="prospectsClose()">← К базе</button><button type="button" class="icon-btn pdw-close" onclick="prospectsClose()" aria-label="Закрыть"><i class="ti ti-x"></i></button></div><h2 class="pdw-title">Новое предприятие</h2></header><div class="pdw-body"><form onsubmit="prospectsCreate(event)"><div class="prospect-fields">'+[['name','Название *'],['city','Город'],['region','Регион'],['segment','Отрасль'],['phone','Телефон'],['email','Почта'],['site','Сайт'],['inn','ИНН'],['address','Адрес площадки']].map(function(p){return '<label class="prospect-field">'+p[1]+'<input name="'+p[0]+'" maxlength="500"'+(p[0]==='name'?' required':'')+'></label>';}).join('')+'<label class="prospect-field">Направление<select name="direction">'+prospectsOptions(PROSPECT_DIRECTIONS,_prospects.direction||'chillers')+'</select></label></div><div class="prospect-save-row"><button class="btn btn-primary" type="submit">Создать</button><span role="status"></span></div></form></div>';
 }
 async function prospectsCreate(event){event.preventDefault();const form=event.target,button=form.querySelector('button[type=submit]'),output=form.querySelector('[role=status]');button.disabled=true;
   const body=Object.fromEntries(new FormData(form).entries());

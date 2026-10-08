@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.251";
+const APP_VERSION = "v2.46.252";
 const APP_VERSION_DATE = "08.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1583,6 +1583,8 @@ function _voiceDeepLink() {
 
 function _restoreLastView() {
   if (_voiceDeepLink()) return;
+  // v2.46.252: прямая ссылка на карточку предприятия — …/#prospects/<id>
+  if (typeof prospectsDeepLink === 'function' && prospectsDeepLink()) return;
   // ТВ-режим (трансляция CRM на телевизор): открыть заданный раздел и
   // не восстанавливать сохранённый вид. Раздел = ключ SECTION_CONFIG
   // (напр. tasks — планёрка, production, warehouse, mail…).
@@ -2086,6 +2088,8 @@ function selectSection(sectionName) {
 }
 
 function selectSidebarItem(screenName) {
+  // v2.46.252: карточка предприятия — панель поверх экрана; уходя с «Базы предприятий», закрываем её
+  if (screenName !== 'sales-prospects' && typeof _prospects !== 'undefined' && _prospects.drawerOpen && typeof prospectsClose === 'function') prospectsClose({ force: true });
   state.currentScreen = screenName;
   _sentrySetNav(state.currentSection, screenName);
   // v2.39.0: если уходим с карточки заявки — глушим polling чата
