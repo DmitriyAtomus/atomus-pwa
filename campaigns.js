@@ -112,7 +112,7 @@ async function campaignsSelectFiltered() {
   });
 }
 function campaignsPanel() {
-  document.querySelector('.prospects').classList.remove('prospect-split');
+  if (typeof prospectsClose === 'function') prospectsClose({ force: true });
   document.getElementById('prospects-overview').hidden = true;
   document.getElementById('prospects-detail').hidden = true;
   const panel = document.getElementById('campaigns-panel'); panel.hidden = false; return panel;

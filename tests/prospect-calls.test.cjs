@@ -154,9 +154,9 @@ test('mailing button is secondary, not the primary blue action', () => {
   assert.doesNotMatch(html, /btn-primary" onclick="campaignsNew\(\)"/);
 });
 
-test('release v2.46.251: version, cache and changelog bumped together', () => {
-  assert.match(fs.readFileSync(path.join(root, 'app-1.js'), 'utf8'), /const APP_VERSION = "v2\.46\.251"/);
-  assert.match(fs.readFileSync(path.join(root, 'sw.js'), 'utf8'), /atomus-v2\.46\.251/);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'version.json'), 'utf8')).version, 'v2.46.251');
-  assert.match(fs.readFileSync(path.join(root, 'app-3.js'), 'utf8'), /const HELP_CHANGELOG = \[\n  \{version:'v2\.46\.251'/);
+test('release: version, cache, version.json and changelog stay in sync', () => {
+  const ver = /const APP_VERSION = "(v[\d.]+)"/.exec(fs.readFileSync(path.join(root, 'app-1.js'), 'utf8'))[1];
+  assert.match(fs.readFileSync(path.join(root, 'sw.js'), 'utf8'), new RegExp("atomus-" + ver.replace(/\./g, '\\.') + "'"));
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'version.json'), 'utf8')).version, ver);
+  assert.match(fs.readFileSync(path.join(root, 'app-3.js'), 'utf8'), new RegExp("const HELP_CHANGELOG = \\[\\n  \\{version:'" + ver.replace(/\./g, '\\.') + "'"));
 });

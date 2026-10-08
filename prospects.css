@@ -18,3 +18,34 @@
 
 /* v2.46.251: звонки, кликабельная строка, быстрые действия */
 .prospect-row{cursor:pointer}.prospect-tel{white-space:nowrap}.prospect-actions{white-space:nowrap;width:84px}.prospect-actions .icon-btn{display:inline-flex;vertical-align:middle;margin-right:4px}.prospect-quick-row td{background:var(--bg,#f4f7fc);padding:12px 16px}.prospect-callbox{display:flex;flex-direction:column;gap:8px;margin:8px 0}.prospect-callbox textarea,.prospect-callback input{box-sizing:border-box;width:100%;border:1px solid var(--border,#dbe1e8);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;background:var(--card,#fff);color:inherit}.prospect-call-buttons{display:flex;gap:8px;flex-wrap:wrap}.prospect-call-reached{color:#176555}.prospect-call-no_answer{color:#a23b2a}.prospect-call-callback{color:#2D5F8B}.prospect-callback{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}.prospect-callback label{display:flex;flex-direction:column;gap:4px;font-size:12px}.prospect-call-panel{border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:12px 16px;margin:10px 0}.prospect-call-panel h4{margin:12px 0 4px;font-size:13px}.prospect-call-btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none!important;color:#fff!important}.prospect-call-summary{font-size:12px;color:var(--text-light,#667985)}.prospect-event-callrow{border-left-color:#2e8c77}.prospect-event-call{margin:6px 0}
+
+/* v2.46.252: карточка — панель поверх таблицы (таблица не сжимается), липкая шапка, ←/→ */
+html.prospect-drawer-open{overflow:hidden}html.prospect-drawer-open .toast{z-index:1300}
+.prospect-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.38);z-index:1200}
+.prospect-drawer{position:fixed;top:0;right:0;bottom:0;width:min(760px,calc(100vw - var(--prospect-drawer-gap,0px)));max-width:100vw;margin:0;padding:0;background:var(--card,#fff);box-shadow:-12px 0 32px rgba(15,23,42,.18);z-index:1201;display:flex;flex-direction:column;color:var(--text,#172b31);box-sizing:border-box}
+.prospect-drawer[hidden],.prospect-backdrop[hidden]{display:none!important}
+.pdw-head{flex:none;padding:12px 20px 0;border-bottom:1px solid var(--border,#e2e8f0);background:var(--card,#fff)}
+.pdw-toprow{display:flex;align-items:center;gap:10px}.pdw-back{padding:6px 12px;white-space:nowrap}
+.pdw-nav{display:flex;align-items:center;gap:4px;margin-left:auto}.pdw-nav .icon-btn:disabled{opacity:.35;cursor:default}
+.pdw-pos{font-size:12px;color:var(--text-light,#667985);min-width:92px;text-align:center;white-space:nowrap}
+.pdw-dirty{font-size:12px;color:#b45309;white-space:nowrap}.pdw-close i{font-size:20px}
+.pdw-title{font-size:20px;line-height:1.25;margin:8px 0 4px;overflow-wrap:anywhere}
+.pdw-sub{font-size:12.5px;color:var(--text-light,#667985);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pdw-callrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:10px 0 6px}
+.pdw-callrow .prospect-call-btn{font-size:15px;padding:10px 18px}.pdw-mainphone{font-size:16px;font-weight:650;white-space:nowrap}
+.pdw-tabs{display:flex;gap:2px;overflow-x:auto;margin:0 -6px}
+.pdw-tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 10px;font:inherit;font-size:13px;color:var(--text-light,#566b75);cursor:pointer;white-space:nowrap}
+.pdw-tabs button:hover,.pdw-tabs button:focus-visible{color:#15796c;border-bottom-color:#15796c}
+.pdw-body{flex:1;min-height:0;overflow-y:auto;padding:4px 20px 48px;overscroll-behavior:contain}
+.pdw-section{padding:14px 0;border-bottom:1px solid var(--border,#eef2f6);scroll-margin-top:6px}.pdw-section:last-child{border-bottom:0}
+.pdw-section h3{font-size:14px;margin:0 0 10px}.pdw-section .prospect-source{margin-top:0}
+.pdw-contacts{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;margin:0 0 10px;font-size:13px;line-height:1.5}
+.pdw-contacts dt{color:var(--text-light,#687780)}.pdw-contacts dd{margin:0;overflow-wrap:anywhere}
+.pdw-after-call{background:#edf7f3;color:#24594e;border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;margin-top:8px}
+.pdw-autonext{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-light,#667985);margin-top:10px;cursor:pointer}
+.prospect-row-last td{background:#eef8f5}
+/* таблица на ~1024 px: название не ломается по буквам, панель выбора компактная */
+@media(min-width:601px){.prospect-table{min-width:760px}.prospect-table td.prospect-col-name{min-width:200px}}
+.campaign-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0}
+.campaign-toolbar .btn{padding:6px 10px;font-size:12.5px;white-space:nowrap}.campaign-toolbar>span{font-size:13px;margin-right:4px;white-space:nowrap}
+@media(max-width:760px){.prospect-drawer{width:100vw;box-shadow:none}.pdw-head{padding:10px 12px 0}.pdw-body{padding:4px 12px 48px}.pdw-contacts{grid-template-columns:1fr;gap:2px}.pdw-contacts dt{margin-top:8px}.pdw-title{font-size:18px}.pdw-pos{min-width:64px}.pdw-back{padding:6px 10px}}
