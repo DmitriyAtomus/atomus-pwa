@@ -7,7 +7,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v2.46.253';
+const CACHE_VERSION = 'atomus-v2.46.254';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 // v2.46.243: данные API больше НЕ кэшируются. Кэш только для файлов /static/*.
 const FILES_CACHE = `${CACHE_VERSION}-files`;
@@ -215,38 +215,65 @@ async function cacheFirst(req, cacheName) {
   }
 }
 
-// === v2.45.148: Web Push (PWA-уведомления) ===
-// Сервер шлёт зашифрованный пуш; здесь показываем системное уведомление.
+// === v2.45.148 / v2.46.254: Web Push (PWA-уведомления + звонок на телефон) ===
+// Android Chrome: clients.openWindow('tel:…') НЕ открывает dialer (чёрная вкладка).
+// Надёжный путь: открыть/сфокусировать PWA на #prospects/<id>?dial=<phone>,
+// приложение само инициирует tel: (или покажет большую кнопку) и армает call-sheet.
 self.addEventListener('push', (event) => {
   let payload = {};
   try { payload = event.data ? event.data.json() : {}; } catch (e) {
     payload = { title: 'Atom CRM', body: (event.data && event.data.text()) || '' };
   }
   const title = payload.title || 'Atom CRM';
+  const data = {
+    url: payload.url || '/',
+    kind: payload.kind || '',
+    prospectId: payload.prospectId || '',
+    phone: payload.phone || '',
+  };
   const options = {
     body: payload.body || '',
     icon: '/icons/icon-192.png',
     badge: '/icons/favicon-32.png',
     tag: payload.tag || undefined,
     renotify: !!payload.tag,
-    data: { url: payload.url || '/' },
-    vibrate: [120, 60, 120],
+    data: data,
+    vibrate: payload.kind === 'call-on-phone' ? [200, 80, 200, 80, 200] : [120, 60, 120],
+    requireInteraction: payload.kind === 'call-on-phone',
   };
+  if (payload.kind === 'call-on-phone') {
+    options.actions = [{ action: 'dial', title: 'Позвонить' }];
+  }
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Клик по уведомлению — открыть/сфокусировать приложение
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || '/';
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      for (const c of clients) {
-        if ('focus' in c) { c.focus(); return; }
+  const d = event.notification.data || {};
+  let url = d.url || '/';
+  // Абсолютный URL в пределах origin
+  try {
+    if (url.startsWith('/')) url = self.location.origin + url;
+  } catch (_) {}
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // Сообщить открытому клиенту про dial (на случай, если hash уже тот же)
+    const msg = { type: 'atomus-call-dial', prospectId: d.prospectId || '', phone: d.phone || '', url: url };
+    for (const c of all) {
+      try { c.postMessage(msg); } catch (_) {}
+      if ('focus' in c) {
+        await c.focus();
+        try {
+          if (typeof c.navigate === 'function' && d.prospectId) await c.navigate(url);
+        } catch (_) {}
+        return;
       }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
-    })
-  );
+    }
+    if (self.clients.openWindow) {
+      // Не вызываем openWindow с tel-схемой — на Android Chrome это ломается.
+      return self.clients.openWindow(url);
+    }
+  })());
 });
 
 async function networkFirst(req) {

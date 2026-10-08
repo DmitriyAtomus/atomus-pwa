@@ -259,7 +259,9 @@ async function loadProspects() {
           '<div class="prospect-meta">' + prospectsEscape(r.verification) + '</div></td>' +
           '<td><span class="prospect-stage">' + prospectsEscape(result.stages[r.stage] || r.stage) + '</span><div class="prospect-meta">' + prospectsEscape(r.owner || 'Не назначен') + '</div>' + (r.calls_count ? '<div class="prospect-meta">' + prospectsCallSummary(r) + '</div>' : '') + '</td>' +
           '<td><div>' + prospectsEscape(r.next_action || 'Уточнить профиль и нужного специалиста') + '</div><div class="prospect-meta">' + prospectsEscape(prospectsDate(r.next_date) + ' ' + (r.next_time || '')) + '</div></td>' +
-          (canManageSales() ? '<td class="prospect-actions"><button class="icon-btn" title="Записать звонок" aria-label="Записать звонок" onclick="prospectsQuick(event,\'' + id + '\',\'call\')"><i class="ti ti-phone"></i></button><button class="icon-btn" title="Комментарий" aria-label="Комментарий" onclick="prospectsQuick(event,\'' + id + '\',\'comment\')"><i class="ti ti-message"></i></button></td>' : '') + '</tr>';
+          (canManageSales() ? '<td class="prospect-actions"><button class="icon-btn" title="Записать звонок" aria-label="Записать звонок" onclick="prospectsQuick(event,\'' + id + '\',\'call\')"><i class="ti ti-phone"></i></button>' +
+          (function(){ var m = prospectsPhones(r.phone).find(function(p){ return p.tel; }); return m ? '<button class="icon-btn prospect-call-phone-btn" data-call-on-phone hidden title="На рабочий телефон" aria-label="На рабочий телефон" onclick="event.stopPropagation();prospectsCallOnPhone(\'' + id + '\',\'' + m.tel + '\')"><i class="ti ti-device-mobile"></i></button>' : ''; })() +
+          '<button class="icon-btn" title="Комментарий" aria-label="Комментарий" onclick="prospectsQuick(event,\'' + id + '\',\'comment\')"><i class="ti ti-message"></i></button></td>' : '') + '</tr>';
       }).join('') + '</tbody></table></div>';
     
     if (typeof prospectsMobileChrome === 'function') prospectsMobileChrome(result);
@@ -273,7 +275,7 @@ async function loadProspects() {
 }
 
 /* ===== v2.46.252: карточка поверх таблицы, ←/→ по выборке, ссылка #prospects/<id>, защита несохранённого ===== */
-var PROSPECT_HASH_RE = /^#prospects\/([^\/?#]+)$/;
+var PROSPECT_HASH_RE = /^#prospects\/([^\/?#]+)(?:\?([^#]*))?$/;
 var PROSPECT_PER_PAGE = 50;
 function prospectsHashId(hash) {
   const m = PROSPECT_HASH_RE.exec(String(hash || ''));
@@ -281,6 +283,14 @@ function prospectsHashId(hash) {
   try { return decodeURIComponent(m[1]); } catch (_) { return ''; }
 }
 function prospectsHashFor(id) { return '#prospects/' + encodeURIComponent(id); }
+function prospectsHashDial(hash) {
+  const m = PROSPECT_HASH_RE.exec(String(hash || ''));
+  if (!m || !m[2]) return '';
+  try {
+    const q = new URLSearchParams(m[2]);
+    return q.get('dial') || '';
+  } catch (_) { return ''; }
+}
 // Соседи в текущей (отфильтрованной и отсортированной сервером) выдаче. anchor — прежнее место карточки,
 // если после звонка она выпала из выборки (например, «Перезвонить» убрал её из «На сегодня»).
 function prospectsNavInfo(rows, id, anchor, page, total, perPage) {
@@ -541,8 +551,11 @@ function prospectsHeadHtml(r, stages) {
     '<h2 class="pdw-title">' + prospectsEscape(r.name || 'Предприятие') + '</h2>' +
     '<div class="pdw-sub">' + prospectsEscape([r.region, r.city].filter(Boolean).join(' · ')) + (r.direction ? ' · ' + prospectsEscape(PROSPECT_DIRECTIONS[r.direction] || r.direction) : '') + ' ' + stage +
     (r.owner ? ' <span class="prospect-meta">' + prospectsEscape(r.owner) + '</span>' : '') + '</div>' +
-    '<div class="pdw-callrow">' + (main && main.tel ? '<a class="btn btn-primary prospect-call-btn" href="tel:' + main.tel + '"><i class="ti ti-phone"></i> Позвонить</a><a class="pdw-mainphone" href="tel:' + main.tel + '">' + prospectsEscape(main.raw) + '</a>' :
+    '<div class="pdw-callrow">' + (main && main.tel ? '<a class="btn btn-primary prospect-call-btn" href="tel:' + main.tel + '"><i class="ti ti-phone"></i> Позвонить</a><a class="pdw-mainphone" href="tel:' + main.tel + '">' + prospectsEscape(main.raw) + '</a>' +
+      '<button type="button" class="btn btn-secondary prospect-call-phone-btn" data-call-on-phone hidden onclick="prospectsCallOnPhone(\'' + prospectsEscape(r.id) + '\',\'' + main.tel + '\')"><i class="ti ti-device-mobile"></i> На рабочий телефон</button>' +
+      '<button type="button" class="btn btn-secondary prospect-qr-fallback-btn" hidden onclick="prospectsCallQr(\'' + prospectsEscape(r.id) + '\',\'' + main.tel + '\',\'' + prospectsEscape(r.name || '') + '\')" title="QR с tel:"><i class="ti ti-qrcode"></i></button>' :
       '<span class="prospect-missing">' + (main ? prospectsEscape(main.raw) + ' — номер не распознан' : 'Телефон не указан') + '</span>') +
+    ' <button type="button" class="btn btn-secondary prospect-vcard-btn" onclick="prospectsSaveVcard(\'' + prospectsEscape(r.id) + '\')"><i class="ti ti-address-book"></i> Сохранить в телефон</button>' +
     ' ' + prospectsCallSummary(r) + '</div>' +
     '<nav class="pdw-tabs" aria-label="Разделы карточки"><button type="button" onclick="prospectsJump(\'pdw-contacts\')">Контакты</button><button type="button" onclick="prospectsJump(\'pdw-call\')">Звонок</button><button type="button" onclick="prospectsJump(\'pdw-work\')">Работа</button><button type="button" onclick="prospectsJump(\'pdw-history\')">История</button></nav>' +
     '</header>';
@@ -736,8 +749,8 @@ function prospectsHistory(events,dict) {
   return events.map(function(ev){
     let changes={};try{changes=JSON.parse(ev.changes_json);}catch(_){}
     const when=new Date(ev.created_at.replace(' ','T')+'Z');
-    const isCall=ev.kind==='call'||!!changes.call;const callResult=ev.result||(changes.call&&changes.call.to)||'';
-    const callLine=isCall?'<p class="prospect-event-call"><i class="ti '+(PROSPECT_CALL_ICONS[callResult]||'ti-phone')+'"></i> <b>Звонок: '+prospectsEscape(PROSPECT_CALL_RESULTS[callResult]||callResult||'—')+'</b>'+(changes.phone&&changes.phone.to?' · '+prospectsEscape(changes.phone.to):'')+'</p>':'';
+    const isCall=ev.kind==='call'||!!changes.call;const isPush=ev.kind==='call_push'||!!changes.sent_to_phone;const callResult=ev.result||(changes.call&&changes.call.to)||'';
+    const callLine=isCall?'<p class="prospect-event-call"><i class="ti '+(PROSPECT_CALL_ICONS[callResult]||'ti-phone')+'"></i> <b>Звонок: '+prospectsEscape(PROSPECT_CALL_RESULTS[callResult]||callResult||'—')+'</b>'+(changes.phone&&changes.phone.to?' · '+prospectsEscape(changes.phone.to):'')+'</p>':(isPush?'<p class="prospect-event-call"><i class="ti ti-device-mobile"></i> <b>Отправлен на телефон</b>'+(changes.sent_to_phone&&changes.sent_to_phone.to?' · '+prospectsEscape(changes.sent_to_phone.to):'')+'</p>':'');
     if(isCall){delete changes.call;delete changes.phone;}
     return '<article class="prospect-event'+(isCall?' prospect-event-callrow':'')+'"><small>'+prospectsEscape(isNaN(when)?ev.created_at:when.toLocaleString('ru-RU',{timeZone:'Asia/Yekaterinburg'}))+' · '+prospectsEscape(ev.actor_name||('Сотрудник #'+ev.actor))+'</small>'+callLine+Object.keys(changes).map(function(key){
       const value=changes[key].to;const label=key==='stage'?dict.stages[value]:key==='direction'?PROSPECT_DIRECTIONS[value]:key==='consent'?dict.consents[value]:key==='contacts_json'?'Список контактов обновлён':value;
@@ -1123,5 +1136,213 @@ function prospectsMobileInitTabs() {
     if (on && prospectsIsMobile()) {
       try { prospectsMobileInitTabs(); } catch (e) {}
     }
+  };
+})();
+
+
+/* ===== v2.46.254: звонок на рабочий Android + vCard ===== */
+var _callDevice = { linked: false, label: '', loaded: false };
+
+async function prospectsLoadCallDevice(force) {
+  if (_callDevice.loaded && !force) return _callDevice;
+  try {
+    const r = await apiGet('/api/push/call-device');
+    _callDevice = { linked: !!(r && r.linked), label: (r && r.label) || (r && r.host) || '', loaded: true, host: (r && r.host) || '' };
+  } catch (_) {
+    _callDevice = { linked: false, label: '', loaded: true };
+  }
+  prospectsSyncCallDeviceUI();
+  return _callDevice;
+}
+
+function prospectsSyncCallDeviceUI() {
+  document.querySelectorAll('[data-call-on-phone]').forEach(function (el) {
+    el.hidden = !_callDevice.linked;
+  });
+  document.querySelectorAll('.prospect-qr-fallback-btn').forEach(function (el) {
+    // QR always available as fallback when there's a phone; show when NOT linked or as secondary
+    el.hidden = false;
+  });
+  const st = document.getElementById('call-device-status');
+  if (st) {
+    st.textContent = _callDevice.linked
+      ? ('Привязан: ' + (_callDevice.label || _callDevice.host || 'телефон'))
+      : 'Рабочий телефон не привязан';
+  }
+  const linkBtn = document.getElementById('call-device-link-btn');
+  const unlinkBtn = document.getElementById('call-device-unlink-btn');
+  const testBtn = document.getElementById('call-device-test-btn');
+  if (linkBtn) linkBtn.hidden = !!_callDevice.linked && !_isLikelyMobileDevice();
+  if (unlinkBtn) unlinkBtn.hidden = !_callDevice.linked;
+  if (testBtn) testBtn.hidden = !_callDevice.linked;
+}
+
+function _isLikelyMobileDevice() {
+  try {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') || (window.matchMedia && matchMedia('(max-width: 759px)').matches);
+  } catch (_) { return false; }
+}
+
+async function prospectsCallOnPhone(id, phone) {
+  if (!id || !phone) return;
+  if (!_callDevice.linked) {
+    showToast('Сначала привяжите рабочий телефон (Аккаунт)', 'info');
+    return;
+  }
+  try {
+    showToast('Отправляю на телефон…', 'info');
+    const r = await prospectsPost('/api/sales/prospects/' + encodeURIComponent(id) + '/call-on-phone', { phone: phone });
+    showToast('📱 Отправлено на рабочий телефон', 'success');
+    if (_prospects.current && _prospects.current.id === id) {
+      try { await prospectsOpen(id, { refresh: true, replace: true }); } catch (_) {}
+    }
+  } catch (e) {
+    const msg = (e && e.message) || 'Не удалось отправить';
+    showToast(msg, 'error');
+    if (/не привязан|пуш не доставлен/i.test(msg)) prospectsCallQr(id, phone, (_prospects.current && _prospects.current.name) || '');
+  }
+}
+
+function prospectsCallQr(id, phone, name) {
+  const tel = String(phone || '').replace(/\s+/g, '');
+  const href = 'tel:' + tel;
+  let root = document.getElementById('prospect-qr-root');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'prospect-qr-root';
+    document.body.appendChild(root);
+  }
+  root.innerHTML = '<div class="pm-sheet-root open" id="prospect-qr-sheet">' +
+    '<div class="pm-backdrop" onclick="prospectsCallQrClose()"></div>' +
+    '<div class="pm-sheet" role="dialog" aria-modal="true" aria-label="QR для звонка">' +
+    '<div class="pm-sheet-handle"></div>' +
+    '<h2>Сканируйте телефоном</h2>' +
+    '<p class="pm-sheet-sub">' + prospectsEscape(name || '') + ' · ' + prospectsEscape(phone || '') + '</p>' +
+    '<div class="prospect-qr-box" id="prospect-qr-box"></div>' +
+    '<p class="prospect-meta" style="text-align:center;margin-top:8px">Или откройте <a href="' + prospectsEscape(href) + '">' + prospectsEscape(href) + '</a></p>' +
+    '<div class="pm-sheet-actions"><button type="button" class="pm-sheet-primary" onclick="prospectsCallQrClose()">Закрыть</button></div>' +
+    '</div></div>';
+  // Simple QR via Google chart API alternative — use offline SVG QR if available, else link + big text
+  const box = document.getElementById('prospect-qr-box');
+  if (box) {
+    // Use a minimal QR via api.qrserver (public) — fallback to large tel button
+    const img = document.createElement('img');
+    img.alt = 'QR tel';
+    img.width = 220; img.height = 220;
+    img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(href);
+    img.onerror = function () {
+      box.innerHTML = '<a class="btn btn-primary" style="font-size:18px;padding:16px" href="' + prospectsEscape(href) + '">Позвонить ' + prospectsEscape(phone) + '</a>';
+    };
+    box.appendChild(img);
+  }
+}
+function prospectsCallQrClose() {
+  const root = document.getElementById('prospect-qr-root');
+  if (root) root.innerHTML = '';
+}
+
+function prospectsSaveVcard(id) {
+  const r = (_prospects.current && _prospects.current.id === id) ? _prospects.current : (_prospects.rows || []).find(function (x) { return x.id === id; });
+  if (!r) { showToast('Откройте карточку', 'info'); return; }
+  const fn = (r.contact_person || r.name || 'Контакт').trim();
+  const org = (r.name || '').trim();
+  const title = (r.contact_role || '').trim();
+  const phones = prospectsPhones(r.phone).map(function (p) { return p.raw; }).filter(Boolean);
+  let extra = []; try { extra = JSON.parse(r.contacts_json || '[]'); } catch (_) {}
+  extra.forEach(function (c) { if (c.phone) phones.push(c.phone); });
+  const emails = String(r.email || '').split(/[;,\s]+/).filter(function (v) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v); });
+  const url = prospectsUrl(r.site) || '';
+  const note = 'Atom CRM: ' + (location.origin || 'https://crm.atomuscrm.ru') + '/#prospects/' + encodeURIComponent(r.id);
+  function esc(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;'); }
+  const lines = ['BEGIN:VCARD', 'VERSION:3.0', 'FN:' + esc(fn)];
+  if (org) lines.push('ORG:' + esc(org));
+  if (title) lines.push('TITLE:' + esc(title));
+  phones.forEach(function (ph, i) { lines.push('TEL;TYPE=' + (i === 0 ? 'WORK,VOICE' : 'VOICE') + ':' + esc(ph)); });
+  emails.forEach(function (em) { lines.push('EMAIL;TYPE=INTERNET:' + esc(em)); });
+  if (url) lines.push('URL:' + esc(url));
+  if (r.address) lines.push('ADR;TYPE=WORK:;;' + esc(r.address) + ';;;;');
+  lines.push('NOTE:' + esc(note));
+  lines.push('END:VCARD');
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/vcard;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (org || fn || 'contact').replace(/[\\/:*?"<>|]+/g, '_') + '.vcf';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { try { URL.revokeObjectURL(a.href); } catch (_) {} }, 2000);
+  showToast('vCard сохранена', 'success');
+}
+
+/* dial from push: #prospects/id?dial=phone */
+function prospectsArmDialFromHash() {
+  const id = prospectsHashId(location.hash);
+  const dial = prospectsHashDial(location.hash);
+  if (!id || !dial) return;
+  _prospectCallPending = { id: id, tel: dial, at: Date.now(), fromPush: true };
+  prospectsEnsureDialUI(id, dial);
+}
+
+function prospectsEnsureDialUI(id, phone) {
+  let overlay = document.getElementById('prospect-dial-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'prospect-dial-overlay';
+    document.body.appendChild(overlay);
+  }
+  const tel = String(phone || '').replace(/\s+/g, '');
+  overlay.innerHTML = '<div class="prospect-dial-full">' +
+    '<div class="prospect-dial-card">' +
+    '<div class="prospect-dial-label">Звонок из CRM</div>' +
+    '<a class="prospect-dial-btn" id="prospect-dial-btn" href="tel:' + prospectsEscape(tel) + '"><i class="ti ti-phone-filled"></i> Позвонить ' + prospectsEscape(phone) + '</a>' +
+    '<button type="button" class="btn btn-secondary" onclick="prospectsDialDismiss()">Отмена</button>' +
+    '</div></div>';
+  overlay.hidden = false;
+  // Try auto-dial (may be blocked without gesture on Android)
+  try {
+    const a = document.getElementById('prospect-dial-btn');
+    if (a) {
+      // programmatic click — works on some Android when coming from notificationclick user gesture chain
+      setTimeout(function () { try { a.click(); } catch (_) {} }, 80);
+    }
+  } catch (_) {}
+  // Arm call sheet via existing visibilitychange listener
+  _prospectCallPending = { id: id, tel: tel, at: Date.now(), fromPush: true };
+}
+
+function prospectsDialDismiss() {
+  const o = document.getElementById('prospect-dial-overlay');
+  if (o) o.hidden = true;
+}
+
+function prospectsHandleDialMessage(ev) {
+  const d = ev && ev.data;
+  if (!d || d.type !== 'atomus-call-dial') return;
+  if (d.prospectId && d.phone) {
+    const want = '#prospects/' + encodeURIComponent(d.prospectId) + '?dial=' + encodeURIComponent(d.phone);
+    if (location.hash !== want) {
+      try { history.replaceState({ prospect: d.prospectId }, '', location.pathname + location.search + want); } catch (_) {}
+    }
+    prospectsOpen(d.prospectId).then(function () { prospectsEnsureDialUI(d.prospectId, d.phone); });
+  } else if (d.url) {
+    try { location.href = d.url; } catch (_) {}
+  }
+}
+
+if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
+  try { navigator.serviceWorker.addEventListener('message', prospectsHandleDialMessage); } catch (_) {}
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('hashchange', function () { try { prospectsArmDialFromHash(); } catch (_) {} });
+  document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(function () { try { prospectsArmDialFromHash(); } catch (_) {} }, 400);
+    setTimeout(function () { try { prospectsLoadCallDevice(); } catch (_) {} }, 800);
+  });
+}
+
+// After drawer opens, refresh call-device button visibility
+(function () {
+  const _show = prospectsShowDrawer;
+  prospectsShowDrawer = function (on) {
+    _show(on);
+    if (on) prospectsLoadCallDevice();
   };
 })();
