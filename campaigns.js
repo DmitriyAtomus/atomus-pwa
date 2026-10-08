@@ -104,6 +104,7 @@ function campaignsClearSelection() {
 async function campaignsSelectFiltered() {
   await campaignsRun(async function () {
     const params = new URLSearchParams();
+    if (typeof _prospects !== 'undefined' && _prospects.direction) params.set('direction', _prospects.direction);
     document.querySelectorAll('#prospects-filters [data-filter]').forEach(el => { if (el.value) params.set(el.dataset.filter, el.value); });
     const result = await campaignsRequest('/selection?' + params);
     result.ids.forEach(id => _campaigns.selected.add(id)); campaignsSelectionLabel();
@@ -111,6 +112,7 @@ async function campaignsSelectFiltered() {
   });
 }
 function campaignsPanel() {
+  document.querySelector('.prospects').classList.remove('prospect-split');
   document.getElementById('prospects-overview').hidden = true;
   document.getElementById('prospects-detail').hidden = true;
   const panel = document.getElementById('campaigns-panel'); panel.hidden = false; return panel;

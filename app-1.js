@@ -200,8 +200,8 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.245";
-const APP_VERSION_DATE = "06.10.2026";
+const APP_VERSION = "v2.46.246";
+const APP_VERSION_DATE = "08.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -19743,7 +19743,7 @@ function renderSalesMore() {
     '<div class="mmc-icon"><i class="ti ti-presentation"></i></div><div class="mmc-title">Презентации</div>' +
     '<div class="mmc-desc">Для клиентов по отраслям</div></div></div>';
   html += '<div class="more-menu-grid"><div class="more-menu-card" onclick="selectSidebarItem(\'sales-prospects\')">' +
-    '<div class="mmc-icon"><i class="ti ti-building-factory-2"></i></div><div class="mmc-title">Заводы и сыроварни</div>' +
+    '<div class="mmc-icon"><i class="ti ti-building-factory-2"></i></div><div class="mmc-title">База предприятий</div>' +
     '<div class="mmc-desc">База потенциальных заказчиков</div></div></div>';
   html += '<div class="more-section-title">СПРАВОЧНИКИ</div>';
   html += '<div class="more-menu-grid">';
