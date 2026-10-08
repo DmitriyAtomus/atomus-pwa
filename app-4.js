@@ -16395,10 +16395,39 @@ function _scheduleSharedInvoiceIntake() {
       history.replaceState({}, '', window.location.pathname);
     }
   } catch (_) {}
+  // v2.46.246: аварийный сброс залипшей сессии/SW без логотипа —
+  // https://crm.atomuscrm.ru/?reset=1 (или ?clear=1)
+  try {
+    const _ru = new URLSearchParams(window.location.search);
+    if (_ru.get('reset') === '1' || _ru.get('clear') === '1') {
+      try { localStorage.removeItem(TOKEN_KEY); } catch (_) {}
+      try {
+        var _bs = document.getElementById('boot-splash-text');
+        if (_bs) _bs.textContent = 'Очищаю кэш…';
+        var _lp = document.getElementById('login-page');
+        if (_lp) _lp.style.display = 'none';
+      } catch (_) {}
+      (async function () {
+        try {
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const r of regs) { try { await r.unregister(); } catch (_) {} }
+          }
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            for (const k of keys) { try { await caches.delete(k); } catch (_) {} }
+          }
+        } catch (_) {}
+        location.replace(location.pathname + '?_r=' + Date.now());
+      })();
+      return;
+    }
+  } catch (_) {}
   // Обычный flow
   const token = localStorage.getItem(TOKEN_KEY);
   if (token) showApp();
   else {
+    try { if (typeof _bootSplashHide === 'function') _bootSplashHide(); } catch (_) {}
     document.getElementById('login-page').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
     if (codeInput) codeInput.focus();

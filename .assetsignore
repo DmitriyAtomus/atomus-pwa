@@ -9,3 +9,7 @@ worker
 functions
 _routes.json
 vercel.json
+.env*
+.vercel
+package.json
+package-lock.json

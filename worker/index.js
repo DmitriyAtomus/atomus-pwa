@@ -12,7 +12,22 @@ function withRobots(resp) {
   return r;
 }
 
+const CORS_ALLOW_HEADERS = 'Content-Type, Authorization, X-Requested-With, X-Guest-Token, X-Atomus-Section';
+
+function applyApiCors(r) {
+  // Backend Allow-Headers omits X-Atomus-Section; rewrite so browser/proxy clients are fine.
+  r.headers.set('Access-Control-Allow-Origin', '*');
+  r.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  r.headers.set('Access-Control-Allow-Headers', CORS_ALLOW_HEADERS);
+  r.headers.set('Access-Control-Max-Age', '86400');
+  return r;
+}
+
 async function proxy(request, url) {
+  // Short-circuit preflight so X-Atomus-Section is always allowed on /api.
+  if (request.method === 'OPTIONS' && (url.pathname === '/api' || url.pathname.startsWith('/api/'))) {
+    return applyApiCors(withRobots(new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })));
+  }
   const target = new URL(url.pathname + url.search, API_ORIGIN);
   const headers = new Headers(request.headers);
   headers.delete('host');
@@ -29,6 +44,7 @@ async function proxy(request, url) {
   // API data must never be cached by browsers/CDN.
   if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
     if (!r.headers.has('Cache-Control')) r.headers.set('Cache-Control', 'no-store');
+    applyApiCors(r);
   }
   return r;
 }
