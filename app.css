@@ -27169,3 +27169,68 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
 @media (max-width: 720px) {
   .pay-list-filters select, .pay-list-search { flex: 1 1 100%; max-width: none; }
 }
+
+/* ===== v2.46.253: мобильная нижняя панель разделов + чистая шапка ===== */
+.app.mobile-layout .top-tools-extra { display: none !important; }
+.app.mobile-layout .hdr-search-btn--mobile-ok {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 40px; height: 40px; min-width: 40px;
+  padding: 0; margin: 0 2px 0 auto;
+  border-radius: 12px; background: rgba(255,255,255,.12); color: #fff;
+  border: 0;
+}
+.app.mobile-layout .hdr-search-btn--mobile-ok .hdr-search-txt,
+.app.mobile-layout .hdr-search-btn--mobile-ok kbd { display: none !important; }
+.app.mobile-layout .hdr-search-btn--mobile-ok i { font-size: 18px; margin: 0; }
+/* прячем ленту m-section-tabs — разделы теперь в нижней панели / Ещё */
+.app.mobile-layout .m-section-tabs-wrap { display: none !important; }
+
+.more-sheet-block { margin-bottom: 18px; }
+.more-sheet-label {
+  font-size: 12px; font-weight: 700; color: var(--text-light, #6E7689);
+  text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; padding: 0 4px;
+}
+.more-sheet-actions {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+}
+.more-action {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  min-height: 72px; padding: 10px 6px; border-radius: 14px;
+  background: var(--bg, #F4F6FA); border: 1px solid var(--border, #E5E9F0);
+  color: var(--text-mid, #4A5061); font-size: 11.5px; font-weight: 600;
+  position: relative; -webkit-tap-highlight-color: transparent;
+}
+.more-action i { font-size: 22px; color: var(--brand, #2D5F8B); }
+.more-action .more-badge, .more-badge {
+  position: absolute; top: 6px; right: 8px;
+  background: #B5260C; color: #fff; border-radius: 999px;
+  font-size: 10px; font-weight: 700; min-width: 18px; height: 18px;
+  display: grid; place-items: center; padding: 0 4px;
+}
+.more-sheet-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+}
+/* Ещё sheet: blocks stack vertically (grid host would put them side-by-side) */
+.mobile-sections-sheet[data-sheet="more"] .mobile-sections-grid {
+  display: block; padding-bottom: 12px;
+}
+.mobile-sections-sheet[data-sheet="more"] .mobile-sections-grid > .more-sheet-block {
+  width: 100%;
+}
+@media (max-width: 360px) {
+  .more-sheet-actions { grid-template-columns: repeat(3, 1fr); }
+  .more-sheet-grid { grid-template-columns: repeat(2, 1fr); }
+}
+/* убираем «пилюлю» плюса — теперь 5 равных вкладок */
+.app.mobile-layout #tab-bar-main {
+  grid-template-columns: repeat(5, 1fr);
+  align-items: stretch;
+}
+.app.mobile-layout #tab-bar-main .plus-tab25,
+.app.mobile-layout #tab-bar-main .plus-fab25 { display: none !important; }
+.app.mobile-layout .tab25 {
+  min-height: 48px; justify-content: center; padding: 6px 2px 8px;
+}
+.app.mobile-layout .tab25.active { color: var(--brand, #2D5F8B); font-weight: 700; }

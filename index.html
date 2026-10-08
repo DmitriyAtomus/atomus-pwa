@@ -196,26 +196,26 @@ setTimeout(function () {
       </nav>
     </div>
     <!-- v2.45.634: глобальный поиск из шапки (Ctrl+K) — только десктоп -->
-    <button class="hdr-search-btn" onclick="openDesktopSearch()" title="Поиск по всей СРМ: договоры, задачи, контрагенты… (Ctrl+K)">
+    <button class="hdr-search-btn hdr-search-btn--mobile-ok" onclick="mobileHeaderSearch()" title="Поиск по всей СРМ: договоры, задачи, контрагенты… (Ctrl+K)">
       <i class="ti ti-search"></i><span class="hdr-search-txt">Поиск…</span><kbd>Ctrl K</kbd>
     </button>
-    <button class="scan-btn scan-btn--camera" id="si-camera-top-btn" onclick="openSupplyInvoiceCameraDirect()" title="Сфотографировать накладную (Фото УПД)">
+    <button class="scan-btn scan-btn--camera top-tools-extra" id="si-camera-top-btn" onclick="openSupplyInvoiceCameraDirect()" title="Сфотографировать накладную (Фото УПД)">
       <i class="ti ti-camera"></i>
       <span class="scan-btn-text">УПД</span>
     </button>
     <input type="file" id="si-camera-direct-input" accept="image/*" capture="environment" style="display:none;" onchange="siHandleCameraDirect(event)">
-    <button class="scan-btn scan-btn--qr" id="scan-btn" onclick="openQrScanner()" title="Сканировать QR-код">
+    <button class="scan-btn scan-btn--qr top-tools-extra" id="scan-btn" onclick="openQrScanner()" title="Сканировать QR-код">
       <i class="ti ti-scan"></i>
       <span class="scan-btn-text">QR</span>
     </button>
     <!-- Прямой эфир окна CRM на офисном телевизоре. Только директору. -->
-    <button class="scan-btn scan-btn--tv" id="tv-cast-top-btn" onclick="toggleTvScreenCast()"
+    <button class="scan-btn scan-btn--tv top-tools-extra" id="tv-cast-top-btn" onclick="toggleTvScreenCast()"
             title="Показать окно CRM на офисном телевизоре" style="display:none;">
       <i class="ti ti-device-tv"></i>
       <span class="scan-btn-text tv-cast-label">Экран на ТВ</span>
     </button>
     <!-- v2.45.x: глобальная кнопка чатов — доступна во всех разделах и всем ролям -->
-    <button class="notif-btn" id="team-chats-top-btn" onclick="openTeamChatsScreen()" title="Чаты">
+    <button class="notif-btn top-tools-extra" id="team-chats-top-btn" onclick="openTeamChatsScreen()" title="Чаты">
       <i class="ti ti-messages"></i>
       <span class="notif-badge team-chats-badge" id="team-chats-top-badge" style="display:none;">0</span>
     </button>
@@ -3592,38 +3592,44 @@ setTimeout(function () {
   </nav>
 
   <!-- ============ ЭТАП 25.0: ЕДИНЫЙ TAB-BAR (мобильный) ============ -->
-  <nav class="tab-bar" id="tab-bar-main">
-    <button class="tab25 active" data-main-tab="sections" onclick="switchMainTab('sections')">
-      <i class="ti ti-layout-grid"></i>
-      <span>Разделы</span>
+  <!-- v2.46.253: нижняя панель разделов CRM -->
+  <nav class="tab-bar" id="tab-bar-main" aria-label="Основные разделы">
+    <button class="tab25 active" data-main-tab="home" onclick="switchMainTab('home')">
+      <i class="ti ti-smart-home"></i>
+      <span>Главная</span>
     </button>
-    <button class="tab25" data-main-tab="search" onclick="switchMainTab('search')">
-      <i class="ti ti-search"></i>
-      <span>Поиск</span>
+    <button class="tab25" data-main-tab="sales" id="tab25-sales" onclick="switchMainTab('sales')">
+      <i class="ti ti-report-money"></i>
+      <span>Продажи</span>
     </button>
-    <button class="tab25 plus-tab25" onclick="mobilePlusAction()">
-      <div class="plus-fab25"><i class="ti ti-plus"></i></div>
+    <button class="tab25" data-main-tab="tasks" id="tab25-tasks" onclick="switchMainTab('tasks')">
+      <i class="ti ti-list-check"></i>
+      <span>Задачи</span>
+      <span class="tab25-badge" id="tasks25-badge" style="display:none;">0</span>
     </button>
-    <button class="tab25" data-main-tab="notifications" onclick="switchMainTab('notifications')">
-      <i class="ti ti-bell"></i>
-      <span>Уведомления</span>
-      <span class="tab25-badge" id="notif25-badge" style="display:none;">0</span>
+    <button class="tab25" data-main-tab="mail" id="tab25-mail" onclick="switchMainTab('mail')">
+      <i class="ti ti-mail"></i>
+      <span>Почта</span>
+      <span class="tab25-badge" id="mail25-badge" style="display:none;">0</span>
     </button>
-    <button class="tab25" data-main-tab="account" onclick="switchMainTab('account')">
-      <i class="ti ti-user"></i>
-      <span>Аккаунт</span>
+    <button class="tab25" data-main-tab="more" onclick="switchMainTab('more')">
+      <i class="ti ti-dots"></i>
+      <span>Ещё</span>
+      <span class="tab25-badge" id="more25-badge" style="display:none;">0</span>
     </button>
   </nav>
+  <!-- legacy ids kept for badge code that still looks up notif25-badge -->
+  <span id="notif25-badge" hidden style="display:none!important">0</span>
 
 </div>
 <!-- /app -->
 
 <!-- v2.46.204: все разделы CRM одним тапом на телефоне -->
 <div class="mobile-sections-overlay" id="mobile-sections-overlay" aria-hidden="true" onclick="closeMobileSections(event)">
-  <section class="mobile-sections-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-sections-title" onclick="event.stopPropagation()">
+  <section class="mobile-sections-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-sections-title" data-sheet="more" onclick="event.stopPropagation()">
     <div class="mobile-sections-handle"></div>
     <div class="mobile-sections-head">
-      <div><span>Навигация</span><h2 id="mobile-sections-title">Разделы CRM</h2></div>
+      <div><span>Навигация</span><h2 id="mobile-sections-title">Ещё</h2></div>
       <button type="button" onclick="closeMobileSections()" aria-label="Закрыть"><i class="ti ti-x"></i></button>
     </div>
     <div class="mobile-sections-grid" id="mobile-sections-grid"></div>

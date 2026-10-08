@@ -13,3 +13,4 @@ vercel.json
 .vercel
 package.json
 package-lock.json
+tests

@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.252";
+const APP_VERSION = "v2.46.253";
 const APP_VERSION_DATE = "08.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -324,6 +324,7 @@ function applyLayout() {
   const app = document.getElementById('app');
   if (state.isDesktop) { app.classList.add('desktop-layout'); app.classList.remove('mobile-layout'); }
   else { app.classList.add('mobile-layout'); app.classList.remove('desktop-layout'); }
+    try { if (typeof _mobileApplyTabVisibility === 'function') _mobileApplyTabVisibility(); } catch (e) {}
 }
 
 window.addEventListener('resize', detectLayout);
@@ -1048,6 +1049,11 @@ function stopNotifPolling() {
 
 function updateNotifBadge(n) {
   const badge = document.getElementById('notif25-badge');
+  const moreBadge = document.getElementById('more25-badge');
+  if (moreBadge) {
+    if (count > 0) { moreBadge.style.display = ''; moreBadge.textContent = count > 99 ? '99+' : String(count); }
+    else moreBadge.style.display = 'none';
+  }
   if (!badge) return;
   if (n > 0) {
     badge.textContent = String(n);
