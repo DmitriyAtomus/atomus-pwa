@@ -97,6 +97,7 @@ test('server conflict on call is reported and data refreshed', async () => {
   ctx._prospects.rows = [{ id: 'ATM-1', revision: 5, phone: '' }];
   ctx.apiPost = async () => ({ ok: false, status: 409, data: { message: 'Карточку уже изменили. Откройте её заново.' } });
   ctx.apiGet = async () => { reloads++; return listing([]); };
+  node('prospect-call-person-row-ATM-1').value = 'Иван Петров';
   await ctx.prospectsCallSubmit('ATM-1', 'row', 'reached');
   assert.match(node('prospect-call-status-row-ATM-1').textContent, /уже изменили/);
   assert.equal(reloads, 1);
@@ -109,6 +110,7 @@ test('call can move a card to a chosen board column in the same request', async 
   ctx.apiPost = async (url, body) => { posts.push({ url, body }); return { ok: true, status: 201, data: { revision: 4 } }; };
   ctx.apiGet = async () => listing([{ id: 'ATM-1', revision: 4, stage: 'contact' }]);
   node('prospect-call-stage-row-ATM-1').value = 'contact';
+  node('prospect-call-person-row-ATM-1').value = 'Иван Петров';
   await ctx.prospectsCallSubmit('ATM-1', 'row', 'reached');
   assert.equal(posts.length, 1);
   assert.equal(posts[0].body.stage, 'contact');
@@ -121,7 +123,7 @@ test('call records who answered and what to send without hiding the comment', as
   const html = ctx.prospectsCallBox('ATM-1', 'row');
   assert.match(html, /С кем говорили/);
   assert.match(html, /Что отправить/);
-  assert.match(html, /value="Петров"/);
+  assert.doesNotMatch(html, /value="Петров"/); // manager confirms who actually answered
   node('prospect-call-person-row-ATM-1').value = 'Иван Петров, инженер';
   node('prospect-call-send-row-ATM-1').value = 'КП на чиллер 50 кВт';
   node('prospect-call-note-row-ATM-1').value = 'Нужна вода +5 °C';
@@ -148,6 +150,7 @@ test('mobile save and next moves once after recording the chosen column', async 
   const { ctx, node } = harness(); const posts = []; let steps = 0;
   ctx._prospects.rows = [{ id: 'ATM-1', revision: 5, stage: 'new', phone: '' }];
   node('pm-call-sheet').dataset = { prospectId: 'ATM-1', result: 'reached' };
+  node('prospect-call-person-sheet-ATM-1').value = 'Иван Петров';
   node('prospect-call-stage-sheet-ATM-1').value = 'needs';
   ctx.apiPost = async (url, body) => { posts.push({ url, body }); return { ok: true, status: 201, data: { revision: 6 } }; };
   ctx.prospectsCallSheetClose = () => {};
@@ -157,6 +160,26 @@ test('mobile save and next moves once after recording the chosen column', async 
   await ctx.prospectsCallSheetSave(true);
   assert.equal(posts[0].body.stage, 'needs');
   assert.equal(steps, 1);
+});
+
+test('completed conversation needs a person and stays visible in all company views', async () => {
+  const { ctx, node } = harness(); const posts = [];
+  const row = { id: 'ATM-1', name: 'Завод', revision: 1, stage: 'new', phone: '', spoken_at: '2026-10-12 10:00:00', spoken_with: 'Иван <Петров>' };
+  ctx._prospects.rows = [row];
+  ctx.apiPost = async (url, body) => { posts.push(body); return { ok: true, status: 201, data: {} }; };
+  ctx.apiGet = async () => listing([row]);
+  await ctx.prospectsCallSubmit('ATM-1', 'row', 'reached');
+  assert.equal(posts.length, 0);
+  assert.match(node('prospect-call-status-row-ATM-1').textContent, /с кем/);
+  node('prospect-call-person-row-ATM-1').value = 'Иван Петров';
+  await ctx.prospectsCallSubmit('ATM-1', 'row', 'reached');
+  assert.equal(posts[0].called_person, 'Иван Петров');
+  const table = node('prospects-list').innerHTML;
+  assert.match(table, /Звонок был · Иван &lt;Петров&gt;/);
+  ctx.prospectsRenderBoard(listing([row]));
+  assert.match(node('prospects-list').innerHTML, /Звонок был · Иван &lt;Петров&gt;/);
+  assert.match(ctx.prospectsMobileListHtml(listing([row])), /Звонок был · Иван &lt;Петров&gt;/);
+  assert.match(ctx.prospectsHeadHtml(row, { new: 'Новый' }), /Звонок был · Иван &lt;Петров&gt;/);
 });
 
 test('quick comment uses PATCH note with revision and requires text', async () => {

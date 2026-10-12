@@ -36,7 +36,7 @@ function prospectsDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value || '') ? value.slice(8) + '.' + value.slice(5, 7) + '.' + value.slice(0, 4) : (value || '—');
 }
 /* v2.46.251: телефоны РФ в любом формате → tel:+7XXXXXXXXXX; звонки и быстрые действия. */
-var PROSPECT_CALL_RESULTS = { reached: 'Дозвонился', no_answer: 'Не дозвонился', callback: 'Перезвонить' };
+var PROSPECT_CALL_RESULTS = { reached: 'Звонок был', no_answer: 'Не дозвонился', callback: 'Перезвонить' };
 var PROSPECT_CALL_ICONS = { reached: 'ti-phone-check', no_answer: 'ti-phone-x', callback: 'ti-phone-call' };
 var PROSPECT_STAGE_ORDER = ['new','checking','contact','needs','brief','offer','negotiation','pilot','won','partner','later','closed'];
 var PROSPECT_STAGE_NAMES = {new:'Новый',checking:'Проверка контактов',contact:'Нужный специалист найден',needs:'Задача выяснена',brief:'Получены исходные данные',offer:'КП подготовлено',negotiation:'Обсуждение КП',pilot:'Пилот',won:'Заказ',partner:'Серийный партнёр',later:'Вернуться позже',closed:'Не подходит'};
@@ -106,16 +106,23 @@ function prospectsCallStagePayload(id, scope, result) {
 }
 function prospectsCallFollowupHtml(id, scope) {
   const k = scope + '-' + id;
-  const row = (_prospects.current && _prospects.current.id === id ? _prospects.current : (_prospects.rows || []).find(function (r) { return r.id === id; })) || {};
   return '<div class="prospect-call-followup">' +
-    '<label>С кем говорили<input id="prospect-call-person-' + prospectsEscape(k) + '" maxlength="500" autocomplete="off" placeholder="Имя и должность" value="' + prospectsEscape(row.contact_person || '') + '"></label>' +
+    '<label>С кем говорили<input id="prospect-call-person-' + prospectsEscape(k) + '" maxlength="500" autocomplete="off" placeholder="Имя и должность"></label>' +
     '<label>Что отправить<input id="prospect-call-send-' + prospectsEscape(k) + '" maxlength="500" autocomplete="off" placeholder="Например, КП на чиллер 50 кВт"></label></div>';
 }
-function prospectsCallFollowupPayload(id, scope) {
+function prospectsCallFollowupPayload(id, scope, result) {
   const k = scope + '-' + id;
   const calledPerson = ((document.getElementById('prospect-call-person-' + k) || {}).value || '').trim();
   const toSend = ((document.getElementById('prospect-call-send-' + k) || {}).value || '').trim();
-  return Object.assign({}, calledPerson ? { called_person: calledPerson } : {}, toSend ? { to_send: toSend } : {});
+  return Object.assign({}, calledPerson && result !== 'no_answer' ? { called_person: calledPerson } : {}, toSend ? { to_send: toSend } : {});
+}
+function prospectsRequireSpokenWith(id, scope, result) {
+  if (result !== 'reached') return;
+  const input = document.getElementById('prospect-call-person-' + scope + '-' + id);
+  if (input && !input.value.trim()) {
+    if (input.focus) input.focus();
+    throw new Error('Укажите, с кем поговорили');
+  }
 }
 function prospectsCallBox(id, scope) {
   const k = scope + '-' + id;
@@ -180,7 +187,7 @@ async function prospectsCallSubmit(id, scope, result) {
     body.next_time = (document.getElementById('prospect-callback-time-' + k) || {}).value || '';
     if (!body.next_date) { if (status) status.textContent = 'Укажите дату, когда перезвонить'; return; }
   }
-  try { Object.assign(body, prospectsCallFollowupPayload(id, scope), prospectsCallStagePayload(id, scope, result)); }
+  try { prospectsRequireSpokenWith(id, scope, result); Object.assign(body, prospectsCallFollowupPayload(id, scope, result), prospectsCallStagePayload(id, scope, result)); }
   catch (e) { if (status) status.textContent = e.message; return; }
   _prospects.posting = true; if (status) status.textContent = 'Сохраняем…';
   try {
@@ -261,6 +268,11 @@ function prospectsCallSummary(r) {
   return '<span class="prospect-call-summary"><i class="ti ti-phone"></i> Звонков: ' + Number(r.calls_count) +
     (when && !isNaN(when) ? ' · последний ' + prospectsEscape(when.toLocaleString('ru-RU', { timeZone: 'Asia/Yekaterinburg', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) : '') +
     (r.last_call_result ? ' — ' + prospectsEscape(PROSPECT_CALL_RESULTS[r.last_call_result] || r.last_call_result) : '') + '</span>';
+}
+function prospectsSpokenBadge(r) {
+  if (!r || !r.spoken_at) return '';
+  return '<span class="prospect-spoken-badge" title="Состоявшийся разговор"><i class="ti ti-phone-check"></i> Звонок был' +
+    (r.spoken_with ? ' · ' + prospectsEscape(r.spoken_with) : '') + '</span>';
 }
 function prospectsOptions(dict, value, empty) {
   return (empty !== undefined ? '<option value="">' + prospectsEscape(empty) + '</option>' : '') +
@@ -402,14 +414,14 @@ async function loadProspects() {
       result.rows.map(function (r) {
         const site = prospectsUrl(r.site); const id = prospectsEscape(r.id);
         return '<tr class="prospect-row" data-prospect-id="' + id + '" onclick="prospectsRowClick(event,\'' + id + '\')" title="Открыть карточку">' + (canManageSales() ? '<td><input class="campaign-select" type="checkbox" data-campaign-select="' + id + '" aria-label="Выбрать ' + prospectsEscape(r.name) + '"' + (typeof _campaigns !== 'undefined' && _campaigns.selected.has(r.id) ? ' checked' : '') + ' onchange="campaignsToggle(\'' + id + '\',this.checked)"></td>' : '') + '<td class="prospect-col-name"><button class="prospect-name" onclick="prospectsOpen(\'' + id + '\')">' + prospectsEscape(r.name) + '</button>' +
-          '<div class="prospect-meta">' + prospectsEscape(r.segment) + (r.priority ? ' · Приоритет ' + prospectsEscape(r.priority) : '') + '</div><div class="prospect-meta">' + prospectsEscape([r.region, r.city].filter(Boolean).join(' · ')) + '</div></td>' +
+          '<div class="prospect-meta">' + prospectsEscape(r.segment) + (r.priority ? ' · Приоритет ' + prospectsEscape(r.priority) : '') + '</div><div class="prospect-meta">' + prospectsEscape([r.region, r.city].filter(Boolean).join(' · ')) + '</div>' + prospectsSpokenBadge(r) + '</td>' +
           '<td><div>' + (r.email ? prospectsEscape(r.email) : '<span class="prospect-missing">Почта не найдена</span>') + '</div><div>' +
           (r.phone ? prospectsPhoneLinks(r.phone, 2) : '<span class="prospect-missing">Телефон не найден</span>') + '</div>' +
           (site ? '<a href="' + prospectsEscape(site) + '" target="_blank" rel="noopener noreferrer">Сайт ↗</a>' : '') +
           '<div class="prospect-meta">' + prospectsEscape(r.verification) + '</div></td>' +
           '<td><span class="prospect-stage">' + prospectsEscape(result.stages[r.stage] || r.stage) + '</span><div class="prospect-meta">' + prospectsEscape(r.owner || 'Не назначен') + '</div>' + (r.calls_count ? '<div class="prospect-meta">' + prospectsCallSummary(r) + '</div>' : '') + '</td>' +
           '<td><div>' + prospectsEscape(r.next_action || 'Уточнить профиль и нужного специалиста') + '</div><div class="prospect-meta">' + prospectsEscape(prospectsDate(r.next_date) + ' ' + (r.next_time || '')) + '</div></td>' +
-          (canManageSales() ? '<td class="prospect-actions"><button class="icon-btn" title="Записать звонок" aria-label="Записать звонок" onclick="prospectsQuick(event,\'' + id + '\',\'call\')"><i class="ti ti-phone"></i></button>' +
+          (canManageSales() ? '<td class="prospect-actions"><button class="icon-btn" title="Звонок был — записать разговор" aria-label="Звонок был — записать разговор" onclick="prospectsQuick(event,\'' + id + '\',\'call\')"><i class="ti ti-phone"></i></button>' +
           (function(){ var m = prospectsPhones(r.phone).find(function(p){ return p.tel; }); return m ? '<button class="icon-btn prospect-call-phone-btn" data-call-on-phone hidden title="На рабочий телефон" aria-label="На рабочий телефон" onclick="event.stopPropagation();prospectsCallOnPhone(\'' + id + '\',\'' + m.tel + '\')"><i class="ti ti-device-mobile"></i></button>' : ''; })() +
           '<button class="icon-btn" title="Комментарий" aria-label="Комментарий" onclick="prospectsQuick(event,\'' + id + '\',\'comment\')"><i class="ti ti-message"></i></button></td>' : '') + '</tr>';
       }).join('') + '</tbody></table></div>';
@@ -702,7 +714,7 @@ function prospectsHeadHtml(r, stages) {
     '<button type="button" class="icon-btn pdw-close" onclick="prospectsClose()" title="Закрыть (Esc)" aria-label="Закрыть карточку"><i class="ti ti-x"></i></button></div>' +
     '<h2 class="pdw-title">' + prospectsEscape(r.name || 'Предприятие') + '</h2>' +
     '<div class="pdw-sub">' + prospectsEscape([r.region, r.city].filter(Boolean).join(' · ')) + (r.direction ? ' · ' + prospectsEscape(PROSPECT_DIRECTIONS[r.direction] || r.direction) : '') + ' ' + stage +
-    (r.owner ? ' <span class="prospect-meta">' + prospectsEscape(r.owner) + '</span>' : '') + '</div>' +
+    (r.owner ? ' <span class="prospect-meta">' + prospectsEscape(r.owner) + '</span>' : '') + '</div>' + prospectsSpokenBadge(r) +
     '<div class="pdw-callrow">' + (main && main.tel ? '<a class="btn btn-primary prospect-call-btn" href="tel:' + main.tel + '"><i class="ti ti-phone"></i> Позвонить</a><a class="pdw-mainphone" href="tel:' + main.tel + '">' + prospectsEscape(main.raw) + '</a>' +
       '<button type="button" class="btn btn-secondary prospect-call-phone-btn" data-call-on-phone hidden onclick="prospectsCallOnPhone(\'' + prospectsEscape(r.id) + '\',\'' + main.tel + '\')"><i class="ti ti-device-mobile"></i> На рабочий телефон</button>' +
       '<button type="button" class="btn btn-secondary prospect-qr-fallback-btn" hidden onclick="prospectsCallQr(\'' + prospectsEscape(r.id) + '\',\'' + main.tel + '\',\'' + prospectsEscape(r.name || '') + '\')" title="QR с tel:"><i class="ti ti-qrcode"></i></button>' :
@@ -910,7 +922,7 @@ function prospectsRenderBoard(result) {
   document.getElementById('prospects-list').innerHTML = '<p class="prospect-meta">Доска показывает текущую страницу: ' + result.rows.length + ' из ' + result.total + '. Перенесите карточку или откройте её и выберите этап.</p><div class="prospect-board">' + stages.filter(function(s){return result.stages[s];}).map(function(stage){
     const rows=result.rows.filter(function(r){return r.stage===stage;});
     return '<section class="prospect-lane" data-stage="'+stage+'" ondragover="event.preventDefault()" ondrop="prospectsDrop(event,\''+stage+'\')"><h3>'+prospectsEscape(result.stages[stage])+' <span>'+rows.length+'</span></h3>'+rows.map(function(r){
-      return '<button class="prospect-board-card" draggable="'+canManageSales()+'" ondragstart="event.dataTransfer.setData(\'text/plain\',\''+r.id+'\')" onclick="prospectsOpen(\''+r.id+'\')"><strong>'+prospectsEscape(r.name)+'</strong><span>'+prospectsEscape(r.city||r.region)+'</span><span>'+prospectsEscape(r.owner||'Ответственный не назначен')+'</span><span>'+prospectsEscape(r.next_action||'Нет следующего действия')+'</span><small>'+prospectsEscape(prospectsDate(r.next_date))+'</small></button>';
+      return '<button class="prospect-board-card" draggable="'+canManageSales()+'" ondragstart="event.dataTransfer.setData(\'text/plain\',\''+r.id+'\')" onclick="prospectsOpen(\''+r.id+'\')"><strong>'+prospectsEscape(r.name)+'</strong>'+prospectsSpokenBadge(r)+'<span>'+prospectsEscape(r.city||r.region)+'</span><span>'+prospectsEscape(r.owner||'Ответственный не назначен')+'</span><span>'+prospectsEscape(r.next_action||'Нет следующего действия')+'</span><small>'+prospectsEscape(prospectsDate(r.next_date))+'</small></button>';
     }).join('')+'</section>';
   }).join('')+'</div>';
 }
@@ -990,7 +1002,7 @@ function prospectsMobileListHtml(result) {
     const dir = PROSPECT_DIRECTIONS[r.direction] || r.segment || '';
     return '<article class="pm-card" data-prospect-id="' + id + '" onclick="prospectsOpen(\'' + id + '\')">' +
       '<div class="pm-card-main">' +
-        '<h3 class="pm-card-name">' + prospectsEscape(r.name) + '</h3>' +
+        '<h3 class="pm-card-name">' + prospectsEscape(r.name) + '</h3>' + prospectsSpokenBadge(r) +
         '<p class="pm-card-meta">' + prospectsEscape([r.city || r.region, dir].filter(Boolean).join(' · ')) + '</p>' +
         '<div class="pm-card-row"><span class="prospect-stage">' + prospectsEscape(stages[r.stage] || r.stage || '—') + '</span></div>' +
         '<p class="pm-card-next">' + prospectsEscape(r.next_action || 'Уточнить профиль') +
@@ -1144,7 +1156,7 @@ function prospectsCallSheetOpen(id, opts) {
     '<h2>Как прошёл звонок?</h2>' +
     '<p class="pm-sub">' + prospectsEscape(row.name || id) + (main ? ' · ' + prospectsEscape(main.raw) : '') + '</p>' +
     '<div class="pm-result-grid">' +
-      '<button type="button" class="pm-result ok" data-result="reached" onclick="prospectsCallSheetPick(this)"><i class="ti ti-phone-check"></i>Дозвонился</button>' +
+      '<button type="button" class="pm-result ok" data-result="reached" onclick="prospectsCallSheetPick(this)"><i class="ti ti-phone-check"></i>Звонок был</button>' +
       '<button type="button" class="pm-result bad" data-result="no_answer" onclick="prospectsCallSheetPick(this)"><i class="ti ti-phone-off"></i>Не дозвонился</button>' +
       '<button type="button" class="pm-result cb" data-result="callback" onclick="prospectsCallSheetPick(this)"><i class="ti ti-phone-outgoing"></i>Перезвонить</button>' +
     '</div>' +
@@ -1223,7 +1235,7 @@ async function prospectsCallSheetSave(goNext) {
     body.next_date = (document.getElementById('pm-call-date') || {}).value || prospectsTomorrow();
     body.next_time = (document.getElementById('pm-call-time') || {}).value || '10:00';
   }
-  try { Object.assign(body, prospectsCallFollowupPayload(id, 'sheet'), prospectsCallStagePayload(id, 'sheet', result)); }
+  try { prospectsRequireSpokenWith(id, 'sheet', result); Object.assign(body, prospectsCallFollowupPayload(id, 'sheet', result), prospectsCallStagePayload(id, 'sheet', result)); }
   catch (e) { showToast(e.message, 'error'); return; }
   try {
     await prospectsPost('/api/sales/prospects/' + encodeURIComponent(id) + '/calls', body);
