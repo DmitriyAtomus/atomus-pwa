@@ -21,6 +21,24 @@ function harness(manage = true) {
 }
 const listing = rows => ({ rows, total: rows.length, page: 1, pages: 1, stats: { total: rows.length }, facets: { segment: [], region: [], owner: [] }, stages: { new: 'Новый' }, consents: {} });
 
+test('view switch styles only its buttons, never the whole screen', () => {
+  const { ctx } = harness();
+  const screen = { className: 'screen active', dataset: {} };
+  const table = { className: '', dataset: { prospectView: 'table' }, setAttribute() {} };
+  const board = { className: '', dataset: { prospectView: 'board' }, setAttribute() {} };
+  ctx.document.querySelector = () => screen;
+  ctx.document.querySelectorAll = selector => {
+    assert.equal(selector, '.prospect-view-switch button[data-prospect-view]');
+    return [table, board];
+  };
+  ctx._prospects.view = 'table';
+  ctx.prospectsSyncViewButtons();
+  assert.equal(screen.className, 'screen active');
+  assert.equal(screen.dataset.prospectView, 'table');
+  assert.equal(table.className, 'btn btn-primary');
+  assert.equal(board.className, 'btn btn-secondary');
+});
+
 test('RU phones in any format normalize to tel:+7…, junk is not linked', () => {
   const { ctx } = harness();
   for (const raw of ['8 (351) 222-33-44', '+7 351 222 33 44', '7-351-222-33-44', '(351) 222-33-44', '83512223344 доб. 105'])
