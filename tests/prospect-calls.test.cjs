@@ -103,6 +103,44 @@ test('server conflict on call is reported and data refreshed', async () => {
   assert.ok(toasts.some(t => t[1] === 'info'));
 });
 
+test('call can move a card to a chosen board column in the same request', async () => {
+  const { ctx, node } = harness(); const posts = [];
+  ctx._prospects.rows = [{ id: 'ATM-1', revision: 3, stage: 'new', phone: '' }];
+  ctx.apiPost = async (url, body) => { posts.push({ url, body }); return { ok: true, status: 201, data: { revision: 4 } }; };
+  ctx.apiGet = async () => listing([{ id: 'ATM-1', revision: 4, stage: 'contact' }]);
+  node('prospect-call-stage-row-ATM-1').value = 'contact';
+  await ctx.prospectsCallSubmit('ATM-1', 'row', 'reached');
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].body.stage, 'contact');
+  assert.equal(posts[0].body.result, 'reached');
+});
+
+test('later column requires a reason; callback date is reused', () => {
+  const { ctx, node } = harness();
+  node('prospect-call-stage-card-ATM-1').value = 'later';
+  assert.throws(() => ctx.prospectsCallStagePayload('ATM-1', 'card', 'callback'), /причину/);
+  node('prospect-call-reason-card-ATM-1').value = 'Бюджет в следующем квартале';
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.prospectsCallStagePayload('ATM-1', 'card', 'callback'))),
+    { stage: 'later', close_reason: 'Бюджет в следующем квартале' });
+  node('prospect-call-stage-date-card-ATM-1').value = '2026-10-20';
+  assert.equal(ctx.prospectsCallStagePayload('ATM-1', 'card', 'reached').next_date, '2026-10-20');
+});
+
+test('mobile save and next moves once after recording the chosen column', async () => {
+  const { ctx, node } = harness(); const posts = []; let steps = 0;
+  ctx._prospects.rows = [{ id: 'ATM-1', revision: 5, stage: 'new', phone: '' }];
+  node('pm-call-sheet').dataset = { prospectId: 'ATM-1', result: 'reached' };
+  node('prospect-call-stage-sheet-ATM-1').value = 'needs';
+  ctx.apiPost = async (url, body) => { posts.push({ url, body }); return { ok: true, status: 201, data: { revision: 6 } }; };
+  ctx.prospectsCallSheetClose = () => {};
+  ctx.loadProspects = async () => {};
+  ctx.prospectsOpen = async () => {};
+  ctx.prospectsStep = async () => { steps++; };
+  await ctx.prospectsCallSheetSave(true);
+  assert.equal(posts[0].body.stage, 'needs');
+  assert.equal(steps, 1);
+});
+
 test('quick comment uses PATCH note with revision and requires text', async () => {
   const { ctx, node } = harness(); const patches = [];
   ctx._prospects.rows = [{ id: 'ATM-1', revision: 9 }];

@@ -38,6 +38,8 @@ function prospectsDate(value) {
 /* v2.46.251: телефоны РФ в любом формате → tel:+7XXXXXXXXXX; звонки и быстрые действия. */
 var PROSPECT_CALL_RESULTS = { reached: 'Дозвонился', no_answer: 'Не дозвонился', callback: 'Перезвонить' };
 var PROSPECT_CALL_ICONS = { reached: 'ti-phone-check', no_answer: 'ti-phone-x', callback: 'ti-phone-call' };
+var PROSPECT_STAGE_ORDER = ['new','checking','contact','needs','brief','offer','negotiation','pilot','won','partner','later','closed'];
+var PROSPECT_STAGE_NAMES = {new:'Новый',checking:'Проверка контактов',contact:'Нужный специалист найден',needs:'Задача выяснена',brief:'Получены исходные данные',offer:'КП подготовлено',negotiation:'Обсуждение КП',pilot:'Пилот',won:'Заказ',partner:'Серийный партнёр',later:'Вернуться позже',closed:'Не подходит'};
 function prospectsTel(raw) {
   const text = String(raw || '').replace(/\s*(?:доб|вн|ext|x)\.?\s*\d.*$/i, '').trim();
   let d = text.replace(/\D/g, '');
@@ -61,10 +63,52 @@ function prospectsTomorrow() {
   const now = new Date(Date.now() + 5 * 3600 * 1000 + 24 * 3600 * 1000);  // Екатеринбург, UTC+5
   return now.toISOString().slice(0, 10);
 }
+function prospectsCallStageHtml(id, scope) {
+  const k = scope + '-' + id;
+  const row = (_prospects.current && _prospects.current.id === id ? _prospects.current : (_prospects.rows || []).find(function (r) { return r.id === id; })) || {};
+  const stages = Object.assign({}, PROSPECT_STAGE_NAMES, (_prospects.dict && _prospects.dict.stages) || {});
+  const current = row.stage ? ' (' + (stages[row.stage] || row.stage) + ')' : '';
+  return '<div class="prospect-call-stage" data-stage-scope="' + prospectsEscape(k) + '">' +
+    '<label>Колонка после звонка<select id="prospect-call-stage-' + prospectsEscape(k) + '" onchange="prospectsCallStageChanged(\'' + prospectsEscape(id) + '\',\'' + scope + '\')">' +
+    '<option value="">Оставить в текущей колонке' + prospectsEscape(current) + '</option>' +
+    PROSPECT_STAGE_ORDER.filter(function (stage) { return !!stages[stage] && stage !== row.stage; }).map(function (stage) {
+      return '<option value="' + stage + '">' + prospectsEscape(stages[stage]) + '</option>';
+    }).join('') + '</select></label>' +
+    '<div class="prospect-call-stage-extra" id="prospect-call-stage-extra-' + prospectsEscape(k) + '" hidden>' +
+    '<label>Причина переноса / отказа<input id="prospect-call-reason-' + prospectsEscape(k) + '" maxlength="5000" placeholder="Коротко укажите причину"></label>' +
+    '<label id="prospect-call-stage-date-wrap-' + prospectsEscape(k) + '">Когда вернуться<input type="date" id="prospect-call-stage-date-' + prospectsEscape(k) + '" value="' + prospectsTomorrow() + '"></label></div></div>';
+}
+function prospectsCallStageChanged(id, scope) {
+  const k = scope + '-' + id;
+  const stage = (document.getElementById('prospect-call-stage-' + k) || {}).value || '';
+  const extra = document.getElementById('prospect-call-stage-extra-' + k);
+  if (extra) extra.hidden = stage !== 'later' && stage !== 'closed';
+  const callback = scope === 'sheet' ? ((document.getElementById('pm-call-sheet') || {}).dataset || {}).result === 'callback' :
+    !((document.getElementById('prospect-callback-' + k) || {}).hidden);
+  const dateWrap = document.getElementById('prospect-call-stage-date-wrap-' + k);
+  if (dateWrap) dateWrap.hidden = stage !== 'later' || callback;
+}
+function prospectsCallStagePayload(id, scope, result) {
+  const k = scope + '-' + id;
+  const stage = (document.getElementById('prospect-call-stage-' + k) || {}).value || '';
+  if (!stage) return {};
+  const payload = { stage: stage };
+  if (stage === 'later' || stage === 'closed') {
+    const reason = ((document.getElementById('prospect-call-reason-' + k) || {}).value || '').trim();
+    if (!reason) throw new Error('Укажите причину переноса или отказа');
+    payload.close_reason = reason;
+    if (stage === 'later' && result !== 'callback') {
+      payload.next_date = (document.getElementById('prospect-call-stage-date-' + k) || {}).value || '';
+      if (!payload.next_date) throw new Error('Укажите дату возврата');
+    }
+  }
+  return payload;
+}
 function prospectsCallBox(id, scope) {
   const k = scope + '-' + id;
   return '<div class="prospect-callbox" data-call-scope="' + prospectsEscape(k) + '">' +
     '<textarea id="prospect-call-note-' + prospectsEscape(k) + '" rows="2" maxlength="5000" placeholder="Комментарий к звонку (необязательно)"></textarea>' +
+    prospectsCallStageHtml(id, scope) +
     '<div class="prospect-call-buttons">' + Object.keys(PROSPECT_CALL_RESULTS).map(function (r) {
       return '<button type="button" class="btn btn-secondary prospect-call-' + r + '" onclick="prospectsCallResult(\'' + prospectsEscape(id) + '\',\'' + scope + '\',\'' + r + '\')"><i class="ti ' + PROSPECT_CALL_ICONS[r] + '"></i> ' + PROSPECT_CALL_RESULTS[r] + '</button>';
     }).join('') + '</div>' +
@@ -83,8 +127,10 @@ function prospectsCallResult(id, scope, result) {
   if (result === 'callback') {
     const k = scope + '-' + id, box = document.getElementById('prospect-callback-' + k);
     const dateEl = document.getElementById('prospect-callback-date-' + k);
-    if (dateEl && !dateEl.value) dateEl.value = prospectsTomorrow();
+    const stageDate = (document.getElementById('prospect-call-stage-date-' + k) || {}).value;
+    if (dateEl && !dateEl.value) dateEl.value = stageDate || prospectsTomorrow();
     if (box) box.hidden = false;
+    prospectsCallStageChanged(id, scope);
     if (dateEl && dateEl.focus) dateEl.focus();
     return;
   }
@@ -120,6 +166,8 @@ async function prospectsCallSubmit(id, scope, result) {
     body.next_time = (document.getElementById('prospect-callback-time-' + k) || {}).value || '';
     if (!body.next_date) { if (status) status.textContent = 'Укажите дату, когда перезвонить'; return; }
   }
+  try { Object.assign(body, prospectsCallStagePayload(id, scope, result)); }
+  catch (e) { if (status) status.textContent = e.message; return; }
   _prospects.posting = true; if (status) status.textContent = 'Сохраняем…';
   try {
     await prospectsPost('/api/sales/prospects/' + encodeURIComponent(id) + '/calls', body);
@@ -570,15 +618,17 @@ function prospectsAutoNext(value) {
   } catch (_) { return false; }
 }
 // После записи звонка из карточки: предложить «Следующее →» (или перейти сразу, если включено).
-async function prospectsAfterCall(id, result) {
+async function prospectsAfterCall(id, result, opts) {
+  opts = opts || {};
   const box = document.getElementById('prospect-after-call');
   if (box) {
     box.hidden = false;
     box.innerHTML = '<i class="ti ti-circle-check"></i> Записано: ' + prospectsEscape(PROSPECT_CALL_RESULTS[result] || result) +
+      (_prospects.current && _prospects.current.stage ? ' · Колонка: ' + prospectsEscape(((_prospects.dict || {}).stages || PROSPECT_STAGE_NAMES)[_prospects.current.stage] || _prospects.current.stage) : '') +
       ' <button type="button" class="btn btn-primary" id="prospect-after-next" onclick="prospectsStep(1)">Следующее →</button>';
     prospectsRenderNav();
   }
-  if (prospectsAutoNext() && _prospects.current && _prospects.current.id === id) await prospectsStep(1);
+  if (!opts.noAutoNext && prospectsAutoNext() && _prospects.current && _prospects.current.id === id) await prospectsStep(1);
 }
 function prospectsKey(e) {
   if (!_prospects.drawerOpen || !e) return;
@@ -1080,11 +1130,12 @@ function prospectsCallSheetOpen(id, opts) {
       '<button type="button" class="pm-result bad" data-result="no_answer" onclick="prospectsCallSheetPick(this)"><i class="ti ti-phone-off"></i>Не дозвонился</button>' +
       '<button type="button" class="pm-result cb" data-result="callback" onclick="prospectsCallSheetPick(this)"><i class="ti ti-phone-outgoing"></i>Перезвонить</button>' +
     '</div>' +
+    prospectsCallStageHtml(id, 'sheet') +
     '<div class="pm-date-chips" id="pm-date-chips" hidden>' +
       '<button type="button" class="active" data-date="' + today + '" onclick="prospectsCallSheetDate(this)">Сегодня</button>' +
       '<button type="button" data-date="' + tomorrow + '" onclick="prospectsCallSheetDate(this)">Завтра</button>' +
       '<button type="button" data-date="pick" onclick="prospectsCallSheetDate(this)">Выбрать…</button>' +
-      '<input type="date" id="pm-call-date" value="' + tomorrow + '" hidden>' +
+      '<input type="date" id="pm-call-date" value="' + today + '" hidden>' +
       '<input type="time" id="pm-call-time" value="10:00" hidden>' +
     '</div>' +
     '<label class="pm-field"><span>Комментарий</span><textarea id="pm-call-note" rows="3" maxlength="5000" placeholder="С кем говорили, о чём договорились…"></textarea></label>' +
@@ -1111,6 +1162,19 @@ function prospectsCallSheetPick(btn) {
   root.dataset.result = btn.dataset.result || '';
   const chips = document.getElementById('pm-date-chips');
   if (chips) chips.hidden = root.dataset.result !== 'callback';
+  if (root.dataset.result === 'callback' && (document.getElementById('prospect-call-stage-sheet-' + root.dataset.prospectId) || {}).value === 'later') {
+    const stageDate = (document.getElementById('prospect-call-stage-date-sheet-' + root.dataset.prospectId) || {}).value;
+    const callDate = document.getElementById('pm-call-date');
+    if (callDate && stageDate) {
+      callDate.value = stageDate;
+      if (chips) {
+        chips.querySelectorAll('button').forEach(function (b) { b.classList.toggle('active', b.dataset.date === 'pick'); });
+        callDate.hidden = false;
+        const callTime = document.getElementById('pm-call-time'); if (callTime) callTime.hidden = false;
+      }
+    }
+  }
+  prospectsCallStageChanged(root.dataset.prospectId, 'sheet');
 }
 function prospectsCallSheetDate(btn) {
   const chips = document.getElementById('pm-date-chips');
@@ -1141,13 +1205,15 @@ async function prospectsCallSheetSave(goNext) {
     body.next_date = (document.getElementById('pm-call-date') || {}).value || prospectsTomorrow();
     body.next_time = (document.getElementById('pm-call-time') || {}).value || '10:00';
   }
+  try { Object.assign(body, prospectsCallStagePayload(id, 'sheet', result)); }
+  catch (e) { showToast(e.message, 'error'); return; }
   try {
     await prospectsPost('/api/sales/prospects/' + encodeURIComponent(id) + '/calls', body);
     prospectsCallSheetClose();
     showToast('Звонок записан', 'success');
     if (_prospects.drawerOpen && _prospects.current && _prospects.current.id === id) {
       await prospectsRefreshCard(id, result);
-      await prospectsAfterCall(id, result);
+      await prospectsAfterCall(id, result, { noAutoNext: goNext });
       if (goNext) await prospectsStep(1);
     } else {
       await loadProspects();
