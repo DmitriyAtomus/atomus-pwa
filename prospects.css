@@ -256,3 +256,10 @@ html.prospect-drawer-open{overflow:hidden}html.prospect-drawer-open .toast{z-ind
 .prospect-call-followup-cell b,.prospect-call-detail b{color:#275b81}
 .pm-sheet .prospect-call-followup input{min-height:48px;font-size:16px}
 @media(max-width:600px){.prospect-call-followup{grid-template-columns:1fr}}
+
+/* v2.46.260: visible completed-conversation marker across list, board and card. */
+.prospect-spoken-badge{display:inline-flex;align-items:center;gap:4px;max-width:100%;box-sizing:border-box;margin-top:6px;padding:5px 9px;border-radius:8px;background:#dff5e8;color:#14643c;font-size:12px;font-weight:700;line-height:1.3;white-space:normal;overflow-wrap:anywhere;border:1px solid #b7e2ca}
+.prospect-spoken-badge .ti{flex:none;font-size:14px}
+.prospect-col-name .prospect-spoken-badge,.pm-card .prospect-spoken-badge,.pdw-head .prospect-spoken-badge{display:flex;width:max-content}
+.prospect-board-card .prospect-spoken-badge{align-self:flex-start;text-align:left}
+.prospect-call-buttons .prospect-call-reached{background:#dff5e8;border-color:#9bd3b4;color:#14643c;font-weight:700}
