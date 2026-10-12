@@ -27234,3 +27234,43 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
   min-height: 48px; justify-content: center; padding: 6px 2px 8px;
 }
 .app.mobile-layout .tab25.active { color: var(--brand, #2D5F8B); font-weight: 700; }
+
+/* ===== v2.46.255: «Счета на оплату» на телефоне (≤600px) ===== */
+.pay-list-cards { display: none; }
+.pay-list-nosup { color: var(--text-light); font-style: italic; font-weight: 500; }
+@media (max-width: 600px) {
+  [data-screen="supply-pay"] > .content-inner { padding: 16px 16px calc(96px + env(safe-area-inset-bottom, 0px)) !important; box-sizing: border-box; }
+  [data-screen="supply-pay"] .page-header { display: flex !important; flex-direction: column; align-items: stretch; gap: 10px; margin: 0 0 4px; padding: 0; background: none; border: 0; box-shadow: none; }
+  [data-screen="supply-pay"] .page-header-title { display: flex; align-items: center; gap: 8px; }
+  [data-screen="supply-pay"] .page-header-title h1 { font-size: 22px; line-height: 1.25; margin: 0; }
+  [data-screen="supply-pay"] .pay-list-actions { display: flex; flex-wrap: nowrap; gap: 8px; }
+  [data-screen="supply-pay"] .pay-list-actions .btn[style*="display: none"], [data-screen="supply-pay"] .pay-list-actions .btn[style*="display:none"] { display: none !important; }
+  [data-screen="supply-pay"] .pay-list-actions .btn { flex: 1 1 0; min-width: 0; min-height: 42px; padding: 8px 10px; white-space: nowrap; }
+  [data-screen="supply-pay"] .pay-list-actions .btn { justify-content: center; }
+  [data-screen="supply-pay"] .page-subtitle { margin: 2px 0 12px; padding: 0; font-size: 13.5px; line-height: 1.4; color: var(--text-light); }
+  [data-screen="supply-pay"] .desktop-layout { padding: 0; margin: 0; }
+  [data-screen="supply-pay"] .filter-row { margin: 0 0 12px; padding: 0; overflow: visible; position: relative; z-index: 1; }
+  [data-screen="supply-pay"] .filter-tabs { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; padding: 2px 0; margin: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; background: none; border: 0; }
+  [data-screen="supply-pay"] .filter-tabs::-webkit-scrollbar { display: none; }
+  [data-screen="supply-pay"] .filter-tab { flex: 0 0 auto; white-space: nowrap; border-radius: 999px; padding: 8px 14px; border: 1px solid var(--border); background: var(--surface); font-size: 14px; }
+  [data-screen="supply-pay"] .filter-tab.active { background: var(--text, #1d2433); color: #fff; border-color: transparent; }
+  [data-screen="supply-pay"] .pay-list-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 0 0 14px; }
+  [data-screen="supply-pay"] .pay-list-search, [data-screen="supply-pay"] .pay-list-filters select { width: 100%; max-width: none; min-width: 0; flex: none; box-sizing: border-box; }
+  [data-screen="supply-pay"] .pay-list-search input, [data-screen="supply-pay"] .pay-list-filters select { width: 100%; box-sizing: border-box; min-height: 44px; font-size: 16px; }
+  [data-screen="supply-pay"] .pay-list-check { min-height: 32px; font-size: 14px; flex: 0 0 auto; }
+  [data-screen="supply-pay"] .pay-list-wrap { overflow: visible; }
+  [data-screen="supply-pay"] .pay-list-table { display: none; }
+  [data-screen="supply-pay"] .pay-list-cards { display: flex; flex-direction: column; gap: 10px; }
+  .pay-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .pay-card:active { background: var(--bg); }
+  .pay-card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .pay-card-sup { font-weight: 700; font-size: 15px; line-height: 1.3; min-width: 0; overflow-wrap: anywhere; }
+  .pay-card-sum { font-weight: 800; font-size: 15px; white-space: nowrap; flex: 0 0 auto; }
+  .pay-card-purpose { margin-top: 4px; font-size: 14px; line-height: 1.35; color: var(--text-mid); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .pay-card-meta { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12.5px; color: var(--text-light); }
+  .pay-card-meta > * + *::before { content: none; }
+  .pay-card-meta .pay-list-status { font-size: 12.5px; }
+  .pay-card-author { margin-top: 4px; font-size: 12.5px; color: var(--text-light); }
+  .pay-card-actions { margin-top: 10px; }
+  .pay-card-actions .btn { margin: 0 !important; }
+}

@@ -200,8 +200,8 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.254";
-const APP_VERSION_DATE = "08.10.2026";
+const APP_VERSION = "v2.46.257";
+const APP_VERSION_DATE = "12.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
