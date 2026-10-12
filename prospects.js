@@ -104,10 +104,24 @@ function prospectsCallStagePayload(id, scope, result) {
   }
   return payload;
 }
+function prospectsCallFollowupHtml(id, scope) {
+  const k = scope + '-' + id;
+  const row = (_prospects.current && _prospects.current.id === id ? _prospects.current : (_prospects.rows || []).find(function (r) { return r.id === id; })) || {};
+  return '<div class="prospect-call-followup">' +
+    '<label>С кем говорили<input id="prospect-call-person-' + prospectsEscape(k) + '" maxlength="500" autocomplete="off" placeholder="Имя и должность" value="' + prospectsEscape(row.contact_person || '') + '"></label>' +
+    '<label>Что отправить<input id="prospect-call-send-' + prospectsEscape(k) + '" maxlength="500" autocomplete="off" placeholder="Например, КП на чиллер 50 кВт"></label></div>';
+}
+function prospectsCallFollowupPayload(id, scope) {
+  const k = scope + '-' + id;
+  const calledPerson = ((document.getElementById('prospect-call-person-' + k) || {}).value || '').trim();
+  const toSend = ((document.getElementById('prospect-call-send-' + k) || {}).value || '').trim();
+  return Object.assign({}, calledPerson ? { called_person: calledPerson } : {}, toSend ? { to_send: toSend } : {});
+}
 function prospectsCallBox(id, scope) {
   const k = scope + '-' + id;
   return '<div class="prospect-callbox" data-call-scope="' + prospectsEscape(k) + '">' +
-    '<textarea id="prospect-call-note-' + prospectsEscape(k) + '" rows="2" maxlength="5000" placeholder="Комментарий к звонку (необязательно)"></textarea>' +
+    prospectsCallFollowupHtml(id, scope) +
+    '<textarea id="prospect-call-note-' + prospectsEscape(k) + '" rows="2" maxlength="5000" placeholder="Комментарий: о чём договорились, важные детали"></textarea>' +
     prospectsCallStageHtml(id, scope) +
     '<div class="prospect-call-buttons">' + Object.keys(PROSPECT_CALL_RESULTS).map(function (r) {
       return '<button type="button" class="btn btn-secondary prospect-call-' + r + '" onclick="prospectsCallResult(\'' + prospectsEscape(id) + '\',\'' + scope + '\',\'' + r + '\')"><i class="ti ' + PROSPECT_CALL_ICONS[r] + '"></i> ' + PROSPECT_CALL_RESULTS[r] + '</button>';
@@ -166,7 +180,7 @@ async function prospectsCallSubmit(id, scope, result) {
     body.next_time = (document.getElementById('prospect-callback-time-' + k) || {}).value || '';
     if (!body.next_date) { if (status) status.textContent = 'Укажите дату, когда перезвонить'; return; }
   }
-  try { Object.assign(body, prospectsCallStagePayload(id, scope, result)); }
+  try { Object.assign(body, prospectsCallFollowupPayload(id, scope), prospectsCallStagePayload(id, scope, result)); }
   catch (e) { if (status) status.textContent = e.message; return; }
   _prospects.posting = true; if (status) status.textContent = 'Сохраняем…';
   try {
@@ -322,13 +336,15 @@ function prospectsRenderCallsJournal(result) {
         '<span class="prospect-call-result-pill prospect-call-' + prospectsEscape(r.result || '') + '"><i class="ti ' + icon + '"></i> ' + prospectsEscape(resLabel) + '</span></div>' +
         '<p class="pm-card-meta">' + prospectsEscape(prospectsFormatCallWhen(r.created_at)) + ' · ' + prospectsEscape(r.actor_name || ('Сотрудник #' + r.actor)) + '</p>' +
         '<p class="pm-card-meta">' + prospectsEscape([r.city || r.region, PROSPECT_DIRECTIONS[r.direction] || r.direction].filter(Boolean).join(' · ')) + '</p>' +
+        (r.called_person ? '<p class="prospect-call-detail"><b>С кем:</b> ' + prospectsEscape(r.called_person) + '</p>' : '') +
+        (r.to_send ? '<p class="prospect-call-detail"><b>Отправить:</b> ' + prospectsEscape(r.to_send) + '</p>' : '') +
         (r.note ? '<p class="prospect-meta">' + prospectsEscape(r.note) + '</p>' : '') +
         '</article>';
     }).join('') + '</div>';
     return;
   }
   root.innerHTML = '<div class="prospect-table-wrap"><table class="prospect-table prospect-calls-table"><thead><tr>' +
-    '<th>Когда</th><th>Кто звонил</th><th>Предприятие</th><th>Результат</th><th>Комментарий</th></tr></thead><tbody>' +
+    '<th>Когда</th><th>Кто звонил</th><th>Предприятие</th><th>Результат</th><th>С кем / что отправить</th><th>Комментарий</th></tr></thead><tbody>' +
     result.rows.map(function (r) {
       const id = prospectsEscape(r.prospect_id);
       const resLabel = PROSPECT_CALL_RESULTS[r.result] || r.result || '—';
@@ -339,6 +355,8 @@ function prospectsRenderCallsJournal(result) {
         '<td class="prospect-col-name"><button class="prospect-name" onclick="event.stopPropagation();prospectsOpen(\'' + id + '\')">' + prospectsEscape(r.name) + '</button>' +
         '<div class="prospect-meta">' + prospectsEscape([r.city || r.region, PROSPECT_DIRECTIONS[r.direction] || r.direction].filter(Boolean).join(' · ')) + '</div></td>' +
         '<td><span class="prospect-call-result-pill prospect-call-' + prospectsEscape(r.result || '') + '"><i class="ti ' + icon + '"></i> ' + prospectsEscape(resLabel) + '</span></td>' +
+        '<td class="prospect-call-followup-cell">' + (r.called_person ? '<div><b>С кем:</b> ' + prospectsEscape(r.called_person) + '</div>' : '') +
+        (r.to_send ? '<div><b>Отправить:</b> ' + prospectsEscape(r.to_send) + '</div>' : '') + (!r.called_person && !r.to_send ? '<span class="prospect-meta">—</span>' : '') + '</td>' +
         '<td class="prospect-call-note">' + (r.note ? prospectsEscape(r.note) : '<span class="prospect-meta">Без комментария</span>') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 }
@@ -913,10 +931,10 @@ function prospectsHistory(events,dict) {
     const when=new Date(ev.created_at.replace(' ','T')+'Z');
     const isCall=ev.kind==='call'||!!changes.call;const isPush=ev.kind==='call_push'||!!changes.sent_to_phone;const callResult=ev.result||(changes.call&&changes.call.to)||'';
     const callLine=isCall?'<p class="prospect-event-call"><i class="ti '+(PROSPECT_CALL_ICONS[callResult]||'ti-phone')+'"></i> <b>Звонок: '+prospectsEscape(PROSPECT_CALL_RESULTS[callResult]||callResult||'—')+'</b>'+(changes.phone&&changes.phone.to?' · '+prospectsEscape(changes.phone.to):'')+'</p>':(isPush?'<p class="prospect-event-call"><i class="ti ti-device-mobile"></i> <b>Отправлен на телефон</b>'+(changes.sent_to_phone&&changes.sent_to_phone.to?' · '+prospectsEscape(changes.sent_to_phone.to):'')+'</p>':'');
-    if(isCall){delete changes.call;delete changes.phone;}
+    if(isCall){delete changes.call;delete changes.phone;if(changes.called_person)delete changes.contact_person;if(changes.to_send)delete changes.next_action;}
     return '<article class="prospect-event'+(isCall?' prospect-event-callrow':'')+'"><small>'+prospectsEscape(isNaN(when)?ev.created_at:when.toLocaleString('ru-RU',{timeZone:'Asia/Yekaterinburg'}))+' · '+prospectsEscape(ev.actor_name||('Сотрудник #'+ev.actor))+'</small>'+callLine+Object.keys(changes).map(function(key){
       const value=changes[key].to;const label=key==='stage'?dict.stages[value]:key==='direction'?PROSPECT_DIRECTIONS[value]:key==='consent'?dict.consents[value]:key==='contacts_json'?'Список контактов обновлён':value;
-      return '<p>'+(key==='note'?'':'<b>'+prospectsEscape(PROSPECT_LABELS[key]||key)+': </b>')+prospectsEscape(label||'—').replace(/\n/g,'<br>')+'</p>';
+      return '<p>'+(key==='note'?'':'<b>'+prospectsEscape(({called_person:'С кем говорили',to_send:'Что отправить'})[key]||PROSPECT_LABELS[key]||key)+': </b>')+prospectsEscape(label||'—').replace(/\n/g,'<br>')+'</p>';
     }).join('')+'</article>';
   }).join('');
 }
@@ -1130,7 +1148,7 @@ function prospectsCallSheetOpen(id, opts) {
       '<button type="button" class="pm-result bad" data-result="no_answer" onclick="prospectsCallSheetPick(this)"><i class="ti ti-phone-off"></i>Не дозвонился</button>' +
       '<button type="button" class="pm-result cb" data-result="callback" onclick="prospectsCallSheetPick(this)"><i class="ti ti-phone-outgoing"></i>Перезвонить</button>' +
     '</div>' +
-    prospectsCallStageHtml(id, 'sheet') +
+    prospectsCallFollowupHtml(id, 'sheet') + prospectsCallStageHtml(id, 'sheet') +
     '<div class="pm-date-chips" id="pm-date-chips" hidden>' +
       '<button type="button" class="active" data-date="' + today + '" onclick="prospectsCallSheetDate(this)">Сегодня</button>' +
       '<button type="button" data-date="' + tomorrow + '" onclick="prospectsCallSheetDate(this)">Завтра</button>' +
@@ -1138,7 +1156,7 @@ function prospectsCallSheetOpen(id, opts) {
       '<input type="date" id="pm-call-date" value="' + today + '" hidden>' +
       '<input type="time" id="pm-call-time" value="10:00" hidden>' +
     '</div>' +
-    '<label class="pm-field"><span>Комментарий</span><textarea id="pm-call-note" rows="3" maxlength="5000" placeholder="С кем говорили, о чём договорились…"></textarea></label>' +
+    '<label class="pm-field"><span>Комментарий</span><textarea id="pm-call-note" rows="3" maxlength="5000" placeholder="О чём договорились, важные детали…"></textarea></label>' +
     '<div class="pm-sheet-actions">' +
       '<button type="button" class="pm-sheet-secondary" onclick="prospectsCallSheetSave(false)">Сохранить</button>' +
       '<button type="button" class="pm-sheet-primary" onclick="prospectsCallSheetSave(true)">Сохранить и следующее →</button>' +
@@ -1205,7 +1223,7 @@ async function prospectsCallSheetSave(goNext) {
     body.next_date = (document.getElementById('pm-call-date') || {}).value || prospectsTomorrow();
     body.next_time = (document.getElementById('pm-call-time') || {}).value || '10:00';
   }
-  try { Object.assign(body, prospectsCallStagePayload(id, 'sheet', result)); }
+  try { Object.assign(body, prospectsCallFollowupPayload(id, 'sheet'), prospectsCallStagePayload(id, 'sheet', result)); }
   catch (e) { showToast(e.message, 'error'); return; }
   try {
     await prospectsPost('/api/sales/prospects/' + encodeURIComponent(id) + '/calls', body);

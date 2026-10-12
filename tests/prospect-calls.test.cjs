@@ -115,6 +115,24 @@ test('call can move a card to a chosen board column in the same request', async 
   assert.equal(posts[0].body.result, 'reached');
 });
 
+test('call records who answered and what to send without hiding the comment', async () => {
+  const { ctx, node } = harness(); const posts = [];
+  ctx._prospects.rows = [{ id: 'ATM-1', revision: 3, stage: 'new', phone: '', contact_person: 'Петров' }];
+  const html = ctx.prospectsCallBox('ATM-1', 'row');
+  assert.match(html, /С кем говорили/);
+  assert.match(html, /Что отправить/);
+  assert.match(html, /value="Петров"/);
+  node('prospect-call-person-row-ATM-1').value = 'Иван Петров, инженер';
+  node('prospect-call-send-row-ATM-1').value = 'КП на чиллер 50 кВт';
+  node('prospect-call-note-row-ATM-1').value = 'Нужна вода +5 °C';
+  ctx.apiPost = async (url, body) => { posts.push(body); return { ok: true, status: 201, data: { revision: 4 } }; };
+  ctx.apiGet = async () => listing([{ id: 'ATM-1', revision: 4, stage: 'new' }]);
+  await ctx.prospectsCallSubmit('ATM-1', 'row', 'reached');
+  assert.equal(posts[0].called_person, 'Иван Петров, инженер');
+  assert.equal(posts[0].to_send, 'КП на чиллер 50 кВт');
+  assert.equal(posts[0].note, 'Нужна вода +5 °C');
+});
+
 test('later column requires a reason; callback date is reused', () => {
   const { ctx, node } = harness();
   node('prospect-call-stage-card-ATM-1').value = 'later';
@@ -166,6 +184,17 @@ test('history shows call events with icon and result, escapes text', () => {
   assert.match(html, /&lt;b&gt;x/);
   assert.match(html, /Обычный комментарий/);
   assert.equal((html.match(/Звонок:/g) || []).length, 1);
+});
+
+test('history shows called person and send item once and escapes them', () => {
+  const { ctx } = harness();
+  const html = ctx.prospectsHistory([{ created_at: '2026-10-12 10:00:00', actor: 1, kind: 'call', result: 'reached',
+    changes_json: JSON.stringify({ call: { to: 'reached' }, called_person: { to: '<Иван>' }, contact_person: { to: '<Иван>' },
+      to_send: { to: 'КП <50 кВт>' }, next_action: { to: 'Отправить: КП <50 кВт>' } }) }], { stages: {}, consents: {} });
+  assert.match(html, /С кем говорили: <\/b>&lt;Иван&gt;/);
+  assert.match(html, /Что отправить: <\/b>КП &lt;50 кВт&gt;/);
+  assert.doesNotMatch(html, /Контактный специалист:/);
+  assert.doesNotMatch(html, /Следующий шаг:/);
 });
 
 test('owner select lists employees and keeps a legacy free-text value', () => {
