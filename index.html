@@ -2124,7 +2124,7 @@ setTimeout(function () {
         <div class="content-inner prospects">
           <div id="prospects-overview">
             <div class="prospect-toolbar" id="prospect-directions"><button class="btn btn-primary" data-direction="chillers" onclick="prospectsDirection('chillers')">Чиллеры</button><button class="btn btn-secondary" data-direction="cheese" onclick="prospectsDirection('cheese')">Сыроварни</button><button class="btn btn-secondary" data-direction="dairy" onclick="prospectsDirection('dairy')">Молочные заводы</button><button class="btn btn-secondary" data-direction="" onclick="prospectsDirection('')">Все</button></div>
-            <div class="prospect-toolbar"><div><button class="btn btn-secondary" onclick="prospectsView('table')">Таблица</button> <button class="btn btn-secondary" onclick="prospectsView('board')">Доска</button></div><div><button class="btn btn-secondary" onclick="prospectsDue('today')">На сегодня</button> <button class="btn btn-secondary" onclick="prospectsDue('overdue')">Просрочено</button> <button class="btn btn-secondary" onclick="prospectsDue('missing')">Без следующего действия</button></div></div>
+            <div class="prospect-toolbar prospect-view-toolbar"><div class="prospect-view-switch" role="group" aria-label="Вид базы"><button class="btn btn-secondary" data-prospect-view="table" onclick="prospectsView('table')">Таблица</button><button class="btn btn-secondary" data-prospect-view="board" onclick="prospectsView('board')">Доска</button><button class="btn btn-secondary" data-prospect-view="calls" onclick="prospectsView('calls')">Журнал звонков</button></div><div class="prospect-due-actions"><button class="btn btn-secondary" onclick="prospectsDue('today')">На сегодня</button><button class="btn btn-secondary" onclick="prospectsDue('overdue')">Просрочено</button><button class="btn btn-secondary" onclick="prospectsDue('missing')">Без следующего действия</button></div></div>
             <div class="prospect-kpis" id="prospects-kpis"></div>
             <div class="prospect-import" id="prospects-import-panel" hidden>
               <b>Добавить производства из Excel</b><p>Поддерживаются лист «База CRM» с заголовками в первой строке и наш файл с листами «Обзвон 40» / «Анализ 40». Сначала проверим файл и покажем количество новых записей. Уже добавленные карточки сохранятся вместе с заметками и этапами работы.</p>
@@ -2133,7 +2133,7 @@ setTimeout(function () {
               <div class="prospect-import-result" id="prospects-import-result" role="status"></div>
             </div>
             <div class="prospect-filters" id="prospects-filters">
-              <label>Поиск<input data-filter="q" placeholder="Название, ИНН, телефон или почта" oninput="prospectsSearch()"></label>
+              <label class="prospect-search-field">Поиск<input data-filter="q" placeholder="Название, ИНН, телефон или почта" oninput="prospectsSearch()"></label>
               <label>Регион<select data-filter="region" data-empty="Все регионы" onchange="prospectsFilter()"><option value="">Все регионы</option></select></label>
               <label>Ответственный<select data-filter="owner" data-empty="Все сотрудники" onchange="prospectsFilter()"><option value="">Все сотрудники</option></select></label>
               <label>Этап<select data-filter="stage" data-empty="Все этапы" onchange="prospectsFilter()"><option value="">Все этапы</option></select></label>
@@ -2143,8 +2143,14 @@ setTimeout(function () {
               <label>Телефон<select data-filter="has_phone" onchange="prospectsFilter()"><option value="">Любое состояние</option><option value="yes">Есть телефон</option><option value="no">Нет телефона</option></select></label>
               <label>Следующий контакт<select data-filter="due" onchange="prospectsFilter()"><option value="">Все даты</option><option value="yes">Сегодня и просроченные</option><option value="today">Сегодня</option><option value="overdue">Просрочено</option><option value="missing">Без следующего действия</option></select></label>
               </div></details>
+            <div class="prospect-call-filters" aria-label="Фильтры журнала звонков">
+              <label>Кто звонил<select data-filter="call_actor" data-empty="Все, кто звонил" onchange="prospectsFilter()"><option value="">Все, кто звонил</option></select></label>
+              <label>Результат<select data-filter="call_result" onchange="prospectsFilter()"><option value="">Любой результат</option><option value="reached">Дозвонился</option><option value="no_answer">Не дозвонился</option><option value="callback">Перезвонить</option></select></label>
+              <label>С даты<input type="date" data-filter="call_from" onchange="prospectsFilter()"></label>
+              <label>По дату<input type="date" data-filter="call_to" onchange="prospectsFilter()"></label>
             </div>
-            <div class="prospect-toolbar"><span id="prospects-count">Загружаем базу…</span><button class="btn btn-secondary" onclick="prospectsReset()">Сбросить фильтры</button></div>
+            </div>
+            <div class="prospect-toolbar prospect-results-bar"><strong id="prospects-count">Загружаем базу…</strong><button class="btn btn-secondary" onclick="prospectsReset()">Сбросить фильтры</button></div>
             <div class="campaign-toolbar" id="campaigns-selection-toolbar" hidden>
               <span id="campaigns-selected">Выбрано: 0</span>
               <button class="btn btn-secondary" onclick="campaignsSelectFiltered()">Выбрать по фильтру</button>

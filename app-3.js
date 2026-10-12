@@ -6918,7 +6918,7 @@ setInterval(function () { try { refreshMailUnread(); } catch (e) {} }, 120000);
 // схлопываем пустоту, выкидываем линейки из чёрточек и невидимые пробелы.
 function _mailPrettyText(body) {
   let s = String(body || '')
-    .replace(/\r\n?/g, '\n')
+    .replace(/\n?/g, '\n')
     .replace(/[ ​‌‍﻿]/g, ' ');
   s = s.split('\n')
     .map(function (line) {
@@ -18843,6 +18843,9 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {version:'v2.46.257',date:'12.10.2026',title:'Удобный журнал звонков',features:['Отдельные фильтры журнала: сотрудник, результат и период рядом с поиском.','В журнале скрыты действия базы предприятий; показатели ясно разделяют общий итог и текущую страницу.','Улучшены отступы, типографика и читаемость строк журнала.']},
+  {version:'v2.46.256',date:'12.10.2026',title:'База предприятий: фильтр и журнал звонков',features:['В дополнительных фильтрах: кто звонил, результат, период.','Режим «Журнал звонков» — список звонков по сотруднику и периоду, клик открывает карточку предприятия.']},
+  {version:'v2.46.255',date:'12.10.2026',title:'Счета на оплату на телефоне',features:['На телефоне список счетов — карточками: поставщик и сумма, назначение, дата, тип, заказ и статус; ничего не обрезается справа.','Если поставщик не распознан, пишем «Поставщик не указан», а не имя сотрудника, который прислал счёт; «Внёс» — отдельной строкой.']},
   {version:'v2.46.254',date:'08.10.2026',title:'Звонок с ПК на рабочий телефон + vCard',features:['С ПК: «📱 На рабочий телефон» в карточке/таблице — пуш на Android «Позвонить: предприятие, номер», тап → набор, по возврату — «Как прошёл звонок?».','На телефоне: Аккаунт → «Сделать этот телефон рабочим для звонков» (нужны уведомления + PWA на домашнем экране).','«Сохранить в телефон» — vCard (.vcf) с контактами предприятия. Если пуш недоступен — QR с tel: на ПК.']},
   {version:'v2.46.253',date:'08.10.2026',title:'Мобильная база предприятий и нижняя панель разделов',features:['Нижняя панель на телефоне: Главная / Продажи / Задачи / Почта / Ещё. В «Ещё» — все разделы, поиск, создание, уведомления, аккаунт, камера/QR/чаты.','База предприятий на телефоне: список сразу, сегменты и чипы, фильтры в шторке, карточки с большой зелёной «Позвонить».','Карточка на весь экран: вкладки Контакты/Звонок/Работа/История, липкое «Сохранить». После звонка — шторка «Как прошёл звонок?» с «Сохранить и следующее».','Шапка на телефоне упрощена: камера, QR, ТВ и чаты перенесены в «Ещё»; поиск и колокольчик остаются сверху.']},
   {version:'v2.46.252',date:'08.10.2026',title:'База предприятий: удобная навигация по карточкам',features:['Карточка открывается панелью поверх таблицы: таблица не сжимается, прокрутка и фильтры сохраняются. Закрыть — ×, «← К базе», Esc или клик по затемнению.','В шапке карточки: название, регион, этап, «12 из 40», стрелки ←/→ к предыдущему и следующему предприятию в текущей выборке (клавиши ←/→ или J/K), большая кнопка «Позвонить» и основной телефон.','Порядок для обзвона: контакты и вопросы для звонка сверху, затем результат звонка, работа с карточкой и история. Быстрые переходы: Контакты / Звонок / Работа / История.','После записи звонка — кнопка «Следующее →» (или автопереход). Несохранённые правки не теряются при записи звонка, а при уходе из карточки CRM предупреждает.','Ссылка на карточку: …/#prospects/<id> — можно переслать, кнопка «Назад» закрывает карточку.']},
@@ -29436,6 +29439,35 @@ async function loadPayList() {
   }
 }
 
+// v2.46.255: поставщик не подменяется автором. Когда распознавание счёта из
+// мессенджера не нашло продавца, бэкенд берёт имя отправителя (from_name) и
+// заводит «поставщика» с именем сотрудника — показываем «Поставщик не указан».
+function _payListNorm(s) {
+  return String(s || '').replace(/\s*·\s*(MAX|Telegram|TG)\s*$/i, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+function _payListSupplierLabel(row) {
+  const name = String((row && row.supplier_name) || '').trim();
+  const n = _payListNorm(name);
+  if (!n || n === 'счёт на оплату' || n === 'счет на оплату' || n === 'поставщик') return '';
+  const a = _payListNorm(row && row.author_name);
+  if (a) {
+    const aw = a.split(' '), nw = n.split(' ');
+    // «Дмитрий Подкорытов» vs «Подкорытов Д.» / «Дмитрий Подкорытов»
+    const sameSet = aw.length && nw.length && nw.every(w => aw.some(x => x === w || (x.replace('.', '') && w.startsWith(x.replace('.', '')))));
+    if (n === a || sameSet) return '';
+  }
+  return name;
+}
+
+function _payListSupplierHtml(row) {
+  const label = _payListSupplierLabel(row);
+  return label ? escapeHtml(label) : '<span class="pay-list-nosup">Поставщик не указан</span>';
+}
+
+function _payListIsMobile() {
+  return !!(window.matchMedia && window.matchMedia('(max-width: 600px)').matches);
+}
+
 function renderPayList() {
   const box = document.getElementById('pay-list-body');
   if (!box) return;
@@ -29445,37 +29477,48 @@ function renderPayList() {
     return;
   }
   const canPay = canMarkPayListPaid();
-  let html = '<table class="pay-list-table"><thead><tr>' +
+  let html = '<table class="pay-list-table" translate="no"><thead><tr>' +
     '<th>Дата</th><th>Тип</th><th>Поставщик</th><th>Назначение платежа</th>' +
     '<th>Сумма</th><th>Кто внёс</th><th>Статус</th><th></th></tr></thead><tbody>';
+  let cards = '<div class="pay-list-cards" translate="no">';
   list.forEach(row => {
     const advance = row.kind === 'advance';
     const tag = advance
       ? '<span class="pay-list-tag advance">Аванс</span>'
       : '<span class="pay-list-tag invoice">Счёт</span>';
-    const orderLine = advance
-      ? '<span class="pay-list-order">без заказа</span>'
-      : '<span class="pay-list-order">' + escapeHtml(row.order_label || ('ORD-' + row.order_id)) + '</span>';
+    const orderText = advance ? 'без заказа' : (row.order_label || ('ORD-' + row.order_id));
+    const orderLine = '<span class="pay-list-order">' + escapeHtml(orderText) + '</span>';
     const paid = row.status === 'paid';
     const status = '<span class="pay-list-status"><span class="pay-list-dot ' + (paid ? 'paid' : 'to_pay') + '"></span>' +
       (paid ? 'Оплачен' : 'На оплату') + '</span>';
     const payBtn = (!paid && canPay)
-      ? '<button class="btn btn-primary btn-small" style="margin-right:6px;" onclick="payListMarkPaid(\'' + row.kind + '\',' + row.id + ', this)">Оплатил</button>'
+      ? '<button class="btn btn-primary btn-small" style="margin-right:6px;" onclick="event.stopPropagation();payListMarkPaid(\'' + row.kind + '\',' + row.id + ', this)">Оплатил</button>'
       : '';
+    const open = 'openPayListRow(\'' + row.kind + '\',' + row.id + ')';
     html += '<tr>' +
       '<td>' + escapeHtml(_payListDate(row.date)) + '</td>' +
       '<td>' + tag + '</td>' +
-      '<td>' + escapeHtml(row.supplier_name || '—') + orderLine + '</td>' +
+      '<td>' + _payListSupplierHtml(row) + orderLine + '</td>' +
       '<td>' + escapeHtml(row.purpose || '—') + '</td>' +
       '<td style="white-space:nowrap;font-weight:700;">' + _payListMoney(row.amount) + '</td>' +
       '<td>' + escapeHtml(row.author_name || '—') + '</td>' +
       '<td>' + status + '</td>' +
       '<td style="white-space:nowrap;">' + payBtn +
-        '<button class="btn btn-secondary btn-small" onclick="openPayListRow(\'' + row.kind + '\',' + row.id + ')">Открыть</button></td>' +
+        '<button class="btn btn-secondary btn-small" onclick="' + open + '">Открыть</button></td>' +
     '</tr>';
+    cards += '<div class="pay-card" role="button" tabindex="0" onclick="' + open + '" onkeydown="if(event.key===\'Enter\'){' + open + '}">' +
+      '<div class="pay-card-top"><span class="pay-card-sup">' + _payListSupplierHtml(row) + '</span>' +
+        '<span class="pay-card-sum">' + _payListMoney(row.amount) + '</span></div>' +
+      '<div class="pay-card-purpose">' + escapeHtml(row.purpose || '—') + '</div>' +
+      '<div class="pay-card-meta"><span>' + escapeHtml(_payListDate(row.date)) + '</span>' + tag +
+        '<span class="pay-card-ord">' + escapeHtml(orderText) + '</span>' + status + '</div>' +
+      (row.author_name ? '<div class="pay-card-author">Внёс: ' + escapeHtml(row.author_name) + '</div>' : '') +
+      (payBtn ? '<div class="pay-card-actions">' + payBtn + '</div>' : '') +
+    '</div>';
   });
   html += '</tbody></table>';
-  box.innerHTML = html;
+  cards += '</div>';
+  box.innerHTML = html + cards;
 }
 
 function openPayListRow(kind, id) {

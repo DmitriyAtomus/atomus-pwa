@@ -212,12 +212,94 @@ function prospectsReset() {
   prospectsFilter();
 }
 
-async function loadProspects() {
-  const root = document.getElementById('prospects-list'); if (!root) return;
-  const seq = ++_prospects.request;
+function prospectsFillCallers(result) {
+  const el = document.querySelector('#prospects-filters [data-filter="call_actor"]');
+  if (!el) return;
+  const value = el.value;
+  const callers = ((result.facets || {}).callers) || [];
+  const dict = {};
+  callers.forEach(function (c) { if (c && c.actor != null) dict[String(c.actor)] = c.name || ('Сотрудник #' + c.actor); });
+  el.innerHTML = prospectsOptions(dict, value, el.dataset.empty || 'Все, кто звонил');
+}
+function prospectsSyncViewButtons() {
+  const screen = document.querySelector('[data-screen="sales-prospects"]');
+  if (screen) screen.dataset.prospectView = _prospects.view;
+  document.querySelectorAll('[data-prospect-view]').forEach(function (b) {
+    b.className = 'btn ' + (b.dataset.prospectView === _prospects.view ? 'btn-primary' : 'btn-secondary');
+    b.setAttribute('aria-pressed', String(b.dataset.prospectView === _prospects.view));
+  });
+}
+function prospectsCallParams() {
   const params = new URLSearchParams({ page: _prospects.page });
   if (_prospects.direction) params.set('direction', _prospects.direction);
-  document.querySelectorAll('#prospects-filters [data-filter]').forEach(function (el) { if (el.value) params.set(el.dataset.filter, el.value); });
+  document.querySelectorAll('#prospects-filters [data-filter]').forEach(function (el) {
+    if (!el.value) return;
+    // due/stage/owner filters apply to enterprise list; journal uses call_* + q + direction
+    if (_prospects.view === 'calls' && ['due', 'stage', 'owner', 'segment', 'has_email', 'has_phone', 'region'].indexOf(el.dataset.filter) >= 0) return;
+    if (_prospects.view !== 'calls' && el.dataset.filter.indexOf('call_') === 0) return;
+    params.set(el.dataset.filter, el.value);
+  });
+  return params;
+}
+function prospectsFormatCallWhen(raw) {
+  const when = new Date(String(raw || '').replace(' ', 'T') + (String(raw || '').endsWith('Z') ? '' : 'Z'));
+  if (isNaN(when)) return raw || '—';
+  return when.toLocaleString('ru-RU', { timeZone: 'Asia/Yekaterinburg', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function prospectsRenderCallsJournal(result) {
+  const root = document.getElementById('prospects-list'); if (!root) return;
+  prospectsFillCallers(result);
+  document.getElementById('prospects-kpis').innerHTML = [
+    [result.total, 'Всего звонков'],
+    [result.rows.filter(function (r) { return r.result === 'reached'; }).length, 'Дозвонились · на странице'],
+    [result.rows.filter(function (r) { return r.result === 'no_answer'; }).length, 'Не дозвонились · на странице'],
+    [result.rows.filter(function (r) { return r.result === 'callback'; }).length, 'Перезвонить · на странице']
+  ].map(function (v) {
+    return '<div class="prospect-kpi"><b>' + prospectsEscape(Number(v[0]).toLocaleString('ru-RU')) + '</b><span>' + v[1] + '</span></div>';
+  }).join('');
+  const first = result.rows.length ? ((Number(result.page || 1) - 1) * 50 + 1) : 0;
+  const last = first ? first + result.rows.length - 1 : 0;
+  document.getElementById('prospects-count').textContent = 'Показано ' + first + '–' + last + ' из ' + Number(result.total || 0).toLocaleString('ru-RU') + ' звонков';
+  if (!result.rows.length) {
+    root.innerHTML = '<div class="empty-block">По этим условиям звонков нет. Измените фильтры или период.</div>';
+    return;
+  }
+  if (prospectsIsMobile()) {
+    root.innerHTML = '<div class="pm-call-journal">' + result.rows.map(function (r) {
+      const id = prospectsEscape(r.prospect_id);
+      const resLabel = PROSPECT_CALL_RESULTS[r.result] || r.result || '—';
+      const icon = PROSPECT_CALL_ICONS[r.result] || 'ti-phone';
+      return '<article class="pm-card prospect-call-journal-card" onclick="prospectsOpen(\'' + id + '\')">' +
+        '<div class="pm-card-top"><strong>' + prospectsEscape(r.name) + '</strong>' +
+        '<span class="prospect-call-result-pill prospect-call-' + prospectsEscape(r.result || '') + '"><i class="ti ' + icon + '"></i> ' + prospectsEscape(resLabel) + '</span></div>' +
+        '<p class="pm-card-meta">' + prospectsEscape(prospectsFormatCallWhen(r.created_at)) + ' · ' + prospectsEscape(r.actor_name || ('Сотрудник #' + r.actor)) + '</p>' +
+        '<p class="pm-card-meta">' + prospectsEscape([r.city || r.region, PROSPECT_DIRECTIONS[r.direction] || r.direction].filter(Boolean).join(' · ')) + '</p>' +
+        (r.note ? '<p class="prospect-meta">' + prospectsEscape(r.note) + '</p>' : '') +
+        '</article>';
+    }).join('') + '</div>';
+    return;
+  }
+  root.innerHTML = '<div class="prospect-table-wrap"><table class="prospect-table prospect-calls-table"><thead><tr>' +
+    '<th>Когда</th><th>Кто звонил</th><th>Предприятие</th><th>Результат</th><th>Комментарий</th></tr></thead><tbody>' +
+    result.rows.map(function (r) {
+      const id = prospectsEscape(r.prospect_id);
+      const resLabel = PROSPECT_CALL_RESULTS[r.result] || r.result || '—';
+      const icon = PROSPECT_CALL_ICONS[r.result] || 'ti-phone';
+      return '<tr class="prospect-row" data-prospect-id="' + id + '" onclick="prospectsOpen(\'' + id + '\')" title="Открыть карточку">' +
+        '<td class="prospect-call-when">' + prospectsEscape(prospectsFormatCallWhen(r.created_at)) + '</td>' +
+        '<td>' + prospectsEscape(r.actor_name || ('Сотрудник #' + r.actor)) + '</td>' +
+        '<td class="prospect-col-name"><button class="prospect-name" onclick="event.stopPropagation();prospectsOpen(\'' + id + '\')">' + prospectsEscape(r.name) + '</button>' +
+        '<div class="prospect-meta">' + prospectsEscape([r.city || r.region, PROSPECT_DIRECTIONS[r.direction] || r.direction].filter(Boolean).join(' · ')) + '</div></td>' +
+        '<td><span class="prospect-call-result-pill prospect-call-' + prospectsEscape(r.result || '') + '"><i class="ti ' + icon + '"></i> ' + prospectsEscape(resLabel) + '</span></td>' +
+        '<td class="prospect-call-note">' + (r.note ? prospectsEscape(r.note) : '<span class="prospect-meta">Без комментария</span>') + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+async function loadProspects() {
+  const root = document.getElementById('prospects-list'); if (!root) return;
+  prospectsSyncViewButtons();
+  if (_prospects.view === 'calls') return loadProspectCalls();
+  const seq = ++_prospects.request;
+  const params = prospectsCallParams();
   root.setAttribute('aria-busy', 'true');
   const importButton = document.getElementById('prospects-import-button');
   if (importButton) importButton.hidden = !canManageSales();
@@ -240,10 +322,12 @@ async function loadProspects() {
     }).join('');
     ['segment', 'region', 'owner', 'stage'].forEach(function (key) {
       const el = document.querySelector('#prospects-filters [data-filter="' + key + '"]');
+      if (!el) return;
       const value = el.value;
-      const dict = key === 'stage' ? result.stages : Object.fromEntries(result.facets[key].map(function (v) { return [v, v]; }));
+      const dict = key === 'stage' ? result.stages : Object.fromEntries((result.facets[key] || []).map(function (v) { return [v, v]; }));
       el.innerHTML = prospectsOptions(dict, value, el.dataset.empty);
     });
+    prospectsFillCallers(result);
     document.getElementById('prospects-count').textContent = 'Найдено: ' + result.total.toLocaleString('ru-RU');
     if (_prospects.view === 'board') prospectsRenderBoard(result);
     else if (prospectsIsMobile()) root.innerHTML = result.rows.length ? prospectsMobileListHtml(result) : '<div class="empty-block">По этим условиям производств нет. Измените фильтры.</div>';
@@ -723,7 +807,35 @@ function prospectsDirection(value) {
   if (typeof campaignsClearSelection === 'function') campaignsClearSelection();
   loadProspects();
 }
-function prospectsView(view) { _prospects.view = view; loadProspects(); }
+async function loadProspectCalls() {
+  const root = document.getElementById('prospects-list'); if (!root) return;
+  const seq = ++_prospects.request;
+  const params = prospectsCallParams();
+  root.setAttribute('aria-busy', 'true');
+  const importButton = document.getElementById('prospects-import-button');
+  if (importButton) importButton.hidden = true;
+  const newButton = document.getElementById('prospects-new-button'); if (newButton) newButton.hidden = true;
+  const campaignToolbar = document.getElementById('campaigns-selection-toolbar');
+  if (campaignToolbar) campaignToolbar.hidden = true;
+  try {
+    const result = await apiGet('/api/sales/prospects/calls?' + params.toString());
+    if (seq !== _prospects.request) return;
+    _prospects.dict = Object.assign(_prospects.dict || {}, result);
+    _prospects.page = result.page; _prospects.rows = result.rows;
+    _prospects.total = result.total; _prospects.pages = result.pages;
+    prospectsRenderCallsJournal(result);
+    if (typeof prospectsMobileChrome === 'function') prospectsMobileChrome(result);
+    document.getElementById('prospects-pagination').innerHTML = '<button class="btn btn-secondary" onclick="prospectsPage(-1)"' + (result.page <= 1 ? ' disabled' : '') + '>← Назад</button><span>' + result.page + ' / ' + result.pages + '</span><button class="btn btn-secondary" onclick="prospectsPage(1)"' + (result.page >= result.pages ? ' disabled' : '') + '>Далее →</button>';
+  } catch (e) {
+    if (seq === _prospects.request) root.innerHTML = '<div class="empty-block">' + prospectsEscape(e.message || 'Не удалось загрузить журнал звонков') + '<br><button class="btn btn-secondary" onclick="loadProspects()">Повторить</button></div>';
+  } finally { if (seq === _prospects.request) root.removeAttribute('aria-busy'); }
+}
+function prospectsView(view) {
+  _prospects.view = view || 'table';
+  _prospects.page = 1;
+  prospectsSyncViewButtons();
+  loadProspects();
+}
 function prospectsDue(value) { document.querySelector('[data-filter="due"]').value=value; prospectsFilter(); }
 function prospectsRenderBoard(result) {
   const stages = ['new','checking','contact','needs','brief','offer','negotiation','pilot','won','partner','later','closed'];
@@ -828,7 +940,8 @@ function prospectsMobileActiveFiltersCount() {
   let n = 0;
   document.querySelectorAll('#prospects-filters [data-filter]').forEach(function (el) {
     if (!el.value) return;
-    if (el.dataset.filter === 'due' && !el.value) return;
+    if (_prospects.view === 'calls' && ['due','stage','owner','segment','has_email','has_phone','region'].indexOf(el.dataset.filter) >= 0) return;
+    if (_prospects.view !== 'calls' && el.dataset.filter.indexOf('call_') === 0) return;
     n += 1;
   });
   return n;
@@ -860,11 +973,15 @@ function prospectsMobileChrome(result) {
       [['chillers','Чиллеры'],['cheese','Сыроварни'],['dairy','Молочные'],['','Все']].map(function (d) {
         return '<button type="button" class="pm-seg-btn' + (_prospects.direction === d[0] ? ' active' : '') + '" onclick="prospectsDirection(\'' + d[0] + '\')">' + d[1] + '</button>';
       }).join('') + '</div>' +
-    '<div class="pm-chips">' +
+    '<div class="pm-seg pm-view-seg">' +
+      [['table','Список'],['calls','Журнал звонков']].map(function (d) {
+        return '<button type="button" class="pm-seg-btn' + (_prospects.view === d[0] ? ' active' : '') + '" onclick="prospectsView(\'' + d[0] + '\')">' + d[1] + '</button>';
+      }).join('') + '</div>' +
+    (_prospects.view === 'calls' ? '' : '<div class="pm-chips">' +
       '<button type="button" class="pm-chip' + (due === 'today' ? ' active' : '') + '" onclick="prospectsDue(\'' + (due === 'today' ? '' : 'today') + '\')">На сегодня' + (s.due ? ' <span class="n">' + Number(s.due) + '</span>' : '') + '</button>' +
       '<button type="button" class="pm-chip danger' + (due === 'overdue' ? ' active' : '') + '" onclick="prospectsDue(\'' + (due === 'overdue' ? '' : 'overdue') + '\')">Просрочено</button>' +
       '<button type="button" class="pm-chip' + (due === 'missing' ? ' active' : '') + '" onclick="prospectsDue(\'' + (due === 'missing' ? '' : 'missing') + '\')">Без шага</button>' +
-    '</div>' +
+    '</div>') +
     '<button type="button" class="pm-filters-btn" onclick="prospectsFiltersOpen()"><i class="ti ti-adjustments-horizontal"></i> Фильтры' +
       (fc ? ' <span class="badge">' + fc + '</span>' : '') + '</button>';
 }
@@ -887,7 +1004,7 @@ function prospectsFiltersOpen() {
   if (body && src) {
     // clone visible fields: q, region, owner, stage
     body.innerHTML = '';
-    ['q','region','owner','stage'].forEach(function (key) {
+    (_prospects.view === 'calls' ? ['q','call_actor','call_result','call_from','call_to'] : ['q','region','owner','stage']).forEach(function (key) {
       const el = src.querySelector('[data-filter="' + key + '"]');
       if (!el) return;
       const label = el.closest('label');
@@ -916,7 +1033,7 @@ function prospectsFiltersClose() {
 }
 function prospectsFiltersApply() {
   const src = document.getElementById('prospects-filters');
-  ['q','region','owner','stage'].forEach(function (key) {
+  ['q','region','owner','stage','call_actor','call_result','call_from','call_to'].forEach(function (key) {
     const from = document.getElementById('pm-filter-' + key);
     const to = src && src.querySelector('[data-filter="' + key + '"]');
     if (from && to) to.value = from.value;
@@ -1263,7 +1380,7 @@ function prospectsSaveVcard(id) {
   if (r.address) lines.push('ADR;TYPE=WORK:;;' + esc(r.address) + ';;;;');
   lines.push('NOTE:' + esc(note));
   lines.push('END:VCARD');
-  const blob = new Blob([lines.join('\r\n')], { type: 'text/vcard;charset=utf-8' });
+  const blob = new Blob([lines.join('\n')], { type: 'text/vcard;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = (org || fn || 'contact').replace(/[\\/:*?"<>|]+/g, '_') + '.vcf';
