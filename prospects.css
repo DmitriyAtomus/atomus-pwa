@@ -263,3 +263,33 @@ html.prospect-drawer-open{overflow:hidden}html.prospect-drawer-open .toast{z-ind
 .prospect-col-name .prospect-spoken-badge,.pm-card .prospect-spoken-badge,.pdw-head .prospect-spoken-badge{display:flex;width:max-content}
 .prospect-board-card .prospect-spoken-badge{align-self:flex-start;text-align:left}
 .prospect-call-buttons .prospect-call-reached{background:#dff5e8;border-color:#9bd3b4;color:#14643c;font-weight:700}
+
+/* v2.46.261: the enterprise database uses the available desktop workspace. */
+@media (min-width: 760px) {
+  body:has(.desktop-layout [data-screen="sales-prospects"].active) { background:#f4f6fa; }
+  .app.desktop-layout:has([data-screen="sales-prospects"].active) { max-width:none; box-shadow:none; }
+  .app.desktop-layout [data-screen="sales-prospects"].active { display:block; min-height:calc(100vh - 64px); background:#f4f6fa; }
+  .app.desktop-layout [data-screen="sales-prospects"] > .page-header {
+    padding:22px 32px; gap:20px; background:#fff; border-bottom:1px solid #dfe6ef;
+  }
+  .app.desktop-layout [data-screen="sales-prospects"] .page-header h1 { font-size:24px; font-weight:700; color:#1d344f; }
+  .app.desktop-layout [data-screen="sales-prospects"] .page-subtitle { font-size:13px; color:#63748b; }
+  .app.desktop-layout [data-screen="sales-prospects"] > .content-inner.prospects {
+    width:100%; max-width:none; margin:0; padding:24px 32px 40px;
+  }
+  .app.desktop-layout [data-screen="sales-prospects"] .prospect-kpis { gap:14px; margin:14px 0 20px; }
+  .app.desktop-layout [data-screen="sales-prospects"] .prospect-kpi { min-height:84px; padding:17px 20px; }
+  .app.desktop-layout [data-screen="sales-prospects"] .prospect-filters { gap:14px; margin-bottom:18px; }
+  .app.desktop-layout [data-screen="sales-prospects"] .prospect-filters input,
+  .app.desktop-layout [data-screen="sales-prospects"] .prospect-filters select { min-height:42px; font-size:14px; }
+  .app.desktop-layout [data-screen="sales-prospects"] .prospect-table-wrap { max-height:calc(100vh - 390px); min-height:340px; }
+  .app.desktop-layout [data-screen="sales-prospects"] .prospect-table { font-size:14px; }
+  .app.desktop-layout [data-screen="sales-prospects"] .prospect-table th { font-size:11px; }
+  .app.desktop-layout [data-screen="sales-prospects"] .prospect-name { font-size:14px; }
+  .app.desktop-layout [data-screen="sales-prospects"] .prospect-meta { font-size:12px; }
+  .app.desktop-layout [data-screen="sales-prospects"] .prospect-actions .icon-btn { width:40px; height:40px; }
+}
+@media (min-width:760px) and (max-width:1100px) {
+  .app.desktop-layout [data-screen="sales-prospects"] > .page-header { padding:18px 22px; }
+  .app.desktop-layout [data-screen="sales-prospects"] > .content-inner.prospects { padding:20px 22px 32px; }
+}

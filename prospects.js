@@ -298,7 +298,7 @@ function prospectsFillCallers(result) {
 function prospectsSyncViewButtons() {
   const screen = document.querySelector('[data-screen="sales-prospects"]');
   if (screen) screen.dataset.prospectView = _prospects.view;
-  document.querySelectorAll('[data-prospect-view]').forEach(function (b) {
+  document.querySelectorAll('.prospect-view-switch button[data-prospect-view]').forEach(function (b) {
     b.className = 'btn ' + (b.dataset.prospectView === _prospects.view ? 'btn-primary' : 'btn-secondary');
     b.setAttribute('aria-pressed', String(b.dataset.prospectView === _prospects.view));
   });
