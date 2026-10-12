@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.258";
+const APP_VERSION = "v2.46.259";
 const APP_VERSION_DATE = "12.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
