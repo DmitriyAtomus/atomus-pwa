@@ -306,6 +306,7 @@ function prospectsSyncViewButtons() {
 function prospectsCallParams() {
   const params = new URLSearchParams({ page: _prospects.page });
   if (_prospects.direction) params.set('direction', _prospects.direction);
+  if (_prospects.dataset) params.set('dataset', _prospects.dataset);
   document.querySelectorAll('#prospects-filters [data-filter]').forEach(function (el) {
     if (!el.value) return;
     // due/stage/owner filters apply to enterprise list; journal uses call_* + q + direction
@@ -344,7 +345,7 @@ function prospectsRenderCallsJournal(result) {
       const resLabel = PROSPECT_CALL_RESULTS[r.result] || r.result || '—';
       const icon = PROSPECT_CALL_ICONS[r.result] || 'ti-phone';
       return '<article class="pm-card prospect-call-journal-card" onclick="prospectsOpen(\'' + id + '\')">' +
-        '<div class="pm-card-top"><strong>' + prospectsEscape(r.name) + '</strong>' +
+        '<div class="pm-card-top"><strong>' + prospectsEscape(r.name) + prospectsBaseTag(r) + '</strong>' +
         '<span class="prospect-call-result-pill prospect-call-' + prospectsEscape(r.result || '') + '"><i class="ti ' + icon + '"></i> ' + prospectsEscape(resLabel) + '</span></div>' +
         '<p class="pm-card-meta">' + prospectsEscape(prospectsFormatCallWhen(r.created_at)) + ' · ' + prospectsEscape(r.actor_name || ('Сотрудник #' + r.actor)) + '</p>' +
         '<p class="pm-card-meta">' + prospectsEscape([r.city || r.region, PROSPECT_DIRECTIONS[r.direction] || r.direction].filter(Boolean).join(' · ')) + '</p>' +
@@ -364,7 +365,7 @@ function prospectsRenderCallsJournal(result) {
       return '<tr class="prospect-row" data-prospect-id="' + id + '" onclick="prospectsOpen(\'' + id + '\')" title="Открыть карточку">' +
         '<td class="prospect-call-when">' + prospectsEscape(prospectsFormatCallWhen(r.created_at)) + '</td>' +
         '<td>' + prospectsEscape(r.actor_name || ('Сотрудник #' + r.actor)) + '</td>' +
-        '<td class="prospect-col-name"><button class="prospect-name" onclick="event.stopPropagation();prospectsOpen(\'' + id + '\')">' + prospectsEscape(r.name) + '</button>' +
+        '<td class="prospect-col-name"><button class="prospect-name" onclick="event.stopPropagation();prospectsOpen(\'' + id + '\')">' + prospectsEscape(r.name) + '</button>' + prospectsBaseTag(r) +
         '<div class="prospect-meta">' + prospectsEscape([r.city || r.region, PROSPECT_DIRECTIONS[r.direction] || r.direction].filter(Boolean).join(' · ')) + '</div></td>' +
         '<td><span class="prospect-call-result-pill prospect-call-' + prospectsEscape(r.result || '') + '"><i class="ti ' + icon + '"></i> ' + prospectsEscape(resLabel) + '</span></td>' +
         '<td class="prospect-call-followup-cell">' + (r.called_person ? '<div><b>С кем:</b> ' + prospectsEscape(r.called_person) + '</div>' : '') +
@@ -405,6 +406,8 @@ async function loadProspects() {
       const dict = key === 'stage' ? result.stages : Object.fromEntries((result.facets[key] || []).map(function (v) { return [v, v]; }));
       el.innerHTML = prospectsOptions(dict, value, el.dataset.empty);
     });
+    _prospects.datasets = result.datasets || [];
+    prospectsRenderBases();
     prospectsFillCallers(result);
     document.getElementById('prospects-count').textContent = 'Найдено: ' + result.total.toLocaleString('ru-RU');
     if (_prospects.view === 'board') prospectsRenderBoard(result);
@@ -413,7 +416,7 @@ async function loadProspects() {
     else root.innerHTML = '<div class="prospect-table-wrap"><table class="prospect-table"><thead><tr>' + (canManageSales() ? '<th>Выбор</th>' : '') + '<th>Производство</th><th>Контакты</th><th>Этап / ответственный</th><th>Следующий шаг</th>' + (canManageSales() ? '<th>Действия</th>' : '') + '</tr></thead><tbody>' +
       result.rows.map(function (r) {
         const site = prospectsUrl(r.site); const id = prospectsEscape(r.id);
-        return '<tr class="prospect-row" data-prospect-id="' + id + '" onclick="prospectsRowClick(event,\'' + id + '\')" title="Открыть карточку">' + (canManageSales() ? '<td><input class="campaign-select" type="checkbox" data-campaign-select="' + id + '" aria-label="Выбрать ' + prospectsEscape(r.name) + '"' + (typeof _campaigns !== 'undefined' && _campaigns.selected.has(r.id) ? ' checked' : '') + ' onchange="campaignsToggle(\'' + id + '\',this.checked)"></td>' : '') + '<td class="prospect-col-name"><button class="prospect-name" onclick="prospectsOpen(\'' + id + '\')">' + prospectsEscape(r.name) + '</button>' +
+        return '<tr class="prospect-row" data-prospect-id="' + id + '" onclick="prospectsRowClick(event,\'' + id + '\')" title="Открыть карточку">' + (canManageSales() ? '<td><input class="campaign-select" type="checkbox" data-campaign-select="' + id + '" aria-label="Выбрать ' + prospectsEscape(r.name) + '"' + (typeof _campaigns !== 'undefined' && _campaigns.selected.has(r.id) ? ' checked' : '') + ' onchange="campaignsToggle(\'' + id + '\',this.checked)"></td>' : '') + '<td class="prospect-col-name"><button class="prospect-name" onclick="prospectsOpen(\'' + id + '\')">' + prospectsEscape(r.name) + '</button>' + prospectsBaseTag(r) +
           '<div class="prospect-meta">' + prospectsEscape(r.segment) + (r.priority ? ' · Приоритет ' + prospectsEscape(r.priority) : '') + '</div><div class="prospect-meta">' + prospectsEscape([r.region, r.city].filter(Boolean).join(' · ')) + '</div>' + prospectsSpokenBadge(r) + '</td>' +
           '<td><div>' + (r.email ? prospectsEscape(r.email) : '<span class="prospect-missing">Почта не найдена</span>') + '</div><div>' +
           (r.phone ? prospectsPhoneLinks(r.phone, 2) : '<span class="prospect-missing">Телефон не найден</span>') + '</div>' +
@@ -882,7 +885,7 @@ async function prospectsImport(preview) {
 }
 
 function prospectsDirection(value) {
-  _prospects.direction = value; _prospects.page = 1; prospectsClose();
+  _prospects.direction = value; _prospects.dataset = ''; _prospects.page = 1; prospectsClose();
   document.querySelectorAll('[data-direction]').forEach(function(b){b.className='btn '+(b.dataset.direction===value?'btn-primary':'btn-secondary');});
   if (typeof campaignsClearSelection === 'function') campaignsClearSelection();
   loadProspects();
@@ -1002,7 +1005,7 @@ function prospectsMobileListHtml(result) {
     const dir = PROSPECT_DIRECTIONS[r.direction] || r.segment || '';
     return '<article class="pm-card" data-prospect-id="' + id + '" onclick="prospectsOpen(\'' + id + '\')">' +
       '<div class="pm-card-main">' +
-        '<h3 class="pm-card-name">' + prospectsEscape(r.name) + '</h3>' + prospectsSpokenBadge(r) +
+        '<h3 class="pm-card-name">' + prospectsEscape(r.name) + prospectsBaseTag(r) + '</h3>' + prospectsSpokenBadge(r) +
         '<p class="pm-card-meta">' + prospectsEscape([r.city || r.region, dir].filter(Boolean).join(' · ')) + '</p>' +
         '<div class="pm-card-row"><span class="prospect-stage">' + prospectsEscape(stages[r.stage] || r.stage || '—') + '</span></div>' +
         '<p class="pm-card-next">' + prospectsEscape(r.next_action || 'Уточнить профиль') +
@@ -1052,7 +1055,7 @@ function prospectsMobileChrome(result) {
     '<div class="pm-seg" id="pm-seg">' +
       [['chillers','Чиллеры'],['cheese','Сыроварни'],['dairy','Молочные'],['','Все']].map(function (d) {
         return '<button type="button" class="pm-seg-btn' + (_prospects.direction === d[0] ? ' active' : '') + '" onclick="prospectsDirection(\'' + d[0] + '\')">' + d[1] + '</button>';
-      }).join('') + '</div>' +
+      }).join('') + '</div>' + prospectsBasesMobileHtml() +
     '<div class="pm-seg pm-view-seg">' +
       [['table','Список'],['calls','Журнал звонков']].map(function (d) {
         return '<button type="button" class="pm-seg-btn' + (_prospects.view === d[0] ? ' active' : '') + '" onclick="prospectsView(\'' + d[0] + '\')">' + d[1] + '</button>';
@@ -1559,3 +1562,53 @@ if (typeof window !== 'undefined') {
     if (on) prospectsLoadCallDevice();
   };
 })();
+
+/* v2.46.264: базы предприятий (dataset) — выбор базы и метка в строке. */
+var PROSPECT_BASE_COLORS = { 'chillers-oem-2026-10-13': 'oem', 'chillers-2026-10-07': 'end' };
+function prospectsBaseInfo(code) {
+  return (_prospects.datasets || []).find(function (b) { return b.code === code; }) || null;
+}
+function prospectsBaseTag(r) {
+  if (!r || !r.dataset || _prospects.dataset) return '';
+  const all = _prospects.datasets || [];
+  if (all.length < 2) return '';
+  const b = prospectsBaseInfo(r.dataset);
+  const text = b ? (b.short + (b.date ? ' · ' + b.date.slice(0, 5) : '')) : r.dataset;
+  return ' <span class="prospect-base-tag prospect-base-' + (PROSPECT_BASE_COLORS[r.dataset] || 'other') + '" title="' + prospectsEscape(b ? b.label : r.dataset) + '">' + prospectsEscape(text) + '</span>';
+}
+function prospectsDataset(code) {
+  _prospects.dataset = code || ''; _prospects.page = 1;
+  if (typeof prospectsClose === 'function') prospectsClose();
+  if (typeof campaignsClearSelection === 'function') campaignsClearSelection();
+  loadProspects();
+}
+function prospectsBasesList() {
+  const all = _prospects.datasets || [];
+  if (all.length < 2 && !_prospects.dataset) return [];
+  const total = all.reduce(function (n, b) { return n + Number(b.total || 0); }, 0);
+  return [{ code: '', label: 'Все базы направления', short: 'Все', date: '', total: total }].concat(all);
+}
+function prospectsRenderBases() {
+  const dirs = document.getElementById('prospect-directions');
+  let box = document.getElementById('prospect-bases');
+  if (!box && dirs && dirs.parentNode) {
+    box = document.createElement('div'); box.id = 'prospect-bases'; box.className = 'prospect-bases';
+    dirs.parentNode.insertBefore(box, dirs.nextSibling);
+  }
+  if (!box) return;
+  const list = prospectsBasesList();
+  box.hidden = !list.length || _prospects.view === 'calls' && !list.length;
+  box.innerHTML = list.map(function (b) {
+    const on = (_prospects.dataset || '') === b.code;
+    const sub = b.code ? [b.date ? 'от ' + b.date : '', Number(b.total).toLocaleString('ru-RU') + ' предпр.', b.working ? b.working + ' в работе' : 'новые'].filter(Boolean).join(' · ') : Number(b.total).toLocaleString('ru-RU') + ' предприятий';
+    return '<button type="button" class="prospect-base-card' + (on ? ' active' : '') + '" aria-pressed="' + on + '" onclick="prospectsDataset(\'' + prospectsEscape(b.code) + '\')"><b>' + prospectsEscape(b.label) + '</b><span>' + prospectsEscape(sub) + '</span></button>';
+  }).join('');
+}
+function prospectsBasesMobileHtml() {
+  const list = prospectsBasesList();
+  if (!list.length) return '';
+  return '<div class="pm-chips pm-bases">' + list.map(function (b) {
+    const on = (_prospects.dataset || '') === b.code;
+    return '<button type="button" class="pm-chip' + (on ? ' active' : '') + '" onclick="prospectsDataset(\'' + prospectsEscape(b.code) + '\')">' + prospectsEscape(b.short + (b.code && b.date ? ' ' + b.date.slice(0, 5) : '')) + ' <span class="n">' + Number(b.total || 0) + '</span></button>';
+  }).join('') + '</div>';
+}
