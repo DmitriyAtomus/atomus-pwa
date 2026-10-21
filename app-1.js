@@ -200,8 +200,8 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.268";
-const APP_VERSION_DATE = "12.10.2026";
+const APP_VERSION = "v2.46.270";
+const APP_VERSION_DATE = "21.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -20443,3 +20443,25 @@ function _midOnAuxClick(e) {
 document.addEventListener('mousedown', _midOnMouseDown, true);
 document.addEventListener('auxclick', _midOnAuxClick, true);
 // ==== КОНЕЦ: СРЕДНИЙ КЛИК ====
+
+// v2.46.268: старый адрес atomus-pwa.vercel.app ходит к серверу через Vercel и часто
+// получает таймауты. Мягко подсказываем перейти на crm.atomuscrm.ru (без авто-редиректа:
+// там нужен повторный вход).
+(function () {
+  try {
+    if (!/vercel\.app$/.test(location.hostname)) return;
+    function show() {
+      if (document.getElementById('old-host-banner')) return;
+      var b = document.createElement('div');
+      b.id = 'old-host-banner';
+      b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#fff3cd;color:#5c4400;border-bottom:1px solid #e0c36a;padding:8px 12px;font:14px/1.35 system-ui,sans-serif;text-align:center;';
+      var target = 'https://crm.atomuscrm.ru' + location.pathname + location.search;
+      b.innerHTML = 'Это старый адрес CRM, через него бывают зависания. Откройте <a href="' + target + '" style="font-weight:700;color:#7a4b00">crm.atomuscrm.ru</a> и сохраните его в закладки. ' +
+        '<button type="button" style="margin-left:8px;border:0;background:transparent;font-size:16px;cursor:pointer" aria-label="Скрыть">×</button>';
+      b.querySelector('button').onclick = function () { b.remove(); try { sessionStorage.setItem('old_host_banner_hidden', '1'); } catch (_) {} };
+      try { if (sessionStorage.getItem('old_host_banner_hidden')) return; } catch (_) {}
+      document.body.appendChild(b);
+    }
+    if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
+  } catch (_) {}
+})();
