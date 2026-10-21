@@ -119,12 +119,21 @@
     );
   }
 
+  var _apiFailSeen = {};
   function captureApiFailure(info) {
     info = info || {};
     var status = info.status;
     var path = scrub(String(info.path || ''));
     var method = info.method || 'GET';
     var kind = info.kind || 'http_error';
+    // v2.46.268: агрегация повторов — один и тот же сбой (метод+путь без query+вид)
+    // уходит в Sentry не чаще раза в 5 минут с вкладки; пропущенные считаем.
+    var _dk = method + ' ' + path.split('?')[0].replace(/\/\d+/g, '/:id') + ' ' + String(status || kind);
+    var _now = Date.now();
+    var _d = _apiFailSeen[_dk];
+    if (_d && _now - _d.t < 300000) { _d.n++; return; }
+    var _skipped = _d ? _d.n : 0;
+    _apiFailSeen[_dk] = { t: _now, n: 0 };
     var msg;
     if (kind === 'network') msg = 'API network error: ' + method + ' ' + path;
     else if (kind === 'timeout') msg = 'API timeout: ' + method + ' ' + path;
@@ -134,9 +143,10 @@
         scope.setTag('section', _section);
         scope.setTag('api_status', String(status || kind));
         scope.setTag('api_method', method);
-        scope.setFingerprint(['api-fail', method, path.replace(/\/\d+/g, '/:id'), String(status || kind)]);
+        scope.setFingerprint(['api-fail', method, path.split('?')[0].replace(/\/\d+/g, '/:id'), String(status || kind)]);
         scope.setLevel(status >= 500 || kind === 'network' || kind === 'timeout' ? 'error' : 'warning');
-        scope.setContext('api', { method: method, path: path, status: status || null, kind: kind });
+        scope.setContext('api', { method: method, path: path, status: status || null, kind: kind, repeats_suppressed: _skipped, hidden: !!document.hidden, online: navigator.onLine });
+        scope.setTag('host', location.hostname);
         window.Sentry.captureMessage(msg);
       });
     } catch (e) {}

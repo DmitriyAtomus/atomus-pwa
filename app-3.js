@@ -6786,8 +6786,20 @@ function _mailConvRow(c) {
 // без кнопки «Обновить». Каждые 3 сек: тред (если открыт) + список диалогов.
 let _mailPollTimer = null;
 let _mailLastMsgKey = '';
+// v2.46.268: без лавины запросов. Тик не стартует, пока не закончился прошлый;
+// тред — раз в 3 с, список диалогов — раз в 15 с; при ошибках пауза растёт до 60 с;
+// если человек 3 мин не трогал страницу — опрос раз в 30 с.
+let _mailPollBusy = false;
+let _mailPollFails = 0;
+let _mailPollNextAt = 0;
+let _mailConvsAt = 0;
+let _mailUserActiveAt = Date.now();
+['mousemove', 'keydown', 'pointerdown', 'touchstart', 'wheel'].forEach(function (ev) {
+  try { window.addEventListener(ev, function () { _mailUserActiveAt = Date.now(); }, { passive: true }); } catch (_) {}
+});
 function _startMailPolling() {
   if (_mailPollTimer) return;
+  _mailPollFails = 0; _mailPollNextAt = 0;
   _mailPollTimer = setInterval(_mailPollTick, 3000);
 }
 function _stopMailPolling() {
@@ -6796,6 +6808,11 @@ function _stopMailPolling() {
 async function _mailPollTick() {
   if (state.currentScreen !== 'mail-messenger') { _stopMailPolling(); return; }
   if (document.hidden) return;  // вкладка в фоне — не дёргаем сервер
+  if (_mailPollBusy) return;
+  const now = Date.now();
+  if (now < _mailPollNextAt) return;
+  const idle = now - _mailUserActiveAt > 180000;
+  _mailPollBusy = true;
   const peer = state._mailPeer;
   try {
     if (peer) {
@@ -6813,12 +6830,23 @@ async function _mailPollTick() {
         if (inp2 && focused) inp2.focus();
       }
     }
-    // список диалогов — тихо, без «Загрузка…»
-    const c = await apiGet('/api/mail/conversations');
-    state._mailConvs = c.conversations || [];
-    _mailRenderList();
-    _mailApplyUnreadTotal((state._mailConvs || []).reduce((s2, x) => s2 + (x.unread || 0), 0));
-  } catch (e) { /* сеть мигнула — попробуем в следующий тик */ }
+    // список диалогов — тихо, без «Загрузка…», не чаще раза в 15 с
+    if (Date.now() - _mailConvsAt >= 15000) {
+      const c = await apiGet('/api/mail/conversations');
+      _mailConvsAt = Date.now();
+      state._mailConvs = c.conversations || [];
+      _mailRenderList();
+      _mailApplyUnreadTotal((state._mailConvs || []).reduce((s2, x) => s2 + (x.unread || 0), 0));
+    }
+    _mailPollFails = 0;
+    _mailPollNextAt = idle ? Date.now() + 30000 : 0;
+  } catch (e) {
+    // сеть мигнула — пауза растёт: 6, 12, 24, 48, 60 с
+    _mailPollFails++;
+    _mailPollNextAt = Date.now() + Math.min(60000, 3000 * Math.pow(2, _mailPollFails));
+  } finally {
+    _mailPollBusy = false;
+  }
 }
 
 // v2.45.807: мобильный режим — назад из треда к списку диалогов
@@ -7717,9 +7745,25 @@ async function calcOpen(id) {
       (!c.offer_id && _calcs.can_offer
         ? '<button class="pl-btn suc grow" onclick="calcToOffer(' + c.id + ')"><i class="ti ti-file-invoice"></i> → Создать КП</button>'
         : (c.offer_id ? '<button class="pl-btn suc grow" onclick="document.getElementById(\'calc-modal\').remove();state.currentOfferId=' + c.offer_id + ';selectSection(\'sales\');selectSidebarItem(\'sales-offer-detail\')"><i class="ti ti-external-link"></i> Открыть КП №' + c.offer_id + '</button>' : '')) +
+      (_calcs.can_delete ? '<button class="pl-btn ghost2" style="color:#d33;" onclick="calcDelete(' + c.id + ')"><i class="ti ti-trash"></i> Удалить</button>' : '') +
     '</div></div>';
   document.body.appendChild(ovl);
   _calcComboDismiss(ovl);
+}
+// v2.46.269: удаление расчёта (только руководитель; мягкое — чат и КП остаются)
+async function calcDelete(id) {
+  if (!confirm('Удалить расчёт Р-' + id + ' насовсем?')) return;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch(API_BASE + '/api/sales/calcs/' + id, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+    let j = {}; try { j = await r.json(); } catch (e) {}
+    if (r.ok && j.ok) {
+      showToast('Расчёт Р-' + id + ' удалён', 'success');
+      document.getElementById('calc-modal')?.remove();
+      await loadSalesCalcs();
+    } else showToast(j.message || 'Не удалось удалить', 'error');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
 function calcSaveCo(id) {
   calcPatch(id, { contractor_id: _calcCoPicked ? _calcCoPicked.id : null });
@@ -18843,7 +18887,9 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
-  {version:'v2.46.268',date:'21.10.2026',title:'Презентации: замена файла',features:['В карандаше у презентации появилась кнопка «Заменить файл»: новая версия встаёт на место старой, ссылка для клиентов остаётся прежней.','Старые версии хранятся в архиве (до 5), их можно вернуть кнопкой «Вернуть».']},
+  {version:'v2.46.270',date:'21.10.2026',title:'Презентации: замена файла',features:['В карандаше у презентации появилась кнопка «Заменить файл»: новая версия встаёт на место старой, ссылка для клиентов остаётся прежней.','Старые версии хранятся в архиве (до 5), их можно вернуть кнопкой «Вернуть».']},
+  {version:'v2.46.269',date:'15.10.2026',title:'Удаление расчётов',features:['В окне расчёта появилась кнопка «Удалить» — только для руководителя. Чат расчёта и КП сохраняются.']},
+  {version:'v2.46.268',date:'14.10.2026',title:'Почта: меньше лишних запросов',features:['Переписка обновляется без лавины запросов: список диалогов раз в 15 с, при плохой связи паузы растут, без активности — опрос реже.','На старом адресе atomus-pwa.vercel.app показывается подсказка перейти на crm.atomuscrm.ru.']},
   {version:'v2.46.267',date:'13.10.2026',title:'База предприятий: чем занимается компания',features:['Под названием предприятия серой строкой показано, что оно производит и зачем ему чиллер.','У 58 компаний базы «Чиллеры OEM» заполнены телефоны и почта с официальных сайтов.']},
   {version:'v2.46.266',date:'13.10.2026',title:'Текст писем снова читается нормально',features:['Исправлена ошибка, из-за которой текст письма в «Почта/MAX → Переписка» показывался по одной букве в строке']},
   {version:'v2.46.265',date:'13.10.2026',title:'Письма в переписке нормальной ширины',features:['Письма в «Почта/MAX → Переписка» больше не сжимаются в узкий столбик по одной букве — пузырь занимает нормальную ширину на компьютере и телефоне']},
