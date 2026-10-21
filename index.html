@@ -3810,7 +3810,7 @@ setTimeout(function () {
       <div id="pres-f-file-row">
         <label class="pres-file">
           <input type="file" id="pres-f-file" accept=".pdf,.pptx,.ppt,.key,.docx,.jpg,.jpeg,.png,.webp,.gif,.heic" onchange="presFileChosen(this)">
-          <b><i class="ti ti-file-upload"></i> Выбрать файл</b>
+          <b id="pres-f-file-label"><i class="ti ti-file-upload"></i> Выбрать файл</b>
           <span id="pres-f-file-info"></span>
         </label>
       </div>
@@ -3822,6 +3822,7 @@ setTimeout(function () {
         <div class="pres-bar"><i></i></div>
         <div class="pres-progress-row"><span class="pres-progress-text"></span><button type="button" onclick="presCancelUpload()">Отменить</button></div>
       </div>
+      <div id="pres-f-versions" class="pres-versions"></div>
       <div id="pres-f-error"></div>
     </div>
     <div class="pres-footer">
