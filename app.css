@@ -27274,3 +27274,13 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
   .pay-card-actions { margin-top: 10px; }
   .pay-card-actions .btn { margin: 0 !important; }
 }
+/* v2.46.263: кнопка «Скачать» у вложений чата */
+.cchat-file-dl{display:inline-flex;align-items:center;gap:4px;margin:4px 0 6px;font-size:12px;color:var(--accent,#2563eb);text-decoration:none;opacity:.9}
+.cchat-file-dl:hover{opacity:1;text-decoration:underline}
+
+/* v2.46.265: пузыри почты/MAX не сжимаются в столбик «по букве» */
+.mm-bub { flex: none; box-sizing: border-box; min-width: min(320px, 85%); max-width: min(85%, 820px); overflow-wrap: break-word; word-break: normal; }
+.mm-body, .mm-folded { overflow-wrap: break-word; word-break: normal; }
+.mm-body table, .mm-body img, .mm-folded table, .mm-folded img { max-width: 100%; height: auto; }
+.mm-body pre { white-space: pre-wrap; max-width: 100%; }
+@media (max-width: 700px) { .mm-bub { min-width: min(240px, 92%); max-width: 92%; } }

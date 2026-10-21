@@ -18780,6 +18780,12 @@ function _renderTeamChatMessages(r) {
   if (wasAtBottom) box.scrollTop = box.scrollHeight;
 }
 
+// v2.46.263: явная кнопка «Скачать» — свежий запрос с ?dl=1 (attachment + имя файла)
+function _teamFileDlBtn(url, f) {
+  const dl = url + (url.indexOf('?') === -1 ? '?' : '&') + 'dl=1';
+  const name = f.original_name || '';
+  return '<a href="' + dl + '" download="' + escapeHtml(name) + '" class="cchat-file-dl" title="Скачать"><i class="ti ti-download"></i> Скачать</a>';
+}
 function _renderTeamMessageFiles(files) {
   if (!files || !files.length) return '';
   let html = '<div class="cchat-msg-files">';
@@ -18791,9 +18797,9 @@ function _renderTeamMessageFiles(files) {
     const url = (typeof API_DIRECT_FALLBACK !== 'undefined' ? API_DIRECT_FALLBACK : API_BASE)
       + (f.url || '/api/team-chats/messages/files/' + f.id);
     if (f.kind === 'photo') {
-      html += '<a href="' + url + '" target="_blank" class="cchat-file-img"><img src="' + url + '" alt="" loading="lazy" decoding="async"></a>';
+      html += '<a href="' + url + '" target="_blank" class="cchat-file-img"><img src="' + url + '" alt="" loading="lazy" decoding="async"></a>' + _teamFileDlBtn(url, f);
     } else if (f.kind === 'video') {
-      html += '<video controls preload="metadata" class="cchat-file-video"><source src="' + url + '" type="' + escapeHtml(f.content_type || '') + '"></video>';
+      html += '<video controls preload="metadata" class="cchat-file-video"><source src="' + url + '" type="' + escapeHtml(f.content_type || '') + '"></video>' + _teamFileDlBtn(url, f);
     } else {
       const name = f.original_name || ('Файл #' + f.id);
       const sz = f.file_size ? Math.round(f.file_size / 1024) + ' КБ' : '';

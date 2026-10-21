@@ -417,7 +417,7 @@ async function loadProspects() {
       result.rows.map(function (r) {
         const site = prospectsUrl(r.site); const id = prospectsEscape(r.id);
         return '<tr class="prospect-row" data-prospect-id="' + id + '" onclick="prospectsRowClick(event,\'' + id + '\')" title="Открыть карточку">' + (canManageSales() ? '<td><input class="campaign-select" type="checkbox" data-campaign-select="' + id + '" aria-label="Выбрать ' + prospectsEscape(r.name) + '"' + (typeof _campaigns !== 'undefined' && _campaigns.selected.has(r.id) ? ' checked' : '') + ' onchange="campaignsToggle(\'' + id + '\',this.checked)"></td>' : '') + '<td class="prospect-col-name"><button class="prospect-name" onclick="prospectsOpen(\'' + id + '\')">' + prospectsEscape(r.name) + '</button>' + prospectsBaseTag(r) +
-          '<div class="prospect-meta">' + prospectsEscape(r.segment) + (r.priority ? ' · Приоритет ' + prospectsEscape(r.priority) : '') + '</div><div class="prospect-meta">' + prospectsEscape([r.region, r.city].filter(Boolean).join(' · ')) + '</div>' + prospectsSpokenBadge(r) + '</td>' +
+          prospectsActivity(r) + '<div class="prospect-meta">' + prospectsEscape(r.segment) + (r.priority ? ' · Приоритет ' + prospectsEscape(r.priority) : '') + '</div><div class="prospect-meta">' + prospectsEscape([r.region, r.city].filter(Boolean).join(' · ')) + '</div>' + prospectsSpokenBadge(r) + '</td>' +
           '<td><div>' + (r.email ? prospectsEscape(r.email) : '<span class="prospect-missing">Почта не найдена</span>') + '</div><div>' +
           (r.phone ? prospectsPhoneLinks(r.phone, 2) : '<span class="prospect-missing">Телефон не найден</span>') + '</div>' +
           (site ? '<a href="' + prospectsEscape(site) + '" target="_blank" rel="noopener noreferrer">Сайт ↗</a>' : '') +
@@ -1005,7 +1005,7 @@ function prospectsMobileListHtml(result) {
     const dir = PROSPECT_DIRECTIONS[r.direction] || r.segment || '';
     return '<article class="pm-card" data-prospect-id="' + id + '" onclick="prospectsOpen(\'' + id + '\')">' +
       '<div class="pm-card-main">' +
-        '<h3 class="pm-card-name">' + prospectsEscape(r.name) + prospectsBaseTag(r) + '</h3>' + prospectsSpokenBadge(r) +
+        '<h3 class="pm-card-name">' + prospectsEscape(r.name) + prospectsBaseTag(r) + '</h3>' + prospectsActivity(r) + prospectsSpokenBadge(r) +
         '<p class="pm-card-meta">' + prospectsEscape([r.city || r.region, dir].filter(Boolean).join(' · ')) + '</p>' +
         '<div class="pm-card-row"><span class="prospect-stage">' + prospectsEscape(stages[r.stage] || r.stage || '—') + '</span></div>' +
         '<p class="pm-card-next">' + prospectsEscape(r.next_action || 'Уточнить профиль') +
@@ -1611,4 +1611,9 @@ function prospectsBasesMobileHtml() {
     const on = (_prospects.dataset || '') === b.code;
     return '<button type="button" class="pm-chip' + (on ? ' active' : '') + '" onclick="prospectsDataset(\'' + prospectsEscape(b.code) + '\')">' + prospectsEscape(b.short + (b.code && b.date ? ' ' + b.date.slice(0, 5) : '')) + ' <span class="n">' + Number(b.total || 0) + '</span></button>';
   }).join('') + '</div>';
+}
+
+/* v2.46.267: short activity line (what they do + why a chiller) under the name. */
+function prospectsActivity(r) {
+  return r && r.activity ? '<div class="prospect-activity">' + prospectsEscape(r.activity) + '</div>' : '';
 }

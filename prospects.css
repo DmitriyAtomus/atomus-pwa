@@ -307,3 +307,5 @@ html.prospect-drawer-open{overflow:hidden}html.prospect-drawer-open .toast{z-ind
 .prospect-base-end{background:#E3F4EA;color:#1D7A44}
 .prospect-base-other{background:#EEF2F6;color:#4A5B6E}
 .pm-bases{margin-top:8px}
+
+.prospect-activity{font-size:12px;line-height:1.35;color:var(--text-muted,#6B7C8F);margin:2px 0 3px;max-width:520px}

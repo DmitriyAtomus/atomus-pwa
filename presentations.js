@@ -107,7 +107,8 @@ function _presFiltered() {
 }
 
 function _presCard(it) {
-  const meta = [it.ext ? it.ext.toUpperCase() : '', _presMB(it.size), it.uploader_name, _presDate(it.created_at)].filter(Boolean);
+  const meta = [it.ext ? it.ext.toUpperCase() : '', _presMB(it.size), it.file_updated_by || it.uploader_name,
+    it.file_updated_at ? 'обновлено ' + _presDate(it.file_updated_at) : _presDate(it.created_at)].filter(Boolean);
   let acts = '';
   if (it.inline) acts += '<button class="btn btn-primary btn-sm" onclick="presOpen(' + it.id + ', false)"><i class="ti ti-external-link"></i> Открыть</button>';
   acts += '<button class="btn btn-secondary btn-sm" onclick="presOpen(' + it.id + ', true)"><i class="ti ti-download"></i> Скачать</button>';
@@ -254,6 +255,8 @@ function presOpenUpload() {
   if (!_pres.canUpload) { showToast('Загружать презентации может отдел продаж и директор', 'error'); return; }
   _pres.editId = null; _pres.file = null;
   document.getElementById('pres-m-title').textContent = 'Новая презентация';
+  document.getElementById('pres-f-file-label').innerHTML = '<i class="ti ti-file-upload"></i> Выбрать файл';
+  document.getElementById('pres-f-versions').innerHTML = '';
   document.getElementById('pres-f-title').value = '';
   document.getElementById('pres-f-cat').value = _pres.cat || '';
   document.getElementById('pres-f-desc').value = '';
@@ -274,7 +277,14 @@ function presEdit(id) {
   document.getElementById('pres-f-title').value = it.title;
   document.getElementById('pres-f-cat').value = it.category || '';
   document.getElementById('pres-f-desc').value = it.description || '';
-  document.getElementById('pres-f-file-row').hidden = true;
+  // v2.46.268: «Заменить файл» — новая версия встаёт на место старой (та же ссылка)
+  document.getElementById('pres-f-file-row').hidden = false;
+  document.getElementById('pres-f-file').value = '';
+  document.getElementById('pres-f-file-label').innerHTML = '<i class="ti ti-replace"></i> Заменить файл';
+  document.getElementById('pres-f-file-info').textContent = 'Сейчас: ' + (it.file_name || '') + ' · ' + _presMB(it.size) +
+    '. Новый файл встанет на это место, ссылка для клиентов не изменится.';
+  document.getElementById('pres-f-versions').innerHTML = '';
+  _presLoadVersions(id);
   document.getElementById('pres-f-submit').innerHTML = '<i class="ti ti-check"></i> Сохранить';
   document.getElementById('pres-f-submit').disabled = false;
   _presCatOptions(); _presFormErr(''); _presProgress(null);
@@ -308,6 +318,7 @@ function presFileChosen(input) {
   _pres.file = f;
   info.textContent = f.name + ' · ' + _presMB(f.size);
   const t = document.getElementById('pres-f-title');
+  if (_pres.editId) { info.textContent = 'Новый файл: ' + f.name + ' · ' + _presMB(f.size) + ' — заменит текущий после «Сохранить»'; return; }
   if (!t.value.trim()) t.value = f.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ');
 }
 
@@ -362,7 +373,7 @@ async function presSubmit() {
   _presFormErr('');
   if (!title) { _presFormErr('Укажите название'); return; }
 
-  if (_pres.editId) {
+  if (_pres.editId && !_pres.file) {
     btn.disabled = true;
     try {
       await apiPatch('/api/presentations/' + _pres.editId, { title: title, category: category, description: description });
@@ -377,6 +388,12 @@ async function presSubmit() {
 
   const f = _pres.file;
   if (!f) { _presFormErr('Выберите файл презентации'); return; }
+  const replaceId = _pres.editId || null;
+  if (replaceId) {
+    const cur = _presById(replaceId);
+    if (!confirm('Заменить файл «' + ((cur && cur.file_name) || '') + '» на «' + f.name + '»?\n' +
+      'Ссылки, отправленные клиентам, будут открывать новую версию. Старый файл останется в архиве — его можно вернуть.')) return;
+  }
   btn.disabled = true;
   btn.innerHTML = '<i class="ti ti-loader"></i> Загружаем…';
   const token = localStorage.getItem(TOKEN_KEY);
@@ -414,9 +431,9 @@ async function presSubmit() {
     }
     _presProgress(100, 'Сохраняем…');
     const item = await _presJson('POST', '/api/presentations/uploads/' + encodeURIComponent(up.id) + '/complete',
-      { title: title, category: category, description: description });
+      { title: title, category: category, description: description, replace_id: replaceId });
     _pres.uploading = null;
-    showToast('Презентация «' + item.title + '» загружена', 'success');
+    showToast(replaceId ? 'Файл заменён — ссылка прежняя' : 'Презентация «' + item.title + '» загружена', 'success');
     _presModal(false);
     loadPresentations();
   } catch (e) {
@@ -428,6 +445,38 @@ async function presSubmit() {
     else _presFormErr('Не удалось загрузить: ' + (e.message || e));
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<i class="ti ti-upload"></i> Загрузить';
+    btn.innerHTML = replaceId ? '<i class="ti ti-check"></i> Сохранить' : '<i class="ti ti-upload"></i> Загрузить';
+  }
+}
+
+// ---------- v2.46.268: прошлые версии файла и откат ----------
+async function _presLoadVersions(id) {
+  const box = document.getElementById('pres-f-versions');
+  if (!box) return;
+  try {
+    const d = await apiGet('/api/presentations/' + id + '/versions?_=' + Date.now());
+    if (_pres.editId !== id) return;
+    const vs = d.items || [];
+    if (!vs.length) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="pres-ver-title">Прошлые версии <span>' + vs.length + '</span></div>' +
+      vs.map(function (v) {
+        return '<div class="pres-ver"><div class="pres-ver-main"><b>' + _presE(v.file_name) + '</b><span>' +
+          _presE([_presMB(v.size), v.author_name, _presDate(v.file_date)].filter(Boolean).join(' · ')) +
+          ' · заменён ' + _presE(_presDate(v.replaced_at)) + '</span></div>' +
+          (d.can_edit ? '<button type="button" class="btn btn-secondary btn-sm" onclick="presRestore(' + id + ',' + v.id + ')"><i class="ti ti-arrow-back-up"></i> Вернуть</button>' : '') +
+          '</div>';
+      }).join('');
+  } catch (_) { box.innerHTML = ''; }
+}
+
+async function presRestore(id, vid) {
+  if (!confirm('Вернуть эту версию? Текущий файл уйдёт в архив, ссылка для клиентов не изменится.')) return;
+  try {
+    await _presJson('POST', '/api/presentations/' + id + '/versions/' + vid + '/restore');
+    showToast('Версия возвращена', 'success');
+    _presModal(false);
+    loadPresentations();
+  } catch (e) {
+    _presFormErr('Не удалось вернуть версию: ' + (e.message || e));
   }
 }

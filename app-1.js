@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.261";
+const APP_VERSION = "v2.46.268";
 const APP_VERSION_DATE = "12.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -1051,7 +1051,7 @@ function updateNotifBadge(n) {
   const badge = document.getElementById('notif25-badge');
   const moreBadge = document.getElementById('more25-badge');
   if (moreBadge) {
-    if (count > 0) { moreBadge.style.display = ''; moreBadge.textContent = count > 99 ? '99+' : String(count); }
+    if (n > 0) { moreBadge.style.display = ''; moreBadge.textContent = n > 99 ? '99+' : String(n); }
     else moreBadge.style.display = 'none';
   }
   if (!badge) return;
