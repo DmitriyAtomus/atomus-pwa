@@ -1051,7 +1051,7 @@ function updateNotifBadge(n) {
   const badge = document.getElementById('notif25-badge');
   const moreBadge = document.getElementById('more25-badge');
   if (moreBadge) {
-    if (count > 0) { moreBadge.style.display = ''; moreBadge.textContent = count > 99 ? '99+' : String(count); }
+    if (n > 0) { moreBadge.style.display = ''; moreBadge.textContent = n > 99 ? '99+' : String(n); }
     else moreBadge.style.display = 'none';
   }
   if (!badge) return;

@@ -59,6 +59,7 @@ html.prospect-drawer-open{overflow:hidden}html.prospect-drawer-open .toast{z-ind
   [data-screen="sales-prospects"].pm-mobile .prospect-toolbar,
   [data-screen="sales-prospects"].pm-mobile .campaign-toolbar,
   [data-screen="sales-prospects"].pm-mobile #prospect-directions,
+  [data-screen="sales-prospects"].pm-mobile #prospect-bases,
   [data-screen="sales-prospects"].pm-mobile .page-subtitle { display: none !important; }
 
   .pm-mobile-bar { padding: 8px 12px 4px; background: var(--bg,#F4F6FA); position: sticky; top: 0; z-index: 5; }
@@ -293,3 +294,18 @@ html.prospect-drawer-open{overflow:hidden}html.prospect-drawer-open .toast{z-ind
   .app.desktop-layout [data-screen="sales-prospects"] > .page-header { padding:18px 22px; }
   .app.desktop-layout [data-screen="sales-prospects"] > .content-inner.prospects { padding:20px 22px 32px; }
 }
+
+/* v2.46.264: базы предприятий */
+.prospect-bases{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 14px}
+.prospect-bases[hidden]{display:none}
+.prospect-base-card{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:200px;padding:10px 14px;border:1px solid var(--border,#D5DFEA);border-radius:12px;background:var(--surface,#fff);cursor:pointer;text-align:left;font:inherit;color:inherit}
+.prospect-base-card b{font-size:14px}
+.prospect-base-card span{font-size:12px;color:var(--text-muted,#6B7C8F)}
+.prospect-base-card.active{border:2px solid var(--primary,#1E6FD9);background:#EEF5FF;padding:9px 13px}
+.prospect-base-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:7px;font-size:11px;font-weight:600;vertical-align:middle;white-space:nowrap}
+.prospect-base-oem{background:#FFF1DC;color:#9A5B00}
+.prospect-base-end{background:#E3F4EA;color:#1D7A44}
+.prospect-base-other{background:#EEF2F6;color:#4A5B6E}
+.pm-bases{margin-top:8px}
+
+.prospect-activity{font-size:12px;line-height:1.35;color:var(--text-muted,#6B7C8F);margin:2px 0 3px;max-width:520px}
