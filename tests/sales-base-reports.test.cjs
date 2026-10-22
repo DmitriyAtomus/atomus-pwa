@@ -120,3 +120,44 @@ test('режим «Неделя» пересчитывает итоги по д�
   assert.match(html, /Итого за неделю 05–11\.10/);
   assert.match(html, /40<\/b> звонков/);
 });
+
+test('обзвон чиллеров подставляет журнал и сохраняет пять полей отчёта', async () => {
+  const { ctx, node, calls } = harness('chillers');
+  ctx._scrState.date = '2026-10-22';
+  ctx.__resp = url => url.includes('chiller-call-report') ? {
+    date: '2026-10-22', scope: 'own',
+    totals: { calls: 2, reached: 1, no_answer: 1, interested: 1, kp_sent: 0, callback: 1, refused: 0 },
+    my_totals: { calls: 2, reached: 1, no_answer: 1, interested: 1, kp_sent: 0, callback: 1, refused: 0 },
+    calls: [{ name: '<Завод>', time: '10:03', result: 'reached', outcome: 'callback', comment: 'Ждёт звонка' }],
+    my_calls: [{ name: '<Завод>', time: '10:03', result: 'reached', outcome: 'callback', comment: 'Ждёт звонка' }],
+  } : { can_edit: true, my_reports: {} };
+  await ctx.loadSalesReports();
+  assert.equal(calls.get[0], '/api/sales/chiller-call-report?date=2026-10-22');
+  const html = node('sales-reports-body').innerHTML;
+  assert.match(html, /id="scr-calls" value="2"/);
+  assert.match(html, /id="scr-connects" value="1"/);
+  assert.match(html, /Перезвонить: <b>1<\/b>/);
+  assert.match(html, /&lt;Завод&gt;/);
+  assert.doesNotMatch(html, /<Завод>/);
+  for (const [key, value] of Object.entries({ calls: 2, connects: 1, interested: 1, presentations: 0, refusals: 0 })) node('scr-' + key).value = String(value);
+  node('scr-comment').value = 'Перезвонить: 1';
+  await ctx.saveChillerCallReport();
+  assert.equal(calls.post[0][0], '/api/sales/base-reports');
+  assert.deepEqual(JSON.parse(JSON.stringify(calls.post[0][1])), {
+    date: '2026-10-22', calls: 2, connects: 1, interested: 1, presentations: 0, refusals: 0, comment: 'Перезвонить: 1',
+  });
+});
+
+test('старый API с 404 оставляет ручной ввод обзвона чиллеров', async () => {
+  const { ctx, node } = harness('chillers');
+  ctx._scrState.date = '2026-10-22';
+  ctx.__resp = url => {
+    if (url.includes('chiller-call-report')) { const error = new Error('HTTP 404'); error.status = 404; throw error; }
+    return { can_edit: true, my_reports: {} };
+  };
+  await ctx.loadSalesReports();
+  const html = node('sales-reports-body').innerHTML;
+  assert.match(html, /Автоподсчёт пока недоступен/);
+  assert.match(html, /id="scr-calls"/);
+  assert.match(html, /id="scr-save"/);
+});

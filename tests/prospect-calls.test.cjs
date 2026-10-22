@@ -21,6 +21,26 @@ function harness(manage = true) {
 }
 const listing = rows => ({ rows, total: rows.length, page: 1, pages: 1, stats: { total: rows.length }, facets: { segment: [], region: [], owner: [] }, stages: { new: 'Новый' }, consents: {} });
 
+test('чиллер: после дозвона итог и комментарий передаются отдельно от контакта', async () => {
+  const { ctx, node } = harness();
+  const posts = [];
+  ctx._prospects.rows = [{ id: 'CH-1', name: 'Чиллер', direction: 'chillers', revision: 1, phone: '83512223344' }];
+  ctx.apiPost = async (url, body) => { posts.push([url, body]); return { ok: true, status: 201, data: { ok: true } }; };
+  ctx.apiGet = async () => listing([{ id: 'CH-1', name: 'Чиллер', direction: 'chillers', revision: 2 }]);
+  assert.match(ctx.prospectsCallBox('CH-1', 'row'), /Итог разговора/);
+  assert.doesNotMatch(ctx.prospectsCallBox('CH-1', 'row'), /С кем говорили/);
+  node('prospect-call-note-row-CH-1').value = 'Нужна цена после расчёта';
+  node('prospect-chiller-choice-row-CH-1').value = 'callback';
+  node('prospect-chiller-date-row-CH-1').value = '2026-10-23';
+  node('prospect-chiller-time-row-CH-1').value = '11:00';
+  await ctx.prospectsCallSubmit('CH-1', 'row', 'reached');
+  assert.equal(posts[0][0], '/api/sales/prospects/CH-1/calls');
+  assert.deepEqual(JSON.parse(JSON.stringify(posts[0][1])), {
+    revision: 1, result: 'reached', outcome: 'callback', note: 'Нужна цена после расчёта',
+    phone: '+73512223344', next_date: '2026-10-23', next_time: '11:00',
+  });
+});
+
 test('view switch styles only its buttons, never the whole screen', () => {
   const { ctx } = harness();
   const screen = { className: 'screen active', dataset: {} };

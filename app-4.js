@@ -15992,6 +15992,7 @@ async function loadSalesReports() {
   const box = document.getElementById('sales-reports-body');
   if (!box) return;
   if (_srGetTab() === 'base') return loadSalesBaseReports();  // v2.46.248
+  if (_srGetTab() === 'chillers') return loadChillerCallReport();
   const month = _srCurMonth();
   box.innerHTML = '<div class="loading-block">Загружаем…</div>';
   try {
@@ -16355,18 +16356,18 @@ var _SBR_FIELDS = [
 ];
 
 function _srGetTab() {
-  try { return localStorage.getItem('srTab') === 'base' ? 'base' : 'general'; } catch (_) { return 'general'; }
+  try { const tab = localStorage.getItem('srTab'); return tab === 'base' || tab === 'chillers' ? tab : 'general'; } catch (_) { return 'general'; }
 }
 
 function _srSetTab(tab) {
-  try { localStorage.setItem('srTab', tab === 'base' ? 'base' : 'general'); } catch (_) {}
+  try { localStorage.setItem('srTab', tab === 'base' || tab === 'chillers' ? tab : 'general'); } catch (_) {}
   loadSalesReports();
 }
 
 function _srTabsHtml() {
   const tab = _srGetTab();
   const btn = (key, label) => '<button class="sr-tab' + (tab === key ? ' active' : '') + '" onclick="_srSetTab(\'' + key + '\')">' + label + '</button>';
-  return '<div class="sr-tabs" role="tablist">' + btn('general', 'Общий отчёт') + btn('base', 'По базе заводов') + '</div>';
+  return '<div class="sr-tabs" role="tablist">' + btn('general', 'Общий отчёт') + btn('base', 'По базе заводов') + btn('chillers', 'Обзвон чиллеров') + '</div>';
 }
 
 function _sbrCurMonth() { return _sbrState.month || _srTodayIso().slice(0, 7); }
@@ -16689,6 +16690,128 @@ async function deleteSalesBaseReport(id) {
     showToast('Удалено', 'success');
     loadSalesBaseReports();
   } catch (e) { showToast('Не удалось удалить: ' + (e.message || ''), 'error'); }
+}
+
+// ============ ОБЗВОН ЧИЛЛЕРОВ ============
+var _scrState = { date: null, seq: 0, report: null, saved: null, manual: false };
+var _SCR_FIELDS = [
+  { key: 'calls', source: 'calls', label: 'Звонков' },
+  { key: 'connects', source: 'reached', label: 'Дозвонов' },
+  { key: 'interested', source: 'interested', label: 'Интерес' },
+  { key: 'presentations', source: 'kp_sent', label: 'КП' },
+  { key: 'refusals', source: 'refused', label: 'Отказы' },
+];
+var _SCR_OUTCOMES = { interested: 'Интерес', kp_sent: 'Отправить КП', callback: 'Перезвонить', refused: 'Отказ' };
+
+function _scrComment(report) {
+  if (!report) return '';
+  const own = report.my_calls || [];
+  const parts = [];
+  if (report.my_totals && report.my_totals.callback) parts.push('Перезвонить: ' + report.my_totals.callback);
+  own.forEach(function (call) {
+    if (call.outcome || call.comment) parts.push(call.name + ' (' + call.time + '): ' +
+      (_SCR_OUTCOMES[call.outcome] || (call.result === 'reached' ? 'Дозвонился' : 'Не дозвонился')) +
+      (call.comment ? ' — ' + call.comment : ''));
+  });
+  return parts.join('\n').slice(0, 2000);
+}
+
+async function loadChillerCallReport() {
+  const box = document.getElementById('sales-reports-body');
+  if (!box) return;
+  const date = _scrState.date || _srTodayIso();
+  const seq = ++_scrState.seq;
+  box.innerHTML = _srTabsHtml() + '<div class="loading-block">Загружаем обзвон чиллеров…</div>';
+  const [live, base] = await Promise.allSettled([
+    apiGet('/api/sales/chiller-call-report?date=' + encodeURIComponent(date)),
+    apiGet('/api/sales/base-reports?month=' + encodeURIComponent(date.slice(0, 7)))
+  ]);
+  if (seq !== _scrState.seq || _srGetTab() !== 'chillers') return;
+  _scrState.date = date;
+  _scrState.report = live.status === 'fulfilled' ? live.value : null;
+  _scrState.manual = live.status === 'rejected' && live.reason && live.reason.status === 404;
+  _scrState.saved = base.status === 'fulfilled' ? ((base.value.my_reports || {})[date] || null) : null;
+  const canEdit = base.status === 'fulfilled' ? !!base.value.can_edit : canManageSales();
+  _scrRender(box, canEdit, live.status === 'rejected' ? live.reason : null);
+}
+
+function _scrRender(box, canEdit, error) {
+  const date = _scrState.date;
+  const report = _scrState.report;
+  const saved = _scrState.saved;
+  const today = _srTodayIso();
+  const source = saved || (report && report.my_totals) || {};
+  let html = _srTabsHtml() + '<section class="scr-report">' +
+    '<div class="scr-heading"><h2>Обзвон чиллеров</h2><label>Дата <input type="date" id="scr-date" value="' + escapeHtml(date) + '" max="' + today + '" onchange="_scrDateChanged(this.value)"></label></div>';
+  if (_scrState.manual) html += '<p class="scr-notice">Автоподсчёт пока недоступен: API ещё не обновлён. Заполните цифры вручную.</p>';
+  else if (error) html += '<p class="scr-notice">Не удалось загрузить журнал: ' + escapeHtml(apiErrorText(error)) + '. Можно заполнить отчёт вручную.</p>';
+  else if (report && report.scope === 'all') {
+    html += '<div class="scr-all"><b>Все сотрудники за день:</b> ' + report.totals.calls + ' звонков, ' + report.totals.reached + ' дозвонов' +
+      (report.employees || []).map(function (emp) { return '<div>' + escapeHtml(emp.name) + ': ' + emp.totals.calls + ' звонков, ' + emp.totals.reached + ' дозвонов</div>'; }).join('') + '</div>';
+  }
+  if (canEdit) {
+    html += '<div class="sr2-form scr-form"><h3>Мой отчёт за день</h3>' +
+      '<div class="scr-grid">' + _SCR_FIELDS.map(function (field) {
+        const value = saved ? saved[field.key] : source[field.source];
+        return '<label>' + field.label + '<input type="number" min="0" step="1" inputmode="numeric" id="scr-' + field.key + '" value="' + (Number(value) || 0) + '"></label>';
+      }).join('') + '</div>' +
+      '<div class="scr-callback">Перезвонить: <b>' + (report ? report.my_totals.callback : 0) + '</b> — попадёт в комментарий</div>' +
+      '<label class="scr-comment-label">Комментарий<textarea id="scr-comment" maxlength="2000" rows="4">' + escapeHtml(saved ? saved.comment : _scrComment(report)) + '</textarea></label>' +
+      '<div class="scr-actions">' + (report ? '<button type="button" class="btn btn-secondary" onclick="_scrAutofill()">Подставить из журнала</button>' : '') +
+      '<button type="button" class="btn btn-primary" id="scr-save" onclick="saveChillerCallReport()">' + (saved ? 'Обновить отчёт' : 'Сохранить отчёт') + '</button></div>' +
+      '<span id="scr-status" role="status"></span></div>';
+  }
+  if (report) {
+    html += '<h3>Звонки дня</h3>';
+    if (!report.calls.length) html += '<div class="empty-block">За этот день звонков по чиллерам нет.</div>';
+    else html += '<div class="scr-table-wrap"><table class="scr-table"><thead><tr><th>Время</th><th>Предприятие</th>' +
+      (report.scope === 'all' ? '<th>Сотрудник</th>' : '') + '<th>Итог</th><th>Комментарий</th></tr></thead><tbody>' +
+      report.calls.map(function (call) {
+        return '<tr><td>' + escapeHtml(call.time) + '</td><td>' + escapeHtml(call.name) + '</td>' +
+          (report.scope === 'all' ? '<td>' + escapeHtml(call.employee_name) + '</td>' : '') +
+          '<td>' + escapeHtml(_SCR_OUTCOMES[call.outcome] || (call.result === 'reached' ? 'Дозвонился' : call.result === 'no_answer' ? 'Не дозвонился' : call.result || '—')) + '</td>' +
+          '<td>' + escapeHtml(call.comment || '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  box.innerHTML = html + '</section>';
+}
+
+function _scrDateChanged(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return;
+  _scrState.date = value;
+  loadChillerCallReport();
+}
+
+function _scrAutofill() {
+  const report = _scrState.report;
+  if (!report) return;
+  _SCR_FIELDS.forEach(function (field) {
+    const input = document.getElementById('scr-' + field.key);
+    if (input) input.value = report.my_totals[field.source] || 0;
+  });
+  const comment = document.getElementById('scr-comment');
+  if (comment) comment.value = _scrComment(report);
+}
+
+async function saveChillerCallReport() {
+  const button = document.getElementById('scr-save');
+  const status = document.getElementById('scr-status');
+  const body = { date: _scrState.date, comment: ((document.getElementById('scr-comment') || {}).value || '').trim() };
+  _SCR_FIELDS.forEach(function (field) {
+    const value = parseInt((document.getElementById('scr-' + field.key) || {}).value, 10);
+    body[field.key] = isNaN(value) || value < 0 ? 0 : value;
+  });
+  if (button) button.disabled = true;
+  if (status) status.textContent = 'Сохраняем…';
+  try {
+    const response = await apiPost('/api/sales/base-reports', body);
+    if (!response.ok) throw new Error((response.data && response.data.message) || 'HTTP ' + response.status);
+    showToast('Отчёт по обзвону чиллеров сохранён', 'success');
+    await loadChillerCallReport();
+  } catch (error) {
+    if (status) status.textContent = error.message || 'Не удалось сохранить';
+    if (button) button.disabled = false;
+  }
 }
 
 // ============ INIT ============

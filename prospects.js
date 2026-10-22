@@ -38,6 +38,50 @@ function prospectsDate(value) {
 /* v2.46.251: телефоны РФ в любом формате → tel:+7XXXXXXXXXX; звонки и быстрые действия. */
 var PROSPECT_CALL_RESULTS = { reached: 'Звонок был', no_answer: 'Не дозвонился', callback: 'Перезвонить' };
 var PROSPECT_CALL_ICONS = { reached: 'ti-phone-check', no_answer: 'ti-phone-x', callback: 'ti-phone-call' };
+var PROSPECT_CALL_OUTCOMES = { interested: 'Интерес', kp_sent: 'Отправить КП', callback: 'Перезвонить', refused: 'Отказ' };
+function prospectsIsChiller(id) {
+  const row = (_prospects.current && _prospects.current.id === id ? _prospects.current : (_prospects.rows || []).find(function (r) { return r.id === id; }));
+  return !!row && row.direction === 'chillers';
+}
+function prospectsChillerOutcomeHtml(id, scope) {
+  const k = scope + '-' + id;
+  return '<div class="prospect-chiller-outcome" id="prospect-chiller-outcome-' + prospectsEscape(k) + '" hidden>' +
+    '<label>Итог разговора<select id="prospect-chiller-choice-' + prospectsEscape(k) + '" onchange="prospectsChillerOutcomeChanged(\'' + prospectsEscape(id) + '\',\'' + scope + '\')">' +
+    '<option value="">Выберите итог</option>' + Object.keys(PROSPECT_CALL_OUTCOMES).map(function (key) {
+      return '<option value="' + key + '">' + PROSPECT_CALL_OUTCOMES[key] + '</option>';
+    }).join('') + '</select></label>' +
+    '<div id="prospect-chiller-callback-' + prospectsEscape(k) + '" hidden>' +
+      '<label>Дата перезвона<input type="date" id="prospect-chiller-date-' + prospectsEscape(k) + '" value="' + prospectsTomorrow() + '"></label>' +
+      '<label>Время<input type="time" id="prospect-chiller-time-' + prospectsEscape(k) + '" value="10:00"></label></div>' +
+    '<div id="prospect-chiller-refused-' + prospectsEscape(k) + '" hidden>' +
+      '<label>Причина отказа<input id="prospect-chiller-reason-' + prospectsEscape(k) + '" maxlength="5000" placeholder="Укажите причину"></label></div>' +
+    (scope === 'sheet' ? '' : '<button type="button" class="btn btn-primary" onclick="prospectsCallSubmit(\'' + prospectsEscape(id) + '\',\'' + scope + '\',\'reached\')">Сохранить звонок</button>') +
+    '</div>';
+}
+function prospectsChillerOutcomeChanged(id, scope) {
+  const k = scope + '-' + id;
+  const choice = (document.getElementById('prospect-chiller-choice-' + k) || {}).value;
+  const callback = document.getElementById('prospect-chiller-callback-' + k);
+  const refused = document.getElementById('prospect-chiller-refused-' + k);
+  if (callback) callback.hidden = choice !== 'callback';
+  if (refused) refused.hidden = choice !== 'refused';
+}
+function prospectsChillerOutcomePayload(id, scope) {
+  const k = scope + '-' + id;
+  const outcome = (document.getElementById('prospect-chiller-choice-' + k) || {}).value || '';
+  if (!PROSPECT_CALL_OUTCOMES[outcome]) throw new Error('Выберите итог разговора');
+  const payload = { outcome: outcome };
+  if (outcome === 'callback') {
+    payload.next_date = (document.getElementById('prospect-chiller-date-' + k) || {}).value || '';
+    payload.next_time = (document.getElementById('prospect-chiller-time-' + k) || {}).value || '';
+    if (!payload.next_date) throw new Error('Укажите дату перезвона');
+  }
+  if (outcome === 'refused') {
+    payload.close_reason = ((document.getElementById('prospect-chiller-reason-' + k) || {}).value || '').trim();
+    if (!payload.close_reason) throw new Error('Укажите причину отказа');
+  }
+  return payload;
+}
 var PROSPECT_STAGE_ORDER = ['new','checking','contact','needs','brief','offer','negotiation','pilot','won','partner','later','closed'];
 var PROSPECT_STAGE_NAMES = {new:'Новый',checking:'Проверка контактов',contact:'Нужный специалист найден',needs:'Задача выяснена',brief:'Получены исходные данные',offer:'КП подготовлено',negotiation:'Обсуждение КП',pilot:'Пилот',won:'Заказ',partner:'Серийный партнёр',later:'Вернуться позже',closed:'Не подходит'};
 function prospectsTel(raw) {
@@ -126,6 +170,12 @@ function prospectsRequireSpokenWith(id, scope, result) {
 }
 function prospectsCallBox(id, scope) {
   const k = scope + '-' + id;
+  if (prospectsIsChiller(id)) return '<div class="prospect-callbox" data-call-scope="' + prospectsEscape(k) + '">' +
+    '<textarea id="prospect-call-note-' + prospectsEscape(k) + '" rows="2" maxlength="5000" placeholder="Комментарий к звонку"></textarea>' +
+    '<div class="prospect-call-buttons">' + ['reached', 'no_answer'].map(function (r) {
+      return '<button type="button" class="btn btn-secondary prospect-call-' + r + '" onclick="prospectsCallResult(\'' + prospectsEscape(id) + '\',\'' + scope + '\',\'' + r + '\')">' + PROSPECT_CALL_RESULTS[r] + '</button>';
+    }).join('') + '</div>' + prospectsChillerOutcomeHtml(id, scope) +
+    '<span class="prospect-meta" id="prospect-call-status-' + prospectsEscape(k) + '" role="status"></span></div>';
   return '<div class="prospect-callbox" data-call-scope="' + prospectsEscape(k) + '">' +
     prospectsCallFollowupHtml(id, scope) +
     '<textarea id="prospect-call-note-' + prospectsEscape(k) + '" rows="2" maxlength="5000" placeholder="Комментарий: о чём договорились, важные детали"></textarea>' +
@@ -145,6 +195,13 @@ function prospectsRevisionOf(id) {
 }
 function prospectsCallResult(id, scope, result) {
   if (!canManageSales()) return;
+  if (prospectsIsChiller(id) && result === 'reached') {
+    const panel = document.getElementById('prospect-chiller-outcome-' + scope + '-' + id);
+    if (panel) panel.hidden = false;
+    const choice = document.getElementById('prospect-chiller-choice-' + scope + '-' + id);
+    if (choice) choice.focus();
+    return;
+  }
   if (result === 'callback') {
     const k = scope + '-' + id, box = document.getElementById('prospect-callback-' + k);
     const dateEl = document.getElementById('prospect-callback-date-' + k);
@@ -187,7 +244,14 @@ async function prospectsCallSubmit(id, scope, result) {
     body.next_time = (document.getElementById('prospect-callback-time-' + k) || {}).value || '';
     if (!body.next_date) { if (status) status.textContent = 'Укажите дату, когда перезвонить'; return; }
   }
-  try { prospectsRequireSpokenWith(id, scope, result); Object.assign(body, prospectsCallFollowupPayload(id, scope, result), prospectsCallStagePayload(id, scope, result)); }
+  try {
+    if (prospectsIsChiller(id)) {
+      if (result === 'reached') Object.assign(body, prospectsChillerOutcomePayload(id, scope));
+    } else {
+      prospectsRequireSpokenWith(id, scope, result);
+      Object.assign(body, prospectsCallFollowupPayload(id, scope, result), prospectsCallStagePayload(id, scope, result));
+    }
+  }
   catch (e) { if (status) status.textContent = e.message; return; }
   _prospects.posting = true; if (status) status.textContent = 'Сохраняем…';
   try {
@@ -342,7 +406,7 @@ function prospectsRenderCallsJournal(result) {
   if (prospectsIsMobile()) {
     root.innerHTML = '<div class="pm-call-journal">' + result.rows.map(function (r) {
       const id = prospectsEscape(r.prospect_id);
-      const resLabel = PROSPECT_CALL_RESULTS[r.result] || r.result || '—';
+      const resLabel = (PROSPECT_CALL_RESULTS[r.result] || r.result || '—') + (r.outcome && PROSPECT_CALL_OUTCOMES[r.outcome] ? ' · ' + PROSPECT_CALL_OUTCOMES[r.outcome] : '');
       const icon = PROSPECT_CALL_ICONS[r.result] || 'ti-phone';
       return '<article class="pm-card prospect-call-journal-card" onclick="prospectsOpen(\'' + id + '\')">' +
         '<div class="pm-card-top"><strong>' + prospectsEscape(r.name) + prospectsBaseTag(r) + '</strong>' +
@@ -360,7 +424,7 @@ function prospectsRenderCallsJournal(result) {
     '<th>Когда</th><th>Кто звонил</th><th>Предприятие</th><th>Результат</th><th>С кем / что отправить</th><th>Комментарий</th></tr></thead><tbody>' +
     result.rows.map(function (r) {
       const id = prospectsEscape(r.prospect_id);
-      const resLabel = PROSPECT_CALL_RESULTS[r.result] || r.result || '—';
+      const resLabel = (PROSPECT_CALL_RESULTS[r.result] || r.result || '—') + (r.outcome && PROSPECT_CALL_OUTCOMES[r.outcome] ? ' · ' + PROSPECT_CALL_OUTCOMES[r.outcome] : '');
       const icon = PROSPECT_CALL_ICONS[r.result] || 'ti-phone';
       return '<tr class="prospect-row" data-prospect-id="' + id + '" onclick="prospectsOpen(\'' + id + '\')" title="Открыть карточку">' +
         '<td class="prospect-call-when">' + prospectsEscape(prospectsFormatCallWhen(r.created_at)) + '</td>' +
@@ -945,8 +1009,9 @@ function prospectsHistory(events,dict) {
     let changes={};try{changes=JSON.parse(ev.changes_json);}catch(_){}
     const when=new Date(ev.created_at.replace(' ','T')+'Z');
     const isCall=ev.kind==='call'||!!changes.call;const isPush=ev.kind==='call_push'||!!changes.sent_to_phone;const callResult=ev.result||(changes.call&&changes.call.to)||'';
-    const callLine=isCall?'<p class="prospect-event-call"><i class="ti '+(PROSPECT_CALL_ICONS[callResult]||'ti-phone')+'"></i> <b>Звонок: '+prospectsEscape(PROSPECT_CALL_RESULTS[callResult]||callResult||'—')+'</b>'+(changes.phone&&changes.phone.to?' · '+prospectsEscape(changes.phone.to):'')+'</p>':(isPush?'<p class="prospect-event-call"><i class="ti ti-device-mobile"></i> <b>Отправлен на телефон</b>'+(changes.sent_to_phone&&changes.sent_to_phone.to?' · '+prospectsEscape(changes.sent_to_phone.to):'')+'</p>':'');
-    if(isCall){delete changes.call;delete changes.phone;if(changes.called_person)delete changes.contact_person;if(changes.to_send)delete changes.next_action;}
+    const outcome=ev.outcome||(changes.outcome&&changes.outcome.to)||'';
+    const callLine=isCall?'<p class="prospect-event-call"><i class="ti '+(PROSPECT_CALL_ICONS[callResult]||'ti-phone')+'"></i> <b>Звонок: '+prospectsEscape(PROSPECT_CALL_RESULTS[callResult]||callResult||'—')+'</b>'+(outcome&&PROSPECT_CALL_OUTCOMES[outcome]?' · '+prospectsEscape(PROSPECT_CALL_OUTCOMES[outcome]):'')+(changes.phone&&changes.phone.to?' · '+prospectsEscape(changes.phone.to):'')+'</p>':(isPush?'<p class="prospect-event-call"><i class="ti ti-device-mobile"></i> <b>Отправлен на телефон</b>'+(changes.sent_to_phone&&changes.sent_to_phone.to?' · '+prospectsEscape(changes.sent_to_phone.to):'')+'</p>':'');
+    if(isCall){delete changes.call;delete changes.phone;delete changes.outcome;if(changes.called_person)delete changes.contact_person;if(changes.to_send)delete changes.next_action;}
     return '<article class="prospect-event'+(isCall?' prospect-event-callrow':'')+'"><small>'+prospectsEscape(isNaN(when)?ev.created_at:when.toLocaleString('ru-RU',{timeZone:'Asia/Yekaterinburg'}))+' · '+prospectsEscape(ev.actor_name||('Сотрудник #'+ev.actor))+'</small>'+callLine+Object.keys(changes).map(function(key){
       const value=changes[key].to;const label=key==='stage'?dict.stages[value]:key==='direction'?PROSPECT_DIRECTIONS[value]:key==='consent'?dict.consents[value]:key==='contacts_json'?'Список контактов обновлён':value;
       return '<p>'+(key==='note'?'':'<b>'+prospectsEscape(({called_person:'С кем говорили',to_send:'Что отправить'})[key]||PROSPECT_LABELS[key]||key)+': </b>')+prospectsEscape(label||'—').replace(/\n/g,'<br>')+'</p>';
@@ -1142,6 +1207,7 @@ function prospectsCallSheetOpen(id, opts) {
   id = id || (_prospectCallPending && _prospectCallPending.id) || (_prospects.current && _prospects.current.id);
   if (!id || !canManageSales()) return;
   const row = (_prospects.rows || []).find(function (r) { return r.id === id; }) || _prospects.current || { id: id };
+  const isChiller = row.direction === 'chillers';
   const phones = prospectsPhones(row.phone);
   const main = phones.find(function (p) { return p.tel; }) || phones[0];
   let root = document.getElementById('pm-call-sheet');
@@ -1161,16 +1227,16 @@ function prospectsCallSheetOpen(id, opts) {
     '<div class="pm-result-grid">' +
       '<button type="button" class="pm-result ok" data-result="reached" onclick="prospectsCallSheetPick(this)"><i class="ti ti-phone-check"></i>Звонок был</button>' +
       '<button type="button" class="pm-result bad" data-result="no_answer" onclick="prospectsCallSheetPick(this)"><i class="ti ti-phone-off"></i>Не дозвонился</button>' +
-      '<button type="button" class="pm-result cb" data-result="callback" onclick="prospectsCallSheetPick(this)"><i class="ti ti-phone-outgoing"></i>Перезвонить</button>' +
+      (isChiller ? '' : '<button type="button" class="pm-result cb" data-result="callback" onclick="prospectsCallSheetPick(this)"><i class="ti ti-phone-outgoing"></i>Перезвонить</button>') +
     '</div>' +
-    prospectsCallFollowupHtml(id, 'sheet') + prospectsCallStageHtml(id, 'sheet') +
+    (isChiller ? prospectsChillerOutcomeHtml(id, 'sheet') : prospectsCallFollowupHtml(id, 'sheet') + prospectsCallStageHtml(id, 'sheet') +
     '<div class="pm-date-chips" id="pm-date-chips" hidden>' +
       '<button type="button" class="active" data-date="' + today + '" onclick="prospectsCallSheetDate(this)">Сегодня</button>' +
       '<button type="button" data-date="' + tomorrow + '" onclick="prospectsCallSheetDate(this)">Завтра</button>' +
       '<button type="button" data-date="pick" onclick="prospectsCallSheetDate(this)">Выбрать…</button>' +
       '<input type="date" id="pm-call-date" value="' + today + '" hidden>' +
       '<input type="time" id="pm-call-time" value="10:00" hidden>' +
-    '</div>' +
+    '</div>') +
     '<label class="pm-field"><span>Комментарий</span><textarea id="pm-call-note" rows="3" maxlength="5000" placeholder="О чём договорились, важные детали…"></textarea></label>' +
     '<div class="pm-sheet-actions">' +
       '<button type="button" class="pm-sheet-secondary" onclick="prospectsCallSheetSave(false)">Сохранить</button>' +
@@ -1193,6 +1259,11 @@ function prospectsCallSheetPick(btn) {
   root.querySelectorAll('.pm-result').forEach(function (b) { b.classList.remove('selected'); });
   btn.classList.add('selected');
   root.dataset.result = btn.dataset.result || '';
+  if (prospectsIsChiller(root.dataset.prospectId)) {
+    const outcome = document.getElementById('prospect-chiller-outcome-sheet-' + root.dataset.prospectId);
+    if (outcome) outcome.hidden = root.dataset.result !== 'reached';
+    return;
+  }
   const chips = document.getElementById('pm-date-chips');
   if (chips) chips.hidden = root.dataset.result !== 'callback';
   if (root.dataset.result === 'callback' && (document.getElementById('prospect-call-stage-sheet-' + root.dataset.prospectId) || {}).value === 'later') {
@@ -1238,7 +1309,14 @@ async function prospectsCallSheetSave(goNext) {
     body.next_date = (document.getElementById('pm-call-date') || {}).value || prospectsTomorrow();
     body.next_time = (document.getElementById('pm-call-time') || {}).value || '10:00';
   }
-  try { prospectsRequireSpokenWith(id, 'sheet', result); Object.assign(body, prospectsCallFollowupPayload(id, 'sheet', result), prospectsCallStagePayload(id, 'sheet', result)); }
+  try {
+    if (prospectsIsChiller(id)) {
+      if (result === 'reached') Object.assign(body, prospectsChillerOutcomePayload(id, 'sheet'));
+    } else {
+      prospectsRequireSpokenWith(id, 'sheet', result);
+      Object.assign(body, prospectsCallFollowupPayload(id, 'sheet', result), prospectsCallStagePayload(id, 'sheet', result));
+    }
+  }
   catch (e) { showToast(e.message, 'error'); return; }
   try {
     await prospectsPost('/api/sales/prospects/' + encodeURIComponent(id) + '/calls', body);
