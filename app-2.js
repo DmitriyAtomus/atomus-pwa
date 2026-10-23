@@ -3011,6 +3011,9 @@ async function _tasksBoardDrop(ev, toStatus) {
 // v2.43.92: быстрое завершение задачи без открытия деталей
 async function _tasksQuickDone(ev, taskId) {
   ev.stopPropagation();
+  // Галочка стоит рядом с «взять в работу» — без подтверждения задача по промаху
+  // уходила в «Готовые» и пропадала из «Открытых» (задача #148, 23.10.2026).
+  if (!confirm('Отметить задачу выполненной? Она уйдёт во вкладку «Готовые».')) return;
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/tasks/' + taskId, {
@@ -3125,7 +3128,7 @@ function renderTaskRow(t) {
   if (!isDone) {
     acts = '<div class="tkr-acts">' +
       '<button class="task-quick-done" onclick="_tasksQuickDone(event,' + t.id + ')" title="Отметить готовой"><i class="ti ti-check"></i></button>' +
-      (t.status === 'new' ? '<span class="tkr-take" onclick="_tasksTakeWork(event,' + t.id + ')">взять в работу</span>' : '') +
+      (t.status === 'new' ? '<button type="button" class="tkr-take" onclick="_tasksTakeWork(event,' + t.id + ')"><i class="ti ti-player-play"></i> в работу</button>' : '') +
     '</div>';
   }
 
