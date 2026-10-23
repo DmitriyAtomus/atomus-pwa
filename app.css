@@ -21645,8 +21645,8 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .tkr-tag.ct.arch { opacity: .6; }
 .tkr-age { font-weight: 600; }
 .tkr-age.old { color: #B45309; font-weight: 800; }
-.tkr-acts { display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0; }
-.tkr-take { font-size: 9.5px; font-weight: 800; color: var(--brand); cursor: pointer; white-space: nowrap; }
+.tkr-acts { display: flex; flex-direction: column; align-items: center; gap: 12px; flex-shrink: 0; }
+.tkr-take { font-size: 12px; font-weight: 800; color: var(--brand); cursor: pointer; white-space: nowrap; min-height: 32px; padding: 6px 10px; border: 1px solid var(--brand); border-radius: 8px; background: transparent; display: inline-flex; align-items: center; gap: 4px; }
 .tkr-take:hover { text-decoration: underline; }
 
 /* v2.45.662: файлы задачи в карточке */
