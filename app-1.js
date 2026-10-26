@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.272";
+const APP_VERSION = "v2.46.273";
 const APP_VERSION_DATE = "22.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -7248,12 +7248,55 @@ async function payDueMarkPaid(orderId, btn) {
   }
 }
 
-// v2.46.179: незакрываемая плашка нового счёта автору заказа.
-// Она живёт поверх экранов и обновляется тем же 30-секундным poll, что колокольчик.
+// v2.46.179: плашка нового счёта автору заказа — поверх экранов, обновляется 30-секундным poll.
+// v2.46.273: плашку можно закрыть (×, свайп, автоскрытие 15 с); нажатие открывает
+// карточку счёта и сразу гасит плашку. Закрытые счета помним локально, чтобы poll
+// не возвращал их снова (бэкенд держит alert до «На оплату»).
 let _supplyInvoiceAuthorAlerts = [];
+const SUPPLY_ALERT_DISMISS_KEY = 'atom_supply_alert_dismissed';
+const SUPPLY_ALERT_AUTOHIDE_MS = 15000;
+const _supplyAlertTimers = {};
+const _supplyAlertHiddenSession = {};   // автоскрытые — до перезагрузки, без отметки «прочитано»
+
+function _supplyAlertDismissed() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SUPPLY_ALERT_DISMISS_KEY) || '{}');
+    return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  } catch (_) { return {}; }
+}
+
+function dismissSupplyInvoiceAuthorAlert(inboxId) {
+  const id = Number(inboxId) || 0;
+  if (!id) return;
+  const d = _supplyAlertDismissed();
+  d[id] = Date.now();
+  // храним не больше 200 последних, старше 30 дней — выбрасываем
+  const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+  const keys = Object.keys(d).filter((k) => d[k] > cutoff).sort((a, b) => d[b] - d[a]).slice(0, 200);
+  const keep = {}; keys.forEach((k) => { keep[k] = d[k]; });
+  try { localStorage.setItem(SUPPLY_ALERT_DISMISS_KEY, JSON.stringify(keep)); } catch (_) {}
+  // гасим связанное обычное уведомление о том же счёте (колокольчик)
+  try {
+    const un = (state.notif && state.notif.unread) || [];
+    un.filter((n) => n && n.entity_type === 'inbox' && Number(n.entity_id) === id)
+      .forEach((n) => { apiPost('/api/notifications/' + n.id + '/ack', {}).catch(() => {}); });
+    if (state.notif && state.notif.unread) {
+      state.notif.unread = un.filter((n) => !(n && n.entity_type === 'inbox' && Number(n.entity_id) === id));
+      if (typeof updateNotifBadge === 'function') updateNotifBadge(state.notif.unread.length);
+    }
+  } catch (_) {}
+  removeSupplyInvoiceAuthorAlertByInbox(id);
+}
 
 function renderSupplyInvoiceAuthorAlerts(alerts) {
-  _supplyInvoiceAuthorAlerts = Array.isArray(alerts) ? alerts.slice() : [];
+  const dismissed = _supplyAlertDismissed();
+  const seen = {};
+  _supplyInvoiceAuthorAlerts = (Array.isArray(alerts) ? alerts : []).filter((alert) => {
+    const id = Number(alert && alert.inbox_id) || 0;
+    if (!id || dismissed[id] || _supplyAlertHiddenSession[id] || seen[id]) return false;
+    seen[id] = 1;
+    return true;
+  });
   let root = document.getElementById('supply-invoice-author-alerts');
   if (!_supplyInvoiceAuthorAlerts.length) {
     if (root) root.remove();
@@ -7269,18 +7312,52 @@ function renderSupplyInvoiceAuthorAlerts(alerts) {
   root.innerHTML = _supplyInvoiceAuthorAlerts.map((alert) => {
     const inboxId = Number(alert && alert.inbox_id) || 0;
     const supplier = escapeHtml((alert && alert.supplier_name) || 'поставщика');
-    return '<button type="button" class="supply-author-alert" ' +
+    return '<div class="supply-author-alert" role="button" tabindex="0" data-inbox="' + inboxId + '" ' +
       'onclick="openSupplyInvoiceAuthorAlert(' + inboxId + ')">' +
         '<span class="supply-author-alert__icon"><i class="ti ti-file-invoice"></i></span>' +
         '<span class="supply-author-alert__text"><b>Новый входящий счёт</b>' +
           '<small>От ' + supplier + ' · открыть счёт</small></span>' +
         '<i class="ti ti-chevron-right supply-author-alert__go"></i>' +
-      '</button>';
+        '<button type="button" class="supply-author-alert__close" aria-label="Закрыть" ' +
+          'onclick="event.stopPropagation();dismissSupplyInvoiceAuthorAlert(' + inboxId + ')"><i class="ti ti-x"></i></button>' +
+      '</div>';
   }).join('');
+  root.querySelectorAll('.supply-author-alert').forEach(_bindSupplyAlertGestures);
+}
+
+// свайп влево/вправо закрывает плашку; автоскрытие через 15 с
+function _bindSupplyAlertGestures(el) {
+  const id = Number(el.dataset.inbox) || 0;
+  if (!_supplyAlertTimers[id]) {
+    _supplyAlertTimers[id] = setTimeout(() => {
+      delete _supplyAlertTimers[id];
+      _supplyAlertHiddenSession[id] = 1;
+      removeSupplyInvoiceAuthorAlertByInbox(id);
+    }, SUPPLY_ALERT_AUTOHIDE_MS);
+  }
+  let x0 = null, dx = 0;
+  el.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; dx = 0; el.style.transition = 'none'; }, { passive: true });
+  el.addEventListener('touchmove', (e) => {
+    if (x0 == null) return;
+    dx = e.touches[0].clientX - x0;
+    el.style.transform = 'translateX(' + dx + 'px)';
+    el.style.opacity = String(Math.max(0.2, 1 - Math.abs(dx) / 240));
+  }, { passive: true });
+  el.addEventListener('touchend', () => {
+    el.style.transition = '';
+    if (Math.abs(dx) > 80) {
+      el.dataset.swiped = '1';
+      dismissSupplyInvoiceAuthorAlert(id);
+    } else {
+      el.style.transform = ''; el.style.opacity = '';
+    }
+    x0 = null;
+  });
 }
 
 function removeSupplyInvoiceAuthorAlertByInbox(inboxId) {
   const id = Number(inboxId) || 0;
+  if (_supplyAlertTimers[id]) { clearTimeout(_supplyAlertTimers[id]); delete _supplyAlertTimers[id]; }
   renderSupplyInvoiceAuthorAlerts(
     _supplyInvoiceAuthorAlerts.filter((alert) => Number(alert.inbox_id) !== id)
   );
@@ -7289,10 +7366,20 @@ function removeSupplyInvoiceAuthorAlertByInbox(inboxId) {
 async function openSupplyInvoiceAuthorAlert(inboxId) {
   const id = Number(inboxId) || 0;
   if (!id) return;
+  const el = document.querySelector('.supply-author-alert[data-inbox="' + id + '"]');
+  if (el && el.dataset.swiped) return;
+  // плашка сделала своё дело — гасим сразу, чтобы не висела поверх карточки
+  dismissSupplyInvoiceAuthorAlert(id);
+  try { if (typeof closeNotifModalForced === 'function') closeNotifModalForced(); } catch (_) {}
   selectSection('supply');
+  // «Все», а не «Не привязаны»: счёт автора обычно уже привязан к заказу,
+  // иначе под карточкой оставался пустой список «Писем нет»
+  state.supplyInboxFilter = 'all';
+  try {
+    document.querySelectorAll('[data-sup-inbox]').forEach((b) => b.classList.toggle('active', b.dataset.supInbox === 'all'));
+  } catch (_) {}
   selectSidebarItem('supply-inbox');
   try {
-    if (typeof loadSupplyInbox === 'function') await loadSupplyInbox();
     if (typeof openInboxInvoice === 'function') await openInboxInvoice(id);
   } catch (_) {
     showToast('Не удалось открыть входящий счёт', 'error');
