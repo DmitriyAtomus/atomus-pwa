@@ -14456,11 +14456,19 @@ function _ibxSecTitle(emoji, title, count) {
 // v2.45.623: окно счёта из «Входящих» — расшифровка (реквизиты + суммы с НДС +
 // позиции) и предпросмотр файла, как в карточке заказа на «На оплату».
 async function openInboxInvoice(inboxId) {
-  let m = (cache.supplyInbox || []).find(x => x.id === inboxId);
+  // v2.46.273: id сравниваем как числа (из уведомлений/плашки может прийти строкой)
+  const _sameId = (x) => x && Number(x.id) === Number(inboxId);
+  let m = (cache.supplyInbox || []).find(_sameId);
   if (!m || !('ai_data' in m)) {
-    try { const list = await apiGet('/api/supply-inbox?status=all'); cache.supplyInbox = list.items || []; m = cache.supplyInbox.find(x => x.id === inboxId); } catch (_) {}
+    for (const st of ['all', 'matched', 'unmatched']) {
+      try {
+        const list = await apiGet('/api/supply-inbox?status=' + st);
+        const found = ((list && list.items) || []).find(_sameId);
+        if (found) { m = found; break; }
+      } catch (_) {}
+    }
   }
-  if (!m) { showToast('Счёт не найден', 'error'); return; }
+  if (!m) { showToast('Счёт не найден — возможно, он уже отправлен в оплату или удалён', 'error'); return; }
   const ai = m.ai_data || {}, doc = ai.document || {}, tot = ai.totals || {}, sup = ai.supplier || {};
   const items = Array.isArray(ai.items) ? ai.items : [];
   const di = (m._docIdx != null) ? m._docIdx : _inboxDocIndex(m);
@@ -18887,6 +18895,7 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {version:'v2.46.273',date:'26.10.2026',title:'Плашка нового счёта: открывается и закрывается',features:['Нажатие на плашку «Новый входящий счёт» открывает карточку счёта и сразу убирает плашку.','У плашки появился крестик, её можно смахнуть в сторону; через 15 секунд она прячется сама.','Счёт ищется во всех входящих, а не только в непривязанных.']},
   {version:'v2.46.272',date:'23.10.2026',title:'Задачи: защита от случайного «готово»',features:['Галочка «готово» в списке задач теперь спрашивает подтверждение.','«В работу» в строке задачи стало отдельной крупной кнопкой подальше от галочки.']},
   {version:'v2.46.271',date:'22.10.2026',title:'Обзвон чиллеров',features:['После дозвона можно выбрать итог: интерес, КП, перезвон или отказ; комментарий хранится в журнале звонка.','В Продажи → Отчёты появилась вкладка «Обзвон чиллеров» с автоподсчётом и сохранением дневного отчёта.']},
   {version:'v2.46.270',date:'21.10.2026',title:'Презентации: замена файла',features:['В карандаше у презентации появилась кнопка «Заменить файл»: новая версия встаёт на место старой, ссылка для клиентов остаётся прежней.','Старые версии хранятся в архиве (до 5), их можно вернуть кнопкой «Вернуть».']},
