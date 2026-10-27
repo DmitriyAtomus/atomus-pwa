@@ -17140,8 +17140,10 @@ function dismissSWUpdate() {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+    // v2.46.275: updateViaCache:'none' — sw.js всегда сверяется с сервером
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
       .then((reg) => {
+        _swReg = reg;
         // Если есть уже ожидающий SW при загрузке (мы его пропустили в прошлый раз)
         if (reg.waiting && navigator.serviceWorker.controller) {
           // v2.46.242: при открытии приложения формы ещё пусты — ставим сразу
@@ -17173,13 +17175,62 @@ if ('serviceWorker' in navigator) {
       })
       .catch((err) => console.warn('SW registration failed:', err));
 
-    // Когда новый SW взял управление — перезагружаемся (один раз)
+    // Когда новый SW взял управление — перезагружаемся (один раз).
+    // v2.46.275: SW теперь ставится сам; если открыта заполненная форма —
+    // не теряем её: ждём, пока форма сохранится или приложение свернут.
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (_swReloadingNow) return;
-      _swReloadingNow = true;
-      window.location.reload();
+      _swReloadWhenSafe();
     });
+    // v2.46.275: страховка — сверяем version.json при возврате в приложение
+    // и раз в 5 минут; новая версия → reg.update() → SW ставится сам.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') _swCheckVersion();
+    });
+    setInterval(() => { if (document.visibilityState === 'visible') _swCheckVersion(); }, 5 * 60 * 1000);
+    setTimeout(_swCheckVersion, 5000);
   });
+}
+
+let _swReg = null;
+function _swReloadWhenSafe() {
+  if (_swReloadingNow) return;
+  if (typeof hasUnsavedChanges === 'function' && hasUnsavedChanges()) {
+    _showUpdateBanner();
+    const retry = () => {
+      if (_swReloadingNow) return;
+      if (!hasUnsavedChanges() || document.visibilityState === 'hidden') {
+        _swReloadingNow = true;
+        window.location.reload();
+      } else setTimeout(retry, 5000);
+    };
+    document.addEventListener('visibilitychange', retry);
+    setTimeout(retry, 5000);
+    return;
+  }
+  _swReloadingNow = true;
+  window.location.reload();
+}
+let _swVerCheckBusy = false;
+function _swCheckVersion() {
+  if (_swVerCheckBusy || _swReloadingNow || typeof APP_VERSION !== 'string') return;
+  _swVerCheckBusy = true;
+  fetch('/version.json?_=' + Date.now(), { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(v => {
+      if (!v || !v.version || v.version === APP_VERSION) return;
+      if (_swReg) _swReg.update().catch(() => {});
+      // Если SW так и не сменился (сбой кэша) — один раз на версию грузим
+      // страницу заново мимо кэша. Ключ в localStorage защищает от цикла.
+      setTimeout(() => {
+        if (_swReloadingNow) return;
+        let key = 'atomus-force-reload-' + v.version;
+        try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (_) { return; }
+        _swReloadWhenSafe();
+      }, 30000);
+    })
+    .catch(() => {})
+    .finally(() => { _swVerCheckBusy = false; });
 }
 
 // ============ DIRTY-STATE TRACKER + beforeunload ============

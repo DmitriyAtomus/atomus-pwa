@@ -7,7 +7,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v2.46.274';
+const CACHE_VERSION = 'atomus-v2.46.275';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 // v2.46.243: данные API больше НЕ кэшируются. Кэш только для файлов /static/*.
 const FILES_CACHE = `${CACHE_VERSION}-files`;
@@ -42,22 +42,31 @@ const STATIC_ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.34.0/tabler-icons.min.css',
 ];
 
-// При установке — пополняем static cache. БЕЗ skipWaiting:
-// новый SW зависает в "waiting", пока страница не пошлёт ему SKIP_WAITING.
-// Это позволяет показать пользователю баннер «Доступно обновление» и дать ему
-// решить, когда переключиться — чтобы не сбросить заполненную форму.
+// v2.46.275: новая версия ставится САМА. Раньше SW ждал в "waiting", пока
+// страница не пришлёт SKIP_WAITING; у старых клиентов (в т.ч. 2.46.261 на
+// телефонах) этого почти никогда не происходило — приложение навсегда
+// оставалось на старой версии. Теперь: skipWaiting сразу, clients.claim,
+// старые кэши удаляются, открытые окна перезагружаются (у старых версий —
+// через их обработчик controllerchange, у новых — с учётом несохранённых форм).
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => {
       return Promise.all(
         STATIC_ASSETS.map((url) =>
-          cache.add(url).catch((err) => {
+          // cache:'reload' — мимо HTTP-кэша браузера, только свежие файлы
+          cache.add(new Request(url, { cache: 'reload' })).catch((err) => {
             console.warn('SW: не удалось закэшировать', url, err);
           })
         )
       );
     })
   );
+  // Chrome «забывает» skipWaiting, если в момент установки старый SW отвечал
+  // на запрос страницы (воспроизведено на 2.46.261: новая версия навсегда
+  // оставалась в waiting). Повторяем вызов, пока воркер жив — повторный
+  // skipWaiting заново запускает активацию.
+  for (let i = 1; i <= 12; i++) setTimeout(() => { self.skipWaiting(); }, i * 2000);
 });
 
 // Страница может попросить нас активироваться немедленно
@@ -172,6 +181,12 @@ self.addEventListener('fetch', (event) => {
     // version.json — всегда свежий (показывает какая версия доступна к установке)
     if (url.pathname === '/version.json') {
       event.respondWith(networkFirst(req));
+      return;
+    }
+    // v2.46.275: сама страница (index.html и SPA-адреса) — network-first с
+    // таймаутом 4 с: новая версия видна сразу, без сети — из кэша.
+    if (req.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
+      event.respondWith(networkFirstHtml(req));
       return;
     }
     event.respondWith(cacheFirst(req, STATIC_CACHE));
@@ -295,4 +310,26 @@ async function networkFirst(req) {
     if (cached) return cached;
     throw err;
   }
+}
+
+// v2.46.275: страница — сначала сеть (до 4 с), иначе кэш / index.html
+async function networkFirstHtml(req) {
+  const net = fetch(req, { cache: 'no-cache' }).then((res) => {
+    const path = new URL(req.url).pathname;
+    // в кэш кладём только саму оболочку приложения, не отдельные .html-страницы
+    const isShell = path === '/' || path === '/index.html' || /^\/(a|b|c|d|u|dev)\/[^/]+\/?$/.test(path) || /^\/feedback\/?$/.test(path);
+    if (isShell && res && res.ok && !res.redirected) {
+      const copy = res.clone();
+      caches.open(STATIC_CACHE).then((c) => c.put('/index.html', copy)).catch(() => {});
+    }
+    return res;
+  });
+  const timeout = new Promise((resolve) => setTimeout(resolve, 4000, null));
+  try {
+    const res = await Promise.race([net, timeout]);
+    if (res) return res;
+  } catch (_) { /* нет сети — ниже кэш */ }
+  const cached = (await caches.match(req)) || (await caches.match('/index.html')) || (await caches.match('/'));
+  if (cached) return cached;
+  return net;
 }
