@@ -27353,11 +27353,46 @@ body:has(.modal-overlay.visible) .fab { display: none !important; }
   .inv-modal-footer { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
 }
 
-/* v2.46.274: телефон — круглые ✦/чат не закрывают последние кнопки экрана: запас прокрутки снизу */
+/* v2.46.274: телефон — без жёлтых круглых кнопок (✦ Клава и чат есть в «Ещё») */
 @media (max-width: 720px) {
-  .main-area .screen:not([data-screen="mail-messenger"]):not([data-screen="devchat"]):not([data-screen="defects-chats"]):not([data-screen="sites-chats"]):not([data-screen="atom-chiller"]):not([data-screen="atom-electrica"]):not([data-screen="products-3d"])::after {
-    content: ''; display: block; height: 88px;
-  }
+  #kp-fab, #devchat-fab { display: none !important; }
   /* фильтры-«таблетки» — палец попадает уверенно */
   .filter-tab { min-height: 36px; }
+}
+
+/* v2.46.274: телефон — удобство */
+@media (max-width: 720px) {
+  /* ряды фильтров: прокрутка видна */
+  .h-scroll-hint {
+    -webkit-mask-image: linear-gradient(90deg, #000 82%, transparent);
+            mask-image: linear-gradient(90deg, #000 82%, transparent);
+    scrollbar-width: thin; padding-bottom: 4px;
+  }
+  .h-scroll-hint.h-scroll-end { -webkit-mask-image: none; mask-image: none; }
+  .h-scroll-hint::-webkit-scrollbar { height: 3px; display: block; }
+  .h-scroll-hint::-webkit-scrollbar-thumb { background: rgba(37, 64, 120, .35); border-radius: 3px; }
+  /* обрезанные шапки вкладок Сайтов и т.п. — прокручиваются, а не режутся */
+  .main-area .screen [class*="tabs"]:not(.filter-tabs) { max-width: 100%; }
+
+  /* зоны нажатия не меньше 36–44px */
+  .main-area .screen button:not(.tab):not(.tab25):not(.supply-author-alert__close) { min-height: 36px; }
+  .main-area .screen .icon-btn { min-width: 40px; min-height: 40px; }
+  .ibx-b, .ibx-ic { min-height: 44px; }
+
+  /* компактная полоса «Новый вид / Вернуть старый» */
+  .sv2-toggle-bar { padding: 2px 4px 2px 10px; margin-bottom: 8px; font-size: 12px; background: transparent; border-style: dashed; }
+  .sv2-toggle-btn { padding: 4px 10px; border: 0; background: transparent; text-decoration: underline; }
+
+  /* Склад: поиск — на всю строку, фильтры под ним (чип «Все» больше не налезает) */
+  .fp-toolbar .search-box, .pt-toolbar .search-box { flex: 1 1 100% !important; width: 100% !important; min-width: 0 !important; }
+
+  /* Входящие: строка счёта — крупные кнопки ровной сеткой */
+  #sup-inbox-list .ibx-r .ibx-r-acts { display: flex; flex-wrap: nowrap; gap: 8px; }
+  #sup-inbox-list .ibx-r .ibx-r-acts .ibx-b { flex: 1 1 0; justify-content: center; font-size: 14px; }
+  #sup-inbox-list .ibx-r .ibx-r-acts .ibx-ic { flex: 0 0 44px; justify-content: center; }
+
+  /* заглушка тяжёлых экранов */
+  .mobile-heavy-stub { margin: 24px 16px; padding: 24px 18px; text-align: center; background: #fff; border: 1px solid var(--border); border-radius: 16px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .mobile-heavy-stub > i { font-size: 40px; color: var(--brand); }
+  .mobile-heavy-stub small { color: var(--text-light); }
 }

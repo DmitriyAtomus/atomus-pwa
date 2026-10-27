@@ -2281,16 +2281,40 @@ var _screenLoadedAt = {};
 // v1.8.763: загрузка данных экрана, вынесенная из selectSidebarItem.
 // Нужна отдельно для автообновления: selectSidebarItem попутно прячет/показывает
 // .screen и делает scrollTo(0) — в фоне это дёргало бы прокрутку под руками.
+// v2.46.274: тяжёлые 3D/CAD-экраны на телефоне — понятная заглушка вместо пустого/зависшего окна
+function _mobileHeavyGuard(frameId, title) {
+  if (window.innerWidth > 720 || window._heavyOk && window._heavyOk[frameId]) return false;
+  const f = document.getElementById(frameId);
+  if (!f || f.getAttribute('src')) return false;
+  const host = f.parentElement;
+  if (!host || host.querySelector('.mobile-heavy-stub')) return true;
+  f.style.display = 'none';
+  const d = document.createElement('div');
+  d.className = 'mobile-heavy-stub';
+  d.innerHTML = '<i class="ti ti-device-desktop"></i><b>' + escapeHtml(title) + ' удобнее на компьютере</b>' +
+    '<small>Это 3D/чертёжный модуль: на телефоне он тяжёлый и мелкий.</small>' +
+    '<button type="button" class="btn btn-secondary">Всё равно открыть</button>';
+  d.querySelector('button').onclick = function () {
+    window._heavyOk = window._heavyOk || {}; window._heavyOk[frameId] = 1;
+    d.remove(); f.style.display = '';
+    if (f.dataset.src) f.setAttribute('src', f.dataset.src);
+  };
+  host.insertBefore(d, f);
+  return true;
+}
+
 function runScreenLoader(screenName) {
   // Загрузка данных под экран
   // v2.45.325: AtomCAD «Атом Электрика» — ленивая загрузка iframe при первом открытии
   if (screenName === 'atom-electrica') {
+    if (_mobileHeavyGuard('atomcad-frame', 'Атом Электрика')) return;
     const _acf = document.getElementById('atomcad-frame');
     if (_acf && !_acf.getAttribute('src') && _acf.dataset.src) _acf.setAttribute('src', _acf.dataset.src);
     if (typeof loadSchematicsBar === 'function') loadSchematicsBar();   // v2.46.166: пакеты ЭСКД
   }
   // «Атом Чиллер» — та же ленивая загрузка: 3D-оболочку тянем при первом открытии
   if (screenName === 'atom-chiller') {
+    if (_mobileHeavyGuard('chiller-frame', 'Атом Чиллер')) return;
     const _chf = document.getElementById('chiller-frame');
     if (_chf && !_chf.getAttribute('src') && _chf.dataset.src) _chf.setAttribute('src', _chf.dataset.src);
     // v2.45.967: кнопка чата по чиллерам — лента Клавы доступна только владельцу
@@ -2302,6 +2326,7 @@ function runScreenLoader(screenName) {
   }
   // «Изделия 3D» — витрина базы, открытая на разделе нашей продукции
   if (screenName === 'products-3d') {
+    if (_mobileHeavyGuard('products3d-frame', 'Изделия 3D')) return;
     const _pf = document.getElementById('products3d-frame');
     if (_pf && !_pf.getAttribute('src') && _pf.dataset.src) _pf.setAttribute('src', _pf.dataset.src);
   }
@@ -20592,4 +20617,33 @@ document.addEventListener('auxclick', _midOnAuxClick, true);
     }
     if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
   } catch (_) {}
+})();
+
+// v2.46.274: телефон — ряды фильтров/вкладок, уходящие за край, получают видимую
+// подсказку прокрутки (затухание у края + тонкая полоса), пока не докручены до конца.
+(function () {
+  const SEL = '.filter-tabs, [class*="tabs"], [class*="chips"], [class*="filters"], [class*="segment"]';
+  function mark() {
+    if (window.innerWidth > 720) return;
+    document.querySelectorAll(SEL).forEach((el) => {
+      if (!el.offsetParent) return;
+      const ox = getComputedStyle(el).overflowX;
+      const scrollable = (ox === 'auto' || ox === 'scroll') && el.scrollWidth > el.clientWidth + 4;
+      el.classList.toggle('h-scroll-hint', scrollable);
+      if (scrollable && !el._hsBound) {
+        el._hsBound = 1;
+        el.addEventListener('scroll', () => {
+          el.classList.toggle('h-scroll-end', el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+        }, { passive: true });
+      }
+    });
+  }
+  let t = null;
+  const later = () => { clearTimeout(t); t = setTimeout(mark, 250); };
+  window.addEventListener('resize', later);
+  document.addEventListener('DOMContentLoaded', () => {
+    later();
+    try { new MutationObserver(later).observe(document.getElementById('app') || document.body, { childList: true, subtree: true }); } catch (_) {}
+  });
+  window._markHScrollHints = mark;
 })();

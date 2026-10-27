@@ -17,3 +17,22 @@ test('модалка прячет плашки и плавающие кнопк�
 test('PDF на телефоне рисуется pdf.js', () => {
   assert.match(app3, /_inboxInvRenderPdfMobile\(cont, blob, url, filename\)/);
 });
+const app1 = fs.readFileSync(path.join(__dirname, '..', 'app-1.js'), 'utf8');
+const app4 = fs.readFileSync(path.join(__dirname, '..', 'app-4.js'), 'utf8');
+test('жёлтые круглые кнопки скрыты на телефоне, функции — в «Ещё»', () => {
+  assert.match(css, /@media \(max-width: 720px\) \{\s*#kp-fab, #devchat-fab \{ display: none !important; \}/);
+  assert.match(app4, /Показать Клаве<\/span>/);
+  assert.match(app4, /devChatFabPickerOpen\(\);\}catch/);
+  assert.doesNotMatch(css, /height: 88px/);
+});
+test('автообновление в первые 30 с после запуска', () => {
+  assert.match(app4, /_swAppStartTs/);
+  assert.match(app4, /_early\) && _swAutoApplyIfSafe\(reg\)/);
+});
+test('журнал изменений не падает без features', () => {
+  assert.match(app4, /Array\.isArray\(v\.features\) \? v\.features : \[\]/);
+});
+test('тяжёлые 3D-экраны на телефоне — заглушка', () => {
+  assert.match(app1, /_mobileHeavyGuard\('chiller-frame'/);
+  assert.match(app1, /h-scroll-hint/);
+});
