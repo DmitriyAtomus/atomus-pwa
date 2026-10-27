@@ -4585,7 +4585,10 @@ function loadHelpChangelog() {
   const container = document.getElementById('help-changelog-body');
   if (!container) return;
   let html = '<div class="cl-timeline">';
-  HELP_CHANGELOG.forEach(v => {
+  const _cl = (typeof HELP_CHANGELOG !== 'undefined' && Array.isArray(HELP_CHANGELOG)) ? HELP_CHANGELOG : [];
+  if (!_cl.length) { container.innerHTML = '<div class="empty-state" style="padding:24px;text-align:center;color:var(--text-light);">Журнал изменений пока пуст</div>'; return; }
+  _cl.forEach(v => {
+    if (!v) return;
     html += '<div class="cl-entry">' +
       '<div class="cl-marker"><i class="ti ti-sparkles"></i></div>' +
       '<div class="cl-body">' +
@@ -4594,7 +4597,7 @@ function loadHelpChangelog() {
           '<span class="cl-date">' + escapeHtml(v.date) + '</span>' +
         '</div>' +
         '<div class="cl-title">' + escapeHtml(v.title) + '</div>' +
-        '<ul class="cl-list">' + v.features.map(f => '<li>' + f + '</li>').join('') + '</ul>' +
+        '<ul class="cl-list">' + (Array.isArray(v.features) ? v.features : []).map(f => '<li>' + f + '</li>').join('') + '</ul>' +
       '</div>' +
       '</div>';
   });
@@ -11253,6 +11256,13 @@ function openMobileSections() {
   html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ try{openSupplyInvoiceCameraDirect();}catch(e){} }, 40)"><i class="ti ti-camera"></i><span>Фото УПД</span></button>';
   html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ try{openQrScanner();}catch(e){} }, 40)"><i class="ti ti-scan"></i><span>QR</span></button>';
   html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ try{openTeamChatsScreen();}catch(e){} }, 40)"><i class="ti ti-messages"></i><span>Чаты</span></button>';
+  // v2.46.274: круглые ✦/чат на телефоне убраны — их функции здесь
+  if (window.KlavaPick && typeof window.KlavaPick.toggle === 'function') {
+    html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ try{window.KlavaPick.toggle();}catch(e){} }, 40)"><i class="ti ti-sparkles"></i><span>Показать Клаве</span></button>';
+  }
+  if (typeof devChatFabPickerOpen === 'function') {
+    html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ try{devChatFabPickerOpen();}catch(e){} }, 40)"><i class="ti ti-message-chatbot"></i><span>Чат с разработкой</span></button>';
+  }
   const tv = document.getElementById('tv-cast-top-btn');
   if (tv && tv.style.display !== 'none') {
     html += '<button type="button" class="more-action" onclick="closeMobileSections(); setTimeout(function(){ try{toggleTvScreenCast();}catch(e){} }, 40)"><i class="ti ti-device-tv"></i><span>Экран на ТВ</span></button>';
@@ -17016,6 +17026,8 @@ function _scheduleSharedInvoiceIntake() {
 
 let _swUpdateBannerShown = false;
 let _swReloadingNow = false;
+// v2.46.274: первые 30 с после запуска форм ещё нет — новую версию ставим сразу, без баннера
+const _swAppStartTs = Date.now();
 
 function _ensureUpdateBannerStyles() {
   if (document.getElementById('sw-update-banner-styles')) return;
@@ -17141,7 +17153,8 @@ if ('serviceWorker' in navigator) {
           if (!newWorker) return;
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              if (!(document.visibilityState === 'hidden' && _swAutoApplyIfSafe(reg))) _showUpdateBanner();
+              const _early = (Date.now() - _swAppStartTs) < 30000;
+              if (!((document.visibilityState === 'hidden' || _early) && _swAutoApplyIfSafe(reg))) _showUpdateBanner();
             }
           });
         });

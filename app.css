@@ -27316,3 +27316,83 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
 .mm-body table, .mm-body img, .mm-folded table, .mm-folded img { max-width: 100%; height: auto; }
 .mm-body pre { white-space: pre-wrap; max-width: 100%; }
 @media (max-width: 700px) { .mm-bub { min-width: min(240px, 92%); max-width: 92%; } }
+
+/* v2.46.274: пока открыта модалка/карточка — плашки и плавающие круглые кнопки не мешают */
+body:has(.modal-overlay.visible) .supply-author-alerts,
+body:has(.modal-overlay.visible) #kp-fab,
+body:has(.modal-overlay.visible) #devchat-fab,
+body:has(.modal-overlay.visible) .fab { display: none !important; }
+
+/* v2.46.274: карточка входящего счёта — кнопки */
+.inv-modal-footer { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.inv-modal-primary {
+  width: 100%; min-height: 48px; font-size: 16px; font-weight: 700; justify-content: center;
+  background: #16a34a; border-color: #16a34a; color: #fff;
+}
+.inv-modal-primary--warn { background: #fff; border-color: #e7b4b4; color: #8C2A2A; }
+.inv-modal-secondary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.inv-modal-secondary .btn { min-height: 44px; justify-content: center; }
+.inv-pdf-pages { display: flex; flex-direction: column; gap: 8px; }
+.inv-pdf-page { width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+.inv-pdf-loading { padding: 24px; text-align: center; color: var(--text-light); background: var(--bg); border-radius: 8px; font-size: 13px; }
+.inv-pdf-more { font-size: 12.5px; color: var(--text-light); text-align: center; }
+.inv-pdf-fallback { margin-top: 8px; text-align: center; }
+@media (min-width: 721px) {
+  .inv-modal-footer { flex-direction: row; justify-content: flex-end; align-items: center; }
+  .inv-modal-primary { width: auto; min-height: 40px; font-size: 14px; order: 2; }
+  .inv-modal-secondary { display: flex; }
+}
+@media (max-width: 720px) {
+  .inv-modal-overlay { align-items: stretch; }
+  .inv-modal-overlay .inv-modal {
+    max-width: none !important; width: 100%; height: 100dvh; max-height: 100dvh !important;
+    border-radius: 0 !important; margin: 0;
+  }
+  .inv-modal-overlay .modal-header { padding-top: calc(12px + env(safe-area-inset-top)); }
+  .inv-modal-overlay .modal-content { flex: 1; }
+  .inv-modal-footer { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+}
+
+/* v2.46.274: телефон — без жёлтых круглых кнопок (✦ Клава и чат есть в «Ещё») */
+@media (max-width: 720px) {
+  #kp-fab, #devchat-fab { display: none !important; }
+  /* фильтры-«таблетки» — палец попадает уверенно */
+  .filter-tab { min-height: 36px; }
+}
+
+/* v2.46.274: телефон — удобство */
+@media (max-width: 720px) {
+  /* ряды фильтров: прокрутка видна */
+  .h-scroll-hint {
+    -webkit-mask-image: linear-gradient(90deg, #000 82%, transparent);
+            mask-image: linear-gradient(90deg, #000 82%, transparent);
+    scrollbar-width: thin; padding-bottom: 4px;
+  }
+  .h-scroll-hint.h-scroll-end { -webkit-mask-image: none; mask-image: none; }
+  .h-scroll-hint::-webkit-scrollbar { height: 3px; display: block; }
+  .h-scroll-hint::-webkit-scrollbar-thumb { background: rgba(37, 64, 120, .35); border-radius: 3px; }
+  /* обрезанные шапки вкладок Сайтов и т.п. — прокручиваются, а не режутся */
+  .main-area .screen [class*="tabs"]:not(.filter-tabs) { max-width: 100%; }
+
+  /* зоны нажатия не меньше 36–44px */
+  .main-area .screen button:not(.tab):not(.tab25):not(.supply-author-alert__close) { min-height: 36px; }
+  .main-area .screen .icon-btn { min-width: 40px; min-height: 40px; }
+  .ibx-b, .ibx-ic { min-height: 44px; }
+
+  /* компактная полоса «Новый вид / Вернуть старый» */
+  .sv2-toggle-bar { padding: 2px 4px 2px 10px; margin-bottom: 8px; font-size: 12px; background: transparent; border-style: dashed; }
+  .sv2-toggle-btn { padding: 4px 10px; border: 0; background: transparent; text-decoration: underline; }
+
+  /* Склад: поиск — на всю строку, фильтры под ним (чип «Все» больше не налезает) */
+  .fp-toolbar .search-box, .pt-toolbar .search-box { flex: 1 1 100% !important; width: 100% !important; min-width: 0 !important; }
+
+  /* Входящие: строка счёта — крупные кнопки ровной сеткой */
+  #sup-inbox-list .ibx-r .ibx-r-acts { display: flex; flex-wrap: nowrap; gap: 8px; }
+  #sup-inbox-list .ibx-r .ibx-r-acts .ibx-b { flex: 1 1 0; justify-content: center; font-size: 14px; }
+  #sup-inbox-list .ibx-r .ibx-r-acts .ibx-ic { flex: 0 0 44px; justify-content: center; }
+
+  /* заглушка тяжёлых экранов */
+  .mobile-heavy-stub { margin: 24px 16px; padding: 24px 18px; text-align: center; background: #fff; border: 1px solid var(--border); border-radius: 16px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .mobile-heavy-stub > i { font-size: 40px; color: var(--brand); }
+  .mobile-heavy-stub small { color: var(--text-light); }
+}

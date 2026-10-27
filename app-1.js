@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.273";
+const APP_VERSION = "v2.46.274";
 const APP_VERSION_DATE = "22.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -2281,16 +2281,40 @@ var _screenLoadedAt = {};
 // v1.8.763: загрузка данных экрана, вынесенная из selectSidebarItem.
 // Нужна отдельно для автообновления: selectSidebarItem попутно прячет/показывает
 // .screen и делает scrollTo(0) — в фоне это дёргало бы прокрутку под руками.
+// v2.46.274: тяжёлые 3D/CAD-экраны на телефоне — понятная заглушка вместо пустого/зависшего окна
+function _mobileHeavyGuard(frameId, title) {
+  if (window.innerWidth > 720 || window._heavyOk && window._heavyOk[frameId]) return false;
+  const f = document.getElementById(frameId);
+  if (!f || f.getAttribute('src')) return false;
+  const host = f.parentElement;
+  if (!host || host.querySelector('.mobile-heavy-stub')) return true;
+  f.style.display = 'none';
+  const d = document.createElement('div');
+  d.className = 'mobile-heavy-stub';
+  d.innerHTML = '<i class="ti ti-device-desktop"></i><b>' + escapeHtml(title) + ' удобнее на компьютере</b>' +
+    '<small>Это 3D/чертёжный модуль: на телефоне он тяжёлый и мелкий.</small>' +
+    '<button type="button" class="btn btn-secondary">Всё равно открыть</button>';
+  d.querySelector('button').onclick = function () {
+    window._heavyOk = window._heavyOk || {}; window._heavyOk[frameId] = 1;
+    d.remove(); f.style.display = '';
+    if (f.dataset.src) f.setAttribute('src', f.dataset.src);
+  };
+  host.insertBefore(d, f);
+  return true;
+}
+
 function runScreenLoader(screenName) {
   // Загрузка данных под экран
   // v2.45.325: AtomCAD «Атом Электрика» — ленивая загрузка iframe при первом открытии
   if (screenName === 'atom-electrica') {
+    if (_mobileHeavyGuard('atomcad-frame', 'Атом Электрика')) return;
     const _acf = document.getElementById('atomcad-frame');
     if (_acf && !_acf.getAttribute('src') && _acf.dataset.src) _acf.setAttribute('src', _acf.dataset.src);
     if (typeof loadSchematicsBar === 'function') loadSchematicsBar();   // v2.46.166: пакеты ЭСКД
   }
   // «Атом Чиллер» — та же ленивая загрузка: 3D-оболочку тянем при первом открытии
   if (screenName === 'atom-chiller') {
+    if (_mobileHeavyGuard('chiller-frame', 'Атом Чиллер')) return;
     const _chf = document.getElementById('chiller-frame');
     if (_chf && !_chf.getAttribute('src') && _chf.dataset.src) _chf.setAttribute('src', _chf.dataset.src);
     // v2.45.967: кнопка чата по чиллерам — лента Клавы доступна только владельцу
@@ -2302,6 +2326,7 @@ function runScreenLoader(screenName) {
   }
   // «Изделия 3D» — витрина базы, открытая на разделе нашей продукции
   if (screenName === 'products-3d') {
+    if (_mobileHeavyGuard('products3d-frame', 'Изделия 3D')) return;
     const _pf = document.getElementById('products3d-frame');
     if (_pf && !_pf.getAttribute('src') && _pf.dataset.src) _pf.setAttribute('src', _pf.dataset.src);
   }
@@ -7309,6 +7334,23 @@ function renderSupplyInvoiceAuthorAlerts(alerts) {
     root.setAttribute('aria-live', 'assertive');
     document.body.appendChild(root);
   }
+  // v2.46.274: несколько счетов — одна компактная плашка, а не стопка поверх экрана
+  if (_supplyInvoiceAuthorAlerts.length > 1) {
+    const n = _supplyInvoiceAuthorAlerts.length;
+    const names = [...new Set(_supplyInvoiceAuthorAlerts.map((a) => (a && a.supplier_name) || 'поставщика'))];
+    const from = escapeHtml(names.length === 1 ? 'От ' + names[0] : names.length + ' поставщиков');
+    root.innerHTML = '<div class="supply-author-alert" role="button" tabindex="0" data-inbox="0" onclick="openSupplyInvoiceAuthorAlertsAll()">' +
+        '<span class="supply-author-alert__icon"><i class="ti ti-file-invoice"></i></span>' +
+        '<span class="supply-author-alert__text"><b>Новых входящих счетов: ' + n + '</b>' +
+          '<small>' + from + '</small></span>' +
+        '<i class="ti ti-chevron-right supply-author-alert__go"></i>' +
+        '<button type="button" class="supply-author-alert__close" aria-label="Закрыть" ' +
+          'onclick="event.stopPropagation();dismissSupplyInvoiceAuthorAlertsAll()"><i class="ti ti-x"></i></button>' +
+      '</div>';
+    root.querySelectorAll('.supply-author-alert').forEach(_bindSupplyAlertGestures);
+    return;
+  }
+  if (_supplyAlertTimers[0]) { clearTimeout(_supplyAlertTimers[0]); delete _supplyAlertTimers[0]; }
   root.innerHTML = _supplyInvoiceAuthorAlerts.map((alert) => {
     const inboxId = Number(alert && alert.inbox_id) || 0;
     const supplier = escapeHtml((alert && alert.supplier_name) || 'поставщика');
@@ -7326,9 +7368,33 @@ function renderSupplyInvoiceAuthorAlerts(alerts) {
 }
 
 // свайп влево/вправо закрывает плашку; автоскрытие через 15 с
+function dismissSupplyInvoiceAuthorAlertsAll() {
+  _supplyInvoiceAuthorAlerts.slice().forEach((a) => dismissSupplyInvoiceAuthorAlert(a.inbox_id));
+}
+
+function _hideSupplyInvoiceAuthorAlertsSession() {
+  _supplyInvoiceAuthorAlerts.forEach((a) => { _supplyAlertHiddenSession[Number(a.inbox_id)] = 1; });
+  renderSupplyInvoiceAuthorAlerts([]);
+}
+
+function openSupplyInvoiceAuthorAlertsAll() {
+  const el = document.querySelector('.supply-author-alert[data-inbox="0"]');
+  if (el && el.dataset.swiped) return;
+  // список открыт — плашку прячем до перезагрузки, «прочитано» ставится при открытии конкретного счёта
+  _hideSupplyInvoiceAuthorAlertsSession();
+  try { if (typeof closeNotifModalForced === 'function') closeNotifModalForced(); } catch (_) {}
+  selectSection('supply');
+  state.supplyInboxFilter = 'all';
+  try { document.querySelectorAll('[data-sup-inbox]').forEach((b) => b.classList.toggle('active', b.dataset.supInbox === 'all')); } catch (_) {}
+  selectSidebarItem('supply-inbox');
+}
+
 function _bindSupplyAlertGestures(el) {
   const id = Number(el.dataset.inbox) || 0;
-  if (!_supplyAlertTimers[id]) {
+  if (!id) {   // общая плашка на несколько счетов
+    if (!_supplyAlertTimers[0]) _supplyAlertTimers[0] = setTimeout(() => { delete _supplyAlertTimers[0]; _hideSupplyInvoiceAuthorAlertsSession(); }, SUPPLY_ALERT_AUTOHIDE_MS);
+  }
+  if (id && !_supplyAlertTimers[id]) {
     _supplyAlertTimers[id] = setTimeout(() => {
       delete _supplyAlertTimers[id];
       _supplyAlertHiddenSession[id] = 1;
@@ -7347,7 +7413,7 @@ function _bindSupplyAlertGestures(el) {
     el.style.transition = '';
     if (Math.abs(dx) > 80) {
       el.dataset.swiped = '1';
-      dismissSupplyInvoiceAuthorAlert(id);
+      if (id) dismissSupplyInvoiceAuthorAlert(id); else dismissSupplyInvoiceAuthorAlertsAll();
     } else {
       el.style.transform = ''; el.style.opacity = '';
     }
@@ -20551,4 +20617,33 @@ document.addEventListener('auxclick', _midOnAuxClick, true);
     }
     if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
   } catch (_) {}
+})();
+
+// v2.46.274: телефон — ряды фильтров/вкладок, уходящие за край, получают видимую
+// подсказку прокрутки (затухание у края + тонкая полоса), пока не докручены до конца.
+(function () {
+  const SEL = '.filter-tabs, [class*="tabs"], [class*="chips"], [class*="filters"], [class*="segment"]';
+  function mark() {
+    if (window.innerWidth > 720) return;
+    document.querySelectorAll(SEL).forEach((el) => {
+      if (!el.offsetParent) return;
+      const ox = getComputedStyle(el).overflowX;
+      const scrollable = (ox === 'auto' || ox === 'scroll') && el.scrollWidth > el.clientWidth + 4;
+      el.classList.toggle('h-scroll-hint', scrollable);
+      if (scrollable && !el._hsBound) {
+        el._hsBound = 1;
+        el.addEventListener('scroll', () => {
+          el.classList.toggle('h-scroll-end', el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+        }, { passive: true });
+      }
+    });
+  }
+  let t = null;
+  const later = () => { clearTimeout(t); t = setTimeout(mark, 250); };
+  window.addEventListener('resize', later);
+  document.addEventListener('DOMContentLoaded', () => {
+    later();
+    try { new MutationObserver(later).observe(document.getElementById('app') || document.body, { childList: true, subtree: true }); } catch (_) {}
+  });
+  window._markHScrollHints = mark;
 })();
