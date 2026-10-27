@@ -27316,3 +27316,48 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
 .mm-body table, .mm-body img, .mm-folded table, .mm-folded img { max-width: 100%; height: auto; }
 .mm-body pre { white-space: pre-wrap; max-width: 100%; }
 @media (max-width: 700px) { .mm-bub { min-width: min(240px, 92%); max-width: 92%; } }
+
+/* v2.46.274: пока открыта модалка/карточка — плашки и плавающие круглые кнопки не мешают */
+body:has(.modal-overlay.visible) .supply-author-alerts,
+body:has(.modal-overlay.visible) #kp-fab,
+body:has(.modal-overlay.visible) #devchat-fab,
+body:has(.modal-overlay.visible) .fab { display: none !important; }
+
+/* v2.46.274: карточка входящего счёта — кнопки */
+.inv-modal-footer { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.inv-modal-primary {
+  width: 100%; min-height: 48px; font-size: 16px; font-weight: 700; justify-content: center;
+  background: #16a34a; border-color: #16a34a; color: #fff;
+}
+.inv-modal-primary--warn { background: #fff; border-color: #e7b4b4; color: #8C2A2A; }
+.inv-modal-secondary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.inv-modal-secondary .btn { min-height: 44px; justify-content: center; }
+.inv-pdf-pages { display: flex; flex-direction: column; gap: 8px; }
+.inv-pdf-page { width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+.inv-pdf-loading { padding: 24px; text-align: center; color: var(--text-light); background: var(--bg); border-radius: 8px; font-size: 13px; }
+.inv-pdf-more { font-size: 12.5px; color: var(--text-light); text-align: center; }
+.inv-pdf-fallback { margin-top: 8px; text-align: center; }
+@media (min-width: 721px) {
+  .inv-modal-footer { flex-direction: row; justify-content: flex-end; align-items: center; }
+  .inv-modal-primary { width: auto; min-height: 40px; font-size: 14px; order: 2; }
+  .inv-modal-secondary { display: flex; }
+}
+@media (max-width: 720px) {
+  .inv-modal-overlay { align-items: stretch; }
+  .inv-modal-overlay .inv-modal {
+    max-width: none !important; width: 100%; height: 100dvh; max-height: 100dvh !important;
+    border-radius: 0 !important; margin: 0;
+  }
+  .inv-modal-overlay .modal-header { padding-top: calc(12px + env(safe-area-inset-top)); }
+  .inv-modal-overlay .modal-content { flex: 1; }
+  .inv-modal-footer { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+}
+
+/* v2.46.274: телефон — круглые ✦/чат не закрывают последние кнопки экрана: запас прокрутки снизу */
+@media (max-width: 720px) {
+  .main-area .screen:not([data-screen="mail-messenger"]):not([data-screen="devchat"]):not([data-screen="defects-chats"]):not([data-screen="sites-chats"]):not([data-screen="atom-chiller"]):not([data-screen="atom-electrica"]):not([data-screen="products-3d"])::after {
+    content: ''; display: block; height: 88px;
+  }
+  /* фильтры-«таблетки» — палец попадает уверенно */
+  .filter-tab { min-height: 36px; }
+}

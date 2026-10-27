@@ -14514,10 +14514,10 @@ async function openInboxInvoice(inboxId) {
   const overlayId = 'inbox-invoice-modal';
   let ov = document.getElementById(overlayId); if (ov) ov.remove();
   ov = document.createElement('div');
-  ov.id = overlayId; ov.className = 'modal-overlay';
+  ov.id = overlayId; ov.className = 'modal-overlay inv-modal-overlay';
   const dlName = String(fname || 'счёт').replace(/'/g, "\\'");
   ov.innerHTML =
-    '<div class="modal" style="max-width:820px;max-height:92vh;display:flex;flex-direction:column;">' +
+    '<div class="modal inv-modal" style="max-width:820px;max-height:92vh;display:flex;flex-direction:column;">' +
       '<div class="modal-header"><h2><i class="ti ti-receipt"></i> Счёт' + (num ? ' № ' + escapeHtml(num) : '') + '</h2>' +
         '<button class="icon-btn" onclick="document.getElementById(\'' + overlayId + '\').remove()"><i class="ti ti-x"></i></button></div>' +
       '<div class="modal-content" style="overflow-y:auto;">' +
@@ -14526,14 +14526,16 @@ async function openInboxInvoice(inboxId) {
         '<div style="margin-top:14px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);font-weight:600;">Предпросмотр</div>' +
         '<div id="inbox-inv-preview" style="margin-top:6px;"><div style="padding:14px;color:var(--text-light);text-align:center;">Загружаем файл…</div></div>' +
       '</div>' +
-      '<div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex-wrap:wrap;">' +
+      '<div class="modal-footer inv-modal-footer">' +
         (m.matched_order_id
-          ? '<button class="btn btn-secondary" style="color:#8C2A2A;" onclick="unmatchInboxAndPay(' + m.id + ',\'' + overlayId + '\')"><i class="ti ti-unlink"></i> Отвязать → На оплату</button>' +
-            '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openSupplyOrder(' + m.matched_order_id + ')"><i class="ti ti-package"></i> Открыть заказ</button>'
-          : '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openAttachInboxToOrder(' + m.id + ')"><i class="ti ti-link"></i> Привязать к заказу</button>' +
-            '<button class="btn" style="background:#16a34a;border-color:#16a34a;color:#fff;" onclick="sendInboxToPay(' + m.id + ',\'' + overlayId + '\')"><i class="ti ti-wallet"></i> На оплату</button>') +
-        '<button class="btn btn-secondary" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + (di >= 0 ? di : 0) + ',\'' + escapeHtml(dlName) + '\')"><i class="ti ti-download"></i> Скачать</button>' +
-        '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove()">Закрыть</button>' +
+          ? '<button class="btn inv-modal-primary inv-modal-primary--warn" onclick="unmatchInboxAndPay(' + m.id + ',\'' + overlayId + '\')"><i class="ti ti-unlink"></i> Отвязать → На оплату</button>' +
+            '<div class="inv-modal-secondary">' +
+              '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openSupplyOrder(' + m.matched_order_id + ')"><i class="ti ti-package"></i> Открыть заказ</button>'
+          : '<button class="btn inv-modal-primary" onclick="sendInboxToPay(' + m.id + ',\'' + overlayId + '\')"><i class="ti ti-wallet"></i> На оплату</button>' +
+            '<div class="inv-modal-secondary">' +
+              '<button class="btn btn-secondary" onclick="document.getElementById(\'' + overlayId + '\').remove();openAttachInboxToOrder(' + m.id + ')"><i class="ti ti-link"></i> Привязать</button>') +
+          '<button class="btn btn-secondary" onclick="downloadInboxAttachmentDirect(' + m.id + ',' + (di >= 0 ? di : 0) + ',\'' + escapeHtml(dlName) + '\')"><i class="ti ti-download"></i> Скачать</button>' +
+        '</div>' +
       '</div>' +
     '</div>';
   document.body.appendChild(ov);
@@ -14562,6 +14564,9 @@ async function _loadInboxInvPreview(inboxId, idx, filename) {
       if (state && state.isDesktop) {
         cont.innerHTML = '<iframe src="' + url + '#view=FitH" style="width:100%;height:70vh;border:1px solid var(--border);border-radius:8px;background:#f4f4f4;"></iframe>';
       } else {
+        // v2.46.274: на телефоне рисуем PDF прямо в карточке (pdf.js), кнопка — запасной путь
+        _inboxInvRenderPdfMobile(cont, blob, url, filename);
+        return;
         cont.innerHTML = '<div style="padding:16px;text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;">' +
           '<i class="ti ti-file-type-pdf" style="font-size:40px;color:#C0392B;"></i>' +
           '<div style="margin:8px 0;font-size:13px;word-break:break-word;">' + escapeHtml(filename || 'счёт.pdf') + '</div>' +
@@ -14572,6 +14577,37 @@ async function _loadInboxInvPreview(inboxId, idx, filename) {
     }
   } catch (e) {
     cont.innerHTML = '<div style="padding:14px;color:var(--danger);">Ошибка загрузки файла.</div>';
+  }
+}
+
+// v2.46.274: встроенный просмотр PDF счёта на телефоне (до 5 страниц, по ширине экрана)
+async function _inboxInvRenderPdfMobile(cont, blob, url, filename) {
+  const fallback = '<div class="inv-pdf-fallback"><button class="btn btn-secondary" onclick="window.open(\'' + url + '\',\'_blank\')">' +
+    '<i class="ti ti-external-link"></i> Открыть PDF целиком</button></div>';
+  cont.innerHTML = '<div class="inv-pdf-pages"><div class="inv-pdf-loading">Открываем PDF…</div></div>' + fallback;
+  try {
+    if (typeof _ensurePdfJs !== 'function') throw new Error('no pdfjs');
+    await _ensurePdfJs();
+    const doc = await window.pdfjsLib.getDocument({ data: await blob.arrayBuffer() }).promise;
+    const pages = cont.querySelector('.inv-pdf-pages');
+    if (!pages) return;
+    pages.innerHTML = '';
+    const w = Math.max(200, pages.clientWidth || (window.innerWidth - 32));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    for (let i = 1; i <= Math.min(doc.numPages, 5); i++) {
+      const page = await doc.getPage(i);
+      const vp1 = page.getViewport({ scale: 1 });
+      const vp = page.getViewport({ scale: (w / vp1.width) * dpr });
+      const c = document.createElement('canvas');
+      c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+      c.className = 'inv-pdf-page';
+      pages.appendChild(c);
+      await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    }
+    if (doc.numPages > 5) pages.insertAdjacentHTML('beforeend', '<div class="inv-pdf-more">Ещё ' + (doc.numPages - 5) + ' стр. — «Открыть PDF целиком»</div>');
+  } catch (e) {
+    const pages = cont.querySelector('.inv-pdf-pages');
+    if (pages) pages.innerHTML = '<div class="inv-pdf-loading"><i class="ti ti-file-type-pdf" style="font-size:40px;color:#C0392B;"></i><br>' + escapeHtml(filename || 'счёт.pdf') + '</div>';
   }
 }
 
@@ -18895,6 +18931,7 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {version:'v2.46.274',date:'27.10.2026',title:'Телефон: удобная карточка счёта',features:['Карточка входящего счёта на телефоне открывается на весь экран, PDF виден прямо в ней.','Главная кнопка оплаты — крупная внизу, «Открыть заказ» и «Скачать» — ровной строкой.','Пока открыта карточка или окно, плашки и круглые кнопки не перекрывают её.']},
   {version:'v2.46.273',date:'26.10.2026',title:'Плашка нового счёта: открывается и закрывается',features:['Нажатие на плашку «Новый входящий счёт» открывает карточку счёта и сразу убирает плашку.','У плашки появился крестик, её можно смахнуть в сторону; через 15 секунд она прячется сама.','Счёт ищется во всех входящих, а не только в непривязанных.']},
   {version:'v2.46.272',date:'23.10.2026',title:'Задачи: защита от случайного «готово»',features:['Галочка «готово» в списке задач теперь спрашивает подтверждение.','«В работу» в строке задачи стало отдельной крупной кнопкой подальше от галочки.']},
   {version:'v2.46.271',date:'22.10.2026',title:'Обзвон чиллеров',features:['После дозвона можно выбрать итог: интерес, КП, перезвон или отказ; комментарий хранится в журнале звонка.','В Продажи → Отчёты появилась вкладка «Обзвон чиллеров» с автоподсчётом и сохранением дневного отчёта.']},

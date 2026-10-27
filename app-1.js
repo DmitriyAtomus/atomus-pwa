@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.273";
+const APP_VERSION = "v2.46.274";
 const APP_VERSION_DATE = "22.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -7309,6 +7309,23 @@ function renderSupplyInvoiceAuthorAlerts(alerts) {
     root.setAttribute('aria-live', 'assertive');
     document.body.appendChild(root);
   }
+  // v2.46.274: несколько счетов — одна компактная плашка, а не стопка поверх экрана
+  if (_supplyInvoiceAuthorAlerts.length > 1) {
+    const n = _supplyInvoiceAuthorAlerts.length;
+    const names = [...new Set(_supplyInvoiceAuthorAlerts.map((a) => (a && a.supplier_name) || 'поставщика'))];
+    const from = escapeHtml(names.length === 1 ? 'От ' + names[0] : names.length + ' поставщиков');
+    root.innerHTML = '<div class="supply-author-alert" role="button" tabindex="0" data-inbox="0" onclick="openSupplyInvoiceAuthorAlertsAll()">' +
+        '<span class="supply-author-alert__icon"><i class="ti ti-file-invoice"></i></span>' +
+        '<span class="supply-author-alert__text"><b>Новых входящих счетов: ' + n + '</b>' +
+          '<small>' + from + '</small></span>' +
+        '<i class="ti ti-chevron-right supply-author-alert__go"></i>' +
+        '<button type="button" class="supply-author-alert__close" aria-label="Закрыть" ' +
+          'onclick="event.stopPropagation();dismissSupplyInvoiceAuthorAlertsAll()"><i class="ti ti-x"></i></button>' +
+      '</div>';
+    root.querySelectorAll('.supply-author-alert').forEach(_bindSupplyAlertGestures);
+    return;
+  }
+  if (_supplyAlertTimers[0]) { clearTimeout(_supplyAlertTimers[0]); delete _supplyAlertTimers[0]; }
   root.innerHTML = _supplyInvoiceAuthorAlerts.map((alert) => {
     const inboxId = Number(alert && alert.inbox_id) || 0;
     const supplier = escapeHtml((alert && alert.supplier_name) || 'поставщика');
@@ -7326,9 +7343,33 @@ function renderSupplyInvoiceAuthorAlerts(alerts) {
 }
 
 // свайп влево/вправо закрывает плашку; автоскрытие через 15 с
+function dismissSupplyInvoiceAuthorAlertsAll() {
+  _supplyInvoiceAuthorAlerts.slice().forEach((a) => dismissSupplyInvoiceAuthorAlert(a.inbox_id));
+}
+
+function _hideSupplyInvoiceAuthorAlertsSession() {
+  _supplyInvoiceAuthorAlerts.forEach((a) => { _supplyAlertHiddenSession[Number(a.inbox_id)] = 1; });
+  renderSupplyInvoiceAuthorAlerts([]);
+}
+
+function openSupplyInvoiceAuthorAlertsAll() {
+  const el = document.querySelector('.supply-author-alert[data-inbox="0"]');
+  if (el && el.dataset.swiped) return;
+  // список открыт — плашку прячем до перезагрузки, «прочитано» ставится при открытии конкретного счёта
+  _hideSupplyInvoiceAuthorAlertsSession();
+  try { if (typeof closeNotifModalForced === 'function') closeNotifModalForced(); } catch (_) {}
+  selectSection('supply');
+  state.supplyInboxFilter = 'all';
+  try { document.querySelectorAll('[data-sup-inbox]').forEach((b) => b.classList.toggle('active', b.dataset.supInbox === 'all')); } catch (_) {}
+  selectSidebarItem('supply-inbox');
+}
+
 function _bindSupplyAlertGestures(el) {
   const id = Number(el.dataset.inbox) || 0;
-  if (!_supplyAlertTimers[id]) {
+  if (!id) {   // общая плашка на несколько счетов
+    if (!_supplyAlertTimers[0]) _supplyAlertTimers[0] = setTimeout(() => { delete _supplyAlertTimers[0]; _hideSupplyInvoiceAuthorAlertsSession(); }, SUPPLY_ALERT_AUTOHIDE_MS);
+  }
+  if (id && !_supplyAlertTimers[id]) {
     _supplyAlertTimers[id] = setTimeout(() => {
       delete _supplyAlertTimers[id];
       _supplyAlertHiddenSession[id] = 1;
@@ -7347,7 +7388,7 @@ function _bindSupplyAlertGestures(el) {
     el.style.transition = '';
     if (Math.abs(dx) > 80) {
       el.dataset.swiped = '1';
-      dismissSupplyInvoiceAuthorAlert(id);
+      if (id) dismissSupplyInvoiceAuthorAlert(id); else dismissSupplyInvoiceAuthorAlertsAll();
     } else {
       el.style.transform = ''; el.style.opacity = '';
     }
