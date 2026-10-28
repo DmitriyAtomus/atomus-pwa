@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.276";
+const APP_VERSION = "v2.46.277";
 const APP_VERSION_DATE = "22.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -4550,8 +4550,13 @@ function devChatAttachPick(kind) {
 // В голосовом — отправляет реплику сразу, Клава отвечает голосом, а правки
 // начнутся только после отдельной команды «давай запускай» (это проверяет API).
 const DCVOICE_MODE_KEY = 'atomus_devchat_voice_dialogue';
+// v2.46.277: озвучка ответов Клавы пока не нужна (свой сервер синтеза отключён) —
+// прячем кнопки «Озвучить», «Голос» и «Мой голос». Код оставлен: чтобы вернуть,
+// поставьте true. Микрофон (диктовка текста) работает как раньше.
+const DCHAT_TTS_ENABLED = false;
 let _dcVoiceMode = false;
-try { _dcVoiceMode = localStorage.getItem(DCVOICE_MODE_KEY) === '1'; } catch (e) {}
+try { _dcVoiceMode = DCHAT_TTS_ENABLED && localStorage.getItem(DCVOICE_MODE_KEY) === '1'; } catch (e) {}
+try { if (!DCHAT_TTS_ENABLED) document.documentElement.classList.add('dchat-tts-off'); } catch (e) {}
 let _dcSpeechAudio = null;
 let _dcSpeechSource = null;
 let _dcSpeechUrl = '';
@@ -4574,6 +4579,7 @@ function _devChatVoiceModeApply() {
 }
 
 function devChatVoiceModeToggle() {
+  if (!DCHAT_TTS_ENABLED) return;
   _dcVoiceMode = !_dcVoiceMode;
   try { localStorage.setItem(DCVOICE_MODE_KEY, _dcVoiceMode ? '1' : '0'); } catch (e) {}
   _devChatVoiceModeApply();
@@ -4864,6 +4870,7 @@ async function devVoiceSend() {
 }
 
 async function _devChatSpeak(text, btn) {
+  if (!DCHAT_TTS_ENABLED) return;
   text = String(text || '').trim();
   if (!text) return;
   if (btn && _dcSpeechButton === btn && document.body.classList.contains('dchat-speaking')) {

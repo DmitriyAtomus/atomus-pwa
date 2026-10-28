@@ -27396,3 +27396,9 @@ body:has(.modal-overlay.visible) .fab { display: none !important; }
   .mobile-heavy-stub > i { font-size: 40px; color: var(--brand); }
   .mobile-heavy-stub small { color: var(--text-light); }
 }
+
+/* v2.46.277: озвучка в чате с Клавой скрыта (флаг DCHAT_TTS_ENABLED в app-1.js) */
+html.dchat-tts-off .dchat-speak,
+html.dchat-tts-off .dchat-voice-toggle,
+html.dchat-tts-off [data-dchat-voice-toggle],
+html.dchat-tts-off .dchat-eye[onclick="devVoiceSetup()"] { display: none !important; }
