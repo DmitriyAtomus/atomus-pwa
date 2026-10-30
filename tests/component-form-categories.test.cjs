@@ -23,7 +23,8 @@ function formContext(opts) {
   const o = opts || {};
   const modal = {
     id: 'comp-form-modal', innerHTML: '', className: '',
-    classList: { add() {}, remove() {} },
+    _cls: new Set(),
+    classList: { add(c) { modal._cls.add(c); }, remove(c) { modal._cls.delete(c); }, contains(c) { return modal._cls.has(c); } },
     querySelector: () => null,
     set onclick(v) {},
   };
@@ -119,7 +120,43 @@ test('при недоступной карточке пустая форма р�
   await ctx.open(81);
 
   assert.deepEqual(ctx.toast, { msg: 'Не удалось загрузить комплектующее', type: 'error' });
-  assert.equal(ctx._modal.innerHTML, '');
+  assert.doesNotMatch(ctx._modal.innerHTML, /id="cf-name"/);
+  assert.equal(ctx._modal.classList.contains('visible'), false, 'окно «Загрузка…» закрыто');
+});
+
+test('v2.46.278: окно открывается сразу, не дожидаясь API, и без /api/supply-items', async () => {
+  const ctx = formContext({ cachedCats: undefined, serverCats: CATS, components: [] });
+  let release;
+  const gate = new Promise(r => { release = r; });
+  const origGet = ctx.apiGet;
+  ctx.apiGet = async (url) => { await gate; return origGet(url); };
+
+  const p = ctx.open();
+  // API ещё не ответил, а окно уже видно с «Загрузка…»
+  assert.equal(ctx._modal.classList.contains('visible'), true);
+  assert.match(ctx._modal.innerHTML, /Новое комплектующее/);
+  assert.match(ctx._modal.innerHTML, /Загрузка…/);
+
+  release();
+  await p;
+  assert.match(ctx._modal.innerHTML, /id="cf-name"/);
+  assert.match(ctx._modal.innerHTML, /Сохранить/);
+  assert.ok(!(ctx.calls || []).includes('/api/supply-items'), 'справочник снабжения форме не нужен');
+});
+
+test('v2.46.278: если окно закрыли во время загрузки — форма не всплывает снова', async () => {
+  const ctx = formContext({ cachedCats: undefined, serverCats: CATS, components: [] });
+  let release;
+  const gate = new Promise(r => { release = r; });
+  const origGet = ctx.apiGet;
+  ctx.apiGet = async (url) => { await gate; return origGet(url); };
+
+  const p = ctx.open();
+  ctx._modal.classList.remove('visible');   // пользователь нажал ✕
+  release();
+  await p;
+  assert.equal(ctx._modal.classList.contains('visible'), false);
+  assert.doesNotMatch(ctx._modal.innerHTML, /id="cf-name"/);
 });
 
 test('категория, которой нет в справочнике, не подменяется первой', async () => {

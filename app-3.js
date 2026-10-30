@@ -749,6 +749,29 @@ async function openComponentForm(componentId) {
     return;
   }
   const isEdit = !!componentId;
+  // v2.46.278: окно показываем сразу с «Загрузка…». Раньше форма ждала подряд
+  // карточку, категории, поставщиков и весь справочник снабжения — при медленном
+  // API (таймаут /api/supply-items 20 с) кнопка «+ Новое комплектующее» выглядела
+  // мёртвой. Справочник снабжения форме вообще не нужен (поле убрано в v2.44.27).
+  let m = document.getElementById('comp-form-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'comp-form-modal';
+    m.className = 'modal-overlay';
+    m.onclick = (e) => { if (e.target === m) closeComponentForm(); };
+    document.body.appendChild(m);
+  }
+  const openToken = (window._compFormToken = (window._compFormToken || 0) + 1);
+  m.innerHTML =
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">' +
+      '<div class="modal-header">' +
+        '<h3><i class="ti ti-tool"></i> ' + (isEdit ? 'Редактировать' : 'Новое') + ' комплектующее</h3>' +
+        '<button class="modal-close" onclick="closeComponentForm()"><i class="ti ti-x"></i></button>' +
+      '</div>' +
+      '<div style="padding:28px 18px;text-align:center;color:var(--text-light);">' +
+        '<i class="ti ti-loader-2"></i> Загрузка…</div>' +
+    '</div>';
+  m.classList.add('visible');
   let c = isEdit ? (cache.components || []).find(x => x.id === componentId) : null;
   // v2.46.161: новый дашборд склада хранит строки в state.ptData, а не в
   // cache.components. Поэтому клик по строке передавал id, но форма не находила
@@ -761,6 +784,7 @@ async function openComponentForm(componentId) {
       if (fresh && fresh.id != null) c = fresh;
     } catch (e) { /* используем найденную в кэше карточку */ }
     if (!c) {
+      closeComponentForm();
       showToast('Не удалось загрузить комплектующее', 'error');
       return;
     }
@@ -768,31 +792,20 @@ async function openComponentForm(componentId) {
   // v2.45.884: форму открывают и из «Что закупить», и из подсказки о нехватке —
   // там справочник категорий ещё не загружен, селект оказывался пустым, а без
   // категории форма не сохраняется («Выбери категорию»). Тянем как поставщиков.
-  if (!(cache.componentCategories || []).length) {
-    try {
-      const rc = await apiGet('/api/components/categories');
-      cache.componentCategories = rc.categories || [];
-    } catch (e) { cache.componentCategories = cache.componentCategories || []; }
-  }
+  // Категории и поставщики грузим параллельно, а не друг за другом.
+  await Promise.all([
+    (cache.componentCategories || []).length ? null : apiGet('/api/components/categories')
+      .then(rc => { cache.componentCategories = (rc && rc.categories) || []; })
+      .catch(() => { cache.componentCategories = cache.componentCategories || []; }),
+    // ЭТАП 33: подгружаем поставщиков если ещё нет
+    cache.suppliers ? null : apiGet('/api/suppliers')
+      .then(r => { cache.suppliers = (r && r.suppliers) || []; })
+      .catch(() => { cache.suppliers = []; }),
+  ]);
+  // Пока грузились — окно закрыли или открыли другое комплектующее: не перерисовываем.
+  if (openToken !== window._compFormToken || !m.classList.contains('visible')) return;
   const cats = cache.componentCategories || [];
-
-  // ЭТАП 33: подгружаем поставщиков если ещё нет
-  if (!cache.suppliers) {
-    try {
-      const r = await apiGet('/api/suppliers');
-      cache.suppliers = r.suppliers || [];
-    } catch (e) { cache.suppliers = []; }
-  }
   const suppliers = cache.suppliers || [];
-
-  let m = document.getElementById('comp-form-modal');
-  if (!m) {
-    m = document.createElement('div');
-    m.id = 'comp-form-modal';
-    m.className = 'modal-overlay';
-    m.onclick = (e) => { if (e.target === m) closeComponentForm(); };
-    document.body.appendChild(m);
-  }
   const curCatKnown = !c || !c.category_id || cats.some(cat => cat.id === c.category_id);
   const catOptions =
     // Категория позиции пропала из справочника — показываем её отдельной строкой,
@@ -815,14 +828,8 @@ async function openComponentForm(componentId) {
   const curSupName = curSup ? curSup.name : '';
   const curSupId = curSup ? curSup.id : '';
 
-  // ЭТАП 28.3.1: подгружаем supply_items для выпадашки связи
-  if (!cache.supplyCatalog) {
-    try {
-      const dCat = await apiGet('/api/supply-items');
-      cache.supplyCatalog = dCat.items || dCat.supply_items || [];
-    } catch (e) { cache.supplyCatalog = []; }
-  }
-  // v2.44.27: siOptions больше не нужны — dropdown «Связь со снабжением» убран из формы
+  // v2.44.27: siOptions больше не нужны — dropdown «Связь со снабжением» убран из формы.
+  // v2.46.278: и /api/supply-items здесь больше не грузим — форма его не использует.
 
   // v2.44.30: для ТЭНов — отдельные поля «куда идёт» и «кВт».
   // Определяем по названию категории (содержит «тэн»).
@@ -839,6 +846,7 @@ async function openComponentForm(componentId) {
       cache.models = await apiGet('/api/models');
     } catch (e) { cache.models = { models: [] }; }
   }
+  if (openToken !== window._compFormToken || !m.classList.contains('visible')) return;
   const allModels = (cache.models && cache.models.models) || [];
   // v2.44.31: target_model_ids — массив. Парсим из JSON-строки если пришёл сырой
   // (бэк отдаёт как есть), либо берём массив, либо fallback на target_model_id.
@@ -857,7 +865,7 @@ async function openComponentForm(componentId) {
 
   // v2.43.87: модалка с max-height + flex-column, тело внутри прокручивается
   m.innerHTML =
-    '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;max-height:92vh;display:flex;flex-direction:column;">' +
+    '<div class="modal comp-form-sheet" onclick="event.stopPropagation()" style="max-width:520px;max-height:92vh;display:flex;flex-direction:column;">' +
       '<div class="modal-header">' +
         '<h3><i class="ti ti-tool"></i> ' + (isEdit ? 'Редактировать' : 'Новое') + ' комплектующее</h3>' +
         '<button class="modal-close" onclick="closeComponentForm()"><i class="ti ti-x"></i></button>' +
@@ -18933,6 +18941,7 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {version:'v2.46.278',date:'30.10.2026',title:'«Новое комплектующее» открывается сразу',features:['Кнопка «+ Новое комплектующее» в Номенклатуре комплектующих сразу открывает окно с «Загрузка…», а не молчит, пока сервер отвечает. Форма больше не ждёт лишний справочник снабжения, категории и поставщики грузятся параллельно. На телефоне форма помещается в экран, кнопки «Сохранить/Отмена» не уходят под панель браузера.']},
   {version:'v2.46.277',date:'28.10.2026',title:'Озвучка в чате с Клавой скрыта',features:['В чате с Клавой убраны кнопки озвучки ответов, «Голос» и «Мой голос» — пока озвучка не нужна. Диктовка голосом в поле ввода работает как раньше.']},
   {version:'v2.46.276',date:'27.10.2026',title:'Время во входящих счетах — по Екатеринбургу',features:['Во «Входящих счетах» время письма и «Последняя проверка» больше не убегают на 5 часов вперёд.']},
   {version:'v2.46.275',date:'27.10.2026',title:'Обновления ставятся сами',features:['Новая версия CRM устанавливается автоматически — ни переустанавливать значок, ни чистить кэш больше не нужно.','Если открыта заполненная форма, обновление подождёт, пока она сохранится.']},
