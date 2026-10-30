@@ -27469,3 +27469,4 @@ html.dchat-tts-off .dchat-eye[onclick="devVoiceSetup()"] { display: none !import
   .bfm-prow { flex-direction: column; gap: 6px; }
   .bfm-pright { align-items: flex-start; max-width: 100%; text-align: left; flex-direction: row; flex-wrap: wrap; }
 }
+.bfm-note.bfm-note-warn { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }

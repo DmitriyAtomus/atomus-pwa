@@ -11,7 +11,7 @@ const b = src.indexOf('// [bfm-pure-end]');
 assert.ok(a > 0 && b > a, 'секция «Из корпусов» найдена');
 const ctx = {};
 vm.runInNewContext(src.slice(a, b) +
-  '\nthis.f = { _bfmIsAisiModel, _bfmExec, _bfmArticle, _bfmLabel, _bfmLineText, _bfmBuildLines, _bfmMerge };', ctx);
+  '\nthis.f = { _bfmIsAisiModel, _bfmExec, _bfmArticle, _bfmLabel, _bfmLineText, _bfmBuildLines, _bfmMerge, _bfmNoParts, _bfmExpandParts };', ctx);
 const f = ctx.f;
 
 const KORPUS = { id: 1, designation: 'AG-02.000.000СБ', name: 'Корпус воздухоохладителя', variant: 'BS-TEF 043M ED' };
@@ -61,9 +61,49 @@ test('с деталями: количество × число корпусов, 
   assert.equal(lines[1].sources.length, 2, 'видно, из каких корпусов деталь');
 });
 
-test('с деталями: корпус без деталей идёт одной позицией', () => {
-  const lines = f._bfmBuildLines([{ item: KORPUS, qty: 1, parts: [] }], 'parts', false);
-  assert.equal(f._bfmLineText(lines[0], 1), '(1) AG-02.000.000 AG-02.000.000СБ Корпус воздухоохладителя BS-TEF 043M ED');
+test('v2.46.280: с деталями — корпус без деталей НЕ подставляется общей строкой', () => {
+  const sel = [{ item: KORPUS, qty: 1, parts: [] }];
+  const lines = f._bfmBuildLines(sel, 'parts', false);
+  assert.equal(lines.length, 0);
+  assert.deepEqual(Array.from(f._bfmNoParts(sel)), ['AG-02.000.000СБ Корпус воздухоохладителя BS-TEF 043M ED']);
+  assert.equal(f._bfmNoParts([{ item: KORPUS, qty: 1, parts: PARTS }]).length, 0);
+});
+
+test('v2.46.280: «С деталями» — режим по умолчанию и первая кнопка', () => {
+  assert.match(src, /mode: 'parts', q: '', sel: \{\}/);
+  const i = src.indexOf("> С деталями</button>");
+  const j = src.indexOf("> Одной позицией</button>");
+  assert.ok(i > 0 && j > i);
+});
+
+test('v2.46.280: вложенные подсборки раскрываются до деталей с умножением', async () => {
+  const items = {
+    1: { id: 1, designation: 'AG-25.000.000СБ', parts: [
+      { designation: 'AG-25.000.001', name: 'Балка', qty: 5, material: 'Лист 08Х18Н10' },
+      { designation: 'AG-25.010.000СБ', name: 'Крышка в сборе', qty: 2 },
+    ] },
+    2: { id: 2, designation: 'AG-25.010.000СБ', parts: [
+      { designation: 'AG-25.010.001', name: 'Крышка верхняя', qty: 1 },
+      { designation: 'AG-25.011.000', name: 'Узел', qty: 3 },
+    ] },
+    3: { id: 3, designation: 'AG-25.011.000', parts: [
+      { designation: 'AG-25.011.001', name: 'Балка верхняя', qty: 2 },
+    ] },
+    // одно-детальное изделие, где деталь = само изделие — не зацикливаемся
+    4: { id: 4, designation: 'AG-01.000.001', parts: [{ designation: 'AG-01.000.001', name: 'Ванна', qty: 1 }] },
+  };
+  const idx = { 'AG-25.000.000': 1, 'AG-25.010.000': 2, 'AG-25.011.000': 3, 'AG-01.000.001': 4 };
+  const getItem = async (id) => items[id];
+  const flat = await f._bfmExpandParts(items[1], getItem, idx, [], 0);
+  assert.deepEqual(flat.map(p => p.designation + '×' + p.qty).join(','),
+    'AG-25.000.001×5,AG-25.010.001×2,AG-25.011.001×12');
+  const self = await f._bfmExpandParts(items[4], getItem, idx, [], 0);
+  assert.equal(self.map(p => p.designation + '×' + p.qty).join(','), 'AG-01.000.001×1');
+  // петля A→B→A не вешает
+  const loop = { 5: { id: 5, designation: 'AG-50.000.000', parts: [{ designation: 'AG-51.000.000', qty: 1 }] },
+                 6: { id: 6, designation: 'AG-51.000.000', parts: [{ designation: 'AG-50.000.000', qty: 2 }] } };
+  const r = await f._bfmExpandParts(loop[5], async id => loop[id], { 'AG-50.000.000': 5, 'AG-51.000.000': 6 }, [], 0);
+  assert.equal(r.map(p => p.designation + '×' + p.qty).join(','), 'AG-50.000.000×2');
 });
 
 test('предпросмотр: уже имеющаяся позиция — количество складывается', () => {

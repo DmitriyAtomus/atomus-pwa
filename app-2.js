@@ -14832,13 +14832,51 @@ function _bfmBuildLines(sel, mode, modelAisi) {
     const itemLabel = _bfmLabel(it.designation, it.name, it.variant);
     const itemMaterial = /AISI|нерж/i.test(itemLabel) ? 'AISI' : '';
     const parts = (s.parts || []).filter(p => p && p.is_active !== 0);
-    if (mode === 'parts' && parts.length) {
+    if (mode === 'parts') {
+      // v2.46.280: без деталей корпус НЕ подставляем общей строкой — его покажем
+      // предупреждением в предпросмотре (см. _bfmNoParts).
       parts.forEach(p => push(_bfmLabel(p.designation, p.name, ''), p.material,
         (Number(p.qty) || 1) * n, itemLabel));
     } else {
       push(itemLabel, itemMaterial, n, itemLabel);
     }
   });
+  return out;
+}
+
+function _bfmNoParts(sel) {
+  return (sel || []).filter(s => !((s.parts || []).filter(p => p && p.is_active !== 0).length))
+    .map(s => _bfmLabel((s.item || {}).designation, (s.item || {}).name, (s.item || {}).variant));
+}
+
+function _bfmArtKey(text) {
+  const a = _bfmArticle(text);
+  return a ? a.toUpperCase() : '';
+}
+
+// v2.46.280: раскрываем вложенные подсборки до конечных деталей. Деталь, чей
+// артикул совпадает с другим изделием из «Изготовления корпусов» (у которого есть
+// свои детали), заменяется его деталями × количество. Защита от петель и от
+// «самого себя» (одно-детальные изделия, где деталь = изделие).
+// getItem(id) → Promise<{id, designation, name, parts}>; artIndex: {ART: itemId}
+async function _bfmExpandParts(item, getItem, artIndex, chain, depth) {
+  const path = (chain || []).concat([item.id]);
+  const out = [];
+  const parts = (item.parts || []).filter(p => p && p.is_active !== 0);
+  for (const p of parts) {
+    const qty = Number(p.qty) || 1;
+    const key = _bfmArtKey(p.designation) || _bfmArtKey(p.name);
+    const subId = key ? artIndex[key] : null;
+    if (subId && path.indexOf(subId) < 0 && (depth || 0) < 8) {
+      const sub = await getItem(subId);
+      const subParts = sub ? await _bfmExpandParts(sub, getItem, artIndex, path, (depth || 0) + 1) : [];
+      if (subParts.length) {
+        subParts.forEach(sp => out.push(Object.assign({}, sp, { qty: (Number(sp.qty) || 1) * qty })));
+        continue;
+      }
+    }
+    out.push({ designation: p.designation, name: p.name, material: p.material, qty: qty });
+  }
   return out;
 }
 
@@ -14890,7 +14928,7 @@ async function openBomFromMfg(modelId, modelName) {
   const m = ((cache.models && cache.models.models) || []).find(x => x.id === modelId) || { name: modelName };
   state._bfm = {
     modelId: modelId, modelName: modelName || m.name || '', aisi: _bfmIsAisiModel(m),
-    mode: 'whole', q: '', sel: {}, open: {}, items: null, groups: [], parts: {},
+    mode: 'parts', q: '', sel: {}, open: {}, items: null, groups: [], parts: {}, details: {},
     acceptWrong: true, createMissing: true, preview: null, busy: false,
   };
   let ov = document.getElementById('bfm-modal');
@@ -14965,14 +15003,14 @@ function _bfmRender() {
     '<div class="bfm-model">' + escapeHtml(b.modelName) +
       (b.aisi ? ' <span class="bfm-tag-aisi">AISI</span>' : '') + '</div>' +
     '<div class="bfm-seg">' +
-      '<button type="button" class="' + (b.mode === 'whole' ? 'on' : '') + '" onclick="bfmSetMode(\'whole\')">' +
-        '<i class="ti ti-box"></i> Одной позицией</button>' +
       '<button type="button" class="' + (b.mode === 'parts' ? 'on' : '') + '" onclick="bfmSetMode(\'parts\')">' +
         '<i class="ti ti-list-tree"></i> С деталями</button>' +
+      '<button type="button" class="' + (b.mode === 'whole' ? 'on' : '') + '" onclick="bfmSetMode(\'whole\')">' +
+        '<i class="ti ti-box"></i> Одной позицией</button>' +
     '</div>' +
     '<div class="bfm-hint">' + (b.mode === 'parts'
-      ? 'В тех. карту попадут детали корпуса; их количество умножится на число корпусов.'
-      : 'Корпус встанет в тех. карту одной строкой.') +
+      ? 'В тех. карту попадут детали корпуса (подсборки раскрываются до деталей); их количество умножится на число корпусов.'
+      : '<b style="color:#B45309;">Корпус встанет одной общей строкой, без деталей.</b>') +
       ' Исполнение: по материалу детали, иначе ' + (b.aisi ? '<b>AISI</b>, как у модели.' : 'сталь, как у модели.') + '</div>' +
     '<input type="search" class="form-input bfm-search" placeholder="Поиск: AG-02, корпус, нагреватель…" value="' +
       escapeHtml(b.q) + '" oninput="bfmSearch(this.value)">' +
@@ -15103,13 +15141,30 @@ async function bfmPreview() {
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Проверяем…'; }
   try {
     if (b.mode === 'parts') {
-      const need = ids.filter(id => !b.parts[id]);
-      const got = await Promise.all(need.map(id => apiGet('/api/mfg/items/' + id)));
-      got.forEach((d, i) => { b.parts[need[i]] = (d && d.parts) || []; });
+      const getItem = (id) => {
+        if (!b.details[id]) b.details[id] = apiGet('/api/mfg/items/' + id);
+        return b.details[id];
+      };
+      const artIndex = {};
+      Object.keys(b.items || {}).forEach(k => {
+        const it = b.items[k];
+        const key = _bfmArtKey(it.designation) || _bfmArtKey(it.name);
+        if (key && !artIndex[key] && Number(it.parts_count) > 0) artIndex[key] = it.id;
+      });
+      for (const id of ids) {
+        if (b.parts[id]) continue;
+        const d = await getItem(id);
+        b.parts[id] = d ? await _bfmExpandParts(d, getItem, artIndex, [], 0) : [];
+      }
     }
     const sel = ids.map(id => ({ item: b.items[id], qty: b.sel[id], parts: b.parts[id] || null }));
-    const noParts = b.mode === 'parts' ? sel.filter(s => !(s.parts || []).length).map(s => s.item._label) : [];
+    const noParts = b.mode === 'parts' ? _bfmNoParts(sel) : [];
     const lines = _bfmBuildLines(sel, b.mode, b.aisi);
+    if (!lines.length) {
+      b.preview = { rows: [], noParts: noParts };
+      _bfmRender();
+      return;
+    }
     const text = lines.map(l => _bfmLineText(l, l.qty)).join('\n');
     const [parsed, bom] = await Promise.all([
       apiPost('/api/bom/parse', { text: text }),
@@ -15151,9 +15206,11 @@ function _bfmRenderPreview() {
     (rows.length - go ? '<span>пропуск <b>' + (rows.length - go) + '</b></span>' : '') +
   '</div>';
   if (b.preview.noParts.length) {
-    h += '<div class="bfm-note"><i class="ti ti-info-circle"></i> Без деталей, поэтому одной позицией: ' +
-      b.preview.noParts.map(escapeHtml).join(', ') + '</div>';
+    h += '<div class="bfm-note bfm-note-warn"><i class="ti ti-alert-triangle"></i> <b>У корпуса нет деталей</b> в «Изготовлении корпусов» — ' +
+      'в тех. карту он <b>не добавлен</b>: ' + b.preview.noParts.map(escapeHtml).join(', ') +
+      '. Загрузите детали в карточку корпуса или выберите «Одной позицией».</div>';
   }
+  if (!rows.length) h += '<div class="empty-block">Добавлять нечего.</div>';
   h += '<div class="bfm-prev">';
   rows.forEach(r => {
     const s = st[r.status];
