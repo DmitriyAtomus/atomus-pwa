@@ -27402,3 +27402,12 @@ html.dchat-tts-off .dchat-speak,
 html.dchat-tts-off .dchat-voice-toggle,
 html.dchat-tts-off [data-dchat-voice-toggle],
 html.dchat-tts-off .dchat-eye[onclick="devVoiceSetup()"] { display: none !important; }
+
+/* v2.46.278: форма «Новое/Редактировать комплектующее» на телефоне —
+   высота по видимой области (dvh), поля 16px (iOS не зумит), кнопки над home-индикатором. */
+@media (max-width: 699px) {
+  #comp-form-modal .modal { max-width: 100% !important; max-height: 92vh !important; max-height: 92dvh !important; }
+  #comp-form-modal .comp-form-sheet .form-input { font-size: 16px; }
+  #comp-form-modal .comp-form-sheet > div:last-child { padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important; }
+  #comp-form-modal .comp-form-sheet > div:last-child .btn { flex: 1 1 auto; justify-content: center; }
+}
