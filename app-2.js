@@ -5215,6 +5215,10 @@ async function openModelDetail(modelId, orderContext) {
                 '<i class="ti ti-clipboard-data"></i> Импорт BOM' +
               '</button>' : '') +
             (canManageModel ?
+              '<button class="btn btn-secondary btn-small" onclick="openBomFromMfg(' + modelId + ', ' + JSON.stringify(m.name || '').replace(/"/g, '&quot;') + ')" title="Добавить корпуса из «Изготовления корпусов» — целиком или с деталями">' +
+                '<i class="ti ti-box-multiple"></i> Из корпусов' +
+              '</button>' : '') +
+            (canManageModel ?
               '<button class="btn btn-primary btn-small" onclick="openBomAddItem(' + modelId + ')">' +
                 '<i class="ti ti-plus"></i> Позиция' +
               '</button>' : '') +
@@ -14753,3 +14757,471 @@ function renderPackingListPrint(box) {
   w.document.close();
 }
 
+
+// ============ v2.46.279: «Из корпусов» — корпуса из «Изготовления корпусов» в тех. карту ============
+// Выбираем корпуса (галочка + количество), режим «одной позицией» или «с деталями»
+// (кол-во деталей × кол-во корпусов), исполнение AISI определяем сами. Проверка и
+// импорт идут тем же путём, что «Импорт BOM» (/api/bom/parse → /bom/import-text).
+// Если позиция уже есть в тех. карте — количество СКЛАДЫВАЕТСЯ (бэк при импорте
+// ставит переданное число, поэтому отправляем «было + добавляем»).
+// [bfm-pure-start]
+const _BFM_ART_RE = /([A-ZА-Я]{2,5}-?\d+(?:[.\-]\d+){2,4}(?:-\d+)?)/;
+
+function _bfmIsAisiModel(m) {
+  if (!m) return false;
+  return /AISI/i.test(m.name || '') || /^нерж/i.test(String(m.exec_fixed || '').trim());
+}
+
+// Исполнение строки: по материалу детали, иначе — как у модели.
+function _bfmExec(material, fallbackAisi) {
+  const s = String(material || '');
+  if (/AISI|нерж|\d{2}[ХX]1[78][НH]|[ХX]18[НH]\d/i.test(s)) return 'stainless';
+  if (/(^|[^А-ЯA-Z])Ст\s*\d|\bS2\d\d|\bDC0\d/i.test(s)) return 'standard';
+  return fallbackAisi ? 'stainless' : 'standard';
+}
+
+function _bfmArticle(text) {
+  const m = _BFM_ART_RE.exec(String(text || ''));
+  return m ? m[1] : '';
+}
+
+function _bfmLabel(designation, name, variant) {
+  const d = String(designation || '').trim();
+  let n = String(name || '').trim();
+  const v = String(variant || '').trim();
+  const base = _bfmArticle(d);
+  let label = (d && !(base && n.indexOf(base) >= 0) && n.indexOf(d) < 0) ? (d + ' ' + n) : n;
+  if (v && label.indexOf(v) < 0) label += ' ' + v;
+  return label.replace(/\s+/g, ' ').trim();
+}
+
+function _bfmFmtQty(q) {
+  const n = Math.round((Number(q) || 0) * 1000) / 1000;
+  return String(n);
+}
+
+// Строка в формате «Импорт BOM»: «(кол-во[N]) АРТИКУЛ название». Артикул ставим
+// отдельно И оставляем в названии — новая позиция получит имя «AG-02.000.001 Кожух»,
+// а не голое «Кожух» (иначе одноимённые детали разных корпусов склеились бы).
+function _bfmLineText(line, qty) {
+  const pre = '(' + _bfmFmtQty(qty) + (line.exec === 'stainless' ? 'N' : '') + ')';
+  return pre + ' ' + (line.art ? line.art + ' ' : '') + line.label;
+}
+
+// sel: [{item, qty, parts|null}] → строки, одинаковые детали складываются.
+function _bfmBuildLines(sel, mode, modelAisi) {
+  const out = [];
+  const byKey = {};
+  const push = (label, material, qty, src) => {
+    if (!label || !(qty > 0)) return;
+    const art = _bfmArticle(label);
+    const exec = _bfmExec(material, modelAisi);
+    const key = (art ? art.toUpperCase() : label.toLowerCase()) + '|' + exec;
+    if (byKey[key]) {
+      byKey[key].qty += qty;
+      if (byKey[key].sources.indexOf(src) < 0) byKey[key].sources.push(src);
+      return;
+    }
+    const line = { key: key, art: art, label: label, exec: exec, qty: qty, sources: [src] };
+    byKey[key] = line;
+    out.push(line);
+  };
+  (sel || []).forEach(s => {
+    const it = s.item || {};
+    const n = Number(s.qty) || 0;
+    const itemLabel = _bfmLabel(it.designation, it.name, it.variant);
+    const itemMaterial = /AISI|нерж/i.test(itemLabel) ? 'AISI' : '';
+    const parts = (s.parts || []).filter(p => p && p.is_active !== 0);
+    if (mode === 'parts' && parts.length) {
+      parts.forEach(p => push(_bfmLabel(p.designation, p.name, ''), p.material,
+        (Number(p.qty) || 1) * n, itemLabel));
+    } else {
+      push(itemLabel, itemMaterial, n, itemLabel);
+    }
+  });
+  return out;
+}
+
+// Сведение разбора (/api/bom/parse) и текущей тех. карты: что будет с каждой строкой.
+function _bfmMerge(lines, parsedItems, bomItems, opts) {
+  const o = opts || {};
+  const byComp = {};
+  const byName = {};
+  (bomItems || []).forEach(b => {
+    if (b.component_id == null) return;
+    byComp[b.component_id] = Number(b.qty_required) || 0;
+    const nm = String(b.component_name || '').trim().toLowerCase();
+    if (nm) byName[nm] = { cid: b.component_id, qty: Number(b.qty_required) || 0 };
+  });
+  const running = {};
+  return (lines || []).map((line, i) => {
+    const p = (parsedItems || [])[i] || {};
+    const comp = p.component || null;
+    let status = 'skip', reason = '', cid = null;
+    if (p.match === 'exact' && comp) { status = 'exact'; cid = comp.id; }
+    else if (p.match === 'wrong_execution' && comp) {
+      if (o.acceptWrong) { status = 'wrong'; cid = comp.id; }
+      else reason = 'в номенклатуре только другое исполнение';
+    } else if (o.createMissing) {
+      status = 'create';
+      const nm = String((p.parsed && p.parsed.name) || '').trim().toLowerCase();
+      if (nm && byName[nm]) cid = byName[nm].cid;
+    } else reason = 'нет в номенклатуре';
+    const ck = cid != null ? 'c' + cid : null;
+    const existing = ck ? (running[ck] != null ? running[ck] : (byComp[cid] || 0)) : 0;
+    const final = status === 'skip' ? existing : existing + line.qty;
+    if (ck && status !== 'skip') running[ck] = final;
+    return {
+      line: line, status: status, reason: reason, existing: existing, final: final,
+      component: comp, text: status === 'skip' ? '' : _bfmLineText(line, final),
+    };
+  });
+}
+// [bfm-pure-end]
+
+function _bfmRootOf(sectionId, byId) {
+  let s = byId[sectionId];
+  let guard = 0;
+  while (s && s.parent_id && byId[s.parent_id] && guard++ < 20) s = byId[s.parent_id];
+  return s || null;
+}
+
+async function openBomFromMfg(modelId, modelName) {
+  const m = ((cache.models && cache.models.models) || []).find(x => x.id === modelId) || { name: modelName };
+  state._bfm = {
+    modelId: modelId, modelName: modelName || m.name || '', aisi: _bfmIsAisiModel(m),
+    mode: 'whole', q: '', sel: {}, open: {}, items: null, groups: [], parts: {},
+    acceptWrong: true, createMissing: true, preview: null, busy: false,
+  };
+  let ov = document.getElementById('bfm-modal');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'bfm-modal';
+    ov.className = 'modal-overlay';
+    ov.onclick = (e) => { if (e.target === ov) closeBomFromMfg(); };
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML =
+    '<div class="modal bfm-sheet" onclick="event.stopPropagation()">' +
+      '<div class="modal-header"><h3><i class="ti ti-box-multiple"></i> Из корпусов → тех. карта</h3>' +
+        '<button class="modal-close" onclick="closeBomFromMfg()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="bfm-body" id="bfm-body"><div class="loading-block">Загружаем корпуса…</div></div>' +
+      '<div class="bfm-foot" id="bfm-foot"></div>' +
+    '</div>';
+  ov.classList.add('visible');
+  try {
+    const [rs, ri] = await Promise.all([apiGet('/api/mfg/sections'), apiGet('/api/mfg/items')]);
+    if (!state._bfm || state._bfm.modelId !== modelId) return;
+    const secs = (rs && rs.sections) || [];
+    const byId = {};
+    secs.forEach(s => { byId[s.id] = s; });
+    const groups = {};
+    const order = [];
+    ((ri && ri.items) || []).forEach(it => {
+      delete it.thumbs;
+      const root = _bfmRootOf(it.section_id, byId);
+      const gid = root ? root.id : 0;
+      if (!groups[gid]) {
+        groups[gid] = { id: gid, name: root ? root.name : 'Без раздела',
+          sort: root ? (Number(root.sort_order) || 0) : 1e9, items: [] };
+        order.push(gid);
+      }
+      it._label = _bfmLabel(it.designation, it.name, it.variant);
+      groups[gid].items.push(it);
+    });
+    const list = order.map(g => groups[g]);
+    list.forEach(g => g.items.sort((a, b) => a._label.localeCompare(b._label, 'ru')));
+    list.sort((a, b) => (a.sort - b.sort) || a.name.localeCompare(b.name, 'ru'));
+    state._bfm.groups = list;
+    state._bfm.items = {};
+    list.forEach(g => g.items.forEach(it => { state._bfm.items[it.id] = it; }));
+    _bfmRender();
+  } catch (e) {
+    const body = document.getElementById('bfm-body');
+    if (body) body.innerHTML = '<div class="empty-block"><i class="ti ti-alert-triangle"></i> Не удалось загрузить корпуса: ' +
+      escapeHtml(String((e && e.message) || e)) + '</div>';
+  }
+}
+
+function closeBomFromMfg() {
+  const ov = document.getElementById('bfm-modal');
+  if (ov) ov.classList.remove('visible');
+  state._bfm = null;
+}
+
+function _bfmSelCount() {
+  const b = state._bfm;
+  return b ? Object.keys(b.sel).filter(k => b.sel[k] > 0).length : 0;
+}
+
+function _bfmRender() {
+  const b = state._bfm;
+  const body = document.getElementById('bfm-body');
+  const foot = document.getElementById('bfm-foot');
+  if (!b || !body || !foot) return;
+  if (b.preview) { _bfmRenderPreview(); return; }
+  const q = b.q.trim().toLowerCase();
+  let h = '<div class="bfm-top">' +
+    '<div class="bfm-model">' + escapeHtml(b.modelName) +
+      (b.aisi ? ' <span class="bfm-tag-aisi">AISI</span>' : '') + '</div>' +
+    '<div class="bfm-seg">' +
+      '<button type="button" class="' + (b.mode === 'whole' ? 'on' : '') + '" onclick="bfmSetMode(\'whole\')">' +
+        '<i class="ti ti-box"></i> Одной позицией</button>' +
+      '<button type="button" class="' + (b.mode === 'parts' ? 'on' : '') + '" onclick="bfmSetMode(\'parts\')">' +
+        '<i class="ti ti-list-tree"></i> С деталями</button>' +
+    '</div>' +
+    '<div class="bfm-hint">' + (b.mode === 'parts'
+      ? 'В тех. карту попадут детали корпуса; их количество умножится на число корпусов.'
+      : 'Корпус встанет в тех. карту одной строкой.') +
+      ' Исполнение: по материалу детали, иначе ' + (b.aisi ? '<b>AISI</b>, как у модели.' : 'сталь, как у модели.') + '</div>' +
+    '<input type="search" class="form-input bfm-search" placeholder="Поиск: AG-02, корпус, нагреватель…" value="' +
+      escapeHtml(b.q) + '" oninput="bfmSearch(this.value)">' +
+  '</div><div id="bfm-list">' + _bfmListHtml(q) + '</div>';
+  body.innerHTML = h;
+  _bfmRenderFoot();
+}
+
+function _bfmListHtml(q) {
+  const b = state._bfm;
+  let h = '';
+  let shown = 0;
+  (b.groups || []).forEach(g => {
+    const items = q ? g.items.filter(it => it._label.toLowerCase().indexOf(q) >= 0) : g.items;
+    if (!items.length) return;
+    const selN = g.items.filter(it => b.sel[it.id] > 0).length;
+    const open = q ? true : !!b.open[g.id];
+    h += '<div class="bfm-group">' +
+      '<button type="button" class="bfm-ghead" onclick="bfmToggleGroup(' + g.id + ')">' +
+        '<i class="ti ti-chevron-' + (open ? 'down' : 'right') + '"></i>' +
+        '<span class="bfm-gname">' + escapeHtml(g.name) + '</span>' +
+        (selN ? '<span class="bfm-gsel">выбрано ' + selN + '</span>' : '') +
+        '<span class="bfm-gcount">' + items.length + '</span>' +
+      '</button>';
+    if (open) {
+      items.forEach(it => {
+        shown++;
+        const qty = b.sel[it.id] || 0;
+        h += '<div class="bfm-row' + (qty > 0 ? ' on' : '') + '" id="bfm-row-' + it.id + '">' +
+          '<label class="bfm-check"><input type="checkbox"' + (qty > 0 ? ' checked' : '') +
+            ' onchange="bfmToggleItem(' + it.id + ', this.checked)">' +
+            '<span class="bfm-name">' + escapeHtml(it._label) +
+              (it.parts_count ? ' <span class="bfm-parts">' + it.parts_count + ' дет.</span>' : '') +
+            '</span></label>' +
+          (qty > 0
+            ? '<div class="bfm-qty">' +
+                '<button type="button" onclick="bfmQtyStep(' + it.id + ',-1)" aria-label="Меньше">−</button>' +
+                '<input type="number" inputmode="numeric" min="1" step="1" value="' + qty + '" ' +
+                  'oninput="bfmQtySet(' + it.id + ', this.value)" aria-label="Количество корпусов">' +
+                '<button type="button" onclick="bfmQtyStep(' + it.id + ',1)" aria-label="Больше">+</button>' +
+              '</div>'
+            : '') +
+        '</div>';
+      });
+    }
+    h += '</div>';
+  });
+  if (!(b.groups || []).length) h = '<div class="empty-block">В «Изготовлении корпусов» пока нет изделий.</div>';
+  else if (q && !shown) h = '<div class="empty-block">Ничего не найдено.</div>';
+  return h;
+}
+
+function _bfmRenderList() {
+  const b = state._bfm;
+  const box = document.getElementById('bfm-list');
+  if (b && box) box.innerHTML = _bfmListHtml(b.q.trim().toLowerCase());
+  _bfmRenderFoot();
+}
+
+function _bfmRenderFoot() {
+  const b = state._bfm;
+  const foot = document.getElementById('bfm-foot');
+  if (!b || !foot) return;
+  const n = _bfmSelCount();
+  foot.innerHTML =
+    '<label class="bfm-opt"><input type="checkbox"' + (b.createMissing ? ' checked' : '') +
+      ' onchange="state._bfm.createMissing=this.checked"> Создавать недостающие позиции</label>' +
+    '<label class="bfm-opt"><input type="checkbox"' + (b.acceptWrong ? ' checked' : '') +
+      ' onchange="state._bfm.acceptWrong=this.checked"> Брать позицию с другим исполнением</label>' +
+    '<div class="bfm-actions">' +
+      '<span class="bfm-count">Выбрано корпусов: <b>' + n + '</b></span>' +
+      '<button class="btn btn-secondary" onclick="closeBomFromMfg()">Отмена</button>' +
+      '<button class="btn btn-primary" id="bfm-check-btn" onclick="bfmPreview()"' + (n ? '' : ' disabled') + '>' +
+        '<i class="ti ti-eye"></i> Проверить</button>' +
+    '</div>';
+}
+
+function bfmSetMode(mode) {
+  if (!state._bfm) return;
+  state._bfm.mode = mode === 'parts' ? 'parts' : 'whole';
+  _bfmRender();
+}
+
+function bfmSearch(v) {
+  if (!state._bfm) return;
+  state._bfm.q = String(v || '');
+  _bfmRenderList();
+}
+
+function bfmToggleGroup(id) {
+  const b = state._bfm;
+  if (!b) return;
+  b.open[id] = !b.open[id];
+  _bfmRenderList();
+}
+
+function bfmToggleItem(id, on) {
+  const b = state._bfm;
+  if (!b) return;
+  if (on) b.sel[id] = b.sel[id] > 0 ? b.sel[id] : 1;
+  else delete b.sel[id];
+  _bfmRenderList();
+}
+
+function bfmQtyStep(id, d) {
+  const b = state._bfm;
+  if (!b) return;
+  const n = (b.sel[id] || 0) + d;
+  if (n <= 0) delete b.sel[id];
+  else b.sel[id] = n;
+  _bfmRenderList();
+}
+
+function bfmQtySet(id, v) {
+  const b = state._bfm;
+  if (!b) return;
+  const n = parseFloat(String(v).replace(',', '.'));
+  if (n > 0) b.sel[id] = n;
+}
+
+async function bfmPreview() {
+  const b = state._bfm;
+  if (!b || b.busy) return;
+  const ids = Object.keys(b.sel).filter(k => b.sel[k] > 0).map(Number);
+  if (!ids.length) { showToast('Отметь хотя бы один корпус', 'error'); return; }
+  b.busy = true;
+  const btn = document.getElementById('bfm-check-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Проверяем…'; }
+  try {
+    if (b.mode === 'parts') {
+      const need = ids.filter(id => !b.parts[id]);
+      const got = await Promise.all(need.map(id => apiGet('/api/mfg/items/' + id)));
+      got.forEach((d, i) => { b.parts[need[i]] = (d && d.parts) || []; });
+    }
+    const sel = ids.map(id => ({ item: b.items[id], qty: b.sel[id], parts: b.parts[id] || null }));
+    const noParts = b.mode === 'parts' ? sel.filter(s => !(s.parts || []).length).map(s => s.item._label) : [];
+    const lines = _bfmBuildLines(sel, b.mode, b.aisi);
+    const text = lines.map(l => _bfmLineText(l, l.qty)).join('\n');
+    const [parsed, bom] = await Promise.all([
+      apiPost('/api/bom/parse', { text: text }),
+      apiGet('/api/models/' + b.modelId + '/bom'),
+    ]);
+    if (!parsed.ok) throw new Error((parsed.data && parsed.data.message) || 'Ошибка разбора');
+    if (state._bfm !== b) return;
+    b.preview = {
+      rows: _bfmMerge(lines, (parsed.data && parsed.data.items) || [], (bom && bom.items) || [],
+        { acceptWrong: b.acceptWrong, createMissing: b.createMissing }),
+      noParts: noParts,
+    };
+    _bfmRender();
+  } catch (e) {
+    showToast('Не удалось проверить: ' + ((e && e.message) || e), 'error');
+    _bfmRenderFoot();
+  } finally {
+    b.busy = false;
+  }
+}
+
+function _bfmRenderPreview() {
+  const b = state._bfm;
+  const body = document.getElementById('bfm-body');
+  const foot = document.getElementById('bfm-foot');
+  const rows = b.preview.rows;
+  const st = {
+    exact: ['bfm-st-ok', 'есть в номенклатуре'],
+    wrong: ['bfm-st-warn', 'другое исполнение'],
+    create: ['bfm-st-new', 'будет создана'],
+    skip: ['bfm-st-skip', 'пропуск'],
+  };
+  const go = rows.filter(r => r.status !== 'skip').length;
+  const add = rows.filter(r => r.status !== 'skip' && r.existing > 0).length;
+  let h = '<div class="bfm-sum">' +
+    '<span>строк <b>' + rows.length + '</b></span>' +
+    '<span>в тех. карту <b>' + go + '</b></span>' +
+    (add ? '<span class="bfm-st-add">прибавим к имеющимся <b>' + add + '</b></span>' : '') +
+    (rows.length - go ? '<span>пропуск <b>' + (rows.length - go) + '</b></span>' : '') +
+  '</div>';
+  if (b.preview.noParts.length) {
+    h += '<div class="bfm-note"><i class="ti ti-info-circle"></i> Без деталей, поэтому одной позицией: ' +
+      b.preview.noParts.map(escapeHtml).join(', ') + '</div>';
+  }
+  h += '<div class="bfm-prev">';
+  rows.forEach(r => {
+    const s = st[r.status];
+    const qtyHtml = r.status === 'skip'
+      ? '<span class="bfm-q">' + _bfmFmtQty(r.line.qty) + '</span>'
+      : (r.existing > 0
+        ? '<span class="bfm-q bfm-st-add" title="Уже есть в тех. карте — количество сложится">' +
+            _bfmFmtQty(r.existing) + ' + ' + _bfmFmtQty(r.line.qty) + ' = <b>' + _bfmFmtQty(r.final) + '</b></span>'
+        : '<span class="bfm-q"><b>' + _bfmFmtQty(r.final) + '</b></span>');
+    h += '<div class="bfm-prow">' +
+      '<div class="bfm-pname">' + escapeHtml(r.line.label) +
+        (r.line.exec === 'stainless' ? ' <span class="bfm-tag-aisi">AISI</span>' : '') +
+        (r.component && r.status !== 'create' && r.component.name && r.component.name !== r.line.label
+          ? '<div class="bfm-pcomp">→ ' + escapeHtml(r.component.name) + '</div>' : '') +
+        (r.line.sources.length > 1 || b.mode === 'parts'
+          ? '<div class="bfm-psrc">' + r.line.sources.map(escapeHtml).join(' · ') + '</div>' : '') +
+      '</div>' +
+      '<div class="bfm-pright">' + qtyHtml +
+        '<span class="bfm-st ' + s[0] + '">' + (r.existing > 0 && r.status !== 'skip' ? 'уже в тех. карте · ' : '') +
+          s[1] + (r.reason ? ': ' + escapeHtml(r.reason) : '') + '</span>' +
+      '</div>' +
+    '</div>';
+  });
+  h += '</div>';
+  body.innerHTML = h;
+  foot.innerHTML = '<div class="bfm-actions">' +
+    '<button class="btn btn-secondary" onclick="bfmBack()"><i class="ti ti-arrow-left"></i> Назад</button>' +
+    '<button class="btn btn-primary" id="bfm-go-btn" onclick="bfmImport()"' + (go ? '' : ' disabled') + '>' +
+      '<i class="ti ti-download"></i> Импортировать (' + go + ')</button>' +
+  '</div>';
+}
+
+function bfmBack() {
+  if (!state._bfm) return;
+  state._bfm.preview = null;
+  _bfmRender();
+}
+
+async function bfmImport() {
+  const b = state._bfm;
+  if (!b || !b.preview || b.busy) return;
+  const text = b.preview.rows.filter(r => r.status !== 'skip').map(r => r.text).join('\n');
+  if (!text) return;
+  b.busy = true;
+  const btn = document.getElementById('bfm-go-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Импорт…'; }
+  try {
+    const r = await apiPost('/api/models/' + b.modelId + '/bom/import-text', {
+      text: text, replace_existing: false,
+      accept_wrong_execution: !!b.acceptWrong, create_missing: !!b.createMissing,
+    });
+    if (!r.ok) {
+      showToast((r.data && r.data.message) || 'Не удалось импортировать', 'error');
+      return;
+    }
+    const d = r.data || {};
+    showToast('В тех. карту добавлено: ' + (d.imported || 0) +
+      (d.created ? ' (новых позиций: ' + d.created + ')' : '') +
+      (d.skipped && d.skipped.length ? ', пропущено ' + d.skipped.length : ''), 'success');
+    const mid = b.modelId;
+    closeBomFromMfg();
+    if (document.getElementById('bom-list') && typeof loadModelBom === 'function') loadModelBom(mid);
+  } catch (e) {
+    showToast('Ошибка соединения', 'error');
+  } finally {
+    b.busy = false;
+    if (btn && document.body.contains(btn)) {
+      btn.disabled = false; btn.innerHTML = '<i class="ti ti-download"></i> Импортировать';
+    }
+  }
+}
