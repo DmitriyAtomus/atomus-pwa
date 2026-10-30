@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.280";
+const APP_VERSION = "v2.46.281";
 const APP_VERSION_DATE = "22.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -10981,12 +10981,21 @@ _startHelpingTimerRefresh();
 // v2.43.47: Toggle «Помогаю сейчас» — POST start-helping или stop-helping
 // v2.43.52: при остановке открывает мини-окно «Что делал?» — заметка идёт в журнал
 /* === v2.44.70: этапы работы — каталог + пикер === */
+// v2.46.281: каталог этапов везде по алфавиту (русская сортировка); «Прочее/Другое…»
+// — в конце. Чек-лист работы (нумерованные этапы с замками) порядок НЕ меняет.
+function _sortStagesRu(list) {
+  const last = (n) => /^(прочее|другое|иное)(?![а-яё])/i.test(String(n || '').trim()) ? 1 : 0;
+  return (list || []).slice().sort((a, b) =>
+    (last(a && a.name) - last(b && b.name)) ||
+    String((a && a.name) || '').trim().localeCompare(String((b && b.name) || '').trim(), 'ru',
+      { sensitivity: 'base', numeric: true }));
+}
 async function _loadWorkStages() {
   // Кэшируем на сессию — список меняется редко
   if (cache._workStages) return cache._workStages;
   try {
     const r = await apiGet('/api/work-stages');
-    cache._workStages = r.items || [];
+    cache._workStages = _sortStagesRu(r.items || []);
   } catch (_) {
     cache._workStages = [];
   }
@@ -11002,7 +11011,7 @@ function openStagePicker({ title, stages, onPick, allowSkip }) {
   m = document.createElement('div');
   m.id = overlayId;
   m.className = 'modal-overlay stage-picker-modal';
-  const chips = (stages || []).map(s =>
+  const chips = _sortStagesRu(stages || []).map(s =>
     '<button class="stage-chip" data-stage-id="' + s.id + '">' + escapeHtml(s.name) + '</button>'
   ).join('');
   m.innerHTML =
@@ -20230,7 +20239,7 @@ function _renderMyDayModal(inner) {
 function closeMyDayModal() { _renderMyDayModal(''); }
 
 function _mydayStartModalHtml() {
-  const stages = _myday.stages || [];
+  const stages = _sortStagesRu(_myday.stages || []);
   const mates = _myday.mates || [];
   let h = '<button class="myday-x" onclick="closeMyDayModal()"><i class="ti ti-x"></i></button>' +
     '<div class="myday-h4"><i class="ti ti-player-play"></i> Начать работу</div>';

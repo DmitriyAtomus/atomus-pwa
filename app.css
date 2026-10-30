@@ -27470,3 +27470,18 @@ html.dchat-tts-off .dchat-eye[onclick="devVoiceSetup()"] { display: none !import
   .bfm-pright { align-items: flex-start; max-width: 100%; text-align: left; flex-direction: row; flex-wrap: wrap; }
 }
 .bfm-note.bfm-note-warn { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
+
+/* v2.46.281: длинные этапы переносятся, без горизонтальной прокрутки */
+.myday-modal { overflow-x: hidden; }
+.myday-chips { min-width: 0; }
+.myday-chip, .stage-picker-modal .stage-chip {
+  white-space: normal; overflow-wrap: anywhere; max-width: 100%;
+  text-align: left; line-height: 1.3; box-sizing: border-box; border-radius: 16px;
+}
+.stage-picker-modal .modal-content { overflow-x: hidden; }
+@media (max-width: 699px) {
+  .myday-ovl { padding: 10px; align-items: flex-end; }
+  .myday-modal { max-height: 90vh; max-height: 90dvh; padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+  .myday-chip { padding: 8px 12px; font-size: 13.5px; }
+  .myday-inp { font-size: 16px; }
+}

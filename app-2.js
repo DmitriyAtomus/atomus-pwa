@@ -6728,7 +6728,7 @@ async function submitBomImport() {
 // v2.45.x: справочник этапов производства (кэш) — для выпадашки этапа в BOM
 async function _ensureWorkStages() {
   if (!cache._workStages) {
-    try { const r = await apiGet('/api/work-stages'); cache._workStages = r.items || []; }
+    try { const r = await apiGet('/api/work-stages'); cache._workStages = (typeof _sortStagesRu === 'function') ? _sortStagesRu(r.items || []) : (r.items || []); }
     catch (e) { cache._workStages = []; }
   }
   return cache._workStages;
