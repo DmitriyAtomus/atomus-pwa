@@ -87,3 +87,9 @@ test('v2.46.283: отмена — только с причиной через /c
   assert.match(src, /newStatus !== 'cancelled'/);
   assert.match(src, /\/cancel', \{ reason \}/);
 });
+
+test('legacy orders (chain_new=false): missing dest not flagged red', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'supply-chain.js'), 'utf8');
+  assert.match(src, /o\.chain_new === false/);
+  assert.match(src, /необязательно/);
+});

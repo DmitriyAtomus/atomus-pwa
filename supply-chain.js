@@ -1018,7 +1018,10 @@
     if (kind !== 'service' && items.length) {
       const miss = root.scMissingDest(items);
       h += '<div class="sc-oc-row"><span class="sc-oc-l">Куда</span>' +
-        (miss ? '<span class="sc-chip sc-chip-bad">' + miss + ' без назначения</span>' : '<span class="sc-chip">все позиции назначены</span>') +
+        (miss ? (o.chain_new === false
+          // заказ создан до v2.46.283: назначение не обязательно, не красим
+          ? '<span class="sc-chip" title="Заказ создан до v2.46.283 — назначение не обязательно">' + miss + ' без назначения · необязательно</span>'
+          : '<span class="sc-chip sc-chip-bad">' + miss + ' без назначения</span>') : '<span class="sc-chip">все позиции назначены</span>') +
         ' <button class="btn btn-secondary btn-small" onclick="scOpenDestPicker(' + Number(o.id) + ', null, loadSupplyOrderDetail)"><i class="ti ti-map-pin"></i> Назначить всем</button></div>';
       h += '<div class="sc-oc-items">' + items.map(it =>
         '<div class="sc-oc-item"><span class="sc-oc-name">' + esc(it.item_name || it.component_name || it.name || ('#' + it.id)) + '</span>' +
