@@ -9950,6 +9950,10 @@ const _CP_ORDER_STATUS_RU = {
   draft:            ['Заказ создан',          '#1E40AF', '#DBEAFE'],
   sent:             ['Счёт запрошен',         '#92400E', '#FEF3C7'],
   awaiting_invoice: ['Счёт запрошен',         '#92400E', '#FEF3C7'],
+  invoice_requested: ['Счёт запрошен',        '#92400E', '#FEF3C7'],
+  approval:         ['На согласовании',       '#9A3412', '#FFEDD5'],
+  shipping:         ['Едет',                  '#075985', '#E0F2FE'],
+  closed:           ['Закрыт',                '#15803D', '#DCFCE7'],
   invoice_received: ['Счёт получен',          '#3730A3', '#E0E7FF'],
   to_pay:           ['На оплате',             '#9A3412', '#FFEDD5'],
   paid:             ['Оплачен',                '#065F46', '#D1FAE5'],
@@ -11161,9 +11165,10 @@ function _supDeliveryStepperHtml(orderStatus) {
   let done = 1, now = 1, lbl0 = 'Заказан';
   switch (orderStatus) {
     case 'draft': done = 0; now = 0; lbl0 = 'Заказ создан'; break;
-    case 'sent': case 'awaiting_invoice': case 'invoice_received': case 'to_pay': done = 1; now = 1; break;
-    case 'paid': case 'partial': done = 2; now = 2; break;
-    case 'received': done = 4; now = 4; break;
+    case 'sent': case 'awaiting_invoice': case 'invoice_requested': case 'invoice_received': case 'approval': case 'to_pay': done = 1; now = 1; break;
+    case 'paid': done = 2; now = 2; break;
+    case 'shipping': case 'partial': done = 2; now = 2; break;
+    case 'received': case 'closed': done = 4; now = 4; break;
   }
   const labels = [lbl0, 'Оплачен', 'В пути', 'На складе'];
   let h = '<div class="sup-steps">';
@@ -11227,7 +11232,7 @@ function renderSupplyShopping(d) {
   const kpiStrip = '<div class="sup-kpis">' +
     _supKpiCard('shopping-cart', 'brand', buyCount, 'К закупке', "supKpiClick('buy')") +
     _supKpiCard('truck-delivery', 'blue', waitCount, 'Ждём поставку', "supKpiClick('wait')") +
-    _supKpiCard('clock-exclamation', 'red', longWait, 'Долго ждём (&gt;14дн)', "supKpiClick('long')") +
+    _supKpiCard('clock-exclamation', 'red', longWait, 'Долго ждём (>14 дн)', "supKpiClick('long')") +
     _supKpiCard('calendar-check', 'green', arriveToday, 'Сегодня на складе', "supKpiClick('today')") +
   '</div>';
   // Табы: К закупке / Ждём поставку
@@ -11777,7 +11782,7 @@ async function openManualOrderDialog(supplierId) {
     return;
   }
   const opts = [
-    ['awaiting_invoice', 'Счёт запрошен', 'Запросили счёт у поставщика, ещё не оплатили'],
+    ['invoice_requested', 'Запрошен счёт', 'Запросили счёт у поставщика, ещё не оплатили'],
     ['invoice_received', 'Счёт получен',  'Счёт от поставщика уже на руках'],
     ['to_pay',           'На оплате',     'Счёт передан на оплату'],
     ['paid',             'Оплачен',       'Уже оплатили — ждём поставку'],
@@ -13758,13 +13763,17 @@ async function deleteSupplyOrder(orderId, label) {
 const SUP_ORD_DESC = {
   open:             'В работе — активные заказы в процессе: черновики, отправленные, ждущие счёт, оплату или поставку. Без оплаченных и полностью полученных.',
   draft:            'Черновик — заказ создан, но ещё не отправлен поставщику. Дополняете позициями и отправляете.',
-  sent:             'Отправлен — заказ ушёл поставщику, ждём ответ и счёт на оплату.',
-  awaiting_invoice: 'Ждут счёт — заказ отправлен, ждём от поставщика счёт, чтобы поставить на оплату.',
-  invoice_received: 'Счёт пришёл — поставщик прислал счёт, его можно отправлять на оплату.',
+  sent:             'Запрошен счёт — заказ ушёл поставщику, ждём счёт на оплату.',
+  awaiting_invoice: 'Запрошен счёт — заказ ушёл поставщику, ждём счёт на оплату.',
+  invoice_requested: 'Запрошен счёт — заказ ушёл поставщику, ждём счёт. Дольше 2 рабочих дней — попадёт в «Зависли».',
+  invoice_received: 'Счёт получен — проверьте поставщика, сумму и назначение позиций и отправьте на оплату.',
   to_pay:           'К оплате — счёт привязан и готов к оплате: очередь бухгалтеру. Тот же список открывает раздел «На оплату» слева.',
   paid:             'Оплачены — счёт оплачен, ждём поставку от поставщика.',
+  shipping:         'Едет — оплачено, поставщик назвал дату поставки.',
   partial:          'Частично — пришла часть позиций заказа, ждём остаток.',
   received:         'Получены — заказ полностью поставлен и оприходован на склад.',
+  closed:           'Закрыты — услуги после оплаты и заказы, у которых всё выдано по назначению.',
+  cancelled:        'Отменены — с причиной отмены.',
   all:              'Все — все заказы поставщикам, в любом статусе.',
 };
 
@@ -16375,16 +16384,17 @@ function _fmtSupOrdTs(s) {
 function renderSupplyOrderDetail(o) {
   const container = document.getElementById('sup-ord-detail');
   const canManage = canManageSupply();
-  const canEdit = canManage && ['draft', 'sent', 'partial'].includes(o.status);
+  // v2.46.283: единая цепочка — позиции правятся до «Получено / Закрыт / Отменён»
+  const canEdit = canManage && !['received', 'closed', 'cancelled'].includes(o.status);
   const canSend = canManage && o.status === 'draft' && (o.items || []).length > 0;
-  const canReceive = canManage && ['sent', 'partial'].includes(o.status);
+  const canReceive = canManage && ['sent', 'invoice_requested', 'shipping', 'partial'].includes(o.status);
   // FSM-переходы для нового лайфцикла снабжения
   // v2.45.35: директор может перезалить счёт на любых открытых статусах,
   // включая to_pay/paid/partial — например, если файл стёрло в storage.
   const _isDir = state.user && (state.user.roles || []).includes('director');
   const _canUploadStatuses = _isDir
-    ? ['sent', 'awaiting_invoice', 'invoice_received', 'to_pay', 'paid', 'partial']
-    : ['sent', 'awaiting_invoice', 'invoice_received'];
+    ? ['sent', 'awaiting_invoice', 'invoice_requested', 'invoice_received', 'approval', 'to_pay', 'paid', 'shipping', 'partial']
+    : ['sent', 'awaiting_invoice', 'invoice_requested', 'invoice_received'];
   const canUploadInvoice = canManage && _canUploadStatuses.includes(o.status);
   // v2.45.310: оплатные переходы (На оплату / Оплачен) доступны и бухгалтеру —
   // бэкенд это разрешает (accountant → to_pay/paid).
@@ -16392,8 +16402,8 @@ function renderSupplyOrderDetail(o) {
   const _canPayFlow = canManage || _isAcc;
   const canToPay         = _canPayFlow && o.status === 'invoice_received';
   const canMarkPaid      = _canPayFlow && o.status === 'to_pay';
-  const canMarkReceived  = canManage && ['paid', 'partial'].includes(o.status);
-  const canCancel        = canManage && !['received', 'cancelled', 'draft'].includes(o.status);
+  const canMarkReceived  = canManage && ['paid', 'shipping', 'partial'].includes(o.status);
+  const canCancel        = canManage && !['received', 'closed', 'cancelled'].includes(o.status);
 
   let html = '';
   // Шапка с возвратом
@@ -16456,11 +16466,14 @@ function renderSupplyOrderDetail(o) {
   // История переходов (только если есть хоть один таймстамп лайфцикла)
   const tsEvents = [
     { ts: o.sent_at,             label: 'Отправлен поставщику',   icon: 'send' },
-    { ts: o.awaiting_invoice_at, label: 'Ждём счёт',              icon: 'clock' },
+    { ts: o.awaiting_invoice_at, label: 'Запрошен счёт',          icon: 'clock' },
     { ts: o.invoice_received_at, label: 'Счёт получен',           icon: 'file-invoice' },
     { ts: o.to_pay_at,           label: 'Передан на оплату',      icon: 'wallet' },
     { ts: o.paid_at,             label: 'Оплачен',                icon: 'cash' },
+    { ts: o.shipping_at,         label: 'Едет',                   icon: 'truck-delivery' },
     { ts: o.fulfilled_at,        label: 'Получено на склад',      icon: 'package' },
+    { ts: o.closed_at,           label: 'Закрыт',                 icon: 'circle-check' },
+    { ts: o.cancelled_at,        label: 'Отменён' + (o.cancel_reason ? ': ' + o.cancel_reason : ''), icon: 'ban' },
   ].filter(e => !!e.ts);
   if (tsEvents.length) {
     html += '<div class="detail-block">' +
@@ -16662,7 +16675,7 @@ function renderSupplyOrderDetail(o) {
   // заказ в «Получены». Раньше «Получено» меняло только статус, а строки «принято 9 из 10»
   // оставались, и заказ возвращался в «частично» после следующей приёмки.
   const _shortLines = (o.items || []).filter(oi => parseFloat(oi.qty || 0) > parseFloat(oi.received_qty || 0)).length;
-  const canReceiveAll = canManage && ['sent', 'awaiting_invoice', 'invoice_received', 'to_pay', 'paid', 'partial'].includes(o.status) && (o.items || []).length > 0;
+  const canReceiveAll = canManage && ['sent', 'awaiting_invoice', 'invoice_requested', 'invoice_received', 'approval', 'to_pay', 'paid', 'shipping', 'partial'].includes(o.status) && (o.items || []).length > 0;
   if (canReceiveAll) actions.push('<button class="btn btn-primary" onclick="receiveAllSupplyOrder(' + o.id + ',' + _shortLines + ')" title="Закрыть все строки по факту и перевести заказ в «Получены»"><i class="ti ti-checks"></i> Всё пришло' + (_shortLines ? ' <span style="display:inline-block;min-width:18px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.28);font-size:11px;font-weight:800;text-align:center;">' + _shortLines + '</span>' : '') + '</button>');
   else if (canMarkReceived) actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'received\',\'Поставка получена на склад?\')"><i class="ti ti-package-import"></i> Получено</button>');
   if (canReceive) actions.push('<button class="btn btn-secondary" onclick="openReceiveOrder(' + o.id + ')"><i class="ti ti-package-import"></i> Приёмка</button>');
@@ -18941,6 +18954,7 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {version:'v2.46.283',date:'03.11.2026',title:'Снабжение: единая цепочка, «Куда», поиск счетов',features:['У заказа поставщику одна цепочка статусов: Запрошен счёт → Счёт получен → На оплате → Оплачен → Едет → Частично → Получено → Закрыт. Услуга после оплаты закрывается сама, оплаченный заказ с датой поставки — «Едет». Отменить можно только с причиной.','У каждого заказа есть тип (товар, изготовление, услуга), у каждой позиции — «Куда»: под договор, на склад или в цех. Без назначения заказ не отправится — подскажет красная строка. Массово: «Всё → к договору», «Выбранные → на склад».','«Что закупить → Ждём поставку»: одна строка на позицию заказа, группами по договорам или по поставщикам, с шагами цепочки и сроком. Новая вкладка «Зависли» — что застряло на шаге и чья очередь, с черновиком напоминания поставщику (само ничего не отправляет).','«Загрузить счёт»: тип, «Куда» и «Что в счёте?» обязательны, сумма тоже. Повторный счёт (тот же файл или номер у того же продавца) не заводится — откроется уже существующий заказ.','Поставщик берётся из реквизитов счёта (ИНН, название), а не из имени того, кто прислал. Кто прислал — отдельной колонкой. Если продавца не нашли — «Поставщик не определён» и кнопки «Взять из счёта» / «Выбрать».','«Счета на оплату»: поиск по поставщику, ИНН, № счёта, сумме (в т.ч. «224 472» и «> 100000»), договору, позиции, кто прислал — с подсказкой, где совпало. Фильтры: договор, период, сумма от–до, плательщик, без поставщика, сумма 0, дубли. Плашка «Требуют исправления» с кнопками «Взять из счёта», «Распознать сумму», «Слить с ORD-…».','В карточке договора — блок «Закупка по договору»: что заказано под договор и что уже пришло.']},
   {version:'v2.46.282',date:'03.11.2026',title:'Этапы по типу изделия, новая карточка работы',features:['Этапы производства теперь подбираются по типу изделия: у НВП (стандарт и AISI) — сварка, зачистка, покраска, сборка, упаковка; у воздухоохладителей — разборка, покраска, сборка, упаковка; у увлажнителей УДФ-1 и УУЗ — как у НВП; у наружных блоков — доработка и упаковка. Нержавейку тоже красят. У комплектов, форсунок и регуляторов этапов нет. Чиллеры — как раньше.','Чек-лист появляется, когда работу берут «В работу» (или сразу при создании). Открытие готовой или отменённой работы больше не создаёт этапы.','Новая карточка работы: кольцо прогресса в шапке, тип изделия, срок, исполнение и мастер; блок «Сейчас идёт» с таймером и большой кнопкой «готово»; этапы лентой — кто сделал и когда, что идёт, что ждёт.','У каждого этапа — свой исполнитель и норма (назначает мастер или директор). Процент считается только по этапам (с нормами — взвешенно), ручной ползунок у таких работ скрыт.','Когда готовы все этапы, кроме упаковки, CRM предложит перевести работу «На проверке»; старт этапа «Упаковка» предложит статус «Упаковка».','В шаблоне этапов направления можно выбрать подгруппу — свой набор этапов для воздухоохладителей, НВП, наружных блоков, увлажнителей.']},
   {version:'v2.46.281',date:'30.10.2026',title:'Этапы работ — по алфавиту',features:['В окне «Начать работу» (Производство → Главная → «Начать») список «Что делаешь (этап)» теперь по алфавиту. Так же отсортированы выбор этапа в работе и этап в тех. карте. Нумерованный чек-лист чиллера остаётся в своём порядке.','Длинные названия этапов переносятся на новую строку — больше нет горизонтальной прокрутки и обрезанного текста, удобно на телефоне.']},
   {version:'v2.46.280',date:'30.10.2026',title:'«Из корпусов»: сразу детали',features:['Окно «Из корпусов» теперь по умолчанию добавляет в тех. карту детали корпуса, а не общее название. Подсборки внутри корпуса раскрываются до конечных деталей с умножением количества.','Если у корпуса нет деталей, он больше не добавляется молча одной строкой — в «Проверить» видно красное предупреждение, а корпус в тех. карту не попадает.']},

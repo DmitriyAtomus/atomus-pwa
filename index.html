@@ -2837,13 +2837,15 @@ setTimeout(function () {
               <div class="filter-tabs sup-ord-tabs">
                 <button class="filter-tab active" data-sup-ord="open"              onclick="setSupplyOrdFilter('open')"><i class="ti ti-folder-open"></i> В работе</button>
                 <button class="filter-tab"        data-sup-ord="draft"             onclick="setSupplyOrdFilter('draft')"><i class="ti ti-pencil"></i> Черновики</button>
-                <button class="filter-tab"        data-sup-ord="sent"              onclick="setSupplyOrdFilter('sent')"><i class="ti ti-send"></i> Отправлены</button>
-                <button class="filter-tab"        data-sup-ord="awaiting_invoice"  onclick="setSupplyOrdFilter('awaiting_invoice')"><i class="ti ti-clock"></i> Ждут счёт</button>
-                <button class="filter-tab"        data-sup-ord="invoice_received"  onclick="setSupplyOrdFilter('invoice_received')"><i class="ti ti-file-invoice"></i> Счёт пришёл</button>
+                <button class="filter-tab"        data-sup-ord="invoice_requested" onclick="setSupplyOrdFilter('invoice_requested')"><i class="ti ti-clock"></i> Запрошен счёт</button>
+                <button class="filter-tab"        data-sup-ord="invoice_received"  onclick="setSupplyOrdFilter('invoice_received')"><i class="ti ti-file-invoice"></i> Счёт получен</button>
                 <button class="filter-tab"        data-sup-ord="to_pay"            onclick="setSupplyOrdFilter('to_pay')"><i class="ti ti-wallet"></i> К оплате</button>
                 <button class="filter-tab"        data-sup-ord="paid"              onclick="setSupplyOrdFilter('paid')"><i class="ti ti-cash"></i> Оплачены</button>
+                <button class="filter-tab"        data-sup-ord="shipping"          onclick="setSupplyOrdFilter('shipping')"><i class="ti ti-truck-delivery"></i> Едет</button>
                 <button class="filter-tab"        data-sup-ord="partial"           onclick="setSupplyOrdFilter('partial')"><i class="ti ti-progress"></i> Частично</button>
                 <button class="filter-tab"        data-sup-ord="received"          onclick="setSupplyOrdFilter('received')"><i class="ti ti-package-import"></i> Получены</button>
+                <button class="filter-tab"        data-sup-ord="closed"            onclick="setSupplyOrdFilter('closed')"><i class="ti ti-circle-check"></i> Закрыты</button>
+                <button class="filter-tab"        data-sup-ord="cancelled"         onclick="setSupplyOrdFilter('cancelled')"><i class="ti ti-ban"></i> Отменены</button>
                 <button class="filter-tab"        data-sup-ord="all"               onclick="setSupplyOrdFilter('all')"><i class="ti ti-list"></i> Все</button>
               </div>
             </div>
@@ -2908,7 +2910,7 @@ setTimeout(function () {
           <div class="pay-list-filters">
             <div class="pay-list-search">
               <i class="ti ti-search"></i>
-              <input type="search" id="pay-list-q" autocomplete="off" placeholder="Поиск: поставщик, назначение, сумма, кто внёс" oninput="onPayListSearch(this.value)">
+              <input type="search" id="pay-list-q" autocomplete="off" placeholder="Поиск: поставщик, ИНН, № счёта, сумма, договор, позиция, кто прислал" oninput="onPayListSearch(this.value)">
             </div>
             <select id="pay-list-supplier" onchange="onPayListSupplier(this.value)">
               <option value="">Все поставщики</option>
@@ -2921,6 +2923,16 @@ setTimeout(function () {
             <label class="pay-list-check"><input type="checkbox" id="pay-list-only-adv" onchange="onPayListOnlyAdv(this.checked)"> Только авансы</label>
             <label class="pay-list-check"><input type="checkbox" id="pay-list-mine" onchange="onPayListMine(this.checked)"> Мои записи</label>
           </div>
+          <div class="sc-pay-chips" id="sc-pay-chips">
+            <select id="sc-pay-contract" onchange="scPaySet('contract_id', this.value)"><option value="">Договор: все</option></select>
+            <span class="sc-pay-range"><i class="ti ti-calendar"></i><input type="date" id="sc-pay-from" onchange="scPaySet('date_from', this.value)" aria-label="Период с"><span>—</span><input type="date" id="sc-pay-to" onchange="scPaySet('date_to', this.value)" aria-label="Период по"></span>
+            <span class="sc-pay-range"><span>Сумма</span><input type="text" inputmode="decimal" id="sc-pay-amin" placeholder="от" oninput="scPaySet('amount_from', this.value, true)"><span>—</span><input type="text" inputmode="decimal" id="sc-pay-amax" placeholder="до" oninput="scPaySet('amount_to', this.value, true)"></span>
+            <input type="text" id="sc-pay-payer" class="sc-pay-payer" placeholder="Плательщик" oninput="scPaySet('payer', this.value, true)">
+            <button type="button" class="sc-fchip" data-flag="no_supplier" onclick="scPayFlag('no_supplier')">Без поставщика</button>
+            <button type="button" class="sc-fchip" data-flag="zero_amount" onclick="scPayFlag('zero_amount')">Сумма 0</button>
+            <button type="button" class="sc-fchip" data-flag="duplicates" onclick="scPayFlag('duplicates')">Дубли</button>
+          </div>
+          <div id="sc-pay-issues"></div>
           <div id="pay-list-body" class="pay-list-wrap">
             <div class="loading-block">Загружаем счета…</div>
           </div>
@@ -4090,6 +4102,7 @@ setTimeout(function () {
 <script src="/app-2.js"></script>
 <script src="/app-3.js"></script>
 <script src="/app-4.js"></script>
+<script src="/supply-chain.js"></script>
 <script src="/prospects.js"></script>
 <script src="/campaigns.js"></script>
 <script src="/presentations.js"></script>
