@@ -144,3 +144,9 @@ test('v2.46.284: подключено в index.html и sw.js, версия по�
   assert.equal(JSON.parse(read('version.json')).version, 'v2.46.284');
   assert.match(read('app-3.js'), /\{version:'v2\.46\.284'/);
 });
+
+test('v2.46.284: ссылка «Старый вид экрана» не под плавающей кнопкой «Показать Клаве»', () => {
+  const css = read('supply-buy.css');
+  assert.match(css, /\.sbv-foot\{[^}]*text-align:left/);
+  assert.match(css, /\.sbv-foot\{[^}]*padding-bottom:72px/);
+});

@@ -89,7 +89,7 @@ body.sbv-on [data-screen="supply-shopping"] .page-subtitle{display:none}
 .sbv-mini .m{color:var(--sb-mu);white-space:nowrap}
 .sbv-empty{margin-top:16px;border:1.5px dashed #CBD3DF;border-radius:14px;padding:26px 12px;text-align:center;font-size:13px;color:var(--sb-mu)}
 .sbv-empty .ti{display:block;font-size:26px;margin-bottom:6px;color:var(--sb-grn)}
-.sbv-foot{margin-top:14px;text-align:right}
+.sbv-foot{margin-top:14px;text-align:left;padding-bottom:72px} /* не под плавающей кнопкой «Показать Клаве» справа внизу */
 .sbv-foot button,.sbv-back button{border:0;background:transparent;color:var(--sb-mu,#6A7585);font-size:12px;display:inline-flex;align-items:center;gap:5px}
 .sbv-back{text-align:right;margin:4px 0 6px}
 .sbv-back button{color:#2F6FB5;font-weight:600;cursor:pointer}
