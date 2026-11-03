@@ -7,7 +7,7 @@
 
    Версия кэша обновляется при каждом релизе — старая инвалидируется.
 */
-const CACHE_VERSION = 'atomus-v2.46.283';
+const CACHE_VERSION = 'atomus-v2.46.284';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 // v2.46.243: данные API больше НЕ кэшируются. Кэш только для файлов /static/*.
 const FILES_CACHE = `${CACHE_VERSION}-files`;
@@ -24,6 +24,8 @@ const STATIC_ASSETS = [
   '/app-3.js',
   '/app-4.js',
   '/supply-chain.js',
+  '/supply-buy.js',
+  '/supply-buy.css',
   '/prospects.js',
   '/prospects.css',
   '/campaigns.js',
