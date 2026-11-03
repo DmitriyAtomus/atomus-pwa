@@ -93,3 +93,17 @@ test('legacy orders (chain_new=false): missing dest not flagged red', () => {
   assert.match(src, /o\.chain_new === false/);
   assert.match(src, /необязательно/);
 });
+
+test('invoice lines: suggestion only, new items need explicit tick', () => {
+  const sc = require('../supply-chain.js');
+  const h = sc.scInvLinesHtml(5, [
+    { idx: 0, name: 'Вентилятор', qty: 2, unit: 'шт', match_item_id: 9, match_name: 'Вентилятор ВО-1' },
+    { idx: 1, name: 'Решётка', qty: 1, unit: 'шт', match_item_id: null },
+    { idx: 2, name: 'Уже', qty: 1, added: true },
+  ]);
+  assert.match(h, /data-item="9"><input type="checkbox" checked>/);
+  assert.match(h, /data-idx="1"><input type="checkbox">/);
+  assert.match(h, /новая — завести в номенклатуру/);
+  assert.doesNotMatch(h, /Уже/);
+  assert.equal(sc.scInvLinesHtml(5, [{ idx: 0, name: 'x', added: true }]), '');
+});

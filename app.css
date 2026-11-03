@@ -27725,3 +27725,8 @@ button.sc-chip, .sc-chip[onclick] { cursor: pointer; }
 }
 .pay-list-wrap:has(.sc-pay-table) { overflow-x: auto; }
 .sc-pay-table td, .sc-pay-table th { vertical-align: top; }
+
+/* v2.46.283 в.9: строки из счёта — предложение */
+.sc-invlines{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border,#e5e7eb)}
+.sc-invline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:4px 0;cursor:pointer}
+.sc-chip-warn{background:#fff8e1;color:#8a5a00}

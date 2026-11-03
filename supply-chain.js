@@ -365,7 +365,28 @@
     return on ? on.getAttribute('data-v') : (seg.getAttribute('data-value') || null);
   }
 
+  /** в.9: строки распознанного счёта — предложение; номенклатура не создаётся без подтверждения. */
+  function scInvLinesHtml(orderId, lines) {
+    const pend = (lines || []).filter(l => !l.added);
+    if (!pend.length) return '';
+    return '<div class="sc-invlines" id="sc-invlines-' + Number(orderId) + '">' +
+      '<div class="sc-oc-row"><span class="sc-oc-l">Строки из счёта</span><span class="sc-sub">распознано ' + pend.length +
+      ' — проверьте и добавьте в заказ; новые позиции номенклатуры заводятся только по вашей галочке</span></div>' +
+      pend.map(l => {
+        const m = l.match_item_id;
+        return '<label class="sc-invline" data-idx="' + Number(l.idx) + '"' + (m ? ' data-item="' + Number(m) + '"' : '') + '>' +
+          '<input type="checkbox"' + (m ? ' checked' : '') + '> ' +
+          '<span class="sc-oc-name">' + esc(l.name) + '</span> <span class="sc-sub">' + esc(String(l.qty || 1)) + ' ' + esc(l.unit || '') +
+          (l.price ? ' · ' + money(l.price) : '') + '</span> ' +
+          (m ? '<span class="sc-chip">в номенклатуре: ' + esc(l.match_name || '') + '</span>'
+             : '<span class="sc-chip sc-chip-warn">новая — завести в номенклатуру</span>') +
+          '</label>';
+      }).join('') +
+      '<div class="sc-oc-row"><button class="btn btn-secondary btn-small" onclick="scInvLinesAccept(' + Number(orderId) + ')"><i class="ti ti-check"></i> Добавить выбранные</button></div></div>';
+  }
+
   const api = {
+    scInvLinesHtml,
     SC_KINDS, SC_DESTS, SC_STEPS, SC_STATUS, SC_STEP_OF,
     scItemDestOk, scMissingDest, scApplyBulk, scDestChipHtml, scStepperHtml, scKindLabel,
     scGroupWaiting, scWaitPaneHtml, scWaitRowHtml, scStuckPaneHtml,
@@ -1052,10 +1073,38 @@
           const anchor = c.querySelector('.dup-alert') || head;
           anchor.parentNode.insertBefore(div.firstChild, anchor.nextSibling);
         }
+        if (o && o.id && o.kind !== 'service') root.scLoadInvLines(o.id);
       } catch (e) { console.warn('sc order card', e); }
       return r;
     };
   }
+
+  root.scLoadInvLines = async function (id) {
+    try {
+      const d = await root.apiGet('/api/supply-orders/' + Number(id) + '/invoice-lines');
+      const html = root.scInvLinesHtml(id, (d && d.lines) || []);
+      const box = document.querySelector('#sup-ord-detail .sc-order-chain');
+      if (!box || !html || document.getElementById('sc-invlines-' + Number(id))) return;
+      const div = document.createElement('div'); div.innerHTML = html;
+      box.appendChild(div.firstChild);
+    } catch (e) { /* предложение необязательно */ }
+  };
+  root.scInvLinesAccept = async function (id) {
+    const rows = Array.from(document.querySelectorAll('#sc-invlines-' + Number(id) + ' .sc-invline'));
+    const lines = rows.filter(r => r.querySelector('input').checked).map(r => {
+      const item = Number(r.getAttribute('data-item')) || null;
+      return item ? { idx: Number(r.getAttribute('data-idx')), item_id: item }
+                  : { idx: Number(r.getAttribute('data-idx')), create: true };
+    });
+    if (!lines.length) { root.showToast('Ничего не выбрано', 'error'); return; }
+    const nNew = lines.filter(l => l.create).length;
+    if (nNew && !confirm('Завести в номенклатуру новых позиций: ' + nNew + '?')) return;
+    try {
+      const r = await post('/api/supply-orders/' + Number(id) + '/invoice-lines/accept', { lines });
+      root.showToast('Добавлено строк: ' + r.added + (r.created_items ? ', новых позиций: ' + r.created_items : ''), 'success');
+      reload();
+    } catch (e) { root.showToast(e.message, 'error'); }
+  };
 
   root.scOrderKind = async function (id, kind) {
     try { await post('/api/supply-orders/' + id + '/kind', { kind }); root.showToast('Тип: ' + root.scKindLabel(kind), 'success'); reload(); }
