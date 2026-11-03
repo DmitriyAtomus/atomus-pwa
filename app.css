@@ -5912,6 +5912,10 @@
   .sup-status-pill.ord-partial           { background: #FFF4E6; color: #C18B00; }
   .sup-status-pill.ord-received          { background: #E8F5E9; color: var(--success); }
   .sup-status-pill.ord-cancelled         { background: #F4F4F5; color: var(--text-faint); }
+  .sup-status-pill.ord-invoice_requested { background: #FEF3C7; color: #92400E; }
+  .sup-status-pill.ord-approval          { background: #FFEDD5; color: #9A3412; }
+  .sup-status-pill.ord-shipping          { background: #E0F2FE; color: #075985; }
+  .sup-status-pill.ord-closed            { background: #E8F5E9; color: var(--success); }
 
   /* Pill kind (material/product) */
   .sup-kind-pill {
@@ -27599,3 +27603,130 @@ html.dchat-tts-off .dchat-eye[onclick="devVoiceSetup()"] { display: none !import
 .pwd-st.open.early .tag { background:#fff4e0; color:#9a5b00; }
 .pwd-st-early { margin-top:4px; font-size:12px; color:#9a5b00; display:flex; gap:4px; align-items:center; }
 .pwd-st-early .ti { font-size:14px; }
+
+/* ===== v2.46.283: единая цепочка снабжения (calm v2) ===== */
+.sc-sub { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+.sc-hint { font-size: 12px; color: var(--text-faint); font-weight: 400; }
+.sc-lbl { font-size: 12.5px; color: var(--text-mid); margin: 12px 0 5px; font-weight: 600; }
+.sc-num { font-variant-numeric: tabular-nums; text-align: right; }
+.sc-bad { color: var(--danger); }
+.sc-err { margin-top: 10px; padding: 8px 12px; border-radius: 10px; background: var(--danger-bg); color: var(--danger); font-size: 13px; font-weight: 600; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.sc-select { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-dark, #1F2430); font-size: 14px; box-sizing: border-box; }
+.sc-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sc-drop { border: 1.5px dashed var(--border-strong); border-radius: 12px; padding: 16px; text-align: center; color: var(--text-mid); cursor: pointer; background: var(--bg); }
+.sc-drop i { font-size: 24px; color: var(--brand); }
+
+/* чипы */
+.sc-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--bg); color: var(--text-mid); border: 1px solid var(--border); white-space: nowrap; cursor: default; }
+button.sc-chip, .sc-chip[onclick] { cursor: pointer; }
+.sc-chip-contract { background: var(--brand-bg); color: var(--brand); border-color: var(--brand-bg-strong); }
+.sc-chip-bad { background: var(--danger-bg); color: var(--danger); border-color: #F5C9BD; }
+.sc-chip-muted { color: var(--text-faint); }
+.sc-fchip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-mid); font-size: 13px; font-weight: 600; cursor: pointer; }
+.sc-fchip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.sc-fchip.bad { border-color: #F5C9BD; color: var(--danger); background: var(--surface); }
+.sc-fchip.bad.on { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* сегмент Тип / Куда */
+.sc-seg, .sc-seg2 { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); }
+.sc-seg button, .sc-seg2 button { flex: 1; border: 0; background: transparent; padding: 8px 10px; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: var(--text-mid); cursor: pointer; display: inline-flex; gap: 5px; align-items: center; justify-content: center; }
+.sc-seg button.on, .sc-seg2 button.on { background: var(--surface); color: var(--brand); box-shadow: 0 1px 2px rgba(20, 30, 50, .08); }
+
+/* шаги */
+.sc-steps { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.sc-step .bar { display: block; height: 4px; border-radius: 3px; background: var(--border); }
+.sc-step .lbl { display: block; font-size: 10.5px; color: var(--text-faint); margin-top: 3px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-step.done .bar { background: var(--brand-light); }
+.sc-step.now .bar { background: var(--brand); }
+.sc-step.now .lbl { color: var(--brand); font-weight: 700; }
+.sc-step.now.warn .bar { background: var(--warning); }
+.sc-step.now.warn .lbl { color: var(--warning); }
+.sc-step.now.paid .bar { background: var(--success); }
+.sc-step.now.paid .lbl { color: var(--success); }
+
+/* «Ждём поставку» / «Зависли» */
+.sc-group { margin: 14px 0; }
+.sc-group-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 2px 6px; }
+.sc-group-head .t { font-size: 13px; font-weight: 700; color: var(--text-dark, #1F2430); }
+.sc-group-head .n { font-size: 12px; color: var(--text-faint); background: var(--bg); border-radius: 999px; padding: 1px 8px; }
+.sc-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.sc-wrow { padding: 11px 14px; border-top: 1px solid var(--border); }
+.sc-wrow:first-child { border-top: 0; }
+.sc-wrow-top { display: flex; align-items: baseline; gap: 8px; justify-content: space-between; }
+.sc-wrow-name { font-size: 14px; font-weight: 600; color: var(--text-dark, #1F2430); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sc-wrow-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 5px; font-size: 12px; color: var(--text-mid); }
+.sc-wrow .sc-steps { margin-top: 8px; }
+.sc-wrow-noitems { background: var(--warning-bg); }
+.sc-due { font-size: 12px; color: var(--text-mid); white-space: nowrap; }
+.sc-due.warn { color: var(--warning); font-weight: 600; }
+.sc-due.bad { color: var(--danger); font-weight: 600; }
+.sc-rule { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: var(--warning-bg); color: var(--warning); font-weight: 600; }
+.sc-link { color: var(--brand); text-decoration: none; font-weight: 600; cursor: pointer; }
+
+/* «Оформить заказ» */
+.sc-owz-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.sc-owz-cb { margin-right: 8px; accent-color: var(--brand); }
+.sc-owz-dest { margin-left: 8px; }
+.sc-bulk { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; }
+.sc-preview-dest { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; background: var(--brand-bg); color: var(--brand); font-size: 13px; font-weight: 600; }
+.sc-preview-dest.bad { background: var(--danger-bg); color: var(--danger); }
+
+/* «Загрузить счёт» */
+.sc-inv-line { display: grid; grid-template-columns: 1fr 64px 84px 110px 32px; gap: 6px; margin-bottom: 6px; align-items: center; }
+.sc-inv-line .sc-select { padding: 7px 8px; font-size: 13px; }
+
+/* «Счета на оплату» */
+.sc-pay-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 10px; }
+.sc-pay-chips select, .sc-pay-payer { padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: 13px; color: var(--text-mid); max-width: 220px; }
+.sc-pay-range { display: inline-flex; gap: 4px; align-items: center; padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: 13px; color: var(--text-mid); }
+.sc-pay-range input { border: 0; background: transparent; font-size: 13px; width: 90px; color: var(--text-dark, #1F2430); }
+.sc-pay-range input[type="date"] { width: 122px; }
+.sc-issues { margin: 0 0 12px; border: 1px solid #F5C9BD; background: var(--danger-bg); border-radius: 14px; padding: 10px 12px; }
+.sc-issues-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--danger); font-size: 14px; font-weight: 600; }
+.sc-issues-table { width: 100%; border-collapse: collapse; margin-top: 8px; background: var(--surface); border-radius: 10px; overflow: hidden; font-size: 13px; }
+.sc-issues-table td, .sc-issues-table th { padding: 7px 10px; border-top: 1px solid var(--border); text-align: left; vertical-align: middle; }
+.sc-acts { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.sc-pay-table tr.sc-row-bad td { background: #FFF7F5; }
+.sc-pay-table tr.sc-row-bad td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+.pay-card.sc-row-bad { border-color: #F5C9BD; box-shadow: inset 3px 0 0 var(--danger); }
+.sc-matched-row td { padding-top: 0 !important; border-top: 0 !important; }
+.sc-matched { font-size: 12px; color: var(--success); background: var(--success-bg); border-radius: 6px; padding: 1px 8px; display: inline-block; }
+
+/* карточка заказа */
+.sc-order-chain { display: flex; flex-direction: column; gap: 10px; }
+.sc-oc-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sc-oc-l { font-size: 12.5px; color: var(--text-mid); font-weight: 600; min-width: 44px; }
+.sc-oc-items { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.sc-oc-item { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--border); font-size: 13.5px; }
+.sc-oc-item:first-child { border-top: 0; }
+.sc-oc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sc-alert { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 9px 12px; border-radius: 10px; background: var(--danger-bg); color: var(--danger); font-size: 13.5px; }
+
+@media (max-width: 600px) {
+  .sc-inv-line { grid-template-columns: 1fr 56px 72px; }
+  .sc-inv-line .sc-dest-sel { grid-column: 1 / 3; }
+  .sc-steps .sc-step .lbl { font-size: 9.5px; }
+  .sc-pay-range input { width: 70px; }
+  .sc-pay-range input[type="date"] { width: 112px; }
+}
+@media (max-width: 600px) {
+  #sup-shop-content .sup-seg { display: flex; width: 100%; box-sizing: border-box; }
+  #sup-shop-content .sup-seg button { flex: 1 1 0; min-width: 0; padding: 8px 6px; justify-content: center; gap: 4px; font-size: 12.5px; white-space: nowrap; }
+  #sup-shop-content .sup-seg button .ti { display: none; }
+}
+.owz2-crow:has(.sc-owz-dest) { flex-wrap: wrap; }
+.owz2-crow .sc-owz-dest { flex-basis: 100%; margin: 2px 0 0 52px; }
+.owz2-crow .sc-owz-cb { width: 18px; height: 18px; margin: 0; }
+@media (max-width: 600px) { .owz2-crow:has(.sc-owz-dest) .owz2-c-name { white-space: normal; } }
+@media (max-width: 600px) {
+  .owz2-crow:has(.sc-owz-dest) .owz2-c-name { flex: 1 1 calc(100% - 70px); }
+  .owz2-crow:has(.sc-owz-dest) .owz2-c-qty { margin-left: 52px; }
+  .owz2-crow .sc-owz-dest { order: 5; }
+}
+.pay-list-wrap:has(.sc-pay-table) { overflow-x: auto; }
+.sc-pay-table td, .sc-pay-table th { vertical-align: top; }
+
+/* v2.46.283 в.9: строки из счёта — предложение */
+.sc-invlines{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border,#e5e7eb)}
+.sc-invline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:4px 0;cursor:pointer}
+.sc-chip-warn{background:#fff8e1;color:#8a5a00}

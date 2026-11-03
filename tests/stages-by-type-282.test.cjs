@@ -150,7 +150,7 @@ test('редактор шаблона — выбор подгруппы', () => 
 
 test('версия одна и та же во всех местах', () => {
   const v = JSON.parse(fs.readFileSync(path.join(root, 'version.json'), 'utf8')).version;
-  assert.equal(v, 'v2.46.282');
+  assert.match(v, /^v2\.46\.\d+$/);
   assert.match(a1, new RegExp('const APP_VERSION = "' + v + '";'));
   assert.match(sw, new RegExp("const CACHE_VERSION = 'atomus-" + v + "';"));
   assert.match(a3, new RegExp("const HELP_CHANGELOG = \\[\\n  \\{version:'" + v + "'"));
