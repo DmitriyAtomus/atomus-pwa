@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.281";
+const APP_VERSION = "v2.46.282";
 const APP_VERSION_DATE = "22.10.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -10469,24 +10469,60 @@ function renderProductionWorkDetail(w) {
   const statusCls = pkbStatusToCss(w.status);
 
   let html = '';
-  html += '<div class="modal-header">';
+  // v2.46.282: шапка карточки по макету — кольцо прогресса, тип изделия, чипы
+  // (срок, исполнение, мастер). QR, метка и закрытие — как раньше.
   // v2.45.712: метка изделия — кликом можно прописать/поменять («№1», «левый»…)
   const labelChip = w.label
     ? '<span class="pkb-wc-tag big" onclick="editWorkLabel(' + w.id + ')" title="Изменить метку">' + escapeHtml(w.label) + ' <i class="ti ti-pencil"></i></span>'
     : '<span class="pkb-wc-tag big empty" onclick="editWorkLabel(' + w.id + ')" title="Метка различает одинаковые изделия на одном заказе"><i class="ti ti-tag"></i> метка</span>';
-  html +=   '<h3>' + escapeHtml(modelTitle) + (w.qty > 1 ? (' × ' + w.qty) : '') + ' ' + labelChip + '</h3>';
-  html +=   '<span class="pkb-status-chip ' + statusCls + '">' + escapeHtml(statusLabel) + '</span>';
+  html += '<div class="modal-header pwd-hero">';
+  html +=   '<div class="pwd-hero-top">';
+  html +=     '<span class="pwd-hero-status ' + statusCls + '"><i></i>' + escapeHtml(statusLabel) + '</span>';
   // v2.45.767: частичный запуск — ждём детали
   if (w.partial_started && w.is_blocked) {
     const _pn = (w.missing_components || []).length;
     html += '<span class="pkb-partial-chip" title="Работа запущена частично — детали в пути">⚠ частично' + (_pn ? ' · ждём ' + _pn : '') + '</span>';
   }
-  // v2.43.70: QR-код сборки прямо из карточки работы — нужен на упаковке/проверке,
-  // когда изделие физически готово, а до страницы «Сборки» идти неудобно.
-  // v2.43.71: кнопка отображается всегда; если у работы ещё нет связанной сборки
-  // (assembly_id пустой) — кликом показываем тост вместо тихого ничего.
-  html += '<button class="btn-icon-qr" style="margin-right:6px;" onclick="showProductionWorkQr(' + w.id + ')" title="QR-код сборки"><i class="ti ti-qrcode"></i> QR</button>';
-  html +=   '<button class="icon-btn" onclick="closeProductionWorkDetail()"><i class="ti ti-x"></i></button>';
+  html +=     labelChip;
+  html +=     '<span class="pwd-hero-sp"></span>';
+  // v2.43.70: QR-код сборки прямо из карточки работы — нужен на упаковке/проверке.
+  html +=     '<button class="btn-icon-qr pwd-hero-ib" onclick="showProductionWorkQr(' + w.id + ')" title="QR-код сборки"><i class="ti ti-qrcode"></i></button>';
+  html +=     '<button class="icon-btn pwd-hero-ib" onclick="closeProductionWorkDetail()" title="Закрыть"><i class="ti ti-x"></i></button>';
+  html +=   '</div>';
+  {
+    const _pct = Math.max(0, Math.min(100, Number(w.progress || 0)));
+    const _kind = _isServiceDetail
+      ? (_wtLabelsDetail[w.work_type] || 'Работа')
+      : (w.model_subgroup_name || w.model_direction_name || '');
+    const _c2 = [];
+    if (w.contract_number) _c2.push('Договор № ' + escapeHtml(String(w.contract_number).trim().replace(/^(договор\s*)?[№#\s]+/i, '')));
+    _c2.push((w.qty || 1) + ' шт.');
+    html += '<div class="pwd-hero-row">' + _pwdRingHtml(_pct, '') +
+      '<div class="pwd-hero-ttl">' +
+        '<div class="k">Производство' + (_kind ? ' · ' + escapeHtml(_kind) : '') + '</div>' +
+        '<h3>' + escapeHtml(modelTitle) + (w.qty > 1 ? (' × ' + w.qty) : '') + '</h3>' +
+        '<div class="c2">' + _c2.join(' · ') + '</div>' +
+      '</div></div>';
+    html += '<div class="pwd-hero-chips">';
+    if (w.deadline_at) {
+      const _iso = String(w.deadline_at).slice(0, 10);
+      const _dl = Math.round((new Date(_iso) - new Date(new Date().toISOString().slice(0, 10))) / 86400000);
+      const _dt = _dl < 0 ? ('просрочен ' + Math.abs(_dl) + ' дн') : (_dl === 0 ? 'сегодня' : _dl + ' дн');
+      html += '<span class="pwd-chip' + (_dl < 0 && !['done', 'cancelled'].includes(w.status) ? ' bad' : '') + '"><i class="ti ti-calendar"></i>' +
+        escapeHtml(formatPkbDate(w.deadline_at)) + ' <small>· ' + _dt + '</small></span>';
+    }
+    const _ex = _pwdEffectiveExec(w);
+    if (_ex) {
+      const _canEx = hasPermission('production.manage') && !['done', 'cancelled'].includes(w.status);
+      html += '<span class="pwd-chip ' + (_ex.code === 'stainless' ? 'aisi' : 'std') + (_canEx ? ' clickable' : '') + '"' +
+        (_canEx ? ' onclick="pwdChangeExecution(' + w.id + ',\'' + _ex.code + '\')" title="Сменить исполнение"' : '') + '>' +
+        '<i class="ti ' + (_ex.code === 'stainless' ? 'ti-shield-check' : 'ti-shield') + '"></i>' + escapeHtml(_ex.label) + '</span>';
+    }
+    if (w.assignee_short_name) {
+      html += '<span class="pwd-chip"><i class="ti ti-user-cog"></i>Мастер: ' + escapeHtml(w.assignee_short_name) + '</span>';
+    }
+    html += '</div>';
+  }
   html += '</div>';
   html += '<div class="modal-body">';
 
@@ -10494,6 +10530,10 @@ function renderProductionWorkDetail(w) {
     const days = pkbOverdueDays(w.deadline_at);
     html += '<div class="pkb-form-error" style="margin-bottom:14px;"><i class="ti ti-alert-triangle"></i> Просрочка ' + (days > 0 ? ('−' + days + ' ' + plural(days, 'день', 'дня', 'дней')) : '') + '</div>';
   }
+
+  // v2.45.760: этапы сборки — чек-лист по шаблону изделия, грузится асинхронно.
+  // v2.46.282: по макету — сразу под шапкой («Сейчас идёт» → лента этапов → прогресс).
+  html += '<div id="pwd-stages" style="display:none;"></div>';
 
   // v2.45.628: факт-плитки вместо плоского списка — срок с дельтой и цветом,
   // кликабельный договор, часы план/факт вместе, мини-шкала прогресса.
@@ -10692,8 +10732,6 @@ function renderProductionWorkDetail(w) {
     html += '</div>';
   }
 
-  // v2.45.760: этапы сборки — чек-лист направления (чиллер), грузится асинхронно
-  html += '<div id="pwd-stages" style="display:none;"></div>';
 
   if (canEditWork || (w.progress != null && ['in_progress', 'review', 'packing'].includes(w.status))) {
     const curPct = Math.max(0, Math.min(100, Number(w.progress || 0)));
@@ -11100,39 +11138,165 @@ function _pwdStageFmtH(h) {
   return Math.floor(mins / 60) + 'ч' + (mins % 60 ? ' ' + (mins % 60) + 'м' : '');
 }
 
+/* === v2.46.282: блок «Этапы» по макету (НВП / воздухоохладители / увлажнители /
+   наружные блоки / чиллеры). Чек-лист приходит с сервера вместе с шаблоном и
+   сводкой; процент — только из этапов, ручной ползунок прячем. === */
+
+function _pwdRingHtml(pct, sub) {
+  const p = Math.max(0, Math.min(100, Number(pct) || 0));
+  const c = 251.3;
+  return '<div class="pwd-ring" id="pwd-hero-ring">' +
+    '<svg width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="40" stroke="rgba(255,255,255,.18)" stroke-width="9" fill="none"/>' +
+    '<circle class="arc" cx="48" cy="48" r="40" stroke="#4ADE80" stroke-width="9" fill="none" stroke-linecap="round" stroke-dasharray="' + c + '" stroke-dashoffset="' + (c * (1 - p / 100)).toFixed(1) + '"/></svg>' +
+    '<div class="c"><span class="p">' + p + '%</span><span class="s">' + escapeHtml(sub || '') + '</span></div></div>';
+}
+
+function _pwdHeroSetProgress(pct, sub) {
+  const el = document.getElementById('pwd-hero-ring');
+  if (!el) return;
+  el.outerHTML = _pwdRingHtml(pct, sub);
+}
+
+// Исполнение работы: своё у работы, иначе из модели («Нерж. AISI» / «Стандарт…»)
+function _pwdEffectiveExec(w) {
+  const fixed = String(w.model_exec_fixed || '');
+  if (!w.execution_type && !fixed) return null;
+  let code = w.execution_type;
+  if (code !== 'standard' && code !== 'stainless') code = /нерж|aisi/i.test(fixed) ? 'stainless' : 'standard';
+  let label = code === 'stainless' ? 'Нерж. AISI' : 'Стандарт';
+  if (code === 'standard' && /^стандарт/i.test(fixed) && !w.execution_type) label = fixed;
+  return { code: code, label: label };
+}
+
+function _pwdIsPackingStage(name) { return /упаков/i.test(String(name || '')); }
+
+function _pwdStageIcon(name) {
+  const n = String(name || '').toLowerCase();
+  const map = [
+    [/упаков|тар[аы]/, 'ti-package'], [/зачист/, 'ti-sparkles'], [/покрас|окрас/, 'ti-brush'],
+    [/сварк|пайк/, 'ti-flame'], [/разборк/, 'ti-hammer'], [/доработ/, 'ti-adjustments'],
+    [/опрессов|вакуум/, 'ti-gauge'], [/электр|расключ|щит|тэн/, 'ti-bolt'], [/программ/, 'ti-cpu'],
+    [/запуск|испыт|пнр/, 'ti-player-play'], [/обклейк|оклейк|изоляц/, 'ti-snowflake'],
+    [/сборк|монтаж|установк|изготовлен/, 'ti-tool'], [/погрузк/, 'ti-truck'], [/схем|паспорт/, 'ti-file-text'],
+  ];
+  for (let k = 0; k < map.length; k++) if (map[k][0].test(n)) return map[k][1];
+  return 'ti-circle-dot';
+}
+
+// «Зачистка» → «Зачистки» для «начнётся после …» (простые окончания на -а / -ка)
+function _pwdGenitive(name) {
+  const s = String(name || '');
+  if (/[^аеиоуыэюя]ка$/i.test(s) || /[гкх]а$/i.test(s)) return s.slice(0, -1) + 'и';
+  if (/а$/i.test(s)) return s.slice(0, -1) + 'ы';
+  return s;
+}
+
+function _pwdClock(startedAt) {
+  if (!startedAt) return '';
+  const raw = String(startedAt);
+  const ms = Date.parse(raw.includes('T') ? raw : (raw.replace(' ', 'T') + 'Z'));
+  if (!ms || isNaN(ms)) return '';
+  const sec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function _pwdClockTick() {
+  if (window._pwdClockTimer) return;
+  window._pwdClockTimer = setInterval(() => {
+    const els = document.querySelectorAll('.pwd-now-clock[data-since]');
+    if (!els.length) { clearInterval(window._pwdClockTimer); window._pwdClockTimer = null; return; }
+    els.forEach(el => { el.textContent = _pwdClock(el.getAttribute('data-since')); });
+  }, 1000);
+}
+
 async function _fillWorkStages(w) {
   const box = document.getElementById('pwd-stages');
   if (!box || !w || !w.id) return;
-  let items = [];
+  let items = [], meta = {};
   try {
     const r = await apiGet('/api/production/works/' + w.id + '/stages');
     items = r.items || [];
+    meta = { template: r.template || null, summary: r.summary || null };
   } catch (e) { return; }
   if (!items.length) return;
-  window._pwdStagesCache = { workId: w.id, items: items };
-  box.innerHTML = _pwdStagesHtml(items, w);
+  window._pwdStagesCache = { workId: w.id, items: items, meta: meta };
+  box.innerHTML = _pwdStagesHtml(items, w, meta);
   box.style.display = '';
+  // процент — только из этапов: ручной ползунок прячем
+  const manual = document.querySelector('#pkb-detail-modal .pwd-progress-block');
+  if (manual) manual.style.display = 'none';
+  const sum = _pwdStagesSummary(items, meta);
+  _pwdHeroSetProgress(sum.pct, sum.done + ' из ' + sum.total);
+  _pwdClockTick();
 }
 
-function _pwdStagesHtml(items, w) {
+function _pwdStagesSummary(items, meta) {
+  const s = (meta && meta.summary) || {};
+  const done = items.filter(x => x.is_done).length;
+  let pct = (s.progress != null) ? s.progress : (items.length ? Math.round(done / items.length * 100) : 0);
+  return { pct: pct, done: done, total: items.length, weighted: !!s.weighted };
+}
+
+function _pwdStagesHtml(items, w, meta) {
+  meta = meta || ((window._pwdStagesCache || {}).meta) || {};
   const canAct = ['in_progress', 'review', 'packing'].includes(w.status);
   const canManage = hasPermission('production.manage');
   const byPos = _pwdStagesByPos(items);
-  const doneCnt = items.filter(s => s.is_done).length;
-  const totalFact = items.reduce((a, s) => a + (s.fact_hours || 0), 0);
-  const pct = items.length ? Math.round(doneCnt / items.length * 100) : 0;
+  const sum = _pwdStagesSummary(items, meta);
+  const doneCnt = sum.done;
   const my = (w.active_helpers || []).find(h => h.is_me);
   const myStageId = my ? my.stage_id : null;
   const showDone = !!window._pwdStagesShowDone;
   const foldDone = doneCnt > 3 && !showDone;
+  const tpl = meta.template;
+  const total = items.length;
 
-  let html = '<div class="pwd-stg-block">';
-  html += '<div class="pwd-stg-head"><span><i class="ti ti-list-check"></i> Этапы сборки</span>' +
-    '<span class="pwd-stg-sum">готово <b>' + doneCnt + ' / ' + items.length + '</b>' +
-    (totalFact > 0 ? ' · Σ ' + _pwdStageFmtH(totalFact) : '') + '</span>' +
-    (canManage ? '<button class="pkb-btn" style="padding:2px 9px;font-size:11px;" onclick="pwdStageAdd(' + w.id + ')" title="Этап только для этой работы — шаблон направления не меняется"><i class="ti ti-plus"></i> этап</button>' : '') +
+  // --- «Сейчас идёт» / «Следующий этап» ---
+  let nowSt = null;
+  items.forEach(st => {
+    if (st.is_done || !(st.running || []).length) return;
+    if (!nowSt || (myStageId && st.stage_type_id === myStageId)) nowSt = st;
+  });
+  let html = '<div class="pwd-stg2">';
+  if (nowSt && canAct) {
+    const rn = nowSt.running || [];
+    const isMine = myStageId && nowSt.stage_type_id === myStageId;
+    const since = (rn.find(x => my && x.employee_id === my.id) || rn[0] || {}).started_at || '';
+    html += '<div class="pwd-now">' +
+      '<div class="l"><span class="dot"></span>Сейчас идёт</div>' +
+      '<div class="row"><div class="ic"><i class="ti ' + _pwdStageIcon(nowSt.name) + '"></i></div>' +
+        '<div class="mn"><div class="nm">' + escapeHtml(nowSt.name) + '</div>' +
+        '<div class="who">' + escapeHtml(rn.map(x => x.name || '').join(', ')) + ' · этап ' + nowSt.position + ' из ' + total + '</div></div>' +
+        '<div class="tm"><b class="pwd-now-clock" data-since="' + escapeHtml(since) + '">' + _pwdClock(since) + '</b>' +
+        '<div>норма ' + (nowSt.norm_hours ? nowSt.norm_hours + 'ч' : '—') + '</div></div></div>' +
+      (isMine
+        ? '<button class="pwd-big" onclick="pwdStageStopDone(' + w.id + ',' + nowSt.id + ')"><i class="ti ti-circle-check"></i>' + escapeHtml(nowSt.name) + ' — готово</button>'
+        : '<button class="pwd-big" onclick="pwdStageToggleDone(' + w.id + ',' + nowSt.id + ',true)"><i class="ti ti-circle-check"></i>' + escapeHtml(nowSt.name) + ' — готово</button>') +
+      '<div class="sec">' +
+        (isMine ? '<button onclick="pwdStagePause(' + w.id + ')"><i class="ti ti-player-pause"></i>Пауза</button>' : '') +
+        '<button onclick="pwdStageComment()"><i class="ti ti-message-plus"></i>Комментарий</button>' +
+      '</div></div>';
+  } else if (canAct) {
+    const next = items.find(st => !st.is_done && !_pwdStageLocked(st, byPos));
+    if (next) {
+      html += '<div class="pwd-now next">' +
+        '<div class="l"><span class="dot"></span>Следующий этап</div>' +
+        '<div class="row"><div class="ic"><i class="ti ' + _pwdStageIcon(next.name) + '"></i></div>' +
+          '<div class="mn"><div class="nm">' + escapeHtml(next.name) + '</div>' +
+          '<div class="who">' + (next.assignee_name ? 'исполнитель: ' + escapeHtml(next.assignee_name) + ' · ' : '') + 'этап ' + next.position + ' из ' + total + '</div></div>' +
+          '<div class="tm"><div>норма ' + (next.norm_hours ? next.norm_hours + 'ч' : '—') + '</div></div></div>' +
+        '<button class="pwd-big go" onclick="pwdStageStart(' + w.id + ',' + next.stage_type_id + ')"><i class="ti ti-player-play"></i>Начать «' + escapeHtml(next.name) + '»</button>' +
+        '</div>';
+    }
+  }
+
+  // --- заголовок ---
+  html += '<div class="pwd-stg2-h"><i class="ti ti-list-check"></i>Этапы' +
+    '<span class="r">' + (tpl && tpl.label ? 'шаблон ' + escapeHtml(tpl.label) + ' · ' : '') +
+    total + ' ' + plural(total, 'этап', 'этапа', 'этапов') + '</span>' +
+    (canManage ? '<button class="pwd-stg2-add" onclick="pwdStageAdd(' + w.id + ')" title="Этап только для этой работы — шаблон не меняется"><i class="ti ti-plus"></i></button>' : '') +
     '</div>';
-  html += '<div class="pwd-stg-bar"><i style="width:' + pct + '%;"></i></div>';
   if (foldDone) {
     html += '<div class="pwd-stg-fold" onclick="pwdStagesToggleFold()"><i class="ti ti-chevron-right"></i> ' +
       doneCnt + ' ' + plural(doneCnt, 'готовый этап свёрнут', 'готовых этапа свёрнуто', 'готовых этапов свёрнуто') + ' — показать</div>';
@@ -11140,49 +11304,180 @@ function _pwdStagesHtml(items, w) {
     html += '<div class="pwd-stg-fold" onclick="pwdStagesToggleFold()"><i class="ti ti-chevron-down"></i> скрыть готовые</div>';
   }
 
+  // --- лента этапов ---
+  html += '<div class="pwd-tl">';
   items.forEach(st => {
     if (st.is_done && foldDone) return;
     const locked = _pwdStageLocked(st, byPos);
     const running = st.running || [];
     const isMine = myStageId && st.stage_type_id === myStageId && !st.is_done;
-    let sub = '';
-    if (st.is_done) {
-      const when = st.done_at ? (String(st.done_at).slice(8, 10) + '.' + String(st.done_at).slice(5, 7)) : '';
-      sub = '✓ ' + (st.done_by_name ? escapeHtml(st.done_by_name) : 'готово') + (when ? ' · ' + when : '');
-    } else if (running.length) {
-      sub = running.map(rn =>
-        '<span class="pwd-stg-live" data-started-at="' + escapeHtml(rn.started_at || '') + '" data-label="⏱ ' + escapeHtml(rn.name || '') + '">⏱ ' +
-        escapeHtml(rn.name || '') + (rn.started_at ? ' · ' + _formatHelpingDuration(rn.started_at) : '') + '</span>').join(' ');
-    } else if (locked) {
-      sub = '🔒 ждём: ' + escapeHtml(locked.join(', '));
-    } else if (st.default_employee_name) {
-      sub = 'обычно: ' + escapeHtml(st.default_employee_name);
+    const state = st.is_done ? 'done' : (running.length ? 'run' : (locked ? 'wait' : 'open'));
+    const tag = { done: 'Готово', run: 'Идёт', wait: 'Ждёт', open: 'Можно начать' }[state];
+    let ln = '';
+    if (state === 'done') {
+      const when = st.done_at ? (String(st.done_at).slice(8, 10) + '.' + String(st.done_at).slice(5, 7) + ' в ' + _pwdStageEkbTime(st.done_at)) : '';
+      ln = '<i class="ti ti-circle-check"></i>' + escapeHtml(st.done_by_name || 'готово') + (when ? ' · ' + when : '');
+    } else if (state === 'run') {
+      ln = '<i class="ti ti-player-play"></i><b class="live">' + running.map(rn =>
+        escapeHtml(rn.name || '') + (rn.started_at ? ' · идёт <span data-started-at="' + escapeHtml(rn.started_at) + '" data-label="">' + _formatHelpingDuration(rn.started_at) + '</span>' : '')).join(', ') + '</b>';
+    } else if (state === 'wait') {
+      const onlyPrev = locked.length === 1 && /^«/.test(locked[0]);
+      ln = '<i class="ti ti-lock"></i>' + (onlyPrev
+        ? 'начнётся после «' + escapeHtml(_pwdGenitive(locked[0].slice(1, -1))) + '»'
+        : 'ждём: ' + escapeHtml(locked.join(', ')));
+    } else {
+      ln = '<i class="ti ti-circle-dashed"></i>' + (st.default_employee_name ? 'обычно: ' + escapeHtml(st.default_employee_name) : 'можно начинать');
     }
-    if (st.norm_hours) sub += (sub ? ' · ' : '') + 'норма ' + st.norm_hours + 'ч';
-
+    const asg = st.assignee_name
+      ? '<span class="' + (canManage ? 'ed' : '') + '"' + (canManage ? ' onclick="pwdStageSetAssignee(' + w.id + ',' + st.id + ')"' : '') + '><i class="ti ti-user"></i>исполнитель: <b>' + escapeHtml(st.assignee_name) + '</b></span>'
+      : '<span class="na' + (canManage ? ' ed' : '') + '"' + (canManage ? ' onclick="pwdStageSetAssignee(' + w.id + ',' + st.id + ')"' : '') + '><i class="ti ti-user"></i>исполнитель: <b>не назначен</b></span>';
+    const norm = '<span class="' + (canManage ? 'ed' : '') + '"' + (canManage ? ' onclick="pwdStageSetNorm(' + w.id + ',' + st.id + ')"' : '') + '><i class="ti ti-clock"></i>норма: <b>' + (st.norm_hours ? st.norm_hours + 'ч' : '—') + '</b></span>';
+    const fact = (st.fact_hours > 0 || state === 'done' || state === 'run')
+      ? '<span class="fact" onclick="pwdStageHistory(' + w.id + ',' + st.id + ')"><i class="ti ti-clock-check"></i>факт: <b>' + _pwdStageFmtH(st.fact_hours) + '</b></span>' : '';
     let act = '';
-    if (canAct && !st.is_done) {
-      if (isMine) {
-        act = '<button class="pwd-stg-btn stop" onclick="pwdStageStopDone(' + w.id + ',' + st.id + ')"><i class="ti ti-player-pause"></i> Стоп + готово</button>';
-      } else if (!locked && !running.length) {
-        act = '<button class="pwd-stg-btn go" onclick="pwdStageStart(' + w.id + ',' + st.stage_type_id + ')"><i class="ti ti-player-play"></i> Начать</button>';
+    if (canAct) {
+      if (state === 'open') {
+        act = '<button class="pwd-stg-btn go" onclick="pwdStageStart(' + w.id + ',' + st.stage_type_id + ')"><i class="ti ti-player-play"></i> Начать</button>' +
+              '<button class="pwd-stg-btn" onclick="pwdStageToggleDone(' + w.id + ',' + st.id + ',true)"><i class="ti ti-check"></i> Готово</button>';
+      } else if (state === 'run') {
+        act = isMine
+          ? '<button class="pwd-stg-btn stop" onclick="pwdStageStopDone(' + w.id + ',' + st.id + ')"><i class="ti ti-player-pause"></i> Стоп + готово</button>'
+          : '<button class="pwd-stg-btn" onclick="pwdStageToggleDone(' + w.id + ',' + st.id + ',true)"><i class="ti ti-check"></i> Готово</button>';
+      } else if (state === 'done') {
+        act = '<button class="pwd-stg-undo" onclick="pwdStageToggleDone(' + w.id + ',' + st.id + ',false)">снять отметку</button>';
       }
     }
     const manageBtns = canManage
       ? '<span class="pwd-stg-edit" onclick="pwdStageRename(' + w.id + ',' + st.id + ')" title="Переименовать"><i class="ti ti-pencil"></i></span>' +
         '<span class="pwd-stg-del" onclick="pwdStageDelete(' + w.id + ',' + st.id + ')" title="Убрать этап из этой работы"><i class="ti ti-x"></i></span>'
       : '';
-    html += '<div class="pwd-stg-row' + (st.is_done ? ' done' : '') + (isMine ? ' mine' : '') + (locked ? ' lkd' : '') + '">' +
-      '<span class="n">' + st.position + '</span>' +
-      '<span class="chk' + (locked && !st.is_done ? ' off' : '') + '" onclick="pwdStageToggleDone(' + w.id + ',' + st.id + ',' + (st.is_done ? 'false' : 'true') + ')" title="' + (st.is_done ? 'Снять отметку' : 'Отметить готовым') + '">' + (st.is_done ? '<i class="ti ti-check"></i>' : '') + '</span>' +
-      '<span class="m clickable" onclick="pwdStageHistory(' + w.id + ',' + st.id + ')" title="Архив: когда и сколько делали этот этап"><span class="t">' + escapeHtml(st.name) + '</span>' +
-      (sub ? '<span class="sub">' + sub + '</span>' : '') + '</span>' +
-      '<span class="fact' + (st.is_done ? ' ok' : '') + '" onclick="pwdStageHistory(' + w.id + ',' + st.id + ')" style="cursor:pointer;">' + _pwdStageFmtH(st.fact_hours) + '</span>' +
-      act + manageBtns +
-      '</div>';
+    html += '<div class="pwd-st ' + state + (isMine ? ' mine' : '') + '">' +
+      '<div class="node"><i class="ti ' + _pwdStageIcon(st.name) + '"></i>' + (state === 'done' ? '<span class="badge"><i class="ti ti-check"></i></span>' : '') + '</div>' +
+      '<div class="box">' +
+        '<div class="hd"><span class="nm" onclick="pwdStageHistory(' + w.id + ',' + st.id + ')" title="Архив: когда и сколько делали этот этап">' + escapeHtml(st.name) + '</span>' +
+          manageBtns + '<span class="tag">' + tag + '</span></div>' +
+        '<div class="ln">' + ln + '</div>' +
+        '<div class="meta">' + asg + norm + fact + '</div>' +
+        (act ? '<div class="acts">' + act + '</div>' : '') +
+      '</div></div>';
   });
   html += '</div>';
+
+  if (canAct && w.status === 'in_progress' && items.some(st => _pwdIsPackingStage(st.name))) {
+    html += '<div class="pwd-hint"><i class="ti ti-info-circle"></i><span>Когда будут готовы все этапы, кроме «Упаковки», CRM предложит перевести работу в статус <b style="white-space:nowrap">«На проверке»</b>.</span></div>';
+  }
+  html += '<div class="pwd-pg"><div class="h"><i class="ti ti-chart-line"></i>Прогресс<b>' + sum.pct + '%</b></div>' +
+    '<div class="bar"><i style="width:' + sum.pct + '%"></i><u style="left:' + sum.pct + '%"></u></div>' +
+    '<div class="lk"><i class="ti ti-lock"></i>Считается по этапам: ' + doneCnt + ' из ' + total + ' ' +
+      plural(doneCnt, 'готов', 'готовы', 'готовы') + (sum.weighted ? ' (с учётом норм часов)' : '') + '. Вручную не меняется.</div></div>';
+  html += '</div>';
   return html;
+}
+
+async function _pwdLoadEmployees() {
+  if (window._pwdEmps) return window._pwdEmps;
+  try {
+    const d = await apiGet('/api/employees/active');
+    window._pwdEmps = (d.items || d.employees || []).filter(e => e.is_active !== false);
+  } catch (e) { window._pwdEmps = []; }
+  return window._pwdEmps;
+}
+
+async function pwdStageSetAssignee(workId, sid) {
+  const c = window._pwdStagesCache || {};
+  const st = (c.items || []).find(x => x.id === sid);
+  const emps = await _pwdLoadEmployees();
+  let m = document.getElementById('pwd-stage-asg-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'pwd-stage-asg-modal';
+  m.className = 'modal-overlay visible';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  const rows = ['<button class="wsp-row" data-emp=""><span class="m"><span class="t">— не назначен —</span></span></button>']
+    .concat(emps.map(e => '<button class="wsp-row' + (st && st.assignee_id === e.id ? ' done' : '') + '" data-emp="' + e.id + '"><span class="m"><span class="t">' +
+      escapeHtml(e.short_name || e.full_name || ('#' + e.id)) + '</span>' + (e.position ? '<span class="s">' + escapeHtml(e.position) + '</span>' : '') + '</span></button>')).join('');
+  m.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;max-height:86vh;display:flex;flex-direction:column;">' +
+    '<div class="modal-header"><h3 style="font-size:14px;"><i class="ti ti-user"></i> Исполнитель этапа «' + escapeHtml((st && st.name) || '') + '»</h3>' +
+    '<button class="icon-btn" onclick="document.getElementById(\'pwd-stage-asg-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+    '<div class="modal-body" style="overflow-y:auto;">' + rows + '</div></div>';
+  document.body.appendChild(m);
+  m.querySelectorAll('[data-emp]').forEach(b => b.addEventListener('click', async () => {
+    const v = b.getAttribute('data-emp');
+    m.remove();
+    try {
+      await apiPatch('/api/production/work-stages/' + sid, { assignee_id: v ? parseInt(v, 10) : null });
+      showToast(v ? 'Исполнитель назначен' : 'Исполнитель снят', 'success');
+    } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
+    _pwdStagesRefreshCard(workId);
+  }));
+}
+
+async function pwdStageSetNorm(workId, sid) {
+  const c = window._pwdStagesCache || {};
+  const st = (c.items || []).find(x => x.id === sid);
+  const v = prompt('Норма на этап «' + ((st && st.name) || '') + '», часов (пусто — убрать):', (st && st.norm_hours) || '');
+  if (v == null) return;
+  const num = String(v).trim().replace(',', '.');
+  if (num && !(parseFloat(num) >= 0)) { showToast('Нужно число часов', 'error'); return; }
+  try {
+    await apiPatch('/api/production/work-stages/' + sid, { norm_hours: num ? parseFloat(num) : null });
+    showToast('Норма сохранена', 'success');
+  } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
+  _pwdStagesRefreshCard(workId);
+}
+
+async function pwdStagePause(workId) {
+  try {
+    const r = await apiPost('/api/production/works/' + workId + '/stop-helping', { note: '' });
+    const mins = ((r && r.data) || {}).minutes || 0;
+    showToast('Пауза' + (mins > 0 ? ' · в журнал: ' + mins + ' мин' : ''), 'success');
+  } catch (e) { showToast('Ошибка соединения', 'error'); }
+  _pwdStagesRefreshCard(workId);
+}
+
+function pwdStageComment() {
+  const inp = document.getElementById('pwc-inp');
+  if (!inp) return;
+  inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => inp.focus(), 250);
+}
+
+// Все этапы, кроме упаковки, готовы → предложить «На проверке»
+function _pwdMaybeSuggestStatus(workId, res) {
+  if (!res || res.suggest_status !== 'review') return false;
+  if (!hasPermission('production.manage')) {
+    showToast('Все этапы, кроме упаковки, готовы — скажи мастеру', 'info');
+    return false;
+  }
+  if (confirm('Готовы все этапы, кроме упаковки.\nПеревести работу в статус «На проверке»?')) {
+    changeProductionWorkStatus(workId, 'review');
+    return true;
+  }
+  return false;
+}
+
+async function pwdChangeExecution(workId, cur) {
+  const next = cur === 'stainless' ? 'standard' : 'stainless';
+  const nextLabel = next === 'stainless' ? 'Нерж. AISI' : 'Стандарт';
+  if (!confirm('Сменить исполнение работы на «' + nextLabel + '»?\nЧек-лист этапов подберётся по новому шаблону.')) return;
+  let res;
+  try {
+    res = await apiPatch('/api/production/works/' + workId, { execution_type: next });
+  } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); return; }
+  const rb = (res && res.stages_rebuild) || null;
+  if (rb && rb.reason === 'has_done') {
+    if (confirm('Уже отмечено этапов: ' + rb.done_count + '.\nПересоздать чек-лист по новому шаблону? Отметки пропадут, часы в журнале останутся.')) {
+      try {
+        const r = await apiPost('/api/production/works/' + workId + '/stages/rebuild', { force: true });
+        showToast(r && r.ok ? 'Этапы пересозданы' : (((r && r.data) || {}).message || 'Не удалось'), r && r.ok ? 'success' : 'error');
+      } catch (e) { showToast('Ошибка соединения', 'error'); }
+    } else {
+      showToast('Исполнение сменено, этапы оставлены как были', 'info');
+    }
+  } else {
+    showToast('Исполнение: ' + nextLabel + (rb && rb.rebuilt ? ' · этапы пересозданы' : ''), 'success');
+  }
+  _pwdStagesRefreshCard(workId);
 }
 
 async function _pwdStagesRefreshCard(workId) {
@@ -11210,14 +11505,27 @@ async function pwdStageToggleDone(workId, sid, makeDone) {
     const locked = _pwdStageLocked(st, _pwdStagesByPos(c.items));
     if (locked) { showToast('🔒 Ждём: ' + locked.join(', '), 'error'); return; }
   }
+  let res = null;
   try {
-    await apiPatch('/api/production/work-stages/' + sid, { done: !!makeDone });
+    res = await apiPatch('/api/production/work-stages/' + sid, { done: !!makeDone });
     showToast(makeDone ? 'Этап готов ✅' : 'Отметка снята', 'success');
   } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
+  // v2.46.282: все этапы, кроме упаковки, готовы → предложить «На проверке»
+  if (makeDone && _pwdMaybeSuggestStatus(workId, res)) return;
   _pwdStagesRefreshCard(workId);
 }
 
 async function pwdStageStart(workId, stageTypeId) {
+  const c = window._pwdStagesCache || {};
+  const st = (c.items || []).find(x => x.stage_type_id === stageTypeId);
+  const wk = state._pkbDetailWork;
+  if (st && _pwdIsPackingStage(st.name) && wk && wk.id === workId &&
+      ['in_progress', 'review'].includes(wk.status) && hasPermission('production.manage')) {
+    if (confirm('Начинаем «' + st.name + '».\nПеревести работу в статус «Упаковка»?')) {
+      try { await apiPatch('/api/production/works/' + workId + '/status', { status: 'packing' }); }
+      catch (e) { showToast((e && e.message) || 'Не удалось сменить статус', 'error'); }
+    }
+  }
   try {
     const r = await apiPost('/api/production/works/' + workId + '/start-helping', { stage_id: stageTypeId });
     if (r && r.ok) showToast('Часики пошли ⏱', 'success');
@@ -11231,9 +11539,10 @@ async function pwdStageStopDone(workId, sid) {
   try {
     const r = await apiPost('/api/production/works/' + workId + '/stop-helping', { note: '' });
     const mins = ((r && r.data) || {}).minutes || 0;
-    await apiPatch('/api/production/work-stages/' + sid, { done: true });
+    const res = await apiPatch('/api/production/work-stages/' + sid, { done: true });
     const fmtMin = mins < 60 ? (mins + ' мин') : (Math.floor(mins / 60) + 'ч ' + (mins % 60) + 'м');
     showToast('Этап готов ✅' + (mins > 0 ? ' · в журнал: ' + fmtMin : ''), 'success');
+    if (_pwdMaybeSuggestStatus(workId, res)) return;
   } catch (e) { showToast((e && e.message) || 'Ошибка', 'error'); }
   _pwdStagesRefreshCard(workId);
   if (state.currentScreen === 'production-dashboard' && typeof loadProductionDashboard === 'function') loadProductionDashboard();

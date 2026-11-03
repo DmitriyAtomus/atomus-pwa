@@ -6241,19 +6241,41 @@ async function submitEditDirection(directionId) {
 // Шаблон задаёт этапы для всех новых работ направления (чиллеры — 26 этапов).
 // «Кто обычно» и «норма, ч» — подсказки в карточке работы; правки сохраняются сразу.
 
-async function openDirectionStagesModal(directionId) {
+// v2.46.282: набор шаблона — на всё направление или на подгруппу
+// (воздухоохладители / НВП / наружные блоки / увлажнители). Подбор для работы:
+// модель → подгруппа → направление; нет набора — у работы этапов нет.
+function _dstQuery(st) {
+  return st && st.subgroupId ? ('?subgroup_id=' + st.subgroupId) : '';
+}
+
+async function openDirectionStagesModal(directionId, subgroupId) {
   const dir = ((cache.models && cache.models.directions) || []).find(d => d.id === directionId);
-  let items = [], emps = [];
+  let items = [], emps = [], subgroups = [], scopes = [];
+  const st0 = { subgroupId: subgroupId || null };
   try {
-    const r = await apiGet('/api/directions/' + directionId + '/stage-templates');
+    const r = await apiGet('/api/directions/' + directionId + '/stage-templates' + _dstQuery(st0));
     items = r.items || [];
+    subgroups = r.subgroups || [];
+    scopes = r.scopes || [];
   } catch (e) {}
+  // открыли направление без своего шаблона, но у подгрупп наборы есть — показываем первую
+  if (!subgroupId && !items.length) {
+    const first = scopes.find(x => x.subgroup_id && !x.model_id && !x.execution_type);
+    if (first) return openDirectionStagesModal(directionId, first.subgroup_id);
+  }
   try {
     const d = await apiGet('/api/employees/active');
     emps = (d.items || d.employees || []).filter(e => e.is_active !== false);
   } catch (e) {}
-  window._dst = { directionId: directionId, items: items, emps: emps, dirName: dir ? dir.name : '' };
+  window._dst = { directionId: directionId, subgroupId: subgroupId || null, items: items, emps: emps,
+                  subgroups: subgroups, scopes: scopes, dirName: dir ? dir.name : '' };
   _dstRender();
+}
+
+function _dstSetScope(val) {
+  const st = window._dst;
+  if (!st) return;
+  openDirectionStagesModal(st.directionId, val ? parseInt(val, 10) : null);
 }
 
 function _dstRender() {
@@ -6282,6 +6304,15 @@ function _dstRender() {
       '<span class="dst-del" onclick="_dstDel(' + t.id + ')" title="Убрать из шаблона"><i class="ti ti-x"></i></span>' +
     '</div>';
   });
+  const cntOf = (sgId) => {
+    const sc = (st.scopes || []).find(x => (x.subgroup_id || null) === (sgId || null) && !x.model_id && !x.execution_type);
+    return sc ? sc.count : 0;
+  };
+  const scopeSel = '<div class="dst-scope"><span>Шаблон для:</span><select onchange="_dstSetScope(this.value)">' +
+    '<option value=""' + (!st.subgroupId ? ' selected' : '') + '>Всё направление' + (cntOf(null) ? ' · ' + cntOf(null) : ' · нет') + '</option>' +
+    (st.subgroups || []).map(sg => '<option value="' + sg.id + '"' + (st.subgroupId === sg.id ? ' selected' : '') + '>Подгруппа «' +
+      escapeHtml(sg.name) + '»' + (cntOf(sg.id) ? ' · ' + cntOf(sg.id) : ' · нет') + '</option>').join('') +
+    '</select></div>';
   overlay.innerHTML =
     '<div class="modal" onclick="event.stopPropagation()" style="max-width:660px;max-height:90vh;display:flex;flex-direction:column;">' +
       '<div class="modal-header">' +
@@ -6291,8 +6322,8 @@ function _dstRender() {
       '<div class="modal-body" style="overflow-y:auto;">' +
         '<div class="form-hint" style="margin-bottom:8px;">' +
           '<i class="ti ti-info-circle" style="vertical-align:-2px;margin-right:4px;color:var(--brand);"></i>' +
-          'Шаблон применяется к новым работам направления (и к старым — при первом открытии карточки). Уже созданные чек-листы работ при правке шаблона не меняются. «Норма, ч» можно заполнить позже — появится сравнение факт/норма.' +
-        '</div>' +
+          'Шаблон подгруппы точнее шаблона направления: работа берёт этапы своей подгруппы, а если их нет — направления. Нет ни того, ни другого — этапов у работы нет (комплекты, форсунки). Чек-лист создаётся при «В работу» (и у незакрытых старых — при открытии карточки); уже созданные чек-листы при правке шаблона не меняются. «Норма, ч» можно заполнить позже.' +
+        '</div>' + scopeSel +
         (rows || '<div class="empty-block" style="padding:16px;"><i class="ti ti-list"></i>Этапов пока нет — добавь первый.</div>') +
         '<button class="dst-add" onclick="_dstAdd()">＋ Добавить этап</button>' +
       '</div>' +
@@ -6304,8 +6335,9 @@ async function _dstReload() {
   const st = window._dst;
   if (!st) return;
   try {
-    const r = await apiGet('/api/directions/' + st.directionId + '/stage-templates');
+    const r = await apiGet('/api/directions/' + st.directionId + '/stage-templates' + _dstQuery(st));
     st.items = r.items || [];
+    st.scopes = r.scopes || st.scopes;
   } catch (e) {}
   _dstRender();
 }
@@ -6314,7 +6346,9 @@ async function _dstAdd() {
   const name = prompt('Название этапа:', '');
   if (name == null || !name.trim()) return;
   try {
-    const r = await apiPost('/api/directions/' + window._dst.directionId + '/stage-templates', { name: name.trim() });
+    const body = { name: name.trim() };
+    if (window._dst.subgroupId) body.subgroup_id = window._dst.subgroupId;
+    const r = await apiPost('/api/directions/' + window._dst.directionId + '/stage-templates', body);
     if (!(r && r.ok)) showToast(((r && r.data) || {}).message || 'Не удалось добавить', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
   _dstReload();
