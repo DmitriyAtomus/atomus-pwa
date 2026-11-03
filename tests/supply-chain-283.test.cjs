@@ -65,12 +65,15 @@ test('v2.46.283: «Ждём поставку» — группы по догов�
 });
 
 test('v2.46.283: файл подключён, версия поднята везде', () => {
+  // v2.46.284: номер версии больше не прибит к 283 — проверяем, что все 4 места совпадают
   assert.match(read('index.html'), /<script src="\/app-4\.js"><\/script>\n<script src="\/supply-chain\.js"><\/script>/);
   assert.match(read('sw.js'), /'\/supply-chain\.js'/);
-  assert.match(read('sw.js'), /atomus-v2\.46\.283/);
-  assert.match(read('app-1.js'), /APP_VERSION = "v2\.46\.283"/);
-  assert.equal(JSON.parse(read('version.json')).version, 'v2.46.283');
-  assert.match(read('app-3.js'), /HELP_CHANGELOG = \[\n  \{version:'v2\.46\.283'/);
+  const v = JSON.parse(read('version.json')).version;
+  assert.ok(v >= 'v2.46.283', v);
+  assert.ok(read('sw.js').includes("atomus-" + v + "'"));
+  assert.ok(read('app-1.js').includes('APP_VERSION = "' + v + '"'));
+  assert.ok(read('app-3.js').includes("HELP_CHANGELOG = [\n  {version:'" + v + "'"));
+  assert.match(read('app-3.js'), /\{version:'v2\.46\.283'/);
 });
 
 test('v2.46.283: поиск счетов — 250 мс, новые фильтры уходят в /api/pay-list', () => {
