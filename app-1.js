@@ -11121,7 +11121,9 @@ function _pwdStagesByPos(items) {
 function _pwdStageLocked(st, byPos) {
   if (st.is_done) return null;
   const waits = [];
-  if (st.requires) {
+  // v2.46.282: soft_order — порядок рекомендованный (не чиллеры): этап можно
+  // начать раньше, карточка лишь предупреждает (см. _pwdStageOrderWaits).
+  if (st.requires && !st.soft_order) {
     String(st.requires).split(',')
       .map(x => parseInt(x.trim(), 10)).filter(Boolean)
       .filter(p => byPos[p] && !byPos[p].is_done)
@@ -11129,6 +11131,23 @@ function _pwdStageLocked(st, byPos) {
   }
   (st.parts_wait || []).forEach(n => waits.push('деталь: ' + n));
   return waits.length ? waits : null;
+}
+
+// v2.46.282: какие предыдущие этапы ещё не готовы (для мягкого порядка —
+// только предупреждение, не замок).
+function _pwdStageOrderWaits(st, byPos) {
+  if (!st || st.is_done || !st.requires || !st.soft_order) return null;
+  const waits = String(st.requires).split(',')
+    .map(x => parseInt(x.trim(), 10)).filter(Boolean)
+    .filter(p => byPos[p] && !byPos[p].is_done)
+    .map(p => byPos[p].name);
+  return waits.length ? waits : null;
+}
+
+function _pwdStageEarlyConfirm(st, byPos, verb) {
+  const ow = _pwdStageOrderWaits(st, byPos);
+  if (!ow) return true;
+  return confirm('⚠ Ещё не готово: «' + ow.join('», «') + '».\n' + verb + ' «' + st.name + '» раньше?');
 }
 
 function _pwdStageFmtH(h) {
@@ -11219,7 +11238,19 @@ async function _fillWorkStages(w) {
     items = r.items || [];
     meta = { template: r.template || null, summary: r.summary || null };
   } catch (e) { return; }
-  if (!items.length) return;
+  if (!items.length) {
+    // v2.46.282: у переделок / ремонтов шаблона нет — этапы добавляются вручную
+    window._pwdStagesCache = { workId: w.id, items: [], meta: meta };
+    if (hasPermission('production.manage') && !['done', 'cancelled'].includes(w.status)) {
+      box.innerHTML = '<div class="pwd-stg2-h"><i class="ti ti-list-check"></i>Этапы' +
+        '<span class="r">нет шаблона</span>' +
+        '<button class="pwd-stg2-add" onclick="pwdStageAdd(' + w.id + ')" title="Добавить этап для этой работы"><i class="ti ti-plus"></i></button></div>' +
+        '<div class="pwd-hint"><i class="ti ti-info-circle"></i><div>У этой работы этапов нет (переделка, ремонт или покупное изделие). ' +
+        'Нужны этапы — добавьте их вручную кнопкой «+»; процент тогда будет считаться по ним.</div></div>';
+      box.style.display = '';
+    }
+    return;
+  }
   window._pwdStagesCache = { workId: w.id, items: items, meta: meta };
   box.innerHTML = _pwdStagesHtml(items, w, meta);
   box.style.display = '';
@@ -11309,10 +11340,13 @@ function _pwdStagesHtml(items, w, meta) {
   items.forEach(st => {
     if (st.is_done && foldDone) return;
     const locked = _pwdStageLocked(st, byPos);
+    const orderW = _pwdStageOrderWaits(st, byPos);
     const running = st.running || [];
     const isMine = myStageId && st.stage_type_id === myStageId && !st.is_done;
     const state = st.is_done ? 'done' : (running.length ? 'run' : (locked ? 'wait' : 'open'));
-    const tag = { done: 'Готово', run: 'Идёт', wait: 'Ждёт', open: 'Можно начать' }[state];
+    const early = !!(orderW && !st.is_done);
+    const tag = (state === 'open' && early) ? 'Можно раньше'
+      : { done: 'Готово', run: 'Идёт', wait: 'Ждёт', open: 'Можно начать' }[state];
     let ln = '';
     if (state === 'done') {
       const when = st.done_at ? (String(st.done_at).slice(8, 10) + '.' + String(st.done_at).slice(5, 7) + ' в ' + _pwdStageEkbTime(st.done_at)) : '';
@@ -11325,8 +11359,15 @@ function _pwdStagesHtml(items, w, meta) {
       ln = '<i class="ti ti-lock"></i>' + (onlyPrev
         ? 'начнётся после «' + escapeHtml(_pwdGenitive(locked[0].slice(1, -1))) + '»'
         : 'ждём: ' + escapeHtml(locked.join(', ')));
+    } else if (early) {
+      ln = '<i class="ti ti-alert-triangle"></i>' + (orderW.length === 1
+        ? 'по порядку — после «' + escapeHtml(_pwdGenitive(orderW[0])) + '», можно раньше'
+        : 'по порядку — после: ' + escapeHtml(orderW.join(', ')) + ', можно раньше');
     } else {
       ln = '<i class="ti ti-circle-dashed"></i>' + (st.default_employee_name ? 'обычно: ' + escapeHtml(st.default_employee_name) : 'можно начинать');
+    }
+    if (state === 'run' && early) {
+      ln += '<div class="pwd-st-early"><i class="ti ti-alert-triangle"></i>начат раньше: ещё не готово «' + escapeHtml(orderW.join('», «')) + '»</div>';
     }
     const asg = st.assignee_name
       ? '<span class="' + (canManage ? 'ed' : '') + '"' + (canManage ? ' onclick="pwdStageSetAssignee(' + w.id + ',' + st.id + ')"' : '') + '><i class="ti ti-user"></i>исполнитель: <b>' + escapeHtml(st.assignee_name) + '</b></span>'
@@ -11351,7 +11392,7 @@ function _pwdStagesHtml(items, w, meta) {
       ? '<span class="pwd-stg-edit" onclick="pwdStageRename(' + w.id + ',' + st.id + ')" title="Переименовать"><i class="ti ti-pencil"></i></span>' +
         '<span class="pwd-stg-del" onclick="pwdStageDelete(' + w.id + ',' + st.id + ')" title="Убрать этап из этой работы"><i class="ti ti-x"></i></span>'
       : '';
-    html += '<div class="pwd-st ' + state + (isMine ? ' mine' : '') + '">' +
+    html += '<div class="pwd-st ' + state + (isMine ? ' mine' : '') + (early ? ' early' : '') + '">' +
       '<div class="node"><i class="ti ' + _pwdStageIcon(st.name) + '"></i>' + (state === 'done' ? '<span class="badge"><i class="ti ti-check"></i></span>' : '') + '</div>' +
       '<div class="box">' +
         '<div class="hd"><span class="nm" onclick="pwdStageHistory(' + w.id + ',' + st.id + ')" title="Архив: когда и сколько делали этот этап">' + escapeHtml(st.name) + '</span>' +
@@ -11504,6 +11545,7 @@ async function pwdStageToggleDone(workId, sid, makeDone) {
   if (makeDone && st) {
     const locked = _pwdStageLocked(st, _pwdStagesByPos(c.items));
     if (locked) { showToast('🔒 Ждём: ' + locked.join(', '), 'error'); return; }
+    if (!_pwdStageEarlyConfirm(st, _pwdStagesByPos(c.items), 'Отметить готовым')) return;
   }
   let res = null;
   try {
@@ -11517,7 +11559,10 @@ async function pwdStageToggleDone(workId, sid, makeDone) {
 
 async function pwdStageStart(workId, stageTypeId) {
   const c = window._pwdStagesCache || {};
-  const st = (c.items || []).find(x => x.stage_type_id === stageTypeId);
+  const st = (c.items || []).find(x => x.stage_type_id === stageTypeId && !x.is_done) ||
+             (c.items || []).find(x => x.stage_type_id === stageTypeId);
+  // v2.46.282: мягкий порядок — предупреждаем, если предыдущие не готовы
+  if (st && !_pwdStageEarlyConfirm(st, _pwdStagesByPos(c.items), 'Начать')) return;
   const wk = state._pkbDetailWork;
   if (st && _pwdIsPackingStage(st.name) && wk && wk.id === workId &&
       ['in_progress', 'review'].includes(wk.status) && hasPermission('production.manage')) {

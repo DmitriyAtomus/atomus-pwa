@@ -155,3 +155,36 @@ test('версия одна и та же во всех местах', () => {
   assert.match(sw, new RegExp("const CACHE_VERSION = 'atomus-" + v + "';"));
   assert.match(a3, new RegExp("const HELP_CHANGELOG = \\[\\n  \\{version:'" + v + "'"));
 });
+
+test('мягкий порядок (не чиллер): следующий этап можно начать раньше, с предупреждением', () => {
+  const items = nvpStages().map(s => Object.assign(s, { soft_order: 1 }));
+  const html = A._pwdStagesHtml(items, work, meta);
+  assert.equal((html.match(/class="pwd-st wait/g) || []).length, 0, 'замков нет');
+  assert.equal((html.match(/class="pwd-st open early"/g) || []).length, 3);
+  assert.match(html, /Можно раньше/);
+  assert.match(html, /по порядку — после «Зачистки», можно раньше/);
+  assert.match(html, /pwdStageStart\(105,12\)/, 'у «Покраски» есть «Начать»');
+});
+
+test('мягкий порядок: идущий раньше срока этап помечен предупреждением', () => {
+  const items = nvpStages().map(s => Object.assign(s, { soft_order: 1 }));
+  items[1].running = [];
+  items[3].running = [{ employee_id: 8, name: 'Иванов А.А.', started_at: '2026-11-03 08:00:00' }];
+  const html = A._pwdStagesHtml(items, work, meta);
+  assert.match(html, /начат раньше: ещё не готово «Покраска»/);
+});
+
+test('чиллер (soft_order=0) — замки как раньше', () => {
+  const items = nvpStages().map(s => Object.assign(s, { soft_order: 0 }));
+  const html = A._pwdStagesHtml(items, work, meta);
+  assert.equal((html.match(/class="pwd-st wait"/g) || []).length, 3);
+  assert.doesNotMatch(html, /Можно раньше/);
+});
+
+test('без этапов (переделка): карточка даёт добавить этап вручную', () => {
+  const i = a1.indexOf('async function _fillWorkStages(w)');
+  const body = a1.slice(i, a1.indexOf('function _pwdStagesSummary', i));
+  assert.match(body, /if \(!items\.length\) \{/);
+  assert.match(body, /pwdStageAdd\(' \+ w\.id \+ '\)/);
+  assert.match(body, /добавьте их вручную/);
+});

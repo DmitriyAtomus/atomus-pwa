@@ -27594,3 +27594,8 @@ html.dchat-tts-off .dchat-eye[onclick="devVoiceSetup()"] { display: none !import
 .pwd-pg .lk { font-size: 12px; color: var(--text-light); display: flex; gap: 5px; align-items: center; }
 .dst-scope { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 12.5px; color: var(--text-mid); flex-wrap: wrap; }
 .dst-scope select { flex: 1; min-width: 180px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border-strong); font-family: inherit; font-size: 13px; }
+
+/* v2.46.282: мягкий порядок этапов — предупреждение «можно раньше» */
+.pwd-st.open.early .tag { background:#fff4e0; color:#9a5b00; }
+.pwd-st-early { margin-top:4px; font-size:12px; color:#9a5b00; display:flex; gap:4px; align-items:center; }
+.pwd-st-early .ti { font-size:14px; }
