@@ -304,31 +304,59 @@
       '<option value="' + Number(c.id) + '"' + (Number(selected) === Number(c.id) ? ' selected' : '') + '>' +
       esc((c.number ? (String(c.number).trim().startsWith('№') ? c.number : '№ ' + c.number) : '#' + c.id) + (c.contractor_name ? ' · ' + c.contractor_name : '')) + '</option>').join('');
   }
-  async function scOpenDestPicker(orderId, itemIds, onDone) {
+  /**
+   * Выбор «Куда»: Договор / Склад / Цех.
+   * orderId — один id или массив id (массово: каждому заказу «всё → …»).
+   * itemIds — только эти строки (одного заказа); пусто — все строки и сам заказ.
+   * cur — текущее назначение {type, contract_id} для подстановки.
+   * opts.labels — подписи заказов для заголовка (ORD-…).
+   */
+  async function scOpenDestPicker(orderId, itemIds, onDone, cur, opts) {
+    const ids = (Array.isArray(orderId) ? orderId : [orderId]).map(Number).filter(Boolean);
+    if (!ids.length) return;
+    cur = cur || {};
+    opts = opts || {};
     const list = await scContracts();
     const old = document.getElementById('sc-dest-modal'); if (old) old.remove();
     const ov = document.createElement('div');
     ov.id = 'sc-dest-modal'; ov.className = 'modal-overlay visible';
     ov.onclick = e => { if (e.target === ov) ov.remove(); };
-    ov.innerHTML = '<div class="modal" style="max-width:440px;" onclick="event.stopPropagation()">' +
-      '<div class="modal-header"><h3><i class="ti ti-arrows-exchange"></i> Куда' + (itemIds && itemIds.length ? ' · ' + itemIds.length + ' поз.' : '') + '</h3>' +
+    const startType = SC_DESTS.some(d => d[0] === cur.type) ? cur.type : 'contract';
+    const what = ids.length > 1 ? ids.length + ' ' + (ids.length < 5 ? 'заказа' : 'заказов')
+      : (itemIds && itemIds.length ? itemIds.length + ' поз.' : (opts.labels && opts.labels[0]) || ('ORD-' + ids[0]));
+    const labels = (opts.labels || []).filter(Boolean);
+    ov.innerHTML = '<div class="modal" style="max-width:460px;" onclick="event.stopPropagation()">' +
+      '<div class="modal-header"><h3><i class="ti ti-map-pin"></i> Куда · ' + esc(what) + '</h3>' +
       '<button class="icon-btn" onclick="document.getElementById(\'sc-dest-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
-      '<div class="modal-body">' + scDestSegHtml('scdp', 'contract') +
-      '<select id="scdp-contract" class="sc-select" style="margin-top:10px;">' + scContractOptionsHtml(list, null) + '</select>' +
+      '<div class="modal-body">' +
+      (labels.length > 1 ? '<div class="sc-sub" style="margin-bottom:8px;">' + esc(labels.join(', ')) + ' — всем позициям сразу</div>' : '') +
+      (opts.note ? '<div class="sc-sub" style="margin-bottom:8px;">' + esc(opts.note) + '</div>' : '') +
+      scDestSegHtml('scdp', startType) +
+      '<select id="scdp-contract" class="sc-select" style="margin-top:10px;' + (startType === 'contract' ? '' : 'display:none;') + '">' + scContractOptionsHtml(list, cur.contract_id || null) + '</select>' +
       '<div id="scdp-err" class="sc-err" style="display:none;"></div></div>' +
       '<div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;">' +
         '<button class="btn btn-secondary" onclick="document.getElementById(\'sc-dest-modal\').remove()">Отмена</button>' +
-        '<button class="btn btn-primary" id="scdp-save">Назначить</button></div></div>';
+        '<button class="btn btn-primary" id="scdp-save"><i class="ti ti-check"></i> Сохранить</button></div></div>';
     document.body.appendChild(ov);
+    const seg = document.getElementById('scdp'); if (seg) seg.setAttribute('data-value', startType);
+    root._scOnSeg_scdp = v => { const sel = document.getElementById('scdp-contract'); if (sel) sel.style.display = v === 'contract' ? '' : 'none'; };
     document.getElementById('scdp-save').onclick = async () => {
+      const err = document.getElementById('scdp-err');
       const dt = scSegValue('scdp') || 'contract';
       const cid = dt === 'contract' ? Number((document.getElementById('scdp-contract') || {}).value || 0) : null;
-      if (dt === 'contract' && !cid) { const e = document.getElementById('scdp-err'); e.style.display = ''; e.textContent = 'Выберите договор'; return; }
-      const r = await root.apiPost('/api/supply-orders/' + Number(orderId) + '/dest',
-        { dest_type: dt, contract_id: cid, item_ids: itemIds || [], all: !itemIds || !itemIds.length });
-      if (!r.ok) { const e = document.getElementById('scdp-err'); e.style.display = ''; e.textContent = (r.data && r.data.message) || 'Не удалось'; return; }
+      if (dt === 'contract' && !cid) { err.style.display = ''; err.textContent = 'Выберите договор'; return; }
+      const btn = document.getElementById('scdp-save'); btn.disabled = true;
+      let fail = 0, lastMsg = '';
+      for (const id of ids) {
+        const one = ids.length === 1 && itemIds && itemIds.length;
+        const r = await root.apiPost('/api/supply-orders/' + id + '/dest',
+          { dest_type: dt, contract_id: cid, item_ids: one ? itemIds : [], all: !one });
+        if (!r || !r.ok) { fail++; lastMsg = (r && r.data && r.data.message) || 'Не удалось'; }
+      }
+      btn.disabled = false;
+      if (fail === ids.length) { err.style.display = ''; err.textContent = lastMsg; return; }
       ov.remove();
-      root.showToast('Назначение сохранено', 'success');
+      root.showToast(fail ? ('Сохранено, но не у всех: ошибок ' + fail) : ('«Куда» сохранено' + (ids.length > 1 ? ' · ' + ids.length + ' заказов' : '')), fail ? 'warning' : 'success');
       if (typeof onDone === 'function') onDone(); else scLoadWaiting();
     };
   }
@@ -1036,18 +1064,28 @@
         ((o.invoice_seller_name || o.invoice_seller_inn) ? '<button class="btn btn-secondary btn-small" onclick="scOrderSupplier(' + Number(o.id) + ', true)">Взять из счёта</button>' : '') +
         '<button class="btn btn-secondary btn-small" onclick="scPayPickSupplier(' + Number(o.id) + ')">Выбрать</button></span></div>';
     }
-    if (kind !== 'service' && items.length) {
-      const miss = root.scMissingDest(items);
-      h += '<div class="sc-oc-row"><span class="sc-oc-l">Куда</span>' +
-        (miss ? (o.chain_new === false
+    {
+      // v2.46.285: «Куда» в карточке — всегда редактируемое, и у заказа без строк
+      const cur = "{type:" + JSON.stringify(o.dest_type || null).replace(/"/g, "'") + ",contract_id:" + (Number(o.contract_id) || 'null') + "}";
+      const lbl = JSON.stringify([o.order_label || ('ORD-' + o.id)]).replace(/"/g, "'");
+      const pick = 'scOpenDestPicker(' + Number(o.id) + ', null, loadSupplyOrderDetail, ' + cur + ', {labels:' + lbl + '})';
+      const has = !!o.dest_type;
+      const miss = items.length ? root.scMissingDest(items) : 0;
+      h += '<div class="sc-oc-row sc-oc-dest"><span class="sc-oc-l">Куда</span>' +
+        (items.length && !has && !miss ? '' : root.scDestChipHtml(o.dest_type || null, o.contract_number || '', pick)) +
+        (items.length ? (miss ? (o.chain_new === false
           // заказ создан до v2.46.283: назначение не обязательно, не красим
-          ? '<span class="sc-chip" title="Заказ создан до v2.46.283 — назначение не обязательно">' + miss + ' без назначения · необязательно</span>'
-          : '<span class="sc-chip sc-chip-bad">' + miss + ' без назначения</span>') : '<span class="sc-chip">все позиции назначены</span>') +
-        ' <button class="btn btn-secondary btn-small" onclick="scOpenDestPicker(' + Number(o.id) + ', null, loadSupplyOrderDetail)"><i class="ti ti-map-pin"></i> Назначить всем</button></div>';
-      h += '<div class="sc-oc-items">' + items.map(it =>
-        '<div class="sc-oc-item"><span class="sc-oc-name">' + esc(it.item_name || it.component_name || it.name || ('#' + it.id)) + '</span>' +
-        '<span class="sc-sub">' + esc(String(it.qty != null ? it.qty : '')) + ' ' + esc(it.unit || '') + '</span>' +
-        root.scDestChipHtml(it.dest_type, it.dest_contract_number, 'scOpenDestPicker(' + Number(o.id) + ',[' + Number(it.id) + '],loadSupplyOrderDetail)') + '</div>').join('') + '</div>';
+          ? ' <span class="sc-chip" title="Заказ создан до v2.46.283 — назначение не обязательно">' + miss + ' без назначения · необязательно</span>'
+          : ' <span class="sc-chip sc-chip-bad">' + miss + ' без назначения</span>') : ' <span class="sc-chip">все позиции назначены</span>') : '') +
+        ' <button class="btn btn-' + (has || (items.length && !miss) ? 'secondary' : 'primary') + ' btn-small sc-dest-edit" onclick="' + pick + '"><i class="ti ti-map-pin"></i> ' +
+        (has || (items.length && !miss) ? 'Изменить «Куда»' : 'Назначить «Куда»') + '</button>' +
+        (kind === 'service' ? ' <span class="sc-sub">для услуги необязательно</span>' : '') + '</div>';
+      if (items.length) {
+        h += '<div class="sc-oc-items">' + items.map(it =>
+          '<div class="sc-oc-item"><span class="sc-oc-name">' + esc(it.item_name || it.component_name || it.name || ('#' + it.id)) + '</span>' +
+          '<span class="sc-sub">' + esc(String(it.qty != null ? it.qty : '')) + ' ' + esc(it.unit || '') + '</span>' +
+          root.scDestChipHtml(it.dest_type, it.dest_contract_number, 'scOpenDestPicker(' + Number(o.id) + ',[' + Number(it.id) + '],loadSupplyOrderDetail)') + '</div>').join('') + '</div>';
+      }
     }
     if (o.cancel_reason) h += '<div class="sc-sub">Причина отмены: ' + esc(o.cancel_reason) + '</div>';
     if (o.merged_into_order_id) h += '<div class="sc-sub">Слит в <a href="#" onclick="event.preventDefault();openSupplyOrder(' + Number(o.merged_into_order_id) + ')">ORD-' + Number(o.merged_into_order_id) + '</a></div>';

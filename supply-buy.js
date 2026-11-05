@@ -1,4 +1,4 @@
-/* v2.46.284 — «Снабжение → Что закупить», вариант 1 «по «Куда»» (выбор Дмитрия, 03.11.2026).
+/* v2.46.284 (+ v2.46.285: «Назначить «Куда»» сразу открывает выбор, массово для «Без «Куда»») — «Снабжение → Что закупить», вариант 1 «по «Куда»» (выбор Дмитрия, 03.11.2026).
  *
  * Отдельный слой поверх app-3.js / supply-chain.js. Старый экран не удалён:
  * он рендерится как раньше и прячется в #sup-shop-content > .sbv-legacy, его
@@ -231,9 +231,10 @@
       const id = Number(r.order_id);
       if (r.dupOf) r.action = { label: 'Отменить дубль', icon: 'x', primary: false, js: 'openSupplyOrder(' + id + ')' };
       else if (r.closedPair) r.action = { label: 'Пришла / не пришла', icon: 'help-circle', primary: false, js: 'openSupplyOrder(' + id + ')' };
+      else if (r.stage === 'inv' && !r.dest.type && r.problems.includes('nodest')) r.action = { label: 'Назначить «Куда»', icon: 'map-pin', primary: true, js: 'sbDestPick(' + id + ')' };
       else if (r.stage === 'inv') r.action = { label: 'Напомнить' + (r.lines.length > 5 && shortSupplier(r.supplier) ? ' ' + shortSupplier(r.supplier) : ''), icon: 'bell', primary: true, js: 'sbRemind(' + id + ')' };
       else if (r.stage === 'pay') r.action = { label: 'Оплатить', icon: 'cash', primary: true, js: 'sbGoPay()' };
-      else if (!r.dest.type) r.action = { label: 'Назначить «Куда»', icon: 'arrow-right', primary: true, js: 'openSupplyOrder(' + id + ')' };
+      else if (!r.dest.type) r.action = { label: 'Назначить «Куда»', icon: 'map-pin', primary: true, js: 'sbDestPick(' + id + ')' };
       else if (!r.expected) r.action = { label: 'Указать дату', icon: 'calendar', primary: false, js: 'openSupplyOrder(' + id + ')' };
       else r.action = { label: 'Пришло', icon: 'package-import', primary: false, js: 'openSupplyOrder(' + id + ')' };
     });
@@ -445,8 +446,12 @@
       warn = g.stage === 'problem';
       sub = rows.length + ' ' + plural(rows.length, ['строка', 'строки', 'строк']);
     } else if (g.kind === 'supplier') { icon = 'building-store'; title = g.title; warn = g.key === 's:-'; }
+    const bulkIds = g.kind === 'none' ? rows.filter(r => r.kind === 'order' && !r.dupOf).map(r => Number(r.order_id)) : [];
+    const bulk = bulkIds.length > 1
+      ? '<button type="button" class="sbv-btn p sbv-bulk" onclick="sbDestPick([' + bulkIds.join(',') + '])">' + ic('map-pin') + '<span>Назначить всем (' + bulkIds.length + ')</span></button>'
+      : '';
     return '<div class="sbv-gh"><span class="sbv-gi' + (warn ? ' warn' : '') + '">' + ic(icon) + '</span><div class="sbv-gtx"><div class="gt">' + esc(title) + '</div><div class="gs">' + esc(sub) + '</div></div>' +
-      (g.kind === 'stage' ? '' : progHtml(rows)) + '</div>';
+      bulk + (g.kind === 'stage' ? '' : progHtml(rows)) + '</div>';
   }
 
   function sbTilesHtml(t, active) {
@@ -576,6 +581,18 @@
   root.sbRemind = function (id) {
     if (typeof root.scReminderDraft === 'function') return root.scReminderDraft(id);
     if (typeof root.openSupplyOrder === 'function') return root.openSupplyOrder(id);
+  };
+  /** «Назначить «Куда»» — сразу окно выбора (договор / склад / цех), без захода в карточку. */
+  root.sbDestPick = function (ids) {
+    const list = (Array.isArray(ids) ? ids : [ids]).map(Number).filter(Boolean);
+    const rows = list.map(id => S.rows.find(r => r.kind === 'order' && r.order_id === id)).filter(Boolean);
+    const labels = rows.map(r => r.label);
+    const first = rows[0];
+    const cur = list.length === 1 && first && first.dest && first.dest.type ? { type: first.dest.type, contract_id: first.dest.contract_id || null } : null;
+    const note = list.length === 1 && first ? (first.title + (first.supplier ? ' · ' + first.supplier : '')) : '';
+    const done = () => { if (typeof root.loadSupplyShopping === 'function') root.loadSupplyShopping(); };
+    if (typeof root.scOpenDestPicker === 'function') return root.scOpenDestPicker(list.length === 1 ? list[0] : list, null, done, cur, { labels, note });
+    if (typeof root.openSupplyOrder === 'function') return root.openSupplyOrder(list[0]);
   };
   root.sbGoPay = function () { if (typeof root.selectSidebarItem === 'function') root.selectSidebarItem('supply-pay'); };
   root.sbCpPick = function (cpId) {

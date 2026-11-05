@@ -57,6 +57,7 @@ test('v2.46.284: «Куда» — договор по строкам, склад
   assert.equal(by('o462').dk, 'none');
   assert.ok(by('o462').problems.includes('nodest'));
   assert.equal(by('o462').action.label, 'Назначить «Куда»');
+  assert.equal(by('o462').action.js, 'sbDestPick(462)', 'v2.46.285: сразу окно выбора, не карточка');
   const groups = sb.sbGroups(rows, 'dest');
   assert.deepEqual(groups.map(g => g.kind), ['contract', 'stock', 'shop', 'none']);
 });
@@ -139,9 +140,12 @@ test('v2.46.284: подключено в index.html и sw.js, версия по�
   assert.ok(idx.indexOf('/supply-buy.js') > idx.indexOf('/supply-chain.js'), 'после supply-chain.js');
   assert.match(idx, /href="\/supply-buy.css"/);
   assert.match(read('sw.js'), /'\/supply-buy.js'/);
-  assert.match(read('sw.js'), /atomus-v2\.46\.284/);
-  assert.match(read('app-1.js'), /APP_VERSION = "v2\.46\.284"/);
-  assert.equal(JSON.parse(read('version.json')).version, 'v2.46.284');
+  // v2.46.285: номер не прибит к 284 — все 4 места совпадают, запись 284 в журнале осталась
+  const v = JSON.parse(read('version.json')).version;
+  assert.ok(v >= 'v2.46.284', v);
+  assert.ok(read('sw.js').includes('atomus-' + v + "'"));
+  assert.ok(read('app-1.js').includes('APP_VERSION = "' + v + '"'));
+  assert.ok(read('app-3.js').includes("{version:'" + v + "'"));
   assert.match(read('app-3.js'), /\{version:'v2\.46\.284'/);
 });
 
