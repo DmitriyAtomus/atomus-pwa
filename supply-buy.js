@@ -153,8 +153,8 @@
       return {
         key: 'o' + o.id, kind: 'order', order_id: o.id, label: o.order_label || ('ORD-' + o.id),
         stage, status: o.status, title: orderTitle(o, lines), supplier: sup, supplier_id: o.supplier_id,
-        when, purpose: o.purpose || '', lines, fromInvoice, dest,
-        qty: lines.length && units.size === 1 && qtySum ? fmtQty(qtySum) + ' ' + [...units][0] : '',
+        when, purpose: o.purpose || '', lines, fromInvoice, dest, ready_date: o.ready_date || null,
+        qty: lines.length && units.size === 1 && qtySum ? fmtQty(qtySum) + ' ' + [...units][0] : (o.items_count ? o.items_count + ' поз.' : ''),
         amount, days, expected: o.expected_date || null, created: parseTs(o.created_at) || 0,
         closedPair: null, dupOf: null, problems: [], _names: lineNamesKey(lines),
         _raw: o,
@@ -261,7 +261,8 @@
           ? 'остаток ' + fmtQty(it.effective_stock) + ' при минимуме ' + fmtQty(it.min_stock)
           : (it.reason || '');
         const r = {
-          key: 'c' + it.component_id + ':' + (supId || 0), kind: 'item', component_id: it.component_id,
+          key: 'c' + it.component_id + ':' + (supId || 0), board_key: it.board_key, kind: 'item', component_id: it.component_id,
+          plan_models: it.plan_models || [], plan_contracts: plan, quantity: Number(it.recommended_qty || it.reorder_qty || 0), unit: it.unit || 'шт.',
           stage: 'buy', title: it.component_name || '—', sku: it.sku || '', supplier: supId ? g.supplier_name : '', supplier_id: supId,
           supplier_email: g.supplier_email || '', dest, lines: [], qty: fmtQty(it.recommended_qty || it.reorder_qty || 0) + ' ' + unitShort(it.unit),
           amount: 0, critical: !!it.is_critical, problems: [], age: { text: '', cls: '' },
@@ -283,7 +284,7 @@
         key: 'p' + it.id, kind: 'cp', cp_id: it.id, stage: 'buy', title: it.item_name || '—', sku: it.nc_code || '',
         supplier: it.supplier_name || '', supplier_id: it.supplier_id || null,
         dest: { type: 'contract', number: it.contract_number || ('#' + it.contract_id), contractor: it.contractor_name || '', contract_id: it.contract_id },
-        lines: [], qty: fmtQty(it.qty) + ' ' + unitShort(it.unit), amount: 0, problems: [], age: { text: '', cls: '' },
+        lines: [], quantity: Number(it.qty), unit: it.unit || 'шт.', qty: fmtQty(it.qty) + ' ' + unitShort(it.unit), amount: 0, problems: [], age: { text: '', cls: '' },
       };
       r.sub = (it.supplier_name ? it.supplier_name + ' · ' : '') + 'покупная позиция договора' + (it.supplier_id ? '' : ' · <nosup>');
       if (!it.supplier_id) {
@@ -485,6 +486,7 @@
   function paint() {
     const host = document.getElementById('sbv-root');
     if (!host) return;
+    if (root.SupplyBoard) return root.SupplyBoard.render(host, S, { paint, rebuild, reload: loadExtra });
     const rows = S.rows;
     const t = sbTiles(rows);
     const vis = sbFilter(rows, S.f);
@@ -522,6 +524,10 @@
       shop: r.shop, cp: r.cp, waiting: r.waiting, orders: r.orders, closed: r.closed,
       hidden: it => !!(hiddenSet && hiddenSet.has && hiddenSet.has(it.component_id)),
     });
+    if (root.SupplyBoard) {
+      S.allRows = root.SupplyBoard.decorateRows(S.rows, S.board || {});
+      S.rows = S.allRows.filter(row => !row.board_hidden && !row.board_consumed);
+    }
     paint();
   }
 
@@ -529,15 +535,21 @@
     const get = root.apiGet;
     if (typeof get !== 'function') return;
     S.loading = true;
-    const [w, o, c] = await Promise.all([
+    const generation = S._loadGeneration = (S._loadGeneration || 0) + 1;
+    const [w, o, c, board] = await Promise.all([
       get('/api/supply/waiting').catch(() => null),
       get('/api/supply-orders?status=open').catch(() => null),
       get('/api/supply-orders?status=closed').catch(() => null),
+      get('/api/supply/board').catch(() => null),
     ]);
+    if (generation !== S._loadGeneration) return;
     S.loading = false;
-    S.raw.waiting = w || { items: [], no_items: [] };
-    S.raw.orders = (o && o.orders) || [];
-    S.raw.closed = (c && c.orders) || [];
+    S.boardReady = !!board;
+    if (board) S.board = board;
+    S.loadError = !w || !o || !c || !board;
+    if (w) S.raw.waiting = w;
+    if (o) S.raw.orders = o.orders || [];
+    if (c) S.raw.closed = c.orders || [];
     S.loadedAt = Date.now();
     rebuild();
   }
@@ -565,6 +577,7 @@
 
   // ---------------------------------------------------------------- глобальные обработчики
   root.sbSet = function (k, v) {
+    if (root.SupplyBoard) root.SupplyBoard.clearSelection();
     if (k === 'mode') { S.mode = v; try { localStorage.setItem('sbv_mode', v); } catch (e) {} }
     else if (k === 'tile') S.f.tile = S.f.tile === v ? '' : v;
     else if (k === 'dest') S.f.dest = v;
@@ -573,6 +586,7 @@
   };
   let _qT = null;
   root.sbSearch = function (v) {
+    if (root.SupplyBoard) root.SupplyBoard.clearSelection();
     S.f.q = v;
     clearTimeout(_qT);
     _qT = setTimeout(() => { S._focusQ = true; paint(); }, 200);

@@ -4,7 +4,7 @@ const path = require('node:path');
 const test = require('node:test');
 
 const root = path.join(__dirname, '..');
-const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8').replace(/\r\n/g, '\n');
 
 // Мини-DOM для окна выбора «Куда»
 function fakeDom() {
@@ -89,9 +89,10 @@ test('v2.46.285: «Что закупить» — кнопка открывает
   assert.match(sb.groupHead(g), /Назначить всем \(2\)/);
 });
 
-test('v2.46.285: версия поднята везде', () => {
-  assert.equal(JSON.parse(read('version.json')).version, 'v2.46.285');
-  assert.match(read('app-1.js'), /APP_VERSION = "v2\.46\.285"/);
-  assert.match(read('sw.js'), /atomus-v2\.46\.285'/);
-  assert.match(read('app-3.js'), /HELP_CHANGELOG = \[\n  \{version:'v2\.46\.285'/);
+test('актуальная версия согласована, история v2.46.285 сохранена', () => {
+  const v=JSON.parse(read('version.json')).version;
+  assert.ok(read('app-1.js').includes('APP_VERSION = "'+v+'"'));
+  assert.ok(read('sw.js').includes("atomus-"+v+"'"));
+  assert.ok(read('app-3.js').includes("HELP_CHANGELOG = [\n  {version:'"+v+"'"));
+  assert.ok(read('app-3.js').includes("{version:'v2.46.285'"));
 });
