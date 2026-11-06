@@ -369,6 +369,91 @@
     return scOpenDestPicker(Number(ids[0]), byOrder[ids[0]]);
   }
 
+  // Оплата импортированного счёта: серверные требования заполняются в том же
+  // действии, без угадывания типа и без массовой перезаписи назначенных строк.
+  function scPaymentNeedsDest(order, kind) {
+    if (!['goods', 'mfg'].includes(kind) || order.chain_new === false) return false;
+    const items = order.items || [];
+    return items.length ? scMissingDest(items) > 0
+      : !scItemDestOk({dest_type: order.dest_type, dest_contract_id: order.contract_id});
+  }
+  async function scCompletePaymentDetails(orderId) {
+    if (document.getElementById('sc-payment-details')) return false;
+    const order = await root.apiGet('/api/supply-orders/' + Number(orderId));
+    const contracts = await scContracts();
+    if (document.getElementById('sc-payment-details')) return false;
+    return new Promise(resolve => {
+      const modal = document.createElement('div');
+      modal.id = 'sc-payment-details'; modal.className = 'modal-overlay visible';
+      let busy = false;
+      const close = value => {
+        document.removeEventListener('keydown', onKey, true);
+        modal.remove(); resolve(value);
+      };
+      const onKey = e => {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!busy) close(false); }
+      };
+      const knownKind = SC_KINDS.some(k => k[0] === order.kind) ? order.kind : '';
+      modal.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="sc-payment-title" style="max-width:540px;max-height:90vh;display:flex;flex-direction:column;">' +
+        '<div class="modal-header"><h3 id="sc-payment-title">Уточнить счёт перед отметкой оплаты</h3></div>' +
+        '<div class="modal-body" style="overflow-y:auto;">' +
+        '<p><b>' + esc(order.order_label || ('ORD-' + orderId)) + '</b> · ' + esc(order.supplier_name || '') + '</p>' +
+        (order.purpose ? '<p>' + esc(order.purpose) + '</p>' : '') +
+        '<p class="sc-sub">В счёте не заполнены обязательные данные закупки. Выберите их здесь, затем продолжится подтверждение оплаты.</p>' +
+        '<fieldset style="border:0;padding:0;margin:0;">' +
+        '<label for="sc-payment-kind" class="sc-lbl">Тип закупки</label>' +
+        '<select id="sc-payment-kind" class="sc-select" style="width:100%;margin:6px 0 14px;">' +
+        '<option value="">— выберите тип —</option>' + SC_KINDS.map(k => '<option value="' + k[0] + '"' + (knownKind === k[0] ? ' selected' : '') + '>' + k[1] + '</option>').join('') + '</select>' +
+        '<div id="sc-payment-dest-wrap"><label for="sc-payment-dest" class="sc-lbl">Куда закупаем</label>' +
+        '<select id="sc-payment-dest" class="sc-select" style="width:100%;margin:6px 0 10px;">' +
+        '<option value="">— выберите назначение —</option>' + SC_DESTS.map(d => '<option value="' + d[0] + '"' + (order.dest_type === d[0] ? ' selected' : '') + '>' + d[1] + '</option>').join('') + '</select>' +
+        '<label id="sc-payment-contract-wrap" class="sc-lbl">Договор<select id="sc-payment-contract" class="sc-select" style="width:100%;margin:6px 0 10px;">' + scContractOptionsHtml(contracts, order.contract_id) + '</select></label>' +
+        '<p class="sc-sub">Назначение заполнится только у строк, где оно ещё не указано.</p></div></fieldset>' +
+        '<div id="sc-payment-error" class="sc-err" role="alert" style="display:none;"></div></div>' +
+        '<div class="modal-footer" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;">' +
+        '<button type="button" class="btn btn-secondary" id="sc-payment-cancel">Отмена</button>' +
+        '<button type="button" class="btn btn-primary" id="sc-payment-save">Сохранить и продолжить</button></div></div>';
+      document.body.appendChild(modal);
+      const el = id => modal.querySelector('#sc-payment-' + id);
+      const showError = message => { el('error').textContent = message; el('error').style.display = ''; };
+      const paint = () => {
+        el('error').style.display = 'none';
+        el('dest-wrap').style.display = scPaymentNeedsDest(order, el('kind').value) ? '' : 'none';
+        el('contract-wrap').style.display = el('dest').value === 'contract' ? '' : 'none';
+      };
+      el('kind').onchange = paint; el('dest').onchange = paint; paint();
+      el('contract').onchange = () => { el('error').style.display = 'none'; };
+      el('cancel').onclick = () => { if (!busy) close(false); };
+      modal.onclick = e => { if (e.target === modal && !busy) close(false); };
+      document.addEventListener('keydown', onKey, true);
+      el('save').onclick = async () => {
+        if (busy) return;
+        const kind = el('kind').value;
+        if (!SC_KINDS.some(k => k[0] === kind)) { showError('Выберите тип закупки'); return; }
+        const body = {kind};
+        if (scPaymentNeedsDest(order, kind)) {
+          const dest = el('dest').value, cid = Number(el('contract').value) || null;
+          if (!SC_DESTS.some(d => d[0] === dest)) { showError('Выберите, куда закупаем'); return; }
+          if (dest === 'contract' && !cid) { showError('Выберите договор'); return; }
+          body.dest_type = dest; body.contract_id = dest === 'contract' ? cid : null;
+        }
+        busy = true; el('save').disabled = true; el('cancel').disabled = true;
+        modal.querySelector('fieldset').disabled = true;
+        el('error').style.display = 'none';
+        try {
+          await root.scPost('/api/supply-orders/' + Number(orderId) + '/kind', body);
+          if (G('cache')) G('cache').supplyOrders = null;
+          close(true);
+        } catch (e) {
+          busy = false; el('save').disabled = false; el('cancel').disabled = false;
+          modal.querySelector('fieldset').disabled = false;
+          showError((e && e.message) || 'Не удалось сохранить данные счёта');
+        }
+      };
+      el(knownKind ? 'dest' : 'kind').focus();
+    });
+  }
+
   // Сегмент-переключатель (Тип / Куда)
   function scKindSegHtml(prefix, value) {
     return '<div class="sc-seg" id="' + prefix + '-kind">' + SC_KINDS.map(k =>
@@ -414,6 +499,7 @@
   }
 
   const api = {
+    scPaymentNeedsDest, scCompletePaymentDetails,
     scInvLinesHtml,
     SC_KINDS, SC_DESTS, SC_STEPS, SC_STATUS, SC_STEP_OF,
     scItemDestOk, scMissingDest, scApplyBulk, scDestChipHtml, scStepperHtml, scKindLabel,
