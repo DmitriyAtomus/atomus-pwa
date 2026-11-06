@@ -15410,11 +15410,11 @@ async function openAttachInboxToOrder(inboxId) {
   const senderHtml = senderName
     ? '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:13px;">Счёт от: <b>' + escapeHtml(senderName) + '</b>' +
         (inb.from_addr && inb.from_name ? ' <span style="color:var(--text-light);">&lt;' + escapeHtml(inb.from_addr) + '&gt;</span>' : '') +
-        '<div style="color:var(--text-light);font-size:12px;margin-top:3px;">Заказы этого поставщика отмечены ✓ и подняты вверх. Если его заказа нет — создайте новый из этого счёта.</div></div>'
+        '<div style="color:var(--text-light);font-size:12px;margin-top:3px;">Заказы с похожими данными отправителя подняты вверх. Перед привязкой проверим поставщика и сумму в самом счёте.</div></div>'
     : '';
   const selectOrEmpty = orders.length
-    ? '<select id="inbox-attach-order-select" class="form-input" style="width:100%;">' + opts + '</select>' +
-      '<button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitAttachInboxToOrder(' + inboxId + ')"><i class="ti ti-check"></i> Привязать к выбранному</button>' +
+    ? '<select id="inbox-attach-order-select" class="form-input" style="width:100%;"><option value="">Выберите заказ поставщика</option>' + opts + '</select>' +
+      '<button id="inbox-attach-submit" class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitAttachInboxToOrder(' + inboxId + ')"><i class="ti ti-check"></i> Привязать к выбранному</button>' +
       '<div style="text-align:center;color:var(--text-light);font-size:12px;">— или —</div>'
     : '<div style="color:var(--text-light);font-size:13px;">Подходящих заказов нет.</div>';
   m.innerHTML =
@@ -15425,7 +15425,7 @@ async function openAttachInboxToOrder(inboxId) {
       '</div>' +
       '<div class="modal-content" style="display:flex;flex-direction:column;gap:10px;">' +
         senderHtml +
-        '<div style="color:var(--text-light);font-size:13px;">Привяжите счёт к существующему заказу — вложение станет файлом счёта, статус перейдёт в «Счёт получен».</div>' +
+        '<div style="color:var(--text-light);font-size:13px;">Выберите заказ. CRM прочитает вложение, проверит поставщика и заполнит номер, дату и сумму счёта.</div>' +
         selectOrEmpty +
         '<button class="btn ' + (orders.length ? 'btn-secondary' : 'btn-primary') + '" style="width:100%;justify-content:center;" onclick="createOrderFromInbox(' + inboxId + ')"><i class="ti ti-plus"></i> Создать новый заказ из этого счёта</button>' +
       '</div>' +
@@ -15457,36 +15457,36 @@ async function createOrderFromInbox(inboxId) {
   }
 }
 
-async function submitAttachInboxToOrder(inboxId, switchSupplier) {
+async function submitAttachInboxToOrder(inboxId) {
   const sel = document.getElementById('inbox-attach-order-select');
   const orderId = parseInt((sel && sel.value) || '0', 10);
-  if (!orderId) { showToast('Выбери заказ', 'error'); return; }
+  if (!orderId) { showToast('Выберите заказ поставщика', 'error'); return; }
+  const btn = document.getElementById('inbox-attach-submit');
+  if (btn && btn.disabled) return;
+  const previousLabel = btn && btn.innerHTML;
+  const otherButtons = [...(document.getElementById('inbox-attach-modal')?.querySelectorAll('button') || [])].filter(b => b !== btn).map(b => [b, b.disabled]);
+  otherButtons.forEach(([b]) => { b.disabled = true; });
+  if (btn) { btn.disabled = true; btn.textContent = 'Проверяем счёт и заполняем реквизиты…'; }
+  if (sel) sel.disabled = true;
   try {
     const r = await fetch(API_BASE + '/api/supply-inbox/' + inboxId + '/attach', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: orderId, switch_supplier: !!switchSupplier }),
+      body: JSON.stringify({ order_id: orderId }),
     });
     const j = await r.json().catch(() => ({}));
-    // v2.45.713: счёт от другой компании — CRM предлагает перевести заказ на неё
-    if (r.status === 409 && j.error === 'supplier_mismatch') {
-      const ok = confirm('Счёт пришёл от «' + (j.sender_supplier_name || '?') + '», ' +
-        'а заказ оформлен на «' + (j.order_supplier_name || '?') + '».\n\n' +
-        'Перевести заказ на «' + (j.sender_supplier_name || '?') + '» и привязать счёт?');
-      if (ok) return submitAttachInboxToOrder(inboxId, true);
-      return;
-    }
-    if (!r.ok) {
-      showToast(j.message || ('Ошибка (HTTP ' + r.status + ')'), 'error');
-      return;
-    }
-    showToast(j.switched_to
-      ? 'Заказ переведён на «' + j.switched_to + '», счёт привязан'
-      : 'Привязано к заказу', 'success');
+    if (!r.ok) { showToast(j.message || ('Ошибка (HTTP ' + r.status + ')'), 'error'); return; }
+    showToast('Счёт' + (j.invoice_number ? ' №' + j.invoice_number : '') + ' привязан' +
+      (j.invoice_total ? ' · ' + Number(j.invoice_total).toLocaleString('ru-RU', {minimumFractionDigits:2}) + ' ₽' : ''), 'success');
     document.getElementById('inbox-attach-modal')?.remove();
+    cache.supplyOrders = null;
     await loadSupplyInbox();
   } catch (e) {
     showToast('Сеть: ' + (e.message || e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = previousLabel; }
+    otherButtons.forEach(([b, disabled]) => { b.disabled = disabled; });
+    if (sel) sel.disabled = false;
   }
 }
 
@@ -18932,6 +18932,7 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {version:'v2.46.291',date:'06.11.2026',title:'Входящие счета: проверка заказа и заполнение реквизитов',features:['Заказ выбирается явно. Перед привязкой CRM читает счёт, проверяет поставщика и заполняет номер, дату и сумму.','Во время проверки повторное нажатие заблокировано; несовпадение поставщика объясняется до изменения заказа.']},
   {version:'v2.46.290',date:'06.11.2026',title:'Оплата: заполнение типа закупки прямо из счёта',features:['Если при отметке оплаты в счёте не указан тип закупки или назначение, открывается окно заполнения вместо тупиковой ошибки. После сохранения продолжается обычное подтверждение оплаты.','Тип закупки выбирает пользователь; уже назначенные строки сохраняются. Отмена окна не отмечает счёт оплаченным.']},
   {version:'v2.46.289',date:'06.11.2026',title:'Задачи: право «Создавать задачи другим» открывает постановку',features:['Сотрудник с этой галочкой в уровне доступа видит «Новая задача» и может ставить обычные задачи, а не только правки щитов.','Продажи, цены и кадры от этой галочки не открываются.']},
   {version:'v2.46.288',date:'06.11.2026',title:'Заказ поставщику: просмотр письма перед отправкой',features:['В карточке черновика кнопка «Просмотреть и отправить» открывает адрес получателя, тему, текст и вложения существующего заказа. Письмо уходит только после нажатия «Отправить» в окне просмотра.','Ручная отметка заказа, отправленного вне CRM, отделена от отправки письма. После успешной отправки карточка обновляет статус.']},
