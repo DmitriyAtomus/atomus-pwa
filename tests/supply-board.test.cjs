@@ -1,5 +1,25 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const board=require('../supply-board.js'),sb=require('../supply-buy.js');
+test('поставщик выбранной строки назначается всему выделению, чужая строка остаётся одиночной',()=>{
+  const rows=Array.from({length:22},(_,i)=>({...base(),key:'c'+i,component_id:i}));
+  const keys=new Set(rows.slice(0,21).map(r=>r.key));
+  assert.equal(board.supplierTargets(rows,keys,rows[4]).length,21);
+  assert.deepEqual(board.supplierTargets(rows,keys,rows[21]),[rows[21]]);
+  const order={key:'o464',kind:'order',stage:'pay'};keys.add(order.key);
+  assert.equal(board.supplierTargets([...rows,order],keys,null).length,21);
+});
+test('14 ТЭНов покрыты заказом на 30: одна строка заказа, связь и избыток сохранены',()=>{
+  const input={orders:[{id:464,status:'to_pay',supplier_id:21,purpose:'ТЭНы на Абхазию',invoice_number:'3384',invoice_items:[{name:'ТЭН',qty:30,unit:'шт'}]}],shop:{groups:[{items:[{
+    component_id:507,component_name:'ТЭН',recommended_qty:14,plan_models:['НВП-15-380-AISI'],
+    plan_contracts:['24ТД/10.26'],order_id:464,order_status:'to_pay',order_match:'exact_name_unit_contract',
+    order_coverage_qty:14,order_remaining_qty:30,order_surplus_qty:16,unit:'шт.'
+  }]}]}};
+  const rows=board.decorateRows(sb.sbBuildRows(input),{});
+  assert.equal(rows.length,1);assert.equal(rows[0].kind,'order');assert.equal(rows[0].coveredNeeds[0].qty,14);
+  assert.equal(rows[0].coveredNeeds[0].surplus,16);assert.equal(rows[0].group_name,'НВП-15-380-AISI');
+  assert.equal(sb.sbTiles(rows).buy.n,0);
+  input.orders=[];assert.equal(sb.sbBuildRows(input)[0].stage,'buy','без загруженного заказа не прячем потребность');
+});
 function base(){return {key:'c1:0',board_key:'c1:0123456789abcdef',kind:'item',title:'Автомат',dk:'c:24',stage:'buy',plan_models:['Щит управления'],plan_contracts:['24'],problems:['nosup'],quantity:2,qty:'2 шт',sub:'план · <nosup>',hay:'автомат'};}
 test('изделие из спецификации; общая потребность не дублируется',()=>{
   const rows=board.decorateRows([base(),{...base(),board_key:'c2:0123456789abcdef',plan_contracts:['24','25'],quantity:6}],{});

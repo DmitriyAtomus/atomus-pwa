@@ -18,7 +18,9 @@
       r.board_revision = m.revision || 0;
       r.original_title = r.title;
       if (m.title) r.title = m.title;
+      const coveredModels = [...new Set((r.coveredNeeds || []).flatMap(n=>n.models || []))];
       r.group_name = m.group_name || (r.plan_models && r.plan_models.length === 1 ? r.plan_models[0] : '') ||
+        (coveredModels.length === 1 ? coveredModels[0] : '') ||
         (r.kind === 'order' ? 'Заказы поставщикам' : (r.dk === 'stock' ? 'Для склада' : 'Общие комплектующие'));
       if (r.kind !== 'order' && m.supplier_id) {
         r.supplier_id = m.supplier_id; r.supplier = m.supplier_name || 'Поставщик';
@@ -52,6 +54,11 @@
       ...(r.kind !== 'order' ? {qty:r.quantity} : {}) }));
   }
   function picked() { return (S.rows || []).filter(r => selected.has(r.key)); }
+  function supplierTargets(rows, keys, row) {
+    // Клик по поставщику выделенной строки относится ко всему выделению.
+    if (row && !keys.has(row.key)) return [row];
+    return rows.filter(r => keys.has(r.key) && r.kind !== 'order' && r.stage === 'buy');
+  }
   function visible() {
     const filtered = root.__sbv.sbFilter(S.rows, S.f);
     return filtered.filter(r => !filterText || r.hay.includes(filterText.toLowerCase()));
@@ -59,9 +66,10 @@
   function subgroups(rows) {
     const map = new Map();
     rows.forEach(r => {
-      let key = r.dk + '|' + r.group_name, title = r.group_name;
-      if (S.mode === 'supplier') { key = r.dk + '|supplier:' + (r.supplier_id || 0); title = r.supplier || 'Поставщик не выбран'; }
-      if (S.mode === 'stage') { key = r.dk + '|stage:' + r.stage; title = label[r.stage] || r.stage; }
+      const prefix = r.dk + '|' + (r.kind === 'order' ? 'orders|' : 'needs|');
+      let key = prefix + r.group_name, title = r.group_name;
+      if (S.mode === 'supplier') { key = prefix + 'supplier:' + (r.supplier_id || 0); title = r.supplier || 'Поставщик не выбран'; }
+      if (S.mode === 'stage') { key = prefix + 'stage:' + r.stage; title = label[r.stage] || r.stage; }
       if (!map.has(key)) map.set(key,{key,title,rows:[]});
       map.get(key).rows.push(r);
     });
@@ -76,27 +84,37 @@
   function rowHTML(r, manage) {
     const date = (r.ready_date?'Изготовят: '+fmtDate(r.ready_date):'') + (r.ready_date&&r.arrival_date?' · ':'') + (r.arrival_date?'Придёт: '+fmtDate(r.arrival_date):'');
     const late = r.arrival_date && r.arrival_date < today();
-    const meta = [r.sku,r.label].filter(Boolean).join(' · ');
+    const invoice = r.kind === 'order' && r._raw && r._raw.invoice_number;
+    const meta = [r.sku,r.label,invoice ? 'Счёт №' + invoice : ''].filter(Boolean).join(' · ');
     const supplier = r.supplier || 'Выбрать';
     const more = manage ? button('row-menu', icon('dots'), 'data-key="'+E(r.key)+'" class="sbw-icon" aria-label="Действия: '+E(r.title)+'"') : '';
     return '<tr class="'+(selected.has(r.key)?'selected':'')+'" data-row="'+E(r.key)+'">'+
       '<td class="sbw-check">'+(manage?'<input type="checkbox" data-select="'+E(r.key)+'" aria-label="Выбрать '+E(r.title)+'" '+(selected.has(r.key)?'checked':'')+'>':'')+'</td>'+
       '<td class="sbw-name">'+button('open',E(r.title),'data-key="'+E(r.key)+'" class="sbw-title"')+
       (meta?'<div class="sbw-meta">'+E(meta)+'</div>':'')+
+      (r.coveredNeeds||[]).map(n=>'<div class="sbw-coverage">'+E(n.models.length?n.models.join(', '):n.name)+
+        ': нужно '+E(n.qty)+' '+E(n.unit)+' · в заказе осталось '+E(n.remaining)+' '+E(n.unit)+
+        ' · докупить 0'+(n.surplus>0?' · сверх потребности '+E(n.surplus)+' '+E(n.unit):'')+'</div>').join('')+
+      (r.kind==='order'&&r.lines&&r.lines.length?button('lines',(S.open[r.key]?'Скрыть состав':'Состав заказа')+' · '+r.lines.length,'data-key="'+E(r.key)+'" class="sbw-lines-toggle" aria-expanded="'+!!S.open[r.key]+'"'):'')+
       '<div class="sbw-dates '+(late?'late':'')+'">'+button('dates',icon('calendar')+' '+E(date || 'Указать сроки')+(late?' · срок прошёл':''),'data-key="'+E(r.key)+'" '+(!manage?'disabled':'') )+'</div></td>'+
-      '<td class="sbw-qty">'+E(r.qty || '—')+'</td>'+
+      '<td class="sbw-qty">'+E(r.qty || '—')+(r.kind==='order'?'<div class="sbw-meta">'+(r.fromInvoice?'по счёту':'к получению')+'</div>':'')+'</td>'+
       '<td class="sbw-supplier">'+(r.stage==='buy'&&manage?button('supplier',icon(r.supplier?'building-store':'plus')+' '+E(supplier),'data-key="'+E(r.key)+'"'):E(r.supplier||'Не указан'))+'</td>'+
       '<td class="sbw-stage">'+badge(r)+(r.amount?'<div class="sbw-meta">'+Number(r.amount).toLocaleString('ru-RU')+' ₽</div>':'')+'</td>'+
       '<td class="sbw-more">'+more+'</td></tr>'+
-      (S.open[r.key] && r.lines && r.lines.length ? '<tr><td colspan="6"><div class="sbw-lines">'+r.lines.map(l=>'<div><span>'+E(l.name)+'</span><span>'+E(l.qty)+' '+E(l.unit||'шт.')+'</span></div>').join('')+'</div></td></tr>':'');
+      (S.open[r.key] && r.lines && r.lines.length ? '<tr class="sbw-detail-row"><td colspan="6"><div class="sbw-lines">'+r.lines.map(l=>'<div><span>'+E(l.name)+'</span><span>'+E(l.qty)+' '+E(l.unit||'шт.')+'</span></div>').join('')+'</div></td></tr>':'');
   }
   function groupHTML(g, manage) {
     const shut = collapsed.has(g.key), count = g.rows.filter(r=>selected.has(r.key)).length;
+    const buy = g.rows.filter(r=>r.kind!=='order'&&r.stage==='buy');
+    const selectedBuy = buy.filter(r=>selected.has(r.key));
+    const supplierCount = selectedBuy.length || buy.length;
     const noSup = g.rows.filter(r=>r.stage==='buy'&&!r.supplier_id).length;
     return '<section class="sbw-group"><div class="sbw-grouphead">'+
       button('collapse',icon(shut?'chevron-right':'chevron-down')+'<span><strong>'+E(g.title)+'</strong><small>'+g.rows.length+' позиций'+(noSup?' · '+noSup+' без поставщика':'')+'</small></span>','data-group="'+E(g.key)+'" aria-expanded="'+!shut+'" class="sbw-group-title"')+
       (manage?button('group-menu',icon('dots'),'data-group="'+E(g.key)+'" class="sbw-icon" aria-label="Действия с группой '+E(g.title)+'"'):'')+'</div>'+
-      (shut?'':'<div class="sbw-group-tools">'+(manage?'<label><input type="checkbox" data-select-group="'+E(g.key)+'" '+(count===g.rows.length?'checked':'')+'>Выбрать все '+g.rows.length+'</label>':'')+'<span>Количество — общая потребность</span></div>'+
+      (shut?'':'<div class="sbw-group-tools">'+(manage?'<label><input type="checkbox" data-select-group="'+E(g.key)+'" '+(count===g.rows.length?'checked':'')+'>Выбрать все '+g.rows.length+'</label>':'')+
+      (manage&&supplierCount?button('group-supplier','Поставщик '+(selectedBuy.length?'выбранным':'всей группе')+' · '+supplierCount,'data-group="'+E(g.key)+'" class="primary"'):'')+
+      '<span>'+(g.rows[0].kind==='order'?'Уже оформленные заказы':'Количество — к покупке')+'</span></div>'+
       '<table class="sbw-table"><thead><tr><th class="sbw-check"></th><th>Позиция</th><th class="sbw-qty">Кол-во</th><th class="sbw-supplier">Поставщик</th><th class="sbw-stage">Этап</th><th class="sbw-more"></th></tr></thead><tbody>'+g.rows.map(r=>rowHTML(r,manage)).join('')+'</tbody></table>')+'</section>';
   }
   function render(h, s, callbacks) {
@@ -121,7 +139,13 @@
     if(manage){const n=picked().length;html+='<div class="sbw-bulk">'+(n?'<strong>Выбрано '+n+' позиций</strong>'+button('supplier',icon('building-store')+' Выбрать поставщика','class="primary"')+button('move',icon('folder')+' В группу')+button('dates',icon('calendar')+' Сроки')+button('draft',icon('file-text')+' Подготовить заказ')+button('hide',icon('archive'),'class="sbw-icon" aria-label="Убрать выбранное"')+button('clear','Снять','class="quiet"'):'<span class="sbw-muted">Отметьте позиции, чтобы назначить поставщика и сроки сразу всем.</span>')+'</div>';}
     if(S.f.tile)html+='<div class="sbw-filter-note">Фильтр: '+E(S.f.tile==='problem'?'Требуют решения':label[S.f.tile])+'</div>';
     const shownDests=[...new Set(seen.map(r=>r.dk))];
-    shownDests.forEach(d=>{const dr=seen.filter(r=>r.dk===d);html+='<div class="sbw-dest-head"><div>'+icon(d==='stock'?'building-warehouse':'file-text')+'<h2>'+E(destName(d,dr[0]))+'</h2></div>'+(manage?button('dest-menu',icon('dots'),'data-dest="'+E(d)+'" class="sbw-icon" aria-label="Изменить назначение"'):'')+'</div>'+(d==='shared'?'<p class="sbw-muted sbw-shared">Общая потребность нескольких договоров — количество учтено один раз.</p>':'')+subgroups(dr).map(g=>groupHTML(g,manage)).join('');});
+    shownDests.forEach(d=>{const dr=seen.filter(r=>r.dk===d);html+='<div class="sbw-dest-head"><div>'+icon(d==='stock'?'building-warehouse':'file-text')+'<h2>'+E(destName(d,dr[0]))+'</h2></div>'+(manage?button('dest-menu',icon('dots'),'data-dest="'+E(d)+'" class="sbw-icon" aria-label="Изменить назначение"'):'')+'</div>'+(d==='shared'?'<p class="sbw-muted sbw-shared">Общая потребность нескольких договоров — количество учтено один раз.</p>':'');
+      [['needs','Нужно заказать',dr.filter(r=>r.kind!=='order')],['orders','Заказы и счета',dr.filter(r=>r.kind==='order')]].forEach(([kind,title,items])=>{
+        if(!items.length)return;
+        html+='<section class="sbw-section" data-section="'+kind+'"><h3>'+title+' <small>'+items.length+'</small></h3>'+
+          (kind==='orders'?'<p class="sbw-muted">Счёт, оплата и поставка показаны в строке своего заказа.</p>':'')+subgroups(items).map(g=>groupHTML(g,manage)).join('')+'</section>';
+      });
+    });
     if(!seen.length)html+='<div class="sbw-empty">'+(S.loading?'Загружаем…':rows.length?'Нет позиций по выбранному фильтру.':'В рабочем списке нет позиций.')+'</div>';
     html+='<div class="sbw-foot">'+button('legacy','Старый вид экрана','class="quiet"')+'</div></div>';
     host.innerHTML=html;
@@ -145,9 +169,11 @@
     else if(a==='legacy'){root.sbLegacy(true);}
     else if(a==='new-order'){if(allowed())root.openNewSupplyOrder();}
     else if(a==='open'&&r){if(r.kind==='order')root.openSupplyOrder(r.order_id);else if(r.kind==='item')root.openComponentDetail(r.component_id);else if(allowed())menuRows([r],r.title);}
+    else if(a==='lines'&&r){S.open[r.key]=!S.open[r.key];hooks.paint();}
     else if(a==='archive')showArchive();
     else if(!allowed())return;
-    else if(a==='supplier')supplierDialog(r?[r]:picked());
+    else if(a==='supplier'){const rows=supplierTargets(S.rows,selected,r);supplierDialog(rows.length?rows:picked());}
+    else if(a==='group-supplier'){const g=subgroups(visible()).find(x=>x.key===d.group);const buy=g.rows.filter(r=>r.kind!=='order'&&r.stage==='buy');const chosen=buy.filter(r=>selected.has(r.key));supplierDialog(chosen.length?chosen:buy);}
     else if(a==='dates')datesDialog(r?[r]:picked());
     else if(a==='move')moveDialog(picked());
     else if(a==='hide')hideDialog(picked());
@@ -225,6 +251,6 @@
     const m=modal('Подготовить заказ','<p>Выбрано '+rows.length+' позиций. Разные поставщики, группы и сроки попадут в отдельные черновики. Отправка поставщику — отдельное действие в карточке заказа.</p>'+rows.map(r=>'<div class="sbw-preview-line"><span>'+E(r.title)+'<small>'+E(r.supplier)+' · '+E(r.group_name)+'</small></span><b>'+E(r.qty)+'</b></div>').join(''),'<button type="button" data-close>Отмена</button><button type="button" id="sbw-draft-save" class="primary">Создать черновики</button>');
     m.querySelector('#sbw-draft-save').onclick=async ev=>{try{const result=await post('/api/supply/board/drafts',{targets:targets(rows)},ev.currentTarget);selected.clear();m.close();await root.loadSupplyShopping();const done=modal('Черновики созданы',(result.orders||[]).map(o=>'<button type="button" class="sbw-dest-option" data-open-order="'+o.id+'">'+E(o.order_label)+' · '+o.items_count+' позиций '+icon('chevron-right')+'</button>').join(''));done.querySelectorAll('[data-open-order]').forEach(b=>b.onclick=()=>{done.close();root.openSupplyOrder(Number(b.dataset.openOrder));});}catch(e){error(e);}};
   }
-  const api={decorateRows,targets,render,clearSelection:()=>selected.clear(),fmtDate};
+  const api={decorateRows,targets,supplierTargets,render,clearSelection:()=>selected.clear(),fmtDate};
   root.SupplyBoard=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

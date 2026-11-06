@@ -1,4 +1,9 @@
 /* Рабочий список закупок. Все правила ограничены экраном и его диалогом. */
+.sbw .sbw-group-tools{flex-wrap:wrap;justify-content:flex-start}.sbw .sbw-group-tools>span{margin-left:auto}.sbw .sbw-group-tools button{font-size:12px}
+.sbw-section>h3{font-size:14px;margin:18px 0 8px}.sbw-section>h3 small{font-weight:400;color:var(--bw-muted)}.sbw-section>p{font-size:12px;margin:0 0 10px}
+.sbw .sbw-lines-toggle{border:0;background:transparent;color:var(--bw-blue);font-size:11px;padding:3px 0;min-height:24px}
+.sbw-coverage{font-size:12px;color:#286140;margin-top:5px;overflow-wrap:anywhere}
+.sbw .sbw-detail-row>td{grid-column:1/-1}.sbw .sbw-lines{padding:4px 10px}.sbw .sbw-lines>div>span:last-child{white-space:nowrap}
 .sbw,.sbw-dialog{--bw-ink:#182b46;--bw-muted:#64748b;--bw-line:#dde5ef;--bw-blue:#286ab0;color:var(--bw-ink);font-size:14px;line-height:1.45}
 .sbw *,.sbw-dialog *{box-sizing:border-box}
 .sbw button,.sbw-dialog button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:7px 12px;border:1px solid var(--bw-line);border-radius:8px;background:#fff;color:var(--bw-ink);font:inherit;font-weight:550;cursor:pointer;line-height:1.35}
