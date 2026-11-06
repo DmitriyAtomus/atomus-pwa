@@ -252,7 +252,15 @@
     const hidden = typeof input.hidden === 'function' ? input.hidden : () => false;
     ((input.shop && input.shop.groups) || []).forEach(g => {
       (g.items || []).forEach(it => {
-        if (it.purchase_status === 'ordered' || (it.order_status && STATUS_STAGE[it.order_status])) return;
+        const linkedOrder = orderRows.find(o => Number(o.order_id) === Number(it.order_id));
+        if (it.order_match && linkedOrder) {
+          linkedOrder.coveredNeeds = linkedOrder.coveredNeeds || [];
+          linkedOrder.coveredNeeds.push({name:it.component_name,models:it.plan_models || [],
+            qty:it.order_coverage_qty,remaining:it.order_remaining_qty,
+            surplus:it.order_surplus_qty,unit:it.unit || 'шт.'});
+        }
+        // При неполной загрузке самого заказа не прячем потребность по догадке.
+        if ((!it.order_match || linkedOrder) && (it.purchase_status === 'ordered' || (it.order_status && STATUS_STAGE[it.order_status]))) return;
         if (hidden(it)) return;
         const plan = Array.isArray(it.plan_contracts) ? it.plan_contracts.filter(Boolean) : [];
         const dest = plan.length ? { type: 'contract', number: String(plan[0]), contractor: '' } : { type: 'stock' };
