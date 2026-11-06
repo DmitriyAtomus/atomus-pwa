@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.289";
+const APP_VERSION = "v2.46.290";
 const APP_VERSION_DATE = "06.11.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -7236,9 +7236,18 @@ async function _supplyOrderTransitionReq(orderId, newStatus, password) {
 // спрашиваем и повторяем. Возвращает {ok, cancelled?, message?}.
 async function supplyOrderTransitionConfirmed(orderId, newStatus) {
   let password = null;
+  let paymentDetailsCompleted = false;
   for (let attempt = 0; attempt < 4; attempt++) {
     const res = await _supplyOrderTransitionReq(orderId, newStatus, password);
     if (res.ok) return res;
+    if (newStatus === 'paid' && res.status === 422 &&
+        ['kind_required', 'dest_required'].includes(res.error) &&
+        !paymentDetailsCompleted && typeof scCompletePaymentDetails === 'function') {
+      paymentDetailsCompleted = true;
+      if (!await scCompletePaymentDetails(orderId)) return { ok: false, cancelled: true };
+      attempt--; // заполнение реквизитов не расходует попытку ввода пароля
+      continue;
+    }
     if (res.status === 401 && res.error === 'password_required') {
       const pw = prompt('Подтвердите оплату — введите ваш пароль от Atom:');
       if (pw === null) return { ok: false, cancelled: true };
