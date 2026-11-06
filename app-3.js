@@ -12579,6 +12579,7 @@ async function submitOrderPreview(orderId) {
       cache.supplyOrders = null;
       if (typeof loadSupplyOrders === 'function') loadSupplyOrders();
       if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+      if (state.currentSupplyOrderId === orderId && typeof loadSupplyOrderDetail === 'function') loadSupplyOrderDetail();
     }, 1200);
   } catch (e) {
     clearTimeout(timeoutTimer);
@@ -12619,32 +12620,9 @@ async function downloadSupplyOrderDocx(orderId) {
 }
 
 async function sendSupplyOrderByEmail(orderId) {
-  try {
-    const url = API_BASE + `/api/supply-orders/${orderId}/send-email`;
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || ''),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({})
-    });
-    if (!resp.ok) {
-      const e = await resp.json().catch(() => ({}));
-      showToast('Ошибка: ' + (e.message || 'Не удалось отправить'), 'error');
-      return;
-    }
-    const result = await resp.json();
-    if (result.success) {
-      showToast(result.message, 'success');
-      // Обновим список заказов
-      loadSupplyOrders();
-    } else {
-      showToast(result.message || 'Ошибка при отправке', 'error');
-    }
-  } catch (e) {
-    showToast('Ошибка: ' + String(e), 'error');
-  }
+  // Открываем существующий ORD без отправки и без создания второго заказа.
+  // Единственная отправка письма — submitOrderPreview после проверки полей.
+  return openExistingShoppingDraft(orderId);
 }
 
 // v2.44.35: bulk-выбор и назначение поставщика на N позиций сразу
@@ -16667,7 +16645,7 @@ function renderSupplyOrderDetail(o) {
 
   // Кнопки действий
   let actions = [];
-  if (canSend)    actions.push('<button class="btn btn-primary" onclick="sendOrder(' + o.id + ')"><i class="ti ti-send"></i> Отправить поставщику</button>');
+  if (canSend)    actions.push('<button class="btn btn-primary" onclick="sendSupplyOrderByEmail(' + o.id + ')"><i class="ti ti-mail"></i> Просмотреть и отправить</button>');
   // FSM-кнопки (последовательность статусов лайфцикла)
   if (canToPay)        actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'to_pay\',\'Передать на оплату?\')"><i class="ti ti-wallet"></i> На оплату</button>');
   if (canMarkPaid)     actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'paid\',\'Отметить заказ как оплаченный?\')"><i class="ti ti-cash"></i> Оплачен</button>');
@@ -16686,8 +16664,8 @@ function renderSupplyOrderDetail(o) {
   if (['draft', 'sent', 'partial'].includes(o.status)) {
     actions.push('<button class="btn btn-secondary" onclick="downloadSupplyOrderDocx(' + o.id + ')"><i class="ti ti-file-download"></i> Скачать DOCX</button>');
   }
-  if (o.status === 'draft' && o.supplier_email) {
-    actions.push('<button class="btn btn-secondary" onclick="sendSupplyOrderByEmail(' + o.id + ')"><i class="ti ti-mail-send"></i> Отправить по email</button>');
+  if (canSend) {
+    actions.push('<button class="btn btn-secondary" onclick="sendOrder(' + o.id + ')" title="Для заказа, уже отправленного вне CRM. Письмо не отправляется."><i class="ti ti-check"></i> Отметить отправленным вручную</button>');
   }
   if (canCancel) {
     actions.push('<button class="btn btn-tertiary" style="color:#B91C1C;" onclick="transitionSupplyOrder(' + o.id + ',\'cancelled\',\'Отменить заказ безвозвратно?\')"><i class="ti ti-x"></i> Отменить</button>');
@@ -16810,7 +16788,7 @@ async function removeOrderItem(oiId) {
 }
 
 async function sendOrder(orderId) {
-  if (!confirm('Перевести заказ в статус "Отправлен"?')) return;
+  if (!confirm('Отметить заказ как отправленный вне CRM? Это изменит статус заказа. Письмо отправляться не будет.')) return;
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/supply-orders/' + orderId + '/send', {
@@ -16822,7 +16800,7 @@ async function sendOrder(orderId) {
       showToast(d.message || 'Не удалось', 'error');
       return;
     }
-    showToast('Заказ отправлен', 'success');
+    showToast('Заказ отмечен как отправленный', 'success');
     cache.supplyOrders = null;
     loadSupplyOrderDetail();
   } catch (e) {
@@ -18954,6 +18932,7 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {version:'v2.46.288',date:'06.11.2026',title:'Заказ поставщику: просмотр письма перед отправкой',features:['В карточке черновика кнопка «Просмотреть и отправить» открывает адрес получателя, тему, текст и вложения существующего заказа. Письмо уходит только после нажатия «Отправить» в окне просмотра.','Ручная отметка заказа, отправленного вне CRM, отделена от отправки письма. После успешной отправки карточка обновляет статус.']},
   {version:'v2.46.287',date:'06.11.2026',title:'Снабжение: массовый поставщик в группе и связь с заказом',features:['Рядом с «Выбрать все» появилась кнопка назначения поставщика группе. Клик по поставщику выделенной строки открывает назначение всем выбранным позициям; в окне видно их количество.','Потребности «Нужно заказать» отделены от оформленных заказов и счетов. Номер счёта и состав заказа доступны прямо в строке.','Старый заказ без связи со складской карточкой учитывается автоматически при точном и однозначном совпадении товара, единицы и договора, если полностью покрывает потребность. Показаны потребность, количество в заказе и превышение; повторная закупка не предлагается.']},
   {version:'v2.46.286',date:'05.11.2026',title:'Снабжение: группы изделий, массовый поставщик и сроки',features:['«Что закупить»: комплектующие сгруппированы по изделиям внутри договора. Можно выбрать несколько позиций, назначить одного поставщика, перенести в группу и подготовить черновик заказа с сохранением количества каждой строки.','Сроки «Изготовят к» и «Придёт к нам» задаются отдельно или массово. Переносы сроков сохраняются в истории.','Названия позиций, групп и «Куда» можно менять. Ненужные строки и назначения убираются из рабочего списка с возможностью восстановления; заказы и оплата сохраняются.','Обновлённый экран работает на компьютере и телефоне. Отправка поставщику остаётся отдельным действием в карточке заказа.']},
   {version:'v2.46.285',date:'03.11.2026',title:'Снабжение: «Куда» — выбор сразу с кнопки и в карточке заказа',features:['«Что закупить»: кнопка «Назначить «Куда»» сразу открывает выбор — Договор (со списком договоров), Склад или Цех — без захода в карточку заказа. У группы «Без «Куда»» кнопка «Назначить всем» — одно назначение сразу нескольким заказам.','Карточка заказа: поле «Куда» есть всегда, и у заказа без позиций (счёт из входящих). Чип и кнопка «Изменить «Куда»» открывают тот же выбор, текущее назначение подставлено.','Строка из счёта «Назначение: …» переименована в «Назначение платежа: …», чтобы не путать с «Куда».']},
