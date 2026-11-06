@@ -200,7 +200,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.288";
+const APP_VERSION = "v2.46.289";
 const APP_VERSION_DATE = "06.11.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -7816,7 +7816,7 @@ function createTaskFromContractChat() {
   const cid = state.currentContractId;
   if (!cid) { showToast('Договор не выбран', 'error'); return; }
   if (typeof canManageTasks === 'function' && !canManageTasks()) {
-    showToast('Создавать задачи может директор, зам или менеджер', 'error');
+    showToast('Нет права «Создавать задачи другим»', 'error');
     return;
   }
   closeContractChat();
