@@ -2676,6 +2676,10 @@ function canManageTasks(category) {
   if (!state.user) return false;
   const r = state.user.roles || [];
   if (r.includes('director') || r.includes('zam') || r.includes('manager')) return true;
+  // v2.46.289: галочка «Создавать задачи другим» открывает обычные задачи.
+  // task_creator приходит с сервера из того же права и не меняет должность на экране.
+  if (r.includes('task_creator')) return true;
+  if (typeof hasPermission === 'function' && hasPermission('tasks.create_for_others')) return true;
   // v2.46.140: инженер ведёт поток «Автоматика» — правки щитов управления;
   // v2.46.141: и мастер — щиты собирает он
   return category === 'automation' && (r.includes('engineer') || r.includes('master'));
@@ -3853,7 +3857,7 @@ function openNewTask() {
   if (!canManageTasks(state.taskAutoPreset ? 'automation' : '')) {
     showToast(tasksAutoOnly()
       ? 'Инженер заносит правки щитов — в разделе «Автоматика»'
-      : 'Создавать задачи может директор, зам или менеджер', 'error');
+      : 'Нет права «Создавать задачи другим»', 'error');
     return;
   }
   state.taskFormMode = 'new';
