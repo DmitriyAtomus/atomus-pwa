@@ -11,6 +11,36 @@ const API_GET_HEDGE_DELAY_MS = 450;
 const API_GET_TIMEOUT_MS = 12000;
 // Мутации: same-origin прокси может висеть без 403 — ждём ~3.5с, abort, затем direct.
 const API_MUTATION_PRIMARY_TIMEOUT_MS = 3500;
+// v2.46.294: загрузка файлов (FormData/Blob) — 3,5 с не хватает: 15 МБ PDF идёт
+// через прокси ~6 с, abort рвал загрузку и повтор шёл напрямую. Для файлов ждём
+// прокси дольше (по размеру) и не уходим на sticky-direct.
+const API_UPLOAD_MIN_TIMEOUT_MS = 60000;
+const API_UPLOAD_BYTES_PER_SEC = 100 * 1024;   // запас на медленный канал
+
+function _apiUploadBytes(body) {
+  try {
+    if (!body || typeof body === 'string') return 0;
+    if (typeof Blob !== 'undefined' && body instanceof Blob) return body.size || 1;
+    if (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer) return body.byteLength || 1;
+    if (typeof ArrayBuffer !== 'undefined' && ArrayBuffer.isView && ArrayBuffer.isView(body)) return body.byteLength || 1;
+    if (typeof FormData !== 'undefined' && body instanceof FormData) {
+      let total = 0;
+      body.forEach(function (v) {
+        if (typeof v === 'string') total += v.length;
+        else if (v && typeof v.size === 'number') total += v.size;
+      });
+      return total || 1;
+    }
+  } catch (e) {}
+  return 0;
+}
+
+function _apiMutationTimeoutMs(init) {
+  const bytes = _apiUploadBytes(init && init.body);
+  if (!bytes) return API_MUTATION_PRIMARY_TIMEOUT_MS;
+  return Math.max(API_UPLOAD_MIN_TIMEOUT_MS,
+    API_MUTATION_PRIMARY_TIMEOUT_MS + Math.ceil(bytes / API_UPLOAD_BYTES_PER_SEC) * 1000);
+}
 const API_DIRECT_STICKY_MS = 60000;
 // Sticky: если чтение (или мутация после таймаута/403) ушло на прямой API —
 // следующие мутации сразу туда ~60с. POST не дублируем: primary abort перед direct.
@@ -129,12 +159,13 @@ window.fetch = async function atomusApiFetch(input, init) {
   // POST/PATCH/DELETE /api/*: sticky → сразу direct; иначе primary с таймаутом,
   // при abort/network/403 → abort primary (без дубля) и direct + sticky.
   if (isProxiedApi && method !== 'GET') {
-    if (_apiDirectRouteUntil > Date.now()) {
+    const isUpload = _apiUploadBytes(init && init.body) > 0;
+    if (!isUpload && _apiDirectRouteUntil > Date.now()) {
       return _atomusNativeFetch(fallbackUrl, init);
     }
     const controller = new AbortController();
     const primaryInit = _apiMergeAbortSignal(init, input, controller);
-    const timeoutId = setTimeout(function () { controller.abort(); }, API_MUTATION_PRIMARY_TIMEOUT_MS);
+    const timeoutId = setTimeout(function () { controller.abort(); }, _apiMutationTimeoutMs(init));
     try {
       const response = await _atomusNativeFetch(input, primaryInit);
       clearTimeout(timeoutId);
@@ -200,7 +231,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.293";
+const APP_VERSION = "v2.46.294";
 const APP_VERSION_DATE = "06.11.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============

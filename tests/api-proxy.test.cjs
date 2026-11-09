@@ -217,3 +217,52 @@ test('быстрый прокси остаётся маршрутом сохра
   await fetch('/api/planerka');await fetch('/api/planerka/start',{method:'POST'});
   assert.deepEqual(calls,['/api/planerka','/api/planerka/start']);
 });
+
+test('v2.46.294: загрузка файла не обрывается через 3,5 с и не уходит в direct', async () => {
+  const app = read('app-1.js')
+    .replace('const API_MUTATION_PRIMARY_TIMEOUT_MS = 3500;', 'const API_MUTATION_PRIMARY_TIMEOUT_MS = 20;')
+    .replace('const API_UPLOAD_MIN_TIMEOUT_MS = 60000;', 'const API_UPLOAD_MIN_TIMEOUT_MS = 200;');
+  const end = app.indexOf('const TOKEN_KEY');
+  const calls = [];
+  const ok = fakeResponse(201, 'application/json', { ok: true });
+  const context = {
+    URL, setTimeout, clearTimeout, AbortController, FormData, Blob, _sentrySectionHeader: () => '',
+    window: {
+      location: { origin: 'https://crm.atomuscrm.ru' },
+      fetch: (url, init) => new Promise((resolve, reject) => {
+        calls.push(String(url));
+        const t = setTimeout(() => resolve(ok), 80); // «загрузка» 80 мс > 20 мс
+        if (init && init.signal) init.signal.addEventListener('abort', () => { clearTimeout(t); reject(new Error('aborted')); });
+      }),
+    },
+  };
+  vm.runInNewContext(app.slice(0, end), context);
+  const fd = new FormData();
+  fd.append('file_1', new Blob([new Uint8Array(1024)], { type: 'application/pdf' }), 'a.pdf');
+  const response = await context.window.fetch('/api/team-chats/33/messages', { method: 'POST', body: fd });
+  assert.equal(response, ok);
+  assert.deepEqual(calls, ['/api/team-chats/33/messages']);
+});
+
+test('v2.46.294: обычный POST по-прежнему уходит в direct после короткого таймаута', async () => {
+  const app = read('app-1.js')
+    .replace('const API_MUTATION_PRIMARY_TIMEOUT_MS = 3500;', 'const API_MUTATION_PRIMARY_TIMEOUT_MS = 20;');
+  const end = app.indexOf('const TOKEN_KEY');
+  const calls = [];
+  const ok = fakeResponse(200, 'application/json', { ok: true });
+  const context = {
+    URL, setTimeout, clearTimeout, AbortController, FormData, Blob, _sentrySectionHeader: () => '',
+    window: {
+      location: { origin: 'https://crm.atomuscrm.ru' },
+      fetch: (url, init) => new Promise((resolve, reject) => {
+        calls.push(String(url));
+        if (calls.length > 1) return resolve(ok);
+        if (init && init.signal) init.signal.addEventListener('abort', () => reject(new Error('aborted')));
+      }),
+    },
+  };
+  vm.runInNewContext(app.slice(0, end), context);
+  const response = await context.window.fetch('/api/team-chats/33/messages', { method: 'POST', body: '{"text":"x"}' });
+  assert.equal(response, ok);
+  assert.deepEqual(calls, ['/api/team-chats/33/messages', 'https://api.atomuscrm.ru/api/team-chats/33/messages']);
+});
