@@ -10018,7 +10018,7 @@ function _renderMessagesInto(feed, messages, countEl, publicView) {
   let html = '';
   let prevDay = '';
   messages.forEach(m => {
-    const day = (m.created_at || '').slice(0, 10);
+    const day = atomusLocalTs(m.created_at).slice(0, 10);   // v2.46.295: по Екатеринбургу
     if (day && day !== prevDay) {
       html += '<div class="defect-chat-day-sep"><span>' + _formatDaySeparator(day) + '</span></div>';
       prevDay = day;
@@ -10124,11 +10124,10 @@ function _playDefectChatPing() {
 // v2.40.0: форматирование разделителя дня
 function _formatDaySeparator(iso) {
   // iso = "2026-05-25"
-  const today = new Date();
-  const todayISO = today.toISOString().slice(0, 10);
+  const todayISO = atomusLocalToday(0);   // v2.46.295: «сегодня» по Екатеринбургу
+  const today = { getFullYear: function () { return parseInt(todayISO.slice(0, 4), 10); } };
   if (iso === todayISO) return 'Сегодня';
-  const yest = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-  if (iso === yest.toISOString().slice(0, 10)) return 'Вчера';
+  if (iso === atomusLocalToday(-1)) return 'Вчера';
   // 25 мая 2026 (или без года если этот год)
   const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
   try {
@@ -10167,11 +10166,11 @@ async function deleteDefectMessage(msgId) {
 function _formatChatTime(iso) {
   if (!iso) return '';
   // 2026-05-25 14:32:11 → 14:32 / 25.05 14:32 / 25.05.2026 14:32
-  const s = String(iso).replace('T', ' ');
-  const today = new Date().toISOString().slice(0, 10);
+  const s = atomusLocalTs(iso);   // v2.46.295: UTC → Екатеринбург
+  const today = atomusLocalToday(0);
   if (s.startsWith(today)) return s.slice(11, 16);
   // другой день этого года
-  const year = String(new Date().getFullYear());
+  const year = today.slice(0, 4);
   if (s.startsWith(year)) return s.slice(8, 10) + '.' + s.slice(5, 7) + ' ' + s.slice(11, 16);
   return s.slice(8, 10) + '.' + s.slice(5, 7) + '.' + s.slice(0, 4) + ' ' + s.slice(11, 16);
 }
@@ -18535,9 +18534,10 @@ function _tcTrim(s, n) { s = s || ''; return s.length > n ? s.slice(0, n) + '…
 
 function _tchatListTime(iso) {
   if (!iso) return '';
+  iso = atomusLocalTs(iso);   // v2.46.295: UTC → Екатеринбург
   const d = iso.slice(0, 10);
-  const today = new Date().toISOString().slice(0, 10);
-  const yest  = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const today = atomusLocalToday(0);
+  const yest  = atomusLocalToday(-1);
   if (d === today) return iso.slice(11, 16) || '';
   if (d === yest)  return 'вчера';
   return d.split('-').reverse().slice(0, 2).join('.');
@@ -18938,12 +18938,13 @@ function _renderTeamChatMessages(r) {
   let lastAuthor = null, lastDate = null;
   msgs.forEach(m => {
     const isMine = (m.author_chat_id === myChatId);
-    const dt = (m.created_at || '').slice(0, 10);
+    const ts = atomusLocalTs(m.created_at);   // v2.46.295: UTC → Екатеринбург
+    const dt = ts.slice(0, 10);
     if (dt !== lastDate) {
       html += '<div class="cchat-date-sep"><span>' + escapeHtml(_chatPrettyDate(dt)) + '</span></div>';
       lastDate = dt; lastAuthor = null;
     }
-    const time = (m.created_at || '').slice(11, 16);
+    const time = ts.slice(11, 16);
     if (m.is_system) {
       html += '<div class="cchat-sys">' + escapeHtml(m.text) + ' · ' + escapeHtml(time) + '</div>';
       lastAuthor = null;

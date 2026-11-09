@@ -231,7 +231,7 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.294";
+const APP_VERSION = "v2.46.295";
 const APP_VERSION_DATE = "06.11.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
@@ -409,6 +409,34 @@ function formatContractNum(num) {
 
 function formatDate(iso) {
   try { const [y, m, d] = iso.split('-'); return d + '.' + m; } catch (e) { return iso; }
+}
+
+// v2.46.295: время в чатах — по Екатеринбургу (UTC+5, без перехода на летнее).
+// Сервер (SQLite datetime('now')) отдаёт «2026-11-09 11:46:46» без зоны — это UTC.
+// Строки с Z/смещением тоже приводим к UTC+5; дату без времени не трогаем.
+const ATOMUS_TZ_OFFSET_MIN = 300;
+function _atomusPad2(n) { return (n < 10 ? '0' : '') + n; }
+function _atomusFmtShifted(ms) {
+  const d = new Date(ms + ATOMUS_TZ_OFFSET_MIN * 60000);
+  return d.getUTCFullYear() + '-' + _atomusPad2(d.getUTCMonth() + 1) + '-' + _atomusPad2(d.getUTCDate()) +
+    ' ' + _atomusPad2(d.getUTCHours()) + ':' + _atomusPad2(d.getUTCMinutes()) + ':' + _atomusPad2(d.getUTCSeconds());
+}
+function atomusLocalTs(ts) {
+  if (!ts) return '';
+  const s = String(ts).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?\s*(Z|[+-]\d{2}:?\d{2})?$/i);
+  if (!m) return s;
+  let ms = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+  const tz = m[7];
+  if (tz && tz.toUpperCase() !== 'Z') {
+    const sign = tz[0] === '-' ? -1 : 1;
+    ms -= sign * (parseInt(tz.slice(1, 3), 10) * 60 + parseInt(tz.slice(-2), 10)) * 60000;
+  }
+  return _atomusFmtShifted(ms);
+}
+// «Сегодня» по Екатеринбургу: YYYY-MM-DD (deltaDays = -1 — вчера).
+function atomusLocalToday(deltaDays) {
+  return _atomusFmtShifted(Date.now() + (deltaDays || 0) * 86400000).slice(0, 10);
 }
 
 function formatDateLong(iso) {
@@ -7901,13 +7929,14 @@ function _renderContractChatMessages(r) {
   let lastDate = null;
   msgs.forEach(m => {
     const isMine = (m.author_chat_id === myChatId);
-    const dt = (m.created_at || '').slice(0, 10);
+    const ts = atomusLocalTs(m.created_at);   // v2.46.295: UTC → Екатеринбург
+    const dt = ts.slice(0, 10);
     if (dt !== lastDate) {
       html += '<div class="cchat-date-sep"><span>' + escapeHtml(_chatPrettyDate(dt)) + '</span></div>';
       lastDate = dt;
       lastAuthor = null;
     }
-    const time = (m.created_at || '').slice(11, 16);
+    const time = ts.slice(11, 16);
     const showHead = (lastAuthor !== (m.author_chat_id || 0)) || (m.is_system);
     lastAuthor = m.author_chat_id || 0;
     const author = m.author_name || (isMine ? 'Я' : 'Сотрудник');
@@ -7938,8 +7967,8 @@ function _renderContractChatMessages(r) {
 
 function _chatPrettyDate(iso) {
   if (!iso) return '';
-  const today = new Date().toISOString().slice(0, 10);
-  const yest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const today = atomusLocalToday(0);
+  const yest = atomusLocalToday(-1);
   if (iso === today) return 'Сегодня';
   if (iso === yest) return 'Вчера';
   return iso.split('-').reverse().join('.');
