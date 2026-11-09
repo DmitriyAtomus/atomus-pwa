@@ -1142,6 +1142,15 @@
     h += '<div class="sc-oc-top">' + root.scStepperHtml(o.step && o.step.index, st) +
       (o.step && o.step.days != null ? '<div class="sc-sub">на этом шаге ' + Number(o.step.days) + ' дн</div>' : '') + '</div>';
     h += '<div class="sc-oc-row"><span class="sc-oc-l">Тип</span>' + kindChips + (!kind ? ' <span class="sc-chip sc-chip-bad">не выбран</span>' : '') + '</div>';
+    if (st === 'paid') {
+      // v2.46.292: после оплаты — не всегда «едет»: «В изготовлении» / «Ждём отгрузку» / «Едет»
+      const sub = o.paid_substage || '';
+      const subChip = (v, label) => '<button type="button" class="sc-fchip' + (sub === v ? ' on' : '') + '" onclick="scOrderSubstage(' + Number(o.id) + ',\'' + v + '\')">' + esc(label) + '</button>';
+      h += '<div class="sc-oc-row sc-oc-substage"><span class="sc-oc-l">Сейчас</span>' +
+        subChip('manufacturing', 'В изготовлении') + subChip('', 'Ждём отгрузку') +
+        '<button type="button" class="sc-fchip" onclick="scOrderSubstage(' + Number(o.id) + ',\'shipping\')">Едет</button>' +
+        (o.invoice_delivery_term ? ' <span class="sc-sub">срок по счёту: ' + esc(o.invoice_delivery_term) + '</span>' : '') + '</div>';
+    }
     if (o.needs_supplier) {
       h += '<div class="sc-alert"><i class="ti ti-alert-triangle"></i> Поставщик не определён' +
         (o.invoice_seller_name ? ' · по счёту: <b>' + esc(o.invoice_seller_name) + '</b>' + (o.invoice_seller_inn ? ' ИНН ' + esc(o.invoice_seller_inn) : '') : '') +
@@ -1230,6 +1239,17 @@
     } catch (e) { root.showToast(e.message, 'error'); }
   };
 
+  root.scOrderSubstage = async function (id, sub) {
+    if (sub === 'shipping') {
+      if (typeof root.transitionSupplyOrder === 'function') return root.transitionSupplyOrder(id, 'shipping');
+      return;
+    }
+    try {
+      await post('/api/supply-orders/' + id + '/substage', { substage: sub || null });
+      root.showToast(sub === 'manufacturing' ? 'В изготовлении' : 'Оплачен, ждём отгрузку', 'success');
+      reload();
+    } catch (e) { root.showToast(e.message, 'error'); }
+  };
   root.scOrderKind = async function (id, kind) {
     try { await post('/api/supply-orders/' + id + '/kind', { kind }); root.showToast('Тип: ' + root.scKindLabel(kind), 'success'); reload(); }
     catch (e) { root.showToast(e.message, 'error'); }
