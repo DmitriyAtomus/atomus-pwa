@@ -78,7 +78,9 @@
   function button(action, text, extra='') { return '<button type="button" data-baction="'+action+'" '+extra+'>'+text+'</button>'; }
   function badge(r) {
     const stage = r.status === 'draft' ? 'draft' : r.stage;
-    const text = r.dupLabel || (r.status === 'partial' ? 'Пришло частично' : r.status === 'shipping' ? 'Едет' : label[stage]) || 'Купить';
+    const raw = r._raw || {};
+    const mfg = r.status === 'paid' && (raw.paid_substage === 'manufacturing' || raw.order_paid_substage === 'manufacturing');
+    const text = r.dupLabel || (r.status === 'partial' ? 'Пришло частично' : r.status === 'shipping' ? 'Едет' : mfg ? 'В изготовлении' : label[stage]) || 'Купить';
     return '<span class="sbw-badge '+(r.dupLabel?'bad':stage)+'">'+E(text)+'</span>';
   }
   function rowHTML(r, manage) {
@@ -251,6 +253,6 @@
     const m=modal('Подготовить заказ','<p>Выбрано '+rows.length+' позиций. Разные поставщики, группы и сроки попадут в отдельные черновики. Отправка поставщику — отдельное действие в карточке заказа.</p>'+rows.map(r=>'<div class="sbw-preview-line"><span>'+E(r.title)+'<small>'+E(r.supplier)+' · '+E(r.group_name)+'</small></span><b>'+E(r.qty)+'</b></div>').join(''),'<button type="button" data-close>Отмена</button><button type="button" id="sbw-draft-save" class="primary">Создать черновики</button>');
     m.querySelector('#sbw-draft-save').onclick=async ev=>{try{const result=await post('/api/supply/board/drafts',{targets:targets(rows)},ev.currentTarget);selected.clear();m.close();await root.loadSupplyShopping();const done=modal('Черновики созданы',(result.orders||[]).map(o=>'<button type="button" class="sbw-dest-option" data-open-order="'+o.id+'">'+E(o.order_label)+' · '+o.items_count+' позиций '+icon('chevron-right')+'</button>').join(''));done.querySelectorAll('[data-open-order]').forEach(b=>b.onclick=()=>{done.close();root.openSupplyOrder(Number(b.dataset.openOrder));});}catch(e){error(e);}};
   }
-  const api={decorateRows,targets,supplierTargets,render,clearSelection:()=>selected.clear(),fmtDate};
+  const api={decorateRows,targets,supplierTargets,render,badge,clearSelection:()=>selected.clear(),fmtDate};
   root.SupplyBoard=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
