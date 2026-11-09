@@ -397,6 +397,7 @@
     if (r.stage === 'go') {
       if (r.status === 'shipping') return chip('go', 'Едет');
       if (r.status === 'partial') return chip('go', 'Пришло частично');
+      if (r._raw && r._raw.paid_substage === 'manufacturing') return chip('go', 'В изготовлении');
       return chip('go', 'Оплачен, едет');
     }
     if (r.stage === 'pay') return chip('pay', r.status === 'to_pay' ? 'На оплату' : (r.status === 'approval' ? 'На согласовании' : 'Счёт получен'));
