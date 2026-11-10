@@ -369,14 +369,24 @@
     return scOpenDestPicker(Number(ids[0]), byOrder[ids[0]]);
   }
 
-  // Оплата счёта: тип закупки (товар / изготовление / услуга) бухгалтер
-  // больше не выбирает — это мешало. Уже указанный тип не трогаем.
-  // Если типа нет, подставляем «товар» (goods): самый частый тип в базе
-  // на 10.11.2026 (goods 166, mfg 102, service 45 среди заполненных).
-  // «Услугу» по умолчанию нельзя — после оплаты такой заказ сразу закрывается.
-  // Назначение («Куда») по-прежнему спрашиваем, только если оно обязательно
-  // и ещё не заполнено; уже назначенные строки не перезаписываем.
+  // v2.46.296: выбор типа закупки временно скрыт во всём UI (оплата,
+  // «Загрузить счёт», мастер «Оформить заказ», чипы в карточке заказа).
+  // Поле kind в БД и логика статусов НЕ удаляются. Вернуть выбор:
+  // SC_FLAGS.hidePurchaseKind = false.
+  // Без типа подставляем «товар» (самый частый в базе на 10.11.2026:
+  // goods 166, mfg 102, service 45). «Услугу» по умолчанию нельзя —
+  // после оплаты такой заказ сразу закрывается. Уже указанный тип не трогаем.
   const SC_PAYMENT_DEFAULT_KIND = 'goods';
+  const SC_PAYMENT_DEFAULT_DEST = 'stock';
+  if (!root.SC_FLAGS) {
+    root.SC_FLAGS = {
+      hidePurchaseKind: true,
+      defaultKind: SC_PAYMENT_DEFAULT_KIND,
+      defaultDest: SC_PAYMENT_DEFAULT_DEST,
+    };
+  }
+  const SC_FLAGS = root.SC_FLAGS;
+  function scHidePurchaseKind() { return !!SC_FLAGS.hidePurchaseKind; }
   function scPaymentKind(order) {
     return SC_KINDS.some(k => k[0] === (order && order.kind)) ? order.kind : SC_PAYMENT_DEFAULT_KIND;
   }
@@ -386,9 +396,42 @@
     return items.length ? scMissingDest(items) > 0
       : !scItemDestOk({dest_type: order.dest_type, dest_contract_id: order.contract_id});
   }
+  async function scFillPaymentDefaults(order) {
+    const kind = scPaymentKind(order);
+    const kindWasSet = SC_KINDS.some(k => k[0] === order.kind);
+    const save = async (path, body) => {
+      await root.scPost('/api/supply-orders/' + Number(order.id) + path, body);
+      if (G('cache')) G('cache').supplyOrders = null;
+    };
+    if (!kindWasSet) {
+      await save('/kind', {kind});
+      order.kind = kind;
+    }
+    if (!scPaymentNeedsDest(order, kind)) return;
+    const items = order.items || [];
+    const missing = items.filter(it => !scItemDestOk(it)).map(it => it.id);
+    const dest = SC_FLAGS.defaultDest || SC_PAYMENT_DEFAULT_DEST;
+    if (missing.length) {
+      await save('/dest', {dest_type: dest, item_ids: missing, all: false});
+      items.forEach(it => { if (missing.indexOf(it.id) >= 0) { it.dest_type = dest; it.dest_contract_id = null; } });
+    } else if (!items.length) {
+      await save('/dest', {dest_type: dest, item_ids: [], all: false});
+      order.dest_type = dest;
+    }
+  }
   async function scCompletePaymentDetails(orderId) {
     if (document.getElementById('sc-payment-details')) return false;
     const order = await root.apiGet('/api/supply-orders/' + Number(orderId));
+    if (document.getElementById('sc-payment-details')) return false;
+    if (scHidePurchaseKind()) {
+      try { await scFillPaymentDefaults(order); return true; }
+      catch (e) {
+        if (typeof root.showToast === 'function') {
+          root.showToast((e && e.message) || 'Не удалось сохранить данные счёта', 'error');
+        }
+        return false;
+      }
+    }
     const contracts = await scContracts();
     if (document.getElementById('sc-payment-details')) return false;
     const kind = scPaymentKind(order);
@@ -469,6 +512,10 @@
 
   // Сегмент-переключатель (Тип / Куда)
   function scKindSegHtml(prefix, value) {
+    if (scHidePurchaseKind()) {
+      const v = SC_KINDS.some(k => k[0] === value) ? value : (SC_FLAGS.defaultKind || SC_PAYMENT_DEFAULT_KIND);
+      return '<div id="' + prefix + '-kind" data-value="' + v + '" hidden style="display:none"></div>';
+    }
     return '<div class="sc-seg" id="' + prefix + '-kind">' + SC_KINDS.map(k =>
       '<button type="button" data-v="' + k[0] + '" class="' + (value === k[0] ? 'on' : '') + '" onclick="scSegPick(\'' + prefix + '-kind\',\'' + k[0] + '\')">' + esc(k[1]) + '</button>').join('') + '</div>';
   }
@@ -512,7 +559,8 @@
   }
 
   const api = {
-    scPaymentNeedsDest, scCompletePaymentDetails, scPaymentKind, SC_PAYMENT_DEFAULT_KIND,
+    scPaymentNeedsDest, scCompletePaymentDetails, scFillPaymentDefaults, scPaymentKind,
+    scHidePurchaseKind, SC_PAYMENT_DEFAULT_KIND, SC_PAYMENT_DEFAULT_DEST, SC_FLAGS,
     scInvLinesHtml,
     SC_KINDS, SC_DESTS, SC_STEPS, SC_STATUS, SC_STEP_OF,
     scItemDestOk, scMissingDest, scApplyBulk, scDestChipHtml, scStepperHtml, scKindLabel,
@@ -585,12 +633,15 @@
     const content = document.querySelector('#supply-modal .owz2 .modal-content');
     if (!content || document.getElementById('owz-kind')) return;
     const o = owz();
-    o.kind = o.kind || null; o.dest = o.dest || null;
+    if (root.scHidePurchaseKind()) o.kind = o.kind || root.SC_PAYMENT_DEFAULT_KIND;
+    else o.kind = o.kind || null;
+    o.dest = o.dest || null;
     const list = await root.scContracts();
     const box = document.createElement('div');
     box.className = 'sc-owz-head';
     box.innerHTML =
-      '<div class="owz2-sec-l"><i class="ti ti-category"></i> Тип · обязательно</div>' + root.scKindSegHtml('owz', o.kind) +
+      (root.scHidePurchaseKind() ? '' : '<div class="owz2-sec-l"><i class="ti ti-category"></i> Тип · обязательно</div>') +
+      root.scKindSegHtml('owz', o.kind) +
       '<div class="owz2-sec-l"><i class="ti ti-map-pin"></i> Куда · обязательно</div>' + root.scDestSegHtml('owz-dest', o.dest) +
       '<select id="owz-dest-contract" class="sc-select" style="margin-top:8px;' + (o.dest === 'contract' ? '' : 'display:none;') + '" onchange="scOwzContract(this)">' +
         '<option value="">— выберите договор —</option>' + list.map(c => '<option value="' + Number(c.id) + '" data-num="' + esc(c.number || '') + '">' +
@@ -611,6 +662,7 @@
     const hint = document.getElementById('owz-dest-hint');
     const sendBtn = document.querySelector('#supply-modal .owz2-foot .btn-primary');
     let msg = '';
+    if (root.scHidePurchaseKind() && !o.kind) o.kind = root.SC_PAYMENT_DEFAULT_KIND;
     if (!o.kind) msg = 'Выберите тип закупки: товар, изготовление или услуга';
     else if (o.kind !== 'service' && miss) msg = miss + ' ' + (miss === 1 ? 'позиция' : 'позиций') + ' без назначения: заказ не отправится';
     if (hint) { hint.style.display = msg ? '' : 'none'; hint.innerHTML = msg ? '<i class="ti ti-alert-triangle"></i> ' + esc(msg) : ''; }
@@ -680,6 +732,7 @@
     root.submitOrderWizard = async function (send) {
       const o = owz();
       if (document.getElementById('owz-kind')) {
+        if (root.scHidePurchaseKind() && !o.kind) o.kind = root.SC_PAYMENT_DEFAULT_KIND;
         if (!o.kind) { root.showToast('Выберите тип закупки', 'error'); return; }
         if (send && o.kind !== 'service' && root.scMissingDest(o.list || [])) { scOwzPaint(); root.showToast('Не у всех позиций выбрано назначение', 'error'); return; }
       }
@@ -746,7 +799,8 @@
           '<div id="pay-inv-drop" onclick="document.getElementById(\'pay-inv-file\').click()" class="sc-drop">' +
             '<i class="ti ti-file-upload"></i><div id="pay-inv-fname">Выбрать файл счёта (PDF, фото, Excel)</div></div>' +
           '<input type="file" id="pay-inv-file" accept="image/*,application/pdf,.pdf,.xlsx,.xls,.doc,.docx" style="display:none;" onchange="_payInvOnFile(event)">' +
-          '<div class="sc-lbl">Тип · обязательно</div>' + root.scKindSegHtml('payinv', null) +
+          (root.scHidePurchaseKind() ? '' : '<div class="sc-lbl">Тип · обязательно</div>') +
+          root.scKindSegHtml('payinv', null) +
           '<div class="sc-lbl">Куда · обязательно</div>' + root.scDestSegHtml('payinv-dest', null) +
           '<select id="pay-inv-contract" class="sc-select" style="margin-top:8px;display:none;">' + root.scContractOptionsHtml(list, null) + '</select>' +
           '<div class="sc-lbl">Поставщик по счёту</div>' +
@@ -1154,7 +1208,9 @@
     let h = '<div class="detail-block sc-order-chain">';
     h += '<div class="sc-oc-top">' + root.scStepperHtml(o.step && o.step.index, st) +
       (o.step && o.step.days != null ? '<div class="sc-sub">на этом шаге ' + Number(o.step.days) + ' дн</div>' : '') + '</div>';
-    h += '<div class="sc-oc-row"><span class="sc-oc-l">Тип</span>' + kindChips + (!kind ? ' <span class="sc-chip sc-chip-bad">не выбран</span>' : '') + '</div>';
+    if (!root.scHidePurchaseKind()) {
+      h += '<div class="sc-oc-row"><span class="sc-oc-l">Тип</span>' + kindChips + (!kind ? ' <span class="sc-chip sc-chip-bad">не выбран</span>' : '') + '</div>';
+    }
     if (st === 'paid') {
       // v2.46.292: после оплаты — не всегда «едет»: «В изготовлении» / «Ждём отгрузку» / «Едет»
       const sub = o.paid_substage || '';
