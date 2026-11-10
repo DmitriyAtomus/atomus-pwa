@@ -26849,6 +26849,24 @@ body.dchat-speaking .dchat-voice-toggle.is-on i { animation: dchatPulse 1s ease-
 .tf2-bar #tf-error:empty{display:block}
 .tf2-go{padding:11px 26px;font-size:14.5px}
 .tf2.auto .tf2-go{background:#d97706;border-color:#d97706}
+
+/* v2.46.297: файлы в форме новой задачи и явная кнопка в карточке */
+.tf2-files{background:#fff;border:1px dashed var(--border-strong);border-radius:14px;padding:14px 16px;margin-top:12px}
+.tf2-files.is-dragover{border-color:var(--brand);background:var(--brand-bg)}
+.tf2-files-empty,.task-files-empty{font-size:12.5px;color:var(--text-light);padding:6px 0 10px}
+.tf2-attach,.task-files-attach{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border-strong);
+  background:var(--surface);color:var(--text-dark);border-radius:10px;
+  padding:8px 14px;font:inherit;font-size:13px;font-weight:650;cursor:pointer;
+}
+.tf2-attach:hover,.task-files-attach:hover{border-color:var(--brand);color:var(--brand)}
+.tf2-attach:disabled,.task-files-attach:disabled{opacity:.6;cursor:default}
+.tf2-files-hint{font-size:11px;color:var(--text-light);margin-top:8px;line-height:1.45}
+.task-files{border:1px dashed transparent;border-radius:14px;padding:10px 12px}
+.task-files.is-dragover{border-color:var(--brand);background:var(--brand-bg)}
+.task-files-t .task-files-attach{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:650}
+.task-files-fail{background:#FDE8E6;color:#B91C1C;border-radius:10px;padding:8px 11px;font-size:12.5px;margin:0 0 8px}
+
 /* исполнители — плитки */
 .ta2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:260px;overflow:auto}
 .ta2-p,.ta2-me{display:flex;align-items:center;gap:8px;min-width:0;border:1px solid var(--border);background:#fff;border-radius:10px;padding:6px 8px;font:inherit;font-size:12.5px;color:var(--text);cursor:pointer;text-align:left}
