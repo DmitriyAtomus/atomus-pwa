@@ -9,7 +9,7 @@ const start=app1.indexOf('async function _supplyOrderTransitionReq(');
 const end=app1.indexOf('async function payDueMarkPaid(',start);
 assert.ok(start>=0&&end>start);
 const handler=app1.slice(start,end)+app3.slice(app3.indexOf('async function payListMarkPaid('));
-const output=process.env.SUPPLY_QA_OUTPUT||path.join(root,'docs/previews/payment-details-20261106');
+const output=process.env.SUPPLY_QA_OUTPUT||path.join(root,'docs/previews/payment-details-20261110');
 (async()=>{
   fs.mkdirSync(output,{recursive:true});
   const browser=await chromium.launch({channel:'chrome',headless:true});
@@ -64,8 +64,15 @@ const output=process.env.SUPPLY_QA_OUTPUT||path.join(root,'docs/previews/payment
     const open=async()=>{await page.locator('#pay').click();await page.locator('#sc-payment-details').waitFor();};
     const postKinds=()=>page.evaluate(()=>requests.filter(r=>r.url.endsWith('/kind')));
     const cancel=()=>page.locator('#sc-payment-cancel').click();
+    const noKindSelect=async()=>{
+      assert.equal(await page.locator('#sc-payment-kind').count(),0);
+      assert.equal(await page.locator('text=Тип закупки').count(),0);
+    };
+
+    // Missing kind on a new order still needs destination; type is not asked.
     await open();
-    assert.equal(await page.locator('#sc-payment-kind').inputValue(),'');
+    await noKindSelect();
+    assert.equal(await page.locator('#sc-payment-dest').inputValue(),'');
     assert.equal((await postKinds()).length,0);
     await cancel();
     await page.waitForFunction(()=>!document.getElementById('pay').disabled);
@@ -75,9 +82,6 @@ const output=process.env.SUPPLY_QA_OUTPUT||path.join(root,'docs/previews/payment
     assert.equal((await postKinds()).length,0);
     await open();
     await page.locator('#sc-payment-save').click();
-    assert.match(await page.locator('#sc-payment-error').innerText(),/Выберите тип/);
-    await page.locator('#sc-payment-kind').selectOption('goods');
-    await page.locator('#sc-payment-save').click();
     assert.match(await page.locator('#sc-payment-error').innerText(),/куда закупаем/);
     await page.locator('#sc-payment-dest').selectOption('contract');
     await page.locator('#sc-payment-save').click();
@@ -85,6 +89,7 @@ const output=process.env.SUPPLY_QA_OUTPUT||path.join(root,'docs/previews/payment
     assert.equal((await postKinds()).length,0);
     await page.locator('#sc-payment-contract').selectOption('17');
     assert.equal(await page.locator('#sc-payment-error').isVisible(),false);
+    await noKindSelect();
     await page.screenshot({path:path.join(output,'payment-desktop.png')});
     await page.evaluate(()=>{savedError=true;});
     await page.locator('#sc-payment-save').click();
@@ -97,43 +102,64 @@ const output=process.env.SUPPLY_QA_OUTPUT||path.join(root,'docs/previews/payment
     assert.equal(await page.evaluate(()=>prompts),2);
     assert.deepEqual((await postKinds()).at(-1).body,{kind:'goods',dest_type:'contract',contract_id:17});
     assert.equal(await page.locator('#sc-payment-details').count(),0);
-    // A service needs no invented warehouse destination; password cancellation never pays.
-    await page.evaluate(()=>resetFixture());await open();
-    await page.locator('#sc-payment-kind').selectOption('service');
-    assert.equal(await page.locator('#sc-payment-dest-wrap').isVisible(),false);
-    await page.evaluate(()=>{passwords=[null];});
-    await page.locator('#sc-payment-save').click();
+
+    // Existing service kind: no modal, no overwrite, cancelled password never pays.
+    await page.evaluate(()=>resetFixture({kind:'service'}));
+    await page.locator('#pay').click();
+    await page.waitForFunction(()=>prompts>0||paid);
+    assert.equal(await page.locator('#sc-payment-details').count(),0);
+    await page.evaluate(()=>{resetFixture({kind:'service'});passwords=[null];});
+    await page.locator('#pay').click();
     await page.waitForFunction(()=>!document.getElementById('pay').disabled);
     assert.equal(await page.evaluate(()=>paid),false);
-    assert.deepEqual((await postKinds())[0].body,{kind:'service'});
+    assert.equal((await postKinds()).length,0);
+
     // Preserve assigned lines; supply a default only for missing destinations.
     await page.evaluate(()=>resetFixture({kind:'mfg',items:[{id:1,dest_type:'contract',dest_contract_id:17},{id:2,dest_type:null}]}));
     await page.setViewportSize({width:390,height:844});await open();
-    assert.equal(await page.locator('#sc-payment-kind').inputValue(),'mfg');
+    await noKindSelect();
     await page.locator('#sc-payment-dest').selectOption('shop');
     await page.screenshot({path:path.join(output,'payment-mobile.png')});
     await page.locator('#sc-payment-save').click();await page.waitForFunction(()=>paid);
     assert.deepEqual(await page.evaluate(()=>fixture.items),[{id:1,dest_type:'contract',dest_contract_id:17},{id:2,dest_type:'shop',dest_contract_id:null}]);
+    assert.deepEqual((await postKinds()).at(-1).body,{kind:'mfg',dest_type:'shop',contract_id:null});
     assert.ok((await postKinds()).every(r=>!('all' in r.body)&&!('item_ids' in r.body)));
-    // Legacy order: only missing kind, no new destination obligation.
-    await page.evaluate(()=>resetFixture({chain_new:false}));await open();
-    await page.locator('#sc-payment-kind').selectOption('goods');
-    assert.equal(await page.locator('#sc-payment-dest-wrap').isVisible(),false);
-    await page.locator('#sc-payment-save').click();await page.waitForFunction(()=>paid);
+
+    // Legacy order without kind: default goods, no destination question, no modal.
+    await page.setViewportSize({width:1366,height:900});
+    await page.evaluate(()=>resetFixture({chain_new:false}));
+    await page.locator('#pay').click();await page.waitForFunction(()=>paid);
+    assert.equal(await page.locator('#sc-payment-details').count(),0);
     assert.deepEqual((await postKinds())[0].body,{kind:'goods'});
+
+    // Missing kind, destination already set: silent default, no modal.
+    await page.evaluate(()=>resetFixture({dest_type:'stock'}));
+    await page.locator('#pay').click();await page.waitForFunction(()=>paid);
+    assert.equal(await page.locator('#sc-payment-details').count(),0);
+    assert.deepEqual((await postKinds())[0].body,{kind:'goods'});
+
     // Already complete order retains its original one-step payment path.
     await page.evaluate(()=>resetFixture({kind:'goods',dest_type:'stock'}));
     await page.locator('#pay').click();await page.waitForFunction(()=>paid);
     assert.equal((await postKinds()).length,0);
     assert.equal(await page.locator('#sc-payment-details').count(),0);
+
+    // Failed silent default does not pay and does not invent destination.
+    await page.evaluate(()=>{resetFixture({dest_type:'stock'});savedError=true;});
+    await page.locator('#pay').click();
+    await page.waitForFunction(()=>!document.getElementById('pay').disabled);
+    assert.equal(await page.evaluate(()=>paid),false);
+    assert.equal(await page.locator('#sc-payment-details').count(),0);
+    assert.deepEqual(await page.evaluate(()=>toasts.at(-1)),{message:'Нет права изменить тип',type:'error'});
+
     // A repeated server refusal does not reopen the dialog or loop indefinitely.
-    await page.evaluate(()=>{resetFixture({chain_new:false});stillReject=true;});await open();
-    await page.locator('#sc-payment-kind').selectOption('goods');await page.locator('#sc-payment-save').click();
+    await page.evaluate(()=>{resetFixture({chain_new:false});stillReject=true;});
+    await page.locator('#pay').click();
     await page.waitForFunction(()=>!document.getElementById('pay').disabled);
     assert.equal(await page.evaluate(()=>paid),false);
     assert.equal((await postKinds()).length,1);
     assert.equal(await page.locator('#sc-payment-details').count(),0);
     assert.deepEqual(errors,[]);
-    console.log('PASS: real payment click, no default guesses, cancel/Escape, required fields, save failure, password and retry, cancelled password, goods/mfg/service, existing line destinations, legacy orders, complete orders, bounded retries, desktop/mobile. Mocked API only; no real payments.');
+    console.log('PASS: payment has no kind picker; default goods when missing; existing kind kept; dest only if required; cancel/Escape; save failure; password and retry; cancelled password; existing line destinations; legacy and complete orders; silent default failure; bounded retries; desktop/mobile. Mocked API only; no real payments.');
   }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
