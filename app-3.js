@@ -5689,6 +5689,22 @@ function showSupplierModal(s) {
         // если синк ЛК не прислал адрес конкретного заказа
         '<div class="form-group"><label>Адрес самовывоза <span style="text-transform:none;font-weight:400;color:var(--text-light);">— где забирать заказы (виден в Логистике)</span></label>' +
           '<input type="text" id="sm-address" value="' + escapeHtml(isEdit ? (s.address || '') : '') + '" placeholder="напр. ул. Богдана Хмельницкого, д. 4Б, ТЦ «Домострой»" ' + (canManage ? '' : 'disabled') + '></div>' +
+        // v2.46.299: банковские реквизиты — для платёжек в Сбер (подставляются из счёта, если пусто)
+        (function () {
+          const dis = canManage ? '' : 'disabled';
+          const f = function (id, key, label, ph, mode) {
+            return '<div class="form-group" style="flex:1;min-width:150px;"><label>' + label + '</label>' +
+              '<input type="text" id="' + id + '" ' + (mode ? 'inputmode="' + mode + '" ' : '') +
+              'value="' + escapeHtml(isEdit ? (s[key] || '') : '') + '" placeholder="' + ph + '" ' + dis + '></div>';
+          };
+          return '<div style="margin:4px 0 2px;font-weight:600;font-size:13px;">Банковские реквизиты <span style="font-weight:400;color:var(--text-light);">— для платёжек в Сбер</span></div>' +
+            '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+              f('sm-bik', 'bik', 'БИК', '9 цифр', 'numeric') + f('sm-kpp', 'kpp', 'КПП', '9 цифр', 'numeric') + '</div>' +
+            '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+              f('sm-account', 'account', 'Расчётный счёт', '20 цифр', 'numeric') +
+              f('sm-corr', 'corr_account', 'Корсчёт', '20 цифр', 'numeric') + '</div>' +
+            f('sm-bank', 'bank_name', 'Банк', 'напр. ПАО Сбербанк', '');
+        })() +
         // v2.45.987: «забираем сами» — оплаченный счёт такого поставщика сам
         // встаёт в Логистику отдельной карточкой «Забрать по нашему счёту»
         '<div class="form-group"><label style="display:flex;align-items:center;gap:9px;text-transform:none;font-weight:600;cursor:pointer;">' +
@@ -6432,6 +6448,11 @@ async function saveSupplier(supplierId) {
     comment:        document.getElementById('sm-comment').value.trim(),
     self_pickup:    !!(document.getElementById('sm-selfpickup') || {}).checked,
   };
+  // v2.46.299: реквизиты для платёжек (поля есть только в новой форме)
+  [['sm-bik', 'bik'], ['sm-kpp', 'kpp'], ['sm-account', 'account'], ['sm-corr', 'corr_account'], ['sm-bank', 'bank_name']].forEach(function (pair) {
+    const el = document.getElementById(pair[0]);
+    if (el) payload[pair[1]] = pair[1] === 'bank_name' ? el.value.trim() : el.value.replace(/\D/g, '');
+  });
   if (!payload.name) { showToast('Укажите название', 'error'); return; }
   try {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -18932,6 +18953,7 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {version:'v2.46.299',date:'11.11.2026',title:'Счета на оплату: черновик платёжки в Сбер',features:['В «Счетах на оплату» кнопка «Платёжка»: проверяет реквизиты поставщика (БИК, счёт, ИНН, НДС в назначении) и показывает получателя, сумму и назначение перед созданием.','Черновик создаётся в СберБизнес без подписи — деньги уходят только после подписи директора в банке. Когда банк исполнит платёж, счёт сам станет «Оплачен».','В карточке поставщика — БИК, КПП, расчётный счёт, корсчёт и банк. Из распознанного счёта они подставляются сами, если поля пустые.']},
   {version:'v2.46.298',date:'10.11.2026',title:'Логистика: карточка УТМ по «Заказ готов» и УПД',features:['В карточке «УТМ · корпуса» готовые заказы появляются не только по письму «Заказ готов», но и когда УТМ присылает УПД. Пустой текст карточки это поясняет.']},
   {version:'v2.46.297',date:'10.11.2026',title:'Задачи: файлы в форме новой задачи',features:['В форме «Новая задача» появилась кнопка «Прикрепить файл» и перетаскивание: файлы копятся в списке до отправки и после создания задачи загружаются на её номер.','Если файл не загрузился, созданная задача не пропадает — показывается, какие вложения не прошли, и их можно прикрепить снова.','В карточке задачи список файлов виден всегда: скачать, удалить, кнопка «Прикрепить файл» и перетаскивание прямо в блок файлов (скрепка в обсуждении тоже осталась).']},
   {version:'v2.46.296',date:'10.11.2026',title:'Оплата счёта без выбора «товар / услуга»',features:['Выбор типа закупки (товар, изготовление, услуга) скрыт везде: в оплате, в «Загрузить счёт», в мастере «Оформить заказ» и в карточке заказа. Поле в базе и статусы не удалялись — вернуть выбор можно флагом.','Если типа нет, подставляется «товар» (самый частый). Уже указанный тип не меняется.','Окно «Уточнить счёт перед отметкой оплаты» больше не появляется: после «Оплатил» сразу пароль. Если «Куда» обязательно и пусто, для пустых строк подставляется «склад»; уже назначенные строки не перезаписываются.']},
@@ -29557,6 +29579,8 @@ async function loadPayList() {
     const d = await apiGet('/api/pay-list?' + p.toString());
     _payListItems = d.items || [];
     _payListCanCreate = !!d.can_create_advance;
+    _payBankCan = !!d.can_create_bank_payment;
+    _payBankEnabled = !!d.bank_payments_enabled;
     syncAdvanceCreateButton();
     const counts = d.counts || {};
     document.querySelectorAll('[data-pay-count]').forEach(el => {
@@ -29625,6 +29649,8 @@ function renderPayList() {
       ? '<button class="btn btn-primary btn-small" style="margin-right:6px;" onclick="event.stopPropagation();payListMarkPaid(\'' + row.kind + '\',' + row.id + ', this)">Оплатил</button>'
       : '';
     const open = 'openPayListRow(\'' + row.kind + '\',' + row.id + ')';
+    const bankBadge = _payBankBadge(row);
+    const bankBtn = _payBankButton(row, paid);
     html += '<tr>' +
       '<td>' + escapeHtml(_payListDate(row.date)) + '</td>' +
       '<td>' + tag + '</td>' +
@@ -29632,8 +29658,8 @@ function renderPayList() {
       '<td>' + escapeHtml(row.purpose || '—') + '</td>' +
       '<td style="white-space:nowrap;font-weight:700;">' + _payListMoney(row.amount) + '</td>' +
       '<td>' + escapeHtml(row.author_name || '—') + '</td>' +
-      '<td>' + status + '</td>' +
-      '<td style="white-space:nowrap;">' + payBtn +
+      '<td>' + status + bankBadge + '</td>' +
+      '<td style="white-space:nowrap;">' + bankBtn + payBtn +
         '<button class="btn btn-secondary btn-small" onclick="' + open + '">Открыть</button></td>' +
     '</tr>';
     cards += '<div class="pay-card" role="button" tabindex="0" onclick="' + open + '" onkeydown="if(event.key===\'Enter\'){' + open + '}">' +
@@ -29642,8 +29668,9 @@ function renderPayList() {
       '<div class="pay-card-purpose">' + escapeHtml(row.purpose || '—') + '</div>' +
       '<div class="pay-card-meta"><span>' + escapeHtml(_payListDate(row.date)) + '</span>' + tag +
         '<span class="pay-card-ord">' + escapeHtml(orderText) + '</span>' + status + '</div>' +
+      (bankBadge ? '<div class="pay-card-bank">' + bankBadge + '</div>' : '') +
       (row.author_name ? '<div class="pay-card-author">Внёс: ' + escapeHtml(row.author_name) + '</div>' : '') +
-      (payBtn ? '<div class="pay-card-actions">' + payBtn + '</div>' : '') +
+      ((payBtn || bankBtn) ? '<div class="pay-card-actions">' + bankBtn + payBtn + '</div>' : '') +
     '</div>';
   });
   html += '</tbody></table>';
@@ -29859,6 +29886,160 @@ async function payAdvanceMarkPaid(id, btn) {
     showToast('Ошибка сети', 'error');
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-cash"></i> Оплатил'; }
   }
+}
+
+// v2.46.299: «Платёжка» — черновик платёжного поручения в СберБизнес.
+// Подписывает директор в самом банке; после «Исполнен» строка станет «Оплачен».
+let _payBankCan = false;
+let _payBankEnabled = false;
+
+function _payBankBadge(row) {
+  const bp = row && row.bank_payment;
+  if (!bp) return '';
+  const st = bp.local_status;
+  const colors = st === 'done' ? ['#E7F6EC', '#1B7A3D'] : st === 'failed' ? ['#FDECEA', '#B5260C'] : ['#EEF3FD', '#2456B8'];
+  const title = bp.error || bp.bank_comment || '';
+  const click = (st === 'sending' || st === 'created')
+    ? ' onclick="event.stopPropagation();payBankRefresh(' + bp.id + ', this)" role="button" style="cursor:pointer;' : ' style="';
+  return '<div class="pay-bank-badge"' + click + 'display:inline-block;margin-top:4px;padding:2px 8px;border-radius:10px;font-size:12px;background:' +
+    colors[0] + ';color:' + colors[1] + ';"' + (title ? ' title="' + escapeHtml(title) + '"' : '') + '>' +
+    '<i class="ti ti-building-bank"></i> ' + escapeHtml(bp.label || 'Платёжка') +
+    (st === 'failed' && bp.error ? ': ' + escapeHtml(String(bp.error).slice(0, 80)) : '') + '</div>';
+}
+
+function _payBankButton(row, paid) {
+  if (paid || !_payBankCan) return '';
+  const bp = row.bank_payment;
+  if (bp && bp.local_status !== 'failed') return '';
+  return '<button class="btn btn-secondary btn-small" style="margin-right:6px;" title="Черновик платёжки в СберБизнес" ' +
+    'onclick="event.stopPropagation();payBankOpen(\'' + row.kind + '\',' + row.id + ', this)"><i class="ti ti-building-bank"></i> Платёжка</button>';
+}
+
+async function payBankRefresh(bpId, el) {
+  if (el) el.style.opacity = '0.5';
+  try {
+    const d = await apiGet('/api/bank-payments/' + bpId + '?refresh=1');
+    const bp = d && d.payment;
+    if (bp) showToast('Сбер: ' + (bp.label || bp.bank_status || 'статус обновлён'), bp.local_status === 'failed' ? 'error' : 'success');
+  } catch (e) {
+    showToast('Статус не получен', 'error');
+  }
+  loadPayList();
+}
+
+function _payBankRow(label, value) {
+  return '<div style="display:flex;gap:8px;margin-top:4px;"><span style="min-width:110px;color:var(--text-mid);">' + label +
+    '</span><span style="word-break:break-all;">' + (value ? escapeHtml(String(value)) : '<span style="color:#B5260C;">не указано</span>') + '</span></div>';
+}
+
+async function payBankOpen(kind, id, btn) {
+  if (btn) btn.disabled = true;
+  let r;
+  try {
+    r = await apiPost('/api/bank-payments', { kind: kind, id: id, preview: true });
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    showToast('Ошибка сети', 'error');
+    return;
+  }
+  if (btn) btn.disabled = false;
+  const pv = r.data && r.data.preview;
+  if (!r.ok || !pv) {
+    showToast((r.data && r.data.message) || 'Не удалось проверить реквизиты', 'error');
+    return;
+  }
+  _payBankModal(pv);
+}
+
+function _payBankModal(pv) {
+  const old = document.getElementById('pay-bank-modal');
+  if (old) old.remove();
+  const p = pv.payee || {}, me = pv.payer || {};
+  const problems = (pv.problems || []).map(x => '<li>' + escapeHtml(x) + '</li>').join('');
+  const warnings = (pv.warnings || []).map(x => '<li>' + escapeHtml(x) + '</li>').join('');
+  const src = p.source === 'invoice' ? 'из счёта' : 'из карточки поставщика';
+  const inp = 'width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;box-sizing:border-box;';
+  const overlay = document.createElement('div');
+  overlay.id = 'pay-bank-modal';
+  overlay.className = 'modal-overlay visible';
+  overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:540px;" onclick="event.stopPropagation()">' +
+      '<div class="modal-header"><h3><i class="ti ti-building-bank"></i> Платёжка в Сбер</h3>' +
+        '<button class="icon-btn" onclick="document.getElementById(\'pay-bank-modal\').remove()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="modal-body" style="font-size:13.5px;line-height:1.45;">' +
+        '<div style="font-size:20px;font-weight:700;">' + _payListMoney(pv.amount) + '</div>' +
+        '<div style="margin-top:10px;font-weight:600;">Получатель <span style="font-weight:400;color:var(--text-mid);">(' + src + ')</span></div>' +
+        _payBankRow('Название', p.name) + _payBankRow('ИНН / КПП', [p.inn, p.kpp].filter(Boolean).join(' / ')) +
+        _payBankRow('Р/с', p.account) + _payBankRow('БИК', p.bik) + _payBankRow('Корсчёт', p.corr_account) +
+        _payBankRow('Банк', p.bank_name) +
+        '<div style="margin-top:10px;font-weight:600;">Плательщик</div>' +
+        _payBankRow('', me.name) + _payBankRow('Р/с', me.account + ' · ' + (me.bank_name || '')) +
+        '<div style="margin-top:10px;font-weight:600;">Назначение платежа</div>' +
+        '<textarea id="pay-bank-purpose" rows="3" maxlength="210" style="' + inp + '">' + escapeHtml(pv.purpose || '') + '</textarea>' +
+        (problems ? '<div style="margin-top:10px;color:#B5260C;"><b>Нельзя создать:</b><ul style="margin:4px 0 0 18px;padding:0;">' + problems + '</ul></div>' : '') +
+        (warnings ? '<div style="margin-top:10px;color:#8A5A00;"><b>Проверьте:</b><ul style="margin:4px 0 0 18px;padding:0;">' + warnings + '</ul></div>' : '') +
+        '<div class="pay-adv-meta" style="margin-top:10px;">' + (pv.bank_enabled
+          ? 'В СберБизнес появится <b>черновик</b>. Деньги уйдут только после подписи директора в банке. Когда банк исполнит платёж, строка станет «Оплачен».'
+          : '<b>Тестовый режим:</b> отправка в Сбер выключена — проверим реквизиты, черновик не создаётся.') + '</div>' +
+        '<div id="pay-bank-err" style="display:none;color:#B5260C;font-size:13px;margin-top:8px;"></div>' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'pay-bank-modal\').remove()">Отмена</button>' +
+        '<button class="btn btn-secondary" onclick="payBankRecheck(\'' + pv.kind + '\',' + pv.id + ')">Проверить ещё раз</button>' +
+        '<button class="btn btn-primary" id="pay-bank-go" onclick="payBankCreate(\'' + pv.kind + '\',' + pv.id + ')">' +
+          (pv.bank_enabled ? 'Создать черновик' : 'Проверить реквизиты') + '</button>' +
+      '</div></div>';
+  document.body.appendChild(overlay);
+  if (problems) { const go = document.getElementById('pay-bank-go'); if (go) go.disabled = true; }
+}
+
+async function payBankRecheck(kind, id) {
+  const el = document.getElementById('pay-bank-purpose');
+  const r = await apiPost('/api/bank-payments', { kind: kind, id: id, preview: true, purpose: el ? el.value : undefined });
+  if (r.ok && r.data && r.data.preview) _payBankModal(r.data.preview);
+  else showToast((r.data && r.data.message) || 'Не удалось проверить', 'error');
+}
+
+async function payBankCreate(kind, id) {
+  const el = document.getElementById('pay-bank-purpose');
+  const err = document.getElementById('pay-bank-err');
+  const go = document.getElementById('pay-bank-go');
+  const body = { kind: kind, id: id, purpose: el ? el.value.trim() : undefined };
+  if (go) go.disabled = true;
+  let res = null;
+  try {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      res = await apiPost('/api/bank-payments', body);
+      const j = res.data || {};
+      if (res.status === 401 && j.error === 'password_required') {
+        const pw = prompt('Подтвердите платёжку — введите ваш пароль от Atom:');
+        if (pw === null) { if (go) go.disabled = false; return; }
+        body.password = (pw || '').trim();
+        continue;
+      }
+      if (res.status === 403 && j.error === 'wrong_password') {
+        const pw = prompt('Неверный пароль. Введите ещё раз:');
+        if (pw === null) { if (go) go.disabled = false; return; }
+        body.password = (pw || '').trim();
+        continue;
+      }
+      break;
+    }
+  } catch (e) {
+    res = { ok: false, data: { message: 'Ошибка сети' } };
+  }
+  const j = (res && res.data) || {};
+  if (!res || !res.ok) {
+    if (err) { err.style.display = ''; err.textContent = j.message || 'Не удалось создать платёжку'; }
+    if (go) go.disabled = false;
+    if (j.payment) loadPayList();
+    return;
+  }
+  const modal = document.getElementById('pay-bank-modal');
+  if (modal) modal.remove();
+  showToast(j.dry_run ? 'Реквизиты в порядке. Отправка в Сбер пока выключена' : 'Черновик в СберБизнес создан — подпишите в банке', 'success');
+  loadPayList();
 }
 
 async function payListMarkPaid(kind, id, btn) {
