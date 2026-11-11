@@ -2653,6 +2653,9 @@ state.taskForm = {
   contract_id: null,
   contract_label: '',
 };
+// v2.46.297: файлы новой задачи копятся локально до создания (File в черновик не кладём)
+state.taskFormPendingFiles = [];
+state.taskFileUploadFail = null;
 // ЭТАП 16В-2: если задача создаётся из карточки договора, прокидываем сюда id —
 // чтобы openNewTask подставил договор в форму автоматически.
 state.taskFromContractId = null;
@@ -3497,13 +3500,214 @@ function _taskDiscItemHtml(c) {
     '</div><div class="task-disc-text">' + escapeHtml(c.text).replace(/\n/g, '<br>') + '</div></div>';
 }
 
-function renderTaskFiles(t) {
-  const files = t.files || [];
-  let h = '<div class="task-files" id="task-files"' + (files.length ? '' : ' style="display:none"') + '>';
-  h += '<div class="task-files-t"><i class="ti ti-paperclip"></i> Файлы <span class="cnt" id="task-files-cnt">' + files.length + '</span></div>';
-  files.forEach(f => { h += _taskFileRowHtml(f); });
+
+// v2.46.297: лимиты как на бэкенде (MAX_FILES_PER_TASK_UPLOAD и _classify_upload)
+const TASK_FILES_MAX_PER_UPLOAD = 5;
+const TASK_FILE_MAX_PHOTO = 8 * 1024 * 1024;    // 8 МБ
+const TASK_FILE_MAX_VIDEO = 50 * 1024 * 1024;   // 50 МБ
+const TASK_FILE_MAX_DOC = 20 * 1024 * 1024;     // 20 МБ
+const TASK_FILE_ACCEPT = 'image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.html,.dwg,.dxf,.step,.stp,.iges,.igs,.3dm,.zip';
+const TASK_FILE_PHOTO_TYPES = {'image/jpeg':1,'image/png':1,'image/webp':1,'image/gif':1,'image/heic':1,'image/heif':1};
+const TASK_FILE_VIDEO_TYPES = {'video/mp4':1,'video/webm':1,'video/quicktime':1,'video/x-m4v':1,'video/x-msvideo':1};
+const TASK_FILE_DOC_TYPES = {
+  'application/pdf':1,'application/msword':1,
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':1,
+  'application/vnd.ms-excel':1,
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':1,
+  'application/vnd.ms-powerpoint':1,
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation':1,
+  'text/plain':1,'text/csv':1,'text/html':1,
+  'application/zip':1,'application/x-zip-compressed':1
+};
+const TASK_FILE_ENG_EXT = {'.dwg':1,'.dxf':1,'.step':1,'.stp':1,'.iges':1,'.igs':1,'.3dm':1,'.zip':1};
+const TASK_FILE_ENG_TYPES = {
+  'application/acad':1,'application/autocad_dwg':1,'application/dwg':1,'application/x-acad':1,
+  'application/x-dwg':1,'application/vnd.dwg':1,'image/vnd.dwg':1,'application/dxf':1,
+  'application/x-dxf':1,'image/vnd.dxf':1,'application/step':1,'application/step-product':1,
+  'model/step':1,'application/iges':1,'model/iges':1,'application/x-3dm':1,'model/vnd.3dm':1
+};
+const TASK_FILE_GENERIC = {'':1,'application/octet-stream':1,'application/x-binary':1};
+
+function taskFileMaxSize(file) {
+  const name = (file && file.name) || '';
+  const ct = String((file && file.type) || '').split(';')[0].trim().toLowerCase();
+  const ext = (name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+  if (ct && TASK_FILE_PHOTO_TYPES[ct]) return TASK_FILE_MAX_PHOTO;
+  if (ct && TASK_FILE_VIDEO_TYPES[ct]) return TASK_FILE_MAX_VIDEO;
+  if (ct && TASK_FILE_DOC_TYPES[ct]) return TASK_FILE_MAX_DOC;
+  if (TASK_FILE_ENG_EXT[ext] && (TASK_FILE_GENERIC[ct] || TASK_FILE_ENG_TYPES[ct])) {
+    return TASK_FILE_MAX_DOC;
+  }
+  return 0;
+}
+
+function taskFileSizeLabel(n) {
+  const kb = Math.round((n || 0) / 1024);
+  if (!kb) return '';
+  return kb >= 1024 ? (kb / 1024).toFixed(1) + ' МБ' : kb + ' КБ';
+}
+
+function taskFileValidateList(fileList) {
+  const ok = [];
+  const errors = [];
+  Array.from(fileList || []).forEach(f => {
+    if (!f || !f.size) return;
+    const limit = taskFileMaxSize(f);
+    if (!limit) { errors.push('«' + (f.name || 'файл') + '»: тип не поддерживается'); return; }
+    if (f.size > limit) {
+      errors.push('«' + (f.name || 'файл') + '» больше ' + Math.floor(limit / 1024 / 1024) + ' МБ');
+      return;
+    }
+    ok.push(f);
+  });
+  return { ok, errors };
+}
+
+function addPendingTaskFiles(fileList) {
+  const res = taskFileValidateList(fileList);
+  if (!state.taskFormPendingFiles) state.taskFormPendingFiles = [];
+  res.ok.forEach(f => {
+    state.taskFormPendingFiles.push({
+      key: 'p' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+      file: f,
+      name: f.name || 'файл',
+      size: f.size || 0,
+      type: f.type || '',
+    });
+  });
+  if (res.errors.length) showToast(res.errors.join('\n'), 'error');
+  refreshTaskFormFiles();
+}
+
+function removePendingTaskFile(key) {
+  state.taskFormPendingFiles = (state.taskFormPendingFiles || []).filter(x => x.key !== key);
+  refreshTaskFormFiles();
+}
+
+function renderTaskFormFilesListHtml() {
+  const list = state.taskFormPendingFiles || [];
+  if (!list.length) {
+    return '<div class="tf2-files-empty" id="tf-files-empty">Перетащите файлы сюда или нажмите «Прикрепить файл»</div>';
+  }
+  return list.map(p => {
+    const sz = taskFileSizeLabel(p.size);
+    const key = String(p.key || '').replace(/[^A-Za-z0-9_]/g, '');
+    return '<div class="task-file-row tf-pending" data-key="' + key + '">' +
+      '<span class="tf-ic"><i class="ti ti-file"></i></span>' +
+      '<span class="tf-nm">' + escapeHtml(p.name || 'файл') + '</span>' +
+      (sz ? '<span class="tf-sz">' + sz + '</span>' : '') +
+      '<button type="button" class="tf-del" onclick="removePendingTaskFile(\'' + key + '\')" title="Убрать"><i class="ti ti-x"></i></button>' +
+    '</div>';
+  }).join('');
+}
+
+function renderTaskFormFilesBlock() {
+  let h = '<div class="tf2-files" id="tf-files" ondragover="_taskFormFilesDrag(event,true)" ondragleave="_taskFormFilesDrag(event,false)" ondrop="_taskFormFilesDrop(event)">';
+  h += '<div class="tf2-lbl"><i class="ti ti-paperclip"></i> Файлы <small>не обязательно, можно перетащить</small></div>';
+  h += '<div id="tf-files-list">' + renderTaskFormFilesListHtml() + '</div>';
+  h += '<input type="file" id="tf-file-inp" multiple style="display:none" accept="' + TASK_FILE_ACCEPT + '" onchange="addPendingTaskFiles(this.files); this.value=\'\'">';
+  h += '<button type="button" class="tf2-attach" id="tf-file-btn" onclick="document.getElementById(\'tf-file-inp\').click()">';
+  h += '<i class="ti ti-paperclip"></i> Прикрепить файл</button>';
+  h += '<div class="tf2-files-hint">Фото до 8 МБ, документы и чертежи до 20 МБ, видео до 50 МБ. За один запрос — до ' +
+       TASK_FILES_MAX_PER_UPLOAD + ' файлов, больше отправим партиями после создания задачи.</div>';
   h += '</div>';
   return h;
+}
+
+function refreshTaskFormFiles() {
+  const el = document.getElementById('tf-files-list');
+  if (el) el.innerHTML = renderTaskFormFilesListHtml();
+}
+
+function _taskFormFilesDrag(e, on) {
+  e.preventDefault();
+  e.stopPropagation();
+  const box = document.getElementById('tf-files');
+  if (box) box.classList.toggle('is-dragover', !!on);
+}
+function _taskFormFilesDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const box = document.getElementById('tf-files');
+  if (box) box.classList.remove('is-dragover');
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) addPendingTaskFiles(e.dataTransfer.files);
+}
+
+async function postTaskFiles(taskId, files) {
+  const fd = new FormData();
+  files.forEach((f, i) => fd.append('file_' + (i + 1), f, f.name || ('файл_' + (i + 1))));
+  const token = localStorage.getItem(TOKEN_KEY);
+  const r = await fetch(API_BASE + '/api/tasks/' + taskId + '/files', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.message || 'Не удалось загрузить');
+  return d;
+}
+
+async function uploadPendingTaskFiles(taskId, pending) {
+  const files = (pending || []).map(p => p.file || p).filter(f => f && f.size > 0);
+  const uploaded = [];
+  const failed = [];
+  for (let i = 0; i < files.length; i += TASK_FILES_MAX_PER_UPLOAD) {
+    const batch = files.slice(i, i + TASK_FILES_MAX_PER_UPLOAD);
+    try {
+      const d = await postTaskFiles(taskId, batch);
+      uploaded.push.apply(uploaded, d.files || batch.map(f => ({ name: f.name })));
+    } catch (e) {
+      if (batch.length === 1) {
+        failed.push({ name: batch[0].name, error: e.message || String(e) });
+      } else {
+        for (let j = 0; j < batch.length; j++) {
+          try {
+            const d2 = await postTaskFiles(taskId, [batch[j]]);
+            uploaded.push.apply(uploaded, d2.files || [{ name: batch[j].name }]);
+          } catch (e2) {
+            failed.push({ name: batch[j].name, error: e2.message || String(e2) });
+          }
+        }
+      }
+    }
+  }
+  return { uploaded, failed };
+}
+
+function renderTaskFiles(t) {
+  const files = t.files || [];
+  const fail = state.taskFileUploadFail && Number(state.taskFileUploadFail.taskId) === Number(t.id)
+    ? state.taskFileUploadFail : null;
+  let h = '<div class="task-files' + (files.length ? '' : ' is-empty') + '" id="task-files"' +
+    ' ondragover="_taskFilesDrag(event,true)" ondragleave="_taskFilesDrag(event,false)" ondrop="_taskFilesDrop(event)">';
+  h += '<div class="task-files-t"><i class="ti ti-paperclip"></i> Файлы <span class="cnt" id="task-files-cnt">' + files.length + '</span>';
+  h += '<button type="button" class="task-files-attach" id="task-files-attach" onclick="document.getElementById(\'task-card-file\').click()"><i class="ti ti-paperclip"></i> Прикрепить файл</button>';
+  h += '</div>';
+  h += '<input type="file" id="task-card-file" multiple style="display:none" accept="' + TASK_FILE_ACCEPT + '" onchange="uploadTaskFiles(this.files); this.value=\'\'">';
+  if (fail && fail.names && fail.names.length) {
+    h += '<div class="task-files-fail" id="task-files-fail">Не загрузились при создании: ' +
+      escapeHtml(fail.names.join(', ')) + '. Прикрепите снова.</div>';
+  }
+  h += '<div id="task-files-rows">';
+  files.forEach(f => { h += _taskFileRowHtml(f); });
+  h += '</div>';
+  if (!files.length) {
+    h += '<div class="task-files-empty" id="task-files-empty">Перетащите файлы сюда или нажмите «Прикрепить файл»</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function _taskFilesDrag(e, on) {
+  e.preventDefault();
+  e.stopPropagation();
+  const box = document.getElementById('task-files');
+  if (box) box.classList.toggle('is-dragover', !!on);
+}
+function _taskFilesDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const box = document.getElementById('task-files');
+  if (box) box.classList.remove('is-dragover');
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) uploadTaskFiles(e.dataTransfer.files);
 }
 
 function _taskFileRowHtml(f) {
@@ -3523,30 +3727,33 @@ function _taskFileRowHtml(f) {
 
 // v2.46.223: загрузка файлов к задаче — скрепка, перетаскивание на ленту, вставка из буфера
 async function uploadTaskFiles(fileList) {
-  const files = Array.from(fileList || []).filter(f => f && f.size > 0);
-  if (!files.length || !state.currentTaskId) return;
-  if (files.length > 5) { showToast('Не более 5 файлов за раз', 'error'); return; }
+  if (!state.currentTaskId) return;
+  const checked = taskFileValidateList(fileList);
+  if (checked.errors.length) showToast(checked.errors.join('\n'), 'error');
+  const files = checked.ok;
+  if (!files.length) return;
+  if (files.length > TASK_FILES_MAX_PER_UPLOAD) { showToast('Не более ' + TASK_FILES_MAX_PER_UPLOAD + ' файлов за раз', 'error'); return; }
   const btn = document.getElementById('task-disc-attach');
+  const btn2 = document.getElementById('task-files-attach');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i>'; }
+  if (btn2) btn2.disabled = true;
   try {
-    const fd = new FormData();
-    files.forEach((f, i) => fd.append('file_' + (i + 1), f, f.name || ('файл_' + (i + 1))));
-    const token = localStorage.getItem(TOKEN_KEY);
-    const r = await fetch(API_BASE + '/api/tasks/' + state.currentTaskId + '/files', {
-      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd,
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.message || 'Не удалось загрузить');
+    const d = await postTaskFiles(state.currentTaskId, files);
     const box = document.getElementById('task-files');
+    const rows = document.getElementById('task-files-rows') || box;
+    const empty = document.getElementById('task-files-empty');
+    if (empty) empty.remove();
+    if (box) { box.style.display = ''; box.classList.remove('is-empty'); }
+    if (rows) {
+      (d.files || []).forEach(f => rows.insertAdjacentHTML('beforeend', _taskFileRowHtml(f)));
+    }
     if (box) {
-      box.style.display = '';
-      (d.files || []).forEach(f => box.insertAdjacentHTML('beforeend', _taskFileRowHtml(f)));
       const cnt = document.getElementById('task-files-cnt');
       if (cnt) cnt.textContent = String(box.querySelectorAll('.task-file-row').length);
     }
     const feed = document.getElementById('task-disc-feed');
-    const empty = document.getElementById('task-disc-empty');
-    if (empty) empty.remove();
+    const discEmpty = document.getElementById('task-disc-empty');
+    if (discEmpty) discEmpty.remove();
     if (feed) {
       const names = (d.files || []).map(f => f.name).join(', ');
       feed.insertAdjacentHTML('beforeend', _taskDiscItemHtml({ kind: 'event', text: 'прикрепил ' + ((d.files || []).length === 1 ? 'файл' : 'файлы') + ': ' + names, created_at: new Date().toISOString().slice(0, 19).replace('T', ' ') }));
@@ -3557,6 +3764,7 @@ async function uploadTaskFiles(fileList) {
     showToast('Файл не загружен: ' + (e.message || e), 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-paperclip"></i>'; }
+    if (btn2) btn2.disabled = false;
   }
 }
 
@@ -3605,7 +3813,7 @@ function renderTaskDiscussion(t) {
   items.forEach(c => { h += _taskDiscItemHtml(c); });
   h += '</div>';
   h += '<div class="task-disc-input">' +
-    '<input type="file" id="task-disc-file" multiple style="display:none" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.dwg,.dxf,.step,.stp,.zip" onchange="uploadTaskFiles(this.files); this.value=\'\'">' +
+    '<input type="file" id="task-disc-file" multiple style="display:none" accept="' + TASK_FILE_ACCEPT + '" onchange="uploadTaskFiles(this.files); this.value=\'\'">' +
     '<button type="button" class="task-disc-attach" id="task-disc-attach" onclick="document.getElementById(\'task-disc-file\').click()" title="Прикрепить файл: фото, PDF, чертёж, архив. Можно перетащить в ленту или вставить из буфера"><i class="ti ti-paperclip"></i></button>' +
     '<textarea id="task-disc-inp" rows="1" maxlength="2000" placeholder="Написать комментарий… (файл — скрепкой, перетащить или Ctrl+V)" ' +
       'oninput="_taskDiscGrow(this)" onkeydown="_taskDiscKey(event)" onpaste="_taskDiscPaste(event)"></textarea>' +
@@ -3849,6 +4057,7 @@ function discardTaskDraft() {
     contract_id: null, contract_label: '',
     category: '', panel: '',
   };
+  state.taskFormPendingFiles = [];
   if (state.currentScreen === 'task-form') renderTaskForm();
   showToast('Черновик очищен', 'info');
 }
@@ -3862,6 +4071,7 @@ function openNewTask() {
   }
   state.taskFormMode = 'new';
   state.currentTaskId = null;
+  state.taskFormPendingFiles = [];
   // ЭТАП 16В-2: если задача создаётся из карточки договора — подставим привязку
   const preContractId = state.taskFromContractId || null;
   const preContractLabel = state.taskFromContractLabel || '';
@@ -3897,6 +4107,7 @@ function openNewTask() {
 
 async function openEditTask() {
   state.taskFormMode = 'edit';
+  state.taskFormPendingFiles = [];
   if (!state.currentTaskId) return;
   try {
     const t = await apiGet('/api/tasks/' + state.currentTaskId);
@@ -4040,6 +4251,8 @@ function renderTaskForm() {
     '<textarea id="tf-description" rows="5" placeholder="' + (isAuto ? 'Что именно: какая уставка, какой узел схемы, версия прошивки, откуда пришло замечание…' : 'Детали, ссылки, что считать сделанным…') + '">' + escapeHtml(f.description) + '</textarea>' +
     '<button type="button" id="tf-description-mic" class="tf2-mic" onclick="_voiceToField(\'tf-description\', \'description\')" title="Надиктовать (Chrome/Edge)"><i class="ti ti-microphone"></i></button>' +
     '</div></div>';
+  // v2.46.297: вложения только при создании — в карточке их уже можно добавить
+  if (!isEdit) html += renderTaskFormFilesBlock();
   html += '</div>';
 
   /* ── правая колонка: кому, когда ── */
@@ -4330,13 +4543,35 @@ async function submitTaskForm() {
       return;
     }
     const created = await r.json();
-    if (!isEdit) clearTaskDraft();   // задача создана — черновик больше не нужен
-    showToast(isEdit ? 'Задача обновлена' : 'Задача создана', 'success');
+    const pending = (!isEdit && state.taskFormPendingFiles) ? state.taskFormPendingFiles.slice() : [];
+    if (!isEdit) {
+      clearTaskDraft();   // задача создана — черновик больше не нужен
+      state.taskFormPendingFiles = [];
+    }
     cache.tasks = {};
     cache.myTasks = null;
     cache.homeKpi = null;
     cache.contractTasks = {};                          // ЭТАП 16В-2: инвалидация задач договора
-    state.currentTaskId = created.id;
+    state.currentTaskId = created.id;                    // даже если файлы не загрузятся — задача уже есть
+    if (!isEdit && pending.length) {
+      btn.innerHTML = '<i class="ti ti-loader"></i> Загружаем файлы…';
+      try {
+        const up = await uploadPendingTaskFiles(created.id, pending);
+        if (up.failed.length) {
+          state.taskFileUploadFail = { taskId: created.id, names: up.failed.map(x => x.name) };
+          showToast('Задача создана, но не загрузились: ' + up.failed.map(x => x.name).join(', '), 'error');
+        } else {
+          showToast(up.uploaded.length
+            ? ('Задача создана, файлов: ' + up.uploaded.length)
+            : 'Задача создана', 'success');
+        }
+      } catch (upErr) {
+        state.taskFileUploadFail = { taskId: created.id, names: pending.map(p => p.name || 'файл') };
+        showToast('Задача создана, но файлы не загрузились: ' + (upErr.message || upErr), 'error');
+      }
+    } else {
+      showToast(isEdit ? 'Задача обновлена' : 'Задача создана', 'success');
+    }
     selectSidebarItem('task-detail');
   } catch (e) {
     errEl.innerHTML = '<div class="sales-error">Ошибка соединения: ' + escapeHtml(String(e)) + '</div>';
