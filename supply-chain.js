@@ -979,6 +979,9 @@
       if (root._scPayLastQ !== reqQ) return; // пришёл ответ на старый запрос
       _payListItems = d.items || [];
       _payListCanCreate = !!d.can_create_advance;
+      // v2.46.300: платёжки в Сбер (кнопка рисуется этим же рендером)
+      _payBankCan = !!d.can_create_bank_payment;
+      _payBankEnabled = !!d.bank_payments_enabled;
       root.syncAdvanceCreateButton();
       const counts = d.counts || {};
       document.querySelectorAll('[data-pay-count]').forEach(el => {
@@ -1096,6 +1099,8 @@
       const payBtn = (!paid && canPay)
         ? '<button class="btn btn-primary btn-small" style="margin-right:6px;" onclick="event.stopPropagation();payListMarkPaid(\'' + row.kind + '\',' + row.id + ', this)">Оплатил</button>' : '';
       const open = 'openPayListRow(\'' + row.kind + '\',' + row.id + ')';
+      const bankBtn = typeof root._payBankButton === 'function' ? root._payBankButton(row, paid) : '';
+      const bankBadge = typeof root._payBankBadge === 'function' ? root._payBankBadge(row) : '';
       const bad = (row.issues || []).length;
       const matched = (row.matched || []).length
         ? '<tr class="sc-matched-row"><td></td><td colspan="8"><span class="sc-matched">совпало: ' + row.matched.map(esc).join(' · ') + '</span></td></tr>' : '';
@@ -1107,8 +1112,8 @@
         '<td>' + esc(row.invoice_number || '—') + '</td>' +
         '<td class="sc-num" style="white-space:nowrap;font-weight:700;">' + (Number(row.amount) ? root._payListMoney(row.amount) : '<span class="sc-chip sc-chip-bad">0 ₽</span>') + '</td>' +
         '<td>' + whoCell(row) + '</td>' +
-        '<td>' + statusCell(row) + (row.duplicate_of ? '<div class="sc-sub sc-bad">дубль ' + esc(row.duplicate_of.order_label) + '</div>' : '') + '</td>' +
-        '<td style="white-space:nowrap;">' + payBtn + '<button class="btn btn-secondary btn-small" onclick="' + open + '">Открыть</button></td>' +
+        '<td>' + statusCell(row) + (row.duplicate_of ? '<div class="sc-sub sc-bad">дубль ' + esc(row.duplicate_of.order_label) + '</div>' : '') + bankBadge + '</td>' +
+        '<td style="white-space:nowrap;">' + bankBtn + payBtn + '<button class="btn btn-secondary btn-small" onclick="' + open + '">Открыть</button></td>' +
       '</tr>' + matched;
       cards += '<div class="pay-card' + (bad ? ' sc-row-bad' : '') + '" role="button" tabindex="0" onclick="' + open + '">' +
         '<div class="pay-card-top"><span class="pay-card-sup">' + supplierCell(row) + '</span>' +
@@ -1118,7 +1123,8 @@
           '<span class="pay-card-ord">' + esc(orderText) + (row.invoice_number ? ' · № ' + esc(row.invoice_number) : '') + '</span>' + statusCell(row) + '</div>' +
         '<div class="pay-card-author">' + whoCell(row) + '</div>' +
         ((row.matched || []).length ? '<div class="sc-matched">совпало: ' + row.matched.map(esc).join(' · ') + '</div>' : '') +
-        (payBtn || bad ? '<div class="pay-card-actions">' + payBtn + issueActions(row) + '</div>' : '') +
+        (bankBadge ? '<div class="pay-card-bank">' + bankBadge + '</div>' : '') +
+        (payBtn || bankBtn || bad ? '<div class="pay-card-actions">' + bankBtn + payBtn + issueActions(row) + '</div>' : '') +
       '</div>';
     });
     box.innerHTML = html + '</tbody></table>' + cards + '</div>';
