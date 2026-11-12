@@ -18953,6 +18953,7 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {version:'v2.46.305',date:'12.11.2026',title:'Платёжка: дата счёта в назначении',features:['В окне «Платёжка» появилась дата счёта. В назначении всегда «Оплата по счету № … от ДД.ММ.ГГГГг.» — так же, как в 1С.','Без даты черновик в Сбер не создаётся. Если дата не подставилась из счёта, её нужно указать вручную.']},
   {version:'v2.46.300',date:'11.11.2026',title:'Счета на оплату: кнопка «Платёжка» видна в списке',features:['Кнопка «Платёжка» и отметка статуса Сбера теперь есть в основном списке «На оплату».','Если в карточке поставщика нет реквизитов, окно платёжки берёт БИК и счёт из файла самого счёта.']},
   {version:'v2.46.299',date:'11.11.2026',title:'Счета на оплату: черновик платёжки в Сбер',features:['В «Счетах на оплату» кнопка «Платёжка»: проверяет реквизиты поставщика (БИК, счёт, ИНН, НДС в назначении) и показывает получателя, сумму и назначение перед созданием.','Черновик создаётся в СберБизнес без подписи — деньги уходят только после подписи директора в банке. Когда банк исполнит платёж, счёт сам станет «Оплачен».','В карточке поставщика — БИК, КПП, расчётный счёт, корсчёт и банк. Из распознанного счёта они подставляются сами, если поля пустые.']},
   {version:'v2.46.298',date:'10.11.2026',title:'Логистика: карточка УТМ по «Заказ готов» и УПД',features:['В карточке «УТМ · корпуса» готовые заказы появляются не только по письму «Заказ готов», но и когда УТМ присылает УПД. Пустой текст карточки это поясняет.']},
@@ -29938,6 +29939,90 @@ function _payBankRow(label, value) {
     '</span><span style="word-break:break-all;">' + (value ? escapeHtml(String(value)) : '<span style="color:#B5260C;">не указано</span>') + '</span></div>';
 }
 
+function _payBankNormalizeDate(value) {
+  let s = String(value || '').trim();
+  if (!s) return '';
+  if (s.length > 10) s = s.slice(0, 10);
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2})$/);
+  if (m) {
+    const yy = parseInt(m[3], 10);
+    return (yy < 70 ? 2000 + yy : 1900 + yy) + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  }
+  return '';
+}
+
+function _payBankDateRu(value) {
+  const iso = _payBankNormalizeDate(value);
+  return iso ? (iso.slice(8, 10) + '.' + iso.slice(5, 7) + '.' + iso.slice(0, 4) + 'г') : '';
+}
+
+function _payBankInvoiceNumber(pv, purpose) {
+  const n = (pv && pv.invoice_number) ? String(pv.invoice_number).trim() : '';
+  if (n) return n;
+  const m = String(purpose || (pv && pv.purpose) || '').match(/№\s*([^\s.]+)/);
+  return m ? m[1] : '';
+}
+
+function _payBankParseDateFromPurpose(text) {
+  const m = String(text || '').match(/\sот\s+(\d{1,2}\.\d{1,2}\.\d{2,4})г?/i);
+  return m ? _payBankNormalizeDate(m[1]) : '';
+}
+
+function _payBankApplyDate(text, number, date) {
+  let t = String(text || '').replace(/по\s+сч[её]ту/gi, 'по счету');
+  const ru = _payBankDateRu(date);
+  if (!ru) return t;
+  if (/\sот\s+\d{1,2}\.\d{1,2}\.\d{2,4}г?/i.test(t)) {
+    return t.replace(/(\sот\s+)\d{1,2}\.\d{1,2}\.\d{2,4}г?/i, '$1' + ru);
+  }
+  const num = String(number || '').trim();
+  if (num) {
+    const pat = new RegExp('(№\\s*' + num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')(?=[\\s.,;]|$)');
+    if (pat.test(t)) return t.replace(pat, '$1 от ' + ru);
+  }
+  const m = t.match(/оплата\s+по\s+счету(?:\s*№\s*\S+)?/i);
+  if (m) {
+    const at = m.index + m[0].length;
+    return t.slice(0, at) + ' от ' + ru + t.slice(at);
+  }
+  const head = 'Оплата по счету' + (num ? ' № ' + num : '') + ' от ' + ru;
+  t = t.trim();
+  return head + (t ? '. ' + t : '');
+}
+
+function _payBankCollectDate(kind) {
+  if (kind === 'advance') return '';
+  const inp = document.getElementById('pay-bank-invoice-date');
+  return inp ? _payBankNormalizeDate(inp.value) : '';
+}
+
+function _payBankSyncPurpose(kind, pv) {
+  if (kind === 'advance') return;
+  const el = document.getElementById('pay-bank-purpose');
+  const iso = _payBankCollectDate(kind);
+  if (!el || !iso) return;
+  el.value = _payBankApplyDate(el.value, _payBankInvoiceNumber(pv || {}, el.value), iso).slice(0, 210);
+}
+
+function payBankOnInvoiceDate(kind) {
+  _payBankSyncPurpose(kind, {});
+}
+
+function _payBankPayload(kind, id, preview) {
+  if (kind !== 'advance') _payBankSyncPurpose(kind, {});
+  const el = document.getElementById('pay-bank-purpose');
+  const body = { kind: kind, id: id, purpose: el ? el.value.trim() : undefined };
+  if (preview) body.preview = true;
+  const iso = _payBankCollectDate(kind);
+  if (kind !== 'advance' && iso) body.invoice_date = iso;
+  return body;
+}
+
+
 async function payBankOpen(kind, id, btn) {
   if (btn) btn.disabled = true;
   let r;
@@ -29961,6 +30046,10 @@ function _payBankModal(pv) {
   const old = document.getElementById('pay-bank-modal');
   if (old) old.remove();
   const p = pv.payee || {}, me = pv.payer || {};
+  const prefDate = pv.kind === 'advance' ? '' : (_payBankNormalizeDate(pv.invoice_date) || _payBankParseDateFromPurpose(pv.purpose));
+  const purposeText = (pv.kind !== 'advance' && prefDate)
+    ? _payBankApplyDate(pv.purpose || '', _payBankInvoiceNumber(pv, pv.purpose), prefDate).slice(0, 210)
+    : (pv.purpose || '');
   const problems = (pv.problems || []).map(x => '<li>' + escapeHtml(x) + '</li>').join('');
   const warnings = (pv.warnings || []).map(x => '<li>' + escapeHtml(x) + '</li>').join('');
   const src = p.source === 'invoice' ? 'из счёта' : 'из карточки поставщика';
@@ -29982,7 +30071,14 @@ function _payBankModal(pv) {
         '<div style="margin-top:10px;font-weight:600;">Плательщик</div>' +
         _payBankRow('', me.name) + _payBankRow('Р/с', me.account + ' · ' + (me.bank_name || '')) +
         '<div style="margin-top:10px;font-weight:600;">Назначение платежа</div>' +
-        '<textarea id="pay-bank-purpose" rows="3" maxlength="210" style="' + inp + '">' + escapeHtml(pv.purpose || '') + '</textarea>' +
+        (pv.kind !== 'advance'
+          ? '<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+            '<label for="pay-bank-invoice-date" style="min-width:110px;color:var(--text-mid);">Дата счёта</label>' +
+            '<input type="date" id="pay-bank-invoice-date" value="' + escapeHtml(prefDate) + '" style="' + inp + 'max-width:200px;" ' +
+            'onchange="payBankOnInvoiceDate(\'' + pv.kind + '\')">' +
+            '<span style="font-size:12px;color:var(--text-mid);">обязательна, в назначении будет «от ДД.ММ.ГГГГг.»</span></div>'
+          : '') +
+        '<textarea id="pay-bank-purpose" rows="3" maxlength="210" style="' + inp + '">' + escapeHtml(purposeText) + '</textarea>' +
         (problems ? '<div style="margin-top:10px;color:#B5260C;"><b>Нельзя создать:</b><ul style="margin:4px 0 0 18px;padding:0;">' + problems + '</ul></div>' : '') +
         (warnings ? '<div style="margin-top:10px;color:#8A5A00;"><b>Проверьте:</b><ul style="margin:4px 0 0 18px;padding:0;">' + warnings + '</ul></div>' : '') +
         '<div class="pay-adv-meta" style="margin-top:10px;">' + (pv.bank_enabled
@@ -30001,17 +30097,23 @@ function _payBankModal(pv) {
 }
 
 async function payBankRecheck(kind, id) {
-  const el = document.getElementById('pay-bank-purpose');
-  const r = await apiPost('/api/bank-payments', { kind: kind, id: id, preview: true, purpose: el ? el.value : undefined });
+  if (kind !== 'advance' && !_payBankCollectDate(kind)) {
+    showToast('Укажите дату счёта', 'error');
+    return;
+  }
+  const r = await apiPost('/api/bank-payments', _payBankPayload(kind, id, true));
   if (r.ok && r.data && r.data.preview) _payBankModal(r.data.preview);
   else showToast((r.data && r.data.message) || 'Не удалось проверить', 'error');
 }
 
 async function payBankCreate(kind, id) {
-  const el = document.getElementById('pay-bank-purpose');
   const err = document.getElementById('pay-bank-err');
   const go = document.getElementById('pay-bank-go');
-  const body = { kind: kind, id: id, purpose: el ? el.value.trim() : undefined };
+  if (kind !== 'advance' && !_payBankCollectDate(kind)) {
+    if (err) { err.style.display = ''; err.textContent = 'Укажите дату счёта — в назначении нужно «Оплата по счету № … от ДД.ММ.ГГГГг.»'; }
+    return;
+  }
+  const body = _payBankPayload(kind, id, false);
   if (go) go.disabled = true;
   let res = null;
   try {
