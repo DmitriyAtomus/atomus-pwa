@@ -102,6 +102,29 @@
         _esc(w.text || '') + extra + '</div>';
     }).join('') + '</div>';
   }
+  function withoutInventory(list) {
+    return (list || []).filter(function (w) { return w.code !== 'stale_inventory'; });
+  }
+  function inventorySummary(card) {
+    var s = card && card.inventory_summary;
+    if (!s || !s.count) return '';
+    var id = 'inv:' + (card.contract_id || 'x');
+    var open = !!st.open[id];
+    var items = (s.items || []).map(function (it) {
+      var when = it.last_at
+        ? ('последняя ' + String(it.last_at).slice(0, 10) + (it.days != null ? ' (' + it.days + ' дн.)' : ''))
+        : 'инвентаризации не было';
+      return '<div class="wtb-min-row"><div><b>' + _esc(it.name || ('#' + it.component_id)) + '</b>' +
+        (it.sku ? '<div class="s">' + _esc(it.sku) + '</div>' : '') +
+        (it.product ? '<div class="s">' + _esc(it.product) + '</div>' : '') +
+        '</div><div class="s">' + _esc(when) + '</div></div>';
+    }).join('');
+    return '<div class="wtb-report wtb-invsum' + (open ? ' open' : '') + '" data-wtb-open="' + id + '">' +
+      '<div class="rh"><div><b>Инвентаризация</b><div class="meta2">' +
+      _esc(s.text || (s.count + ' позиций без инвентаризации >' + (s.stale_days || 60) + ' дн.')) +
+      '</div></div><span class="wtb-pill wait">' + s.count + '</span></div>' +
+      '<div class="rb">' + items + '</div></div>';
+  }
   function linkMethodRu(m) {
     return ({
       explicit: 'явная связь',
@@ -257,7 +280,12 @@
         '<div class="rowm" style="grid-template-columns:1fr 1fr;margin-top:8px;">' +
           '<div class="m err"><b>' + (c.data_errors || 0) + '</b>ошибки данных</div>' +
           '<div class="m"><b>' + (c.warnings_count || 0) + '</b>предупреждений</div>' +
-        '</div></button>';
+        '</div>' +
+        ((c.inventory_summary && c.inventory_summary.count)
+          ? '<div class="invline">Инвентаризация: ' + c.inventory_summary.count +
+            ' позиций без инвентаризации &gt;' + (c.inventory_summary.stale_days || 60) + ' дн.</div>'
+          : '') +
+        '</button>';
     });
     if (!cards.length) html += '<div class="wtb-empty">Нет договоров в производстве</div>';
     html += '</div>';
@@ -319,7 +347,7 @@
       '<td></td>' +
       '<td class="nm">' + _esc(ch.name || '—') +
         (ch.sku ? '<small>' + _esc(ch.sku) + '</small>' : '') +
-        mark + inact + shareChips(ch) + renderWarns(ch.warnings) + '</td>' +
+        mark + inact + shareChips(ch) + renderWarns(withoutInventory(ch.warnings)) + '</td>' +
       '<td>' + fmt(ch.need) + '</td>' +
       '<td>' + fmt(ch.stock_allocated) + '</td>' +
       '<td class="wtb-num-wait">' + fmt(ch.in_transit_allocated) + '</td>' +
@@ -343,10 +371,10 @@
         '<th></th><th>Комплектующее</th><th>Нужно</th><th>Склад</th><th>В пути</th><th>Докупить</th><th>Статус</th>' +
         '</tr></thead><tbody>' + row.children.map(childRow).join('') + '</tbody></table>';
     } else if ((row.data_errors || []).indexOf('empty_bom') >= 0) {
-      body = renderWarns(row.warnings);
+      body = renderWarns(withoutInventory(row.warnings));
     }
     if ((row.children || []).length && (row.warnings || []).length) {
-      body = renderWarns(row.warnings) + body;
+      body = renderWarns(withoutInventory(row.warnings)) + body;
     }
     return '<div class="wtb-card ' + statusClass(row.status) + (open ? ' open' : '') + '" data-wtb-open="' + _esc(id) + '">' +
       '<div class="wtb-ch">' +
@@ -391,7 +419,7 @@
           '<div class="wtb-kpi wait"><div class="n">' + fmt(card.in_transit_qty) + '</div><div class="l">В пути</div></div>' +
           '<div class="wtb-kpi err"><div class="n">' + (card.data_errors || 0) + '</div><div class="l">Ошибки данных</div></div>' +
           '<div class="wtb-kpi wait"><div class="n">' + (card.warnings_count || 0) + '</div><div class="l">Предупреждения</div></div>' +
-        '</div>';
+        '</div>' + inventorySummary(card);
     } else {
       setSub('Изделия всех договоров в производстве.');
       head = '<div class="wtb-h2">Изделия · ' + items.length + '</div>';
