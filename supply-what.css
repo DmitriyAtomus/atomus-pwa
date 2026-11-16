@@ -134,3 +134,20 @@ table.wtb-comp .nm small{display:block;color:var(--wtb-light);font-weight:400;}
   .wtb-seg button{padding:7px 10px;font-size:12px;}
   .wtb-search{width:100%;flex:1 1 100%;}
 }
+
+.wtb-warns{margin-top:8px;display:flex;flex-direction:column;gap:6px;}
+.wtb-warn{background:var(--wtb-warnbg);color:#8A4B00;border:1px solid #F0D7A3;border-radius:8px;padding:6px 9px;font-size:12px;text-align:left;}
+.wtb-warn b{display:block;font-size:12px;margin-bottom:2px;}
+.wtb-warn.stock,.wtb-warn.wait{background:var(--wtb-waitbg);color:var(--wtb-wait);border-color:#C9DBF0;}
+.wtb-warn.err{background:var(--wtb-dangerbg);color:var(--wtb-danger);border-color:#F3C7BB;}
+.wtb-sug{background:#fff;border:1px solid var(--wtb-border);border-radius:14px;padding:14px 16px;margin-bottom:14px;}
+.wtb-sug h3{font-size:15px;margin:0 0 8px;}
+.wtb-sug .row{padding:8px 0;border-top:1px solid var(--wtb-border);font-size:13px;}
+.wtb-sug .row:first-of-type{border-top:0;}
+.wtb-report{background:#fff;border:1px solid var(--wtb-border);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+.wtb-report .rh{display:flex;justify-content:space-between;gap:10px;padding:12px 14px;background:#F7F8FB;cursor:pointer;}
+.wtb-report .rb{padding:10px 14px;display:none;}
+.wtb-report.open .rb{display:block;}
+.wtb-dup{background:var(--wtb-okbg);color:var(--wtb-ok);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;margin-left:6px;}
+
+.wtb-ord464{outline:2px solid #2F6FED;background:#EEF3FF;}
