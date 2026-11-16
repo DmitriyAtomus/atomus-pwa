@@ -1,0 +1,136 @@
+/* Что закупить v2 (этап 1) — дерево договоров, виды, «в пути». */
+.wtb-root{
+  --wtb-brand:#2D5F8B;--wtb-brand-light:#4A7FB5;--wtb-brand-bg:#EAF2FA;
+  --wtb-text:#1B2030;--wtb-mid:#4A5061;--wtb-light:#6E7689;--wtb-faint:#9AA1B0;
+  --wtb-bg:#F4F6FA;--wtb-surface:#fff;--wtb-border:#E5E9F0;--wtb-border-strong:#D5DAE5;
+  --wtb-ok:#1F7B3F;--wtb-okbg:#E8F4ED;--wtb-danger:#B5260C;--wtb-dangerbg:#FCE8E2;
+  --wtb-warn:#B5710C;--wtb-warnbg:#FBF1DD;--wtb-info:#2D5F8B;--wtb-infobg:#EAF2FA;
+  --wtb-wait:#1D4F91;--wtb-waitbg:#E7F0FA;--wtb-violet:#6D28D9;
+  --wtb-navy1:#15294A;
+  color:var(--wtb-text);
+  font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+}
+.wtb-root *{box-sizing:border-box;}
+.wtb-sub{color:var(--wtb-light);font-size:13px;margin:0 0 14px;}
+.wtb-h2{font-size:15px;margin:0 0 10px;color:var(--wtb-mid);font-weight:700;}
+.wtb-back{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--wtb-brand);font-weight:600;font-size:13px;cursor:pointer;margin-bottom:8px;padding:0;}
+.wtb-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px;}
+.wtb-seg{display:flex;flex-wrap:wrap;background:#fff;border:1px solid var(--wtb-border);border-radius:10px;overflow:hidden;}
+.wtb-seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:13px;color:var(--wtb-mid);cursor:pointer;}
+.wtb-seg button.on{background:var(--wtb-navy1);color:#fff;}
+.wtb-search{flex:1;min-width:160px;border:1px solid var(--wtb-border);border-radius:8px;padding:8px 12px;background:#fff;font:inherit;}
+.wtb-lcards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+.wtb-lcard{background:#fff;border:1px solid var(--wtb-border);border-radius:14px;padding:16px 16px 14px;cursor:pointer;text-align:left;width:100%;box-shadow:0 1px 2px rgba(16,24,40,.04);}
+.wtb-lcard:hover{border-color:var(--wtb-brand-light);box-shadow:0 8px 22px rgba(30,58,95,.12);}
+.wtb-lcard.need{border-top:4px solid var(--wtb-danger);}
+.wtb-lcard.oktop{border-top:4px solid var(--wtb-ok);}
+.wtb-lcard.mid{border-top:4px solid var(--wtb-warn);}
+.wtb-lcard .num{font-size:16px;font-weight:700;letter-spacing:-.2px;}
+.wtb-lcard .who{color:var(--wtb-mid);font-size:13.5px;margin:0 0 8px;}
+.wtb-lcard .rowm{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;}
+.wtb-lcard .m{font-size:11.5px;color:var(--wtb-light);background:#F7F8FB;border-radius:8px;padding:7px 8px;}
+.wtb-lcard .m b{display:block;font-size:18px;color:var(--wtb-text);letter-spacing:-.3px;}
+.wtb-lcard .m.buy b{color:var(--wtb-danger);}
+.wtb-lcard .m.ok b{color:var(--wtb-ok);}
+.wtb-lcard .m.err b{color:var(--wtb-warn);}
+.wtb-lcard .m.wait b{color:var(--wtb-wait);}
+.wtb-minbox{background:#fff;border:1px solid var(--wtb-border);border-radius:14px;padding:16px 18px;margin-bottom:16px;}
+.wtb-minbox h3{font-size:15px;margin:0 0 4px;}
+.wtb-minbox .lead{color:var(--wtb-light);font-size:12.5px;margin-bottom:12px;}
+.wtb-min-row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--wtb-border);}
+.wtb-min-row:first-of-type{border-top:0;}
+.wtb-chead{background:#fff;border:1px solid var(--wtb-border);border-radius:14px;padding:16px 18px;margin-bottom:14px;}
+.wtb-chead h2{font-size:18px;margin:0 0 6px;}
+.wtb-meta{display:flex;flex-wrap:wrap;gap:4px 18px;color:var(--wtb-mid);font-size:13px;}
+.wtb-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+.wtb-kpi{background:#fff;border:1px solid var(--wtb-border);border-radius:12px;padding:12px 14px;}
+.wtb-kpi .n{font-size:24px;font-weight:700;letter-spacing:-.4px;}
+.wtb-kpi .l{font-size:12px;color:var(--wtb-light);margin-top:2px;}
+.wtb-kpi.ok .n{color:var(--wtb-ok);} .wtb-kpi.buy .n{color:var(--wtb-danger);}
+.wtb-kpi.err .n{color:var(--wtb-warn);} .wtb-kpi.wait .n{color:var(--wtb-wait);}
+.wtb-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--wtb-light);margin:0 0 12px;}
+.wtb-legend span{display:flex;align-items:center;gap:6px;}
+.wtb-lg{width:10px;height:10px;border-radius:3px;display:inline-block;}
+.wtb-lg.s{background:var(--wtb-ok);} .wtb-lg.o{background:var(--wtb-wait);}
+.wtb-lg.m{background:#E5E9F0;border:1px solid var(--wtb-border-strong);} .wtb-lg.e{background:var(--wtb-warn);}
+.wtb-tree{position:relative;padding-left:22px;}
+.wtb-tree:before{content:"";position:absolute;left:9px;top:8px;bottom:8px;width:2px;background:#D5DAE5;border-radius:2px;}
+.wtb-card{background:#fff;border:1px solid var(--wtb-border);border-radius:12px;margin-bottom:10px;overflow:hidden;position:relative;box-shadow:0 1px 2px rgba(16,24,40,.04);}
+.wtb-card:before{content:"";position:absolute;left:-22px;top:22px;width:14px;height:2px;background:#D5DAE5;}
+.wtb-card:after{content:"";position:absolute;left:-27px;top:17px;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #B7C0D0;z-index:1;}
+.wtb-card.st-ok:after{border-color:var(--wtb-ok);background:var(--wtb-okbg);}
+.wtb-card.st-buy:after{border-color:var(--wtb-danger);background:var(--wtb-dangerbg);}
+.wtb-card.st-wait:after{border-color:var(--wtb-wait);background:var(--wtb-waitbg);}
+.wtb-card.st-err:after{border-color:var(--wtb-warn);background:var(--wtb-warnbg);}
+.wtb-card.st-mark:after{border-color:var(--wtb-wait);background:var(--wtb-waitbg);}
+.wtb-card.st-ok{border-left:4px solid var(--wtb-ok);}
+.wtb-card.st-buy{border-left:4px solid var(--wtb-danger);}
+.wtb-card.st-wait{border-left:4px solid var(--wtb-wait);}
+.wtb-card.st-err{border-left:4px solid var(--wtb-warn);}
+.wtb-card.st-mark{border-left:4px solid var(--wtb-wait);}
+.wtb-ch{display:flex;align-items:flex-start;gap:12px;padding:12px 14px 10px;cursor:pointer;}
+.wtb-pos{flex:0 0 28px;width:28px;height:28px;border-radius:8px;background:var(--wtb-brand-bg);color:var(--wtb-brand);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.wtb-cinfo{flex:1;min-width:0;}
+.wtb-cinfo .name{font-size:15px;font-weight:700;letter-spacing:-.2px;}
+.wtb-cinfo .meta2{color:var(--wtb-light);font-size:12.5px;margin-top:2px;}
+.wtb-cstat{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
+.wtb-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.wtb-pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 8px;font-size:11.5px;font-weight:700;white-space:nowrap;line-height:1.2;}
+.wtb-pill.buy{background:var(--wtb-dangerbg);color:var(--wtb-danger);}
+.wtb-pill.ok{background:var(--wtb-okbg);color:var(--wtb-ok);}
+.wtb-pill.wait{background:var(--wtb-waitbg);color:var(--wtb-wait);}
+.wtb-pill.err{background:var(--wtb-warnbg);color:var(--wtb-warn);}
+.wtb-pill.kind{background:#EEF1F6;color:var(--wtb-mid);font-weight:600;}
+.wtb-pill.res{background:#F1EBFF;color:#6D28D9;}
+.wtb-pill.mark{background:var(--wtb-waitbg);color:var(--wtb-wait);}
+.wtb-bar-wrap{margin-top:8px;max-width:520px;}
+.wtb-bar{display:flex;height:8px;border-radius:99px;overflow:hidden;background:#E8EBF2;}
+.wtb-bar i{display:block;height:100%;}
+.wtb-bar i.s{background:var(--wtb-ok);} .wtb-bar i.o{background:var(--wtb-wait);} .wtb-bar i.m{background:transparent;}
+.wtb-bar.empty{background:repeating-linear-gradient(-45deg,#FBF1DD,#FBF1DD 6px,#fff 6px,#fff 12px);}
+.wtb-bar-lbl{font-size:12px;color:var(--wtb-mid);margin-top:4px;}
+.wtb-bodyc{padding:0 14px 14px 54px;display:none;overflow-x:auto;}
+.wtb-card.open .wtb-bodyc{display:block;}
+.wtb-tog{color:var(--wtb-faint);transition:transform .15s;transform:rotate(-90deg);margin-top:4px;}
+.wtb-card.open .wtb-tog{transform:rotate(0);}
+table.wtb-comp{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--wtb-border);border-radius:10px;overflow:hidden;}
+table.wtb-comp th{text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--wtb-light);padding:7px 8px;background:#F7F8FB;border-bottom:1px solid var(--wtb-border);font-weight:600;}
+table.wtb-comp th:nth-child(1),table.wtb-comp th:nth-child(2),
+table.wtb-comp td:nth-child(1),table.wtb-comp td:nth-child(2){text-align:left;}
+table.wtb-comp td{padding:7px 8px;border-bottom:1px solid var(--wtb-border);text-align:right;vertical-align:middle;font-variant-numeric:tabular-nums;}
+table.wtb-comp tr:last-child td{border-bottom:0;}
+table.wtb-comp .nm{font-weight:600;text-align:left;}
+table.wtb-comp .nm small{display:block;color:var(--wtb-light);font-weight:400;}
+.wtb-num-buy{color:var(--wtb-danger);font-weight:700;}
+.wtb-num-ok{color:var(--wtb-ok);font-weight:700;}
+.wtb-num-wait{color:var(--wtb-wait);font-weight:700;}
+.wtb-share{display:inline-flex;align-items:center;gap:4px;background:var(--wtb-brand-bg);color:var(--wtb-brand);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;margin-left:6px;white-space:nowrap;}
+.wtb-supg{background:#fff;border:1px solid var(--wtb-border);border-radius:12px;margin-bottom:12px;overflow:hidden;}
+.wtb-supg .gh{display:flex;align-items:center;gap:10px;padding:12px 14px;background:#F7F8FB;border-bottom:1px solid var(--wtb-border);}
+.wtb-supg .gh .sp{flex:1;}
+.wtb-prodchip{display:inline-flex;background:var(--wtb-brand-bg);color:var(--wtb-brand);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px;}
+.wtb-flat{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--wtb-border);border-radius:12px;overflow:hidden;}
+.wtb-flat th,.wtb-flat td{padding:8px 10px;border-bottom:1px solid var(--wtb-border);text-align:left;font-size:13px;}
+.wtb-flat th{background:#F7F8FB;font-size:11px;text-transform:uppercase;color:var(--wtb-light);letter-spacing:.03em;}
+.wtb-flat tr:last-child td{border-bottom:0;}
+.wtb-tr{background:#fff;border:1px solid var(--wtb-border);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:grid;grid-template-columns:1.2fr 1.4fr .8fr .8fr .8fr;gap:8px;align-items:start;}
+.wtb-tr.overdue{border-left:4px solid var(--wtb-danger);}
+.wtb-tr .lbl{font-weight:700;}
+.wtb-tr .meta{color:var(--wtb-light);font-size:12.5px;}
+.wtb-tr .over{color:var(--wtb-danger);font-weight:700;}
+.wtb-empty{color:var(--wtb-light);padding:20px;text-align:center;}
+.wtb-hint{font-size:12px;color:var(--wtb-light);margin-top:8px;}
+.wtb-legacy{margin:8px 0 0;border:0;background:none;color:var(--wtb-light);font-size:12px;cursor:pointer;text-decoration:underline;}
+@media(max-width:700px){
+  .wtb-lcards{grid-template-columns:1fr;}
+  .wtb-kpis{grid-template-columns:1fr 1fr;}
+  .wtb-tree{padding-left:0;}
+  .wtb-tree:before,.wtb-card:before,.wtb-card:after{display:none;}
+  .wtb-bodyc{padding:0 12px 12px;overflow-x:auto;}
+  .wtb-cstat{align-items:flex-start;}
+  .wtb-tr{grid-template-columns:1fr 1fr; }
+  .wtb-flat{display:block;overflow-x:auto;}
+  table.wtb-comp{font-size:12px;min-width:520px;}
+  .wtb-seg button{padding:7px 10px;font-size:12px;}
+  .wtb-search{width:100%;flex:1 1 100%;}
+}

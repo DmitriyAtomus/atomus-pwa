@@ -9948,6 +9948,12 @@ async function logiPickupDone(orderId, fromDone) {
 async function loadSupplyShopping() {
   const container = document.getElementById('sup-shop-content');
   if (!container) return;
+  if (typeof window.wtbTryLoad === 'function') {
+    try {
+      const used = await window.wtbTryLoad(container);
+      if (used) return;
+    } catch (e) { /* нет нового API — старый путь */ }
+  }
   container.innerHTML = '<div class="loading-block">Считаем что нужно закупить…</div>';
   try {
     const d = await apiGet('/api/supply/shopping-list');
