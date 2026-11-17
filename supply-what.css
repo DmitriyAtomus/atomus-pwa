@@ -209,6 +209,7 @@ table.wtb-comp .nm small{display:block;color:var(--wtb-light);font-weight:400;}
   .wtb-modal { max-height:96vh; }
 }
 
+.wtb-modal-b .wtb-search { width:100%; flex:none; display:block; }
 .wtb-supfield {
   display:flex; align-items:center; gap:10px; padding:8px 12px 10px;
   border-top:1px solid #f0f0f0; background:#fbfbfe;
