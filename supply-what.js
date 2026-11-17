@@ -17,6 +17,7 @@
     contractId: null,
     q: '',
     includeDrafts: false,
+    selected: {},
     open: {},
     inactive: null
   };
@@ -337,22 +338,108 @@
     }).join('');
   }
 
-  function childRow(ch) {
+
+  function toOrder(obj) {
+    if (!obj) return 0;
+    if (obj.to_order != null) return Number(obj.to_order) || 0;
+    return Number(obj.to_buy != null ? obj.to_buy : obj.to_buy_qty) || 0;
+  }
+  function lineKey(row, ch) {
+    if (ch && ch.component_id) return 'ci:' + row.contract_item_id + ':c:' + ch.component_id;
+    return 'ci:' + row.contract_item_id;
+  }
+  function orderableLine(row, ch) {
+    if (ch) {
+      return {
+        key: lineKey(row, ch),
+        contract_id: row.contract_id,
+        contract_item_id: row.contract_item_id,
+        component_id: ch.component_id || null,
+        name: ch.name,
+        product_name: row.name,
+        position_no: row.position_no,
+        qty: toOrder(ch),
+        unit: ch.unit || row.unit,
+        supplier_id: ch.supplier_id || row.supplier_id || null,
+        supplier_name: ch.supplier_name || row.supplier_name || '',
+        contract_number: row.contract_number,
+        drafts: ch.drafts || []
+      };
+    }
+    return {
+      key: lineKey(row, null),
+      contract_id: row.contract_id,
+      contract_item_id: row.contract_item_id,
+      component_id: null,
+      name: row.name,
+      product_name: row.name,
+      position_no: row.position_no,
+      qty: toOrder(row),
+      unit: row.unit,
+      supplier_id: row.supplier_id || null,
+      supplier_name: row.supplier_name || '',
+      contract_number: row.contract_number,
+      drafts: row.drafts || []
+    };
+  }
+  function draftChips(list) {
+    return (list || []).map(function (d) {
+      return '<span class="wtb-pill wait" title="Черновик, поставщику не отправлен">черновик ' +
+        _esc(d.order_label || ('ORD-' + d.order_id)) + '</span>';
+    }).join('');
+  }
+  function collectOrderable(items) {
+    var out = [];
+    (items || []).forEach(function (row) {
+      if (row.children && row.children.length) {
+        row.children.forEach(function (ch) {
+          if (toOrder(ch) > 0) out.push(orderableLine(row, ch));
+        });
+      } else if (toOrder(row) > 0) {
+        out.push(orderableLine(row, null));
+      }
+    });
+    return out;
+  }
+  function linePayload(l, supplierOverride) {
+    var o = {
+      key: l.key,
+      contract_id: l.contract_id,
+      contract_item_id: l.contract_item_id,
+      component_id: l.component_id,
+      qty: l.qty
+    };
+    if (supplierOverride || l.supplier_id) o.supplier_id = supplierOverride || l.supplier_id;
+    return o;
+  }
+
+  function childRow(row, ch) {
     var stt = ch.status || '';
     var buyCls = (ch.to_buy > 0) ? 'wtb-num-buy' : (ch.in_transit_allocated > 0 ? 'wtb-num-wait' : 'wtb-num-ok');
     var mark = ch.in_stock_not_reserved
       ? '<span class="wtb-pill mark">на складе, не зарезервировано</span>' : '';
     var inact = ch.inactive ? '<span class="wtb-pill err">неактивный BOM</span>' : '';
+    var line = orderableLine(row, ch);
+    var can = toOrder(ch) > 0;
+    var checked = can && st.selected[line.key] ? ' checked' : '';
+    var box = can
+      ? '<label class="wtb-check" onclick="event.stopPropagation()"><input type="checkbox" data-wtb-line="' +
+        _esc(line.key) + '" ' + checked + '></label>'
+      : '';
+    var orderBtn = can
+      ? '<button type="button" class="wtb-order-btn" data-wtb-order-one="' + _esc(line.key) +
+        '" onclick="event.stopPropagation()">Заказать</button>'
+      : draftChips(ch.drafts);
     return '<tr>' +
-      '<td></td>' +
+      '<td class="wtb-td-check">' + box + '</td>' +
       '<td class="nm">' + _esc(ch.name || '—') +
         (ch.sku ? '<small>' + _esc(ch.sku) + '</small>' : '') +
-        mark + inact + shareChips(ch) + renderWarns(withoutInventory(ch.warnings)) + '</td>' +
+        mark + inact + draftChips(ch.drafts) + shareChips(ch) + renderWarns(withoutInventory(ch.warnings)) + '</td>' +
       '<td>' + fmt(ch.need) + '</td>' +
       '<td>' + fmt(ch.stock_allocated) + '</td>' +
       '<td class="wtb-num-wait">' + fmt(ch.in_transit_allocated) + '</td>' +
       '<td class="' + buyCls + '">' + fmt(ch.to_buy) + '</td>' +
-      '<td>' + _esc(statusLabel(stt)) + '</td>' +
+      '<td>' + _esc(statusLabel(stt)) + orderBtn + '</td>' +
       '</tr>';
   }
 
@@ -361,6 +448,8 @@
     var open = !!st.open[id] || (row.data_errors || []).length > 0 || (row.to_buy_qty > 0) || (row.warnings || []).length > 0;
     var pills = '<span class="wtb-pill kind">' + _esc(row.supply_kind_label || row.supply_kind || '') + '</span>';
     if (row.to_buy_qty > 0) pills += '<span class="wtb-pill buy">докупить ' + fmt(row.to_buy_qty) + '</span>';
+    if (toOrder(row) > 0 && toOrder(row) !== Number(row.to_buy_qty)) pills += '<span class="wtb-pill buy">заказать ' + fmt(toOrder(row)) + '</span>';
+    if ((row.drafts || []).length) pills += draftChips(row.drafts);
     if (row.in_transit_qty > 0) pills += '<span class="wtb-pill wait">в пути ' + fmt(row.in_transit_qty) + '</span>';
     if ((row.data_errors || []).length) pills += '<span class="wtb-pill err">ошибок данных: ' + row.data_errors.length + '</span>';
     if ((row.children || []).some(function (c) { return c.in_stock_not_reserved; }))
@@ -369,23 +458,34 @@
     if ((row.children || []).length) {
       body = '<table class="wtb-comp"><thead><tr>' +
         '<th></th><th>Комплектующее</th><th>Нужно</th><th>Склад</th><th>В пути</th><th>Докупить</th><th>Статус</th>' +
-        '</tr></thead><tbody>' + row.children.map(childRow).join('') + '</tbody></table>';
+        '</tr></thead><tbody>' + row.children.map(function (ch) { return childRow(row, ch); }).join('') + '</tbody></table>';
     } else if ((row.data_errors || []).indexOf('empty_bom') >= 0) {
       body = renderWarns(withoutInventory(row.warnings));
     }
     if ((row.children || []).length && (row.warnings || []).length) {
       body = renderWarns(withoutInventory(row.warnings)) + body;
     }
+    var prodLines = collectOrderable([row]);
+    var allSel = prodLines.length && prodLines.every(function (l) { return st.selected[l.key]; });
+    var someSel = prodLines.some(function (l) { return st.selected[l.key]; });
+    var prodBox = prodLines.length
+      ? '<label class="wtb-check wtb-check-prod" onclick="event.stopPropagation()"><input type="checkbox" data-wtb-line-group="' +
+        _esc(id) + '"' + (allSel ? ' checked' : '') + (someSel && !allSel ? ' data-indeterminate="1"' : '') + '></label>'
+      : '';
+    var prodOrder = prodLines.length
+      ? '<button type="button" class="wtb-order-btn" data-wtb-order-group="' + _esc(id) +
+        '" onclick="event.stopPropagation()">Заказать</button>'
+      : '';
     return '<div class="wtb-card ' + statusClass(row.status) + (open ? ' open' : '') + '" data-wtb-open="' + _esc(id) + '">' +
       '<div class="wtb-ch">' +
-        '<div class="wtb-pos">' + _esc(row.position_no != null ? row.position_no : '') + '</div>' +
+        '<div class="wtb-pos">' + prodBox + _esc(row.position_no != null ? row.position_no : '') + '</div>' +
         '<div class="wtb-cinfo"><div class="name">' + _esc(row.name || '—') + '</div>' +
           '<div class="meta2">' + fmt(row.qty) + ' ' + unit(row.unit) +
           (withContract && row.contract_number ? ' · договор ' + _esc(row.contract_number) : '') +
           (row.model_article ? ' · ' + _esc(row.model_article) : '') + '</div>' +
           '<div class="wtb-pills">' + pills + '</div>' + readinessBar(row) +
         '</div>' +
-        '<div class="wtb-cstat"><span class="wtb-pill ' +
+        '<div class="wtb-cstat">' + prodOrder + '<span class="wtb-pill ' +
           (row.status === 'to_buy' ? 'buy' : row.status === 'in_transit' ? 'wait' : (row.status === 'data_error' || row.status === 'in_stock_not_reserved') ? (row.status === 'in_stock_not_reserved' ? 'mark' : 'err') : 'ok') +
           '">' + _esc(statusLabel(row.status)) + '</span>' +
           '<span class="wtb-tog">▾</span></div>' +
@@ -442,7 +542,7 @@
       items.forEach(function (r) { html += productCard(r, !st.contractId); });
     }
     if (!items.length) html += '<div class="wtb-empty">Нет позиций</div>';
-    html += '</div></div>';
+    html += '</div>' + orderBar(items) + '</div>';
     return html;
   }
 
@@ -655,6 +755,263 @@
     bind();
   }
 
+
+  function currentItems() {
+    var payload = st.contractId ? st.tree : (st.tree || st.landing);
+    return (payload && payload.items) || [];
+  }
+  function selectedLines() {
+    var all = collectOrderable(currentItems());
+    return all.filter(function (l) { return st.selected[l.key]; });
+  }
+  function orderBar(items) {
+    var n = selectedLines().length;
+    var can = collectOrderable(items).length;
+    if (!can && !n) return '';
+    return '<div class="wtb-orderbar' + (n ? ' on' : '') + '">' +
+      (n ? '<strong>Выбрано ' + n + '</strong>' : '<span class="wtb-muted">Отметьте позиции, чтобы заказать</span>') +
+      '<span class="sp"></span>' +
+      (n ? '<button type="button" class="btn btn-secondary btn-small" data-wtb-clear>Снять</button>' : '') +
+      '<button type="button" class="btn btn-primary btn-small" data-wtb-order-sel' + (n ? '' : ' disabled') +
+      '>Заказать' + (n ? ' выбранные' : '') + '</button></div>';
+  }
+  function findLine(key) {
+    return collectOrderable(currentItems()).filter(function (l) { return l.key === key; })[0];
+  }
+  function toggleLine(key, on) {
+    if (on) st.selected[key] = 1;
+    else delete st.selected[key];
+  }
+  function toggleGroup(id, on) {
+    var row = currentItems().filter(function (r) { return (r.id || ('ci:' + r.contract_item_id)) === id; })[0];
+    if (!row) return;
+    collectOrderable([row]).forEach(function (l) { toggleLine(l.key, on); });
+  }
+  function closeWtbModal() {
+    var m = document.getElementById('wtb-order-modal');
+    if (m) m.remove();
+  }
+  function wtbModal(html) {
+    closeWtbModal();
+    var wrap = document.createElement('div');
+    wrap.id = 'wtb-order-modal';
+    wrap.className = 'wtb-modal-back';
+    wrap.innerHTML = '<div class="wtb-modal" onclick="event.stopPropagation()">' + html + '</div>';
+    wrap.addEventListener('click', function (e) { if (e.target === wrap) closeWtbModal(); });
+    document.body.appendChild(wrap);
+    return wrap;
+  }
+  function openOrderCard(id) {
+    closeWtbModal();
+    if (typeof openSupplyOrder === 'function') openSupplyOrder(Number(id));
+    else if (typeof window.openSupplyOrder === 'function') window.openSupplyOrder(Number(id));
+  }
+  async function startOrder(lines) {
+    if (!lines || !lines.length) return;
+    var overrides = {};
+    function items() {
+      return lines.map(function (l) { return linePayload(l, overrides[l.key]); });
+    }
+    wtbModal('<div class="wtb-modal-h"><h3>Создать заказы поставщикам</h3>' +
+      '<button type="button" class="modal-close" data-wtb-close><i class="ti ti-x"></i></button></div>' +
+      '<div class="wtb-modal-b">Готовим черновики…</div>');
+    var preview;
+    try {
+      var res = await apiPost('/api/supply/what-to-buy/drafts', { dry_run: true, items: items() });
+      if (!res || !res.ok) throw new Error((res && res.data && (res.data.message || res.data.error)) || 'Не удалось подготовить заказ');
+      preview = res.data;
+    } catch (e) {
+      wtbModal('<div class="wtb-modal-h"><h3>Не удалось подготовить заказ</h3>' +
+        '<button type="button" class="modal-close" data-wtb-close><i class="ti ti-x"></i></button></div>' +
+        '<div class="wtb-modal-b">' + _esc((e && e.message) || e) + '</div>' +
+        '<div class="wtb-modal-f"><button type="button" data-wtb-close>Закрыть</button></div>');
+      bindModal();
+      return;
+    }
+    renderPreview(preview);
+
+    function renderPreview(p) {
+      var groups = p.groups || [];
+      var total = p.items_count || lines.length;
+      var will = p.orders_count || 0;
+      var html = '<div class="wtb-modal-h"><h3>Создать заказы поставщикам</h3>' +
+        '<button type="button" class="modal-close" data-wtb-close><i class="ti ti-x"></i></button></div>';
+      html += '<div class="wtb-modal-lead">' + total + ' выбранных позици' + (total === 1 ? 'я' : 'й') +
+        (st.tree && st.tree.contract ? ' договора ' + _esc(st.tree.contract.number || '') : '') +
+        ' будут разобраны на ' + will + ' черновик' + (will === 1 ? '' : (will >= 2 && will <= 4 ? 'а' : 'ов')) +
+        '. Поставщику ничего не отправится.</div><div class="wtb-modal-b">';
+      groups.forEach(function (g, idx) {
+        html += '<div class="wtb-og' + (g.missing_supplier ? ' miss' : '') + '"><div class="ogh">' +
+          '<b>' + (idx + 1) + '. Поставщик</b>' +
+          '<span class="wtb-pill ' + (g.missing_supplier ? 'err' : 'buy') + '">' + g.items_count + '</span>' +
+          '<span class="sp"></span><span class="s">' + _esc(g.contract_number || '') + ' · Куда: договор</span></div>';
+        html += '<div class="wtb-supfield"><div class="wtb-supval">' +
+          _esc(g.missing_supplier ? 'Не назначен' : (g.supplier_name || ('Поставщик #' + g.supplier_id))) +
+          '</div><button type="button" class="wtb-link" data-wtb-pick-sup="' + idx + '">' +
+          (g.missing_supplier ? 'Выбрать поставщика' : 'Сменить') + '</button></div>';
+        (g.items || []).forEach(function (it) {
+          html += '<div class="wtb-oline"><div><b>' + _esc(it.name) + '</b> ×' + fmt(it.qty) +
+            (it.unit ? ' ' + _esc(it.unit) : '') +
+            '<div class="s">изделие: ' + (it.position_no != null ? 'поз. ' + _esc(it.position_no) + ' ' : '') +
+            _esc(it.product_name || '') + '</div></div><div class="wtb-oline-r"><span class="wtb-num-buy">докупить ' + fmt(it.qty) + '</span>' +
+            '<button type="button" class="wtb-link" data-wtb-pick-line="' + _esc(it.key) + '">' +
+            (it.supplier_id ? 'сменить' : 'выбрать поставщика') + '</button></div></div>';
+        });
+        html += '</div>';
+      });
+      html += '</div><div class="wtb-modal-f"><button type="button" data-wtb-close>Отмена</button>';
+      if (p.can_create) {
+        html += '<button type="button" class="btn btn-primary" data-wtb-create>+ Создать ' + will +
+          ' черновик' + (will === 1 ? '' : (will >= 2 && will <= 4 ? 'а' : 'ов')) + '</button>';
+      } else {
+        html += '<button type="button" class="btn btn-primary" disabled>Сначала назначьте поставщика</button>';
+      }
+      html += '</div>';
+      var wrap = document.getElementById('wtb-order-modal');
+      if (wrap) wrap.querySelector('.wtb-modal').innerHTML = html;
+      bindModal(p, groups);
+    }
+
+    function bindModal(p, groups) {
+      var box = document.getElementById('wtb-order-modal');
+      if (!box) return;
+      box.querySelectorAll('[data-wtb-close]').forEach(function (b) {
+        b.onclick = function () { closeWtbModal(); };
+      });
+      var createBtn = box.querySelector('[data-wtb-create]');
+      if (createBtn) {
+        createBtn.onclick = async function () {
+          createBtn.disabled = true;
+          createBtn.textContent = 'Создаём…';
+          try {
+            var resC = await apiPost('/api/supply/what-to-buy/drafts', { dry_run: false, items: items() });
+            if (!resC || !resC.ok) throw new Error((resC && resC.data && (resC.data.message || resC.data.error)) || 'Не удалось создать черновики');
+            var result = resC.data;
+            showCreated(result);
+            st.selected = {};
+            if (st.contractId) await openContract(st.contractId);
+            else render();
+          } catch (e) {
+            createBtn.disabled = false;
+            createBtn.textContent = 'Повторить';
+            if (typeof showToast === 'function') showToast((e && e.message) || String(e), 'error');
+          }
+        };
+      }
+      box.querySelectorAll('[data-wtb-pick-sup]').forEach(function (b) {
+        b.onclick = function () {
+          var g = groups[Number(b.getAttribute('data-wtb-pick-sup'))];
+          if (g) pickSupplier(g.items || [], g.supplier_id, g.missing_supplier
+            ? 'Выбрать поставщика'
+            : 'Сменить поставщика');
+        };
+      });
+      box.querySelectorAll('[data-wtb-pick-line]').forEach(function (b) {
+        b.onclick = function () {
+          var key = b.getAttribute('data-wtb-pick-line');
+          var item = null;
+          (groups || []).forEach(function (g) {
+            (g.items || []).forEach(function (it) { if (it.key === key) item = it; });
+          });
+          if (item) {
+            pickSupplier([item], item.supplier_id, item.supplier_id
+              ? 'Сменить поставщика для «' + item.name + '»'
+              : 'Поставщик для «' + item.name + '»');
+          }
+        };
+      });
+    }
+
+    async function pickSupplier(targetItems, currentId, title) {
+      var data;
+      try { data = await apiGet('/api/suppliers'); } catch (e) {
+        if (typeof showToast === 'function') showToast('Не удалось загрузить поставщиков', 'error');
+        return;
+      }
+      var suppliers = (data.suppliers || data.items || []).filter(function (s) {
+        return s.is_active !== false && s.is_active !== 0;
+      });
+      var current = currentId != null && currentId !== '' ? Number(currentId) : null;
+      var choice = current;
+      var html = '<div class="wtb-modal-h"><h3>' + _esc(title || 'Выбрать поставщика') + '</h3>' +
+        '<button type="button" class="modal-close" data-wtb-close><i class="ti ti-x"></i></button></div>' +
+        '<div class="wtb-modal-lead">Поиск по справочнику поставщиков. Разбивка черновиков пойдёт по выбранному.</div>' +
+        '<div class="wtb-modal-b"><input type="search" class="wtb-search" id="wtb-sup-q" placeholder="Найти поставщика по названию или ИНН" autocomplete="off">' +
+        '<div id="wtb-sup-list" class="wtb-sup-list"></div></div>' +
+        '<div class="wtb-modal-f"><button type="button" data-wtb-back-prev>Назад</button>' +
+        '<button type="button" class="btn btn-primary" id="wtb-sup-save"' + (choice ? '' : ' disabled') + '>Назначить</button></div>';
+      var wrap = document.getElementById('wtb-order-modal');
+      wrap.querySelector('.wtb-modal').innerHTML = html;
+      function applyChoice(id) {
+        choice = Number(id);
+        var save = document.getElementById('wtb-sup-save');
+        if (save) save.disabled = !choice;
+        draw();
+      }
+      function draw() {
+        var q = (document.getElementById('wtb-sup-q').value || '').trim().toLowerCase();
+        var list = suppliers.filter(function (s) {
+          return ((s.name || '') + ' ' + (s.inn || '')).toLowerCase().indexOf(q) >= 0;
+        });
+        document.getElementById('wtb-sup-list').innerHTML = list.map(function (s) {
+          var on = Number(s.id) === Number(choice);
+          return '<button type="button" class="wtb-supopt' + (on ? ' on' : '') + '" data-wtb-sup-id="' + s.id + '">' +
+            '<span class="wtb-supopt-name">' + _esc(s.name || '—') + '</span>' +
+            (s.inn ? '<span class="s">ИНН ' + _esc(s.inn) + '</span>' : '') +
+            (on ? '<span class="wtb-supopt-check">✓</span>' : '') +
+            '</button>';
+        }).join('') || '<div class="wtb-empty">Поставщики не найдены</div>';
+        document.querySelectorAll('[data-wtb-sup-id]').forEach(function (el) {
+          el.onclick = function () { applyChoice(el.getAttribute('data-wtb-sup-id')); };
+        });
+      }
+      draw();
+      document.getElementById('wtb-sup-q').oninput = draw;
+      setTimeout(function () {
+        var s = document.getElementById('wtb-sup-q');
+        if (s) s.focus();
+      }, 50);
+      wrap.querySelectorAll('[data-wtb-close]').forEach(function (b) { b.onclick = closeWtbModal; });
+      wrap.querySelector('[data-wtb-back-prev]').onclick = function () { renderPreview(p); };
+      document.getElementById('wtb-sup-save').onclick = function () {
+        if (!choice) return;
+        var rec = suppliers.filter(function (s) { return Number(s.id) === Number(choice); })[0] || {};
+        var name = rec.name || '';
+        (targetItems || []).forEach(function (it) { overrides[it.key] = choice; });
+        lines.forEach(function (l) {
+          if ((targetItems || []).some(function (it) { return it.key === l.key; })) {
+            l.supplier_id = choice;
+            l.supplier_name = name;
+          }
+        });
+        apiPost('/api/supply/what-to-buy/drafts', { dry_run: true, items: items() }).then(function (res) {
+          if (!res || !res.ok) throw new Error((res && res.data && (res.data.message || res.data.error)) || 'Не удалось обновить превью');
+          renderPreview(res.data);
+        }).catch(function (e) { if (typeof showToast === 'function') showToast((e && e.message) || String(e), 'error'); });
+      };
+    }
+
+    function showCreated(result) {
+      var orders = result.orders || [];
+      var html = '<div class="wtb-modal-h"><h3>Черновики созданы</h3>' +
+        '<button type="button" class="modal-close" data-wtb-close><i class="ti ti-x"></i></button></div>' +
+        '<div class="wtb-modal-lead">Поставщику ничего не отправлялось. Письмо и перевод дальше — из карточки заказа.</div>' +
+        '<div class="wtb-modal-b">';
+      orders.forEach(function (o) {
+        html += '<button type="button" class="wtb-created" data-open-ord="' + o.id + '">' +
+          _esc(o.order_label) + ' · ' + _esc(o.supplier_name || '') + ' · ' + o.items_count +
+          ' позиц. · ' + _esc(o.contract_number || '') + '</button>';
+      });
+      html += '</div><div class="wtb-modal-f"><button type="button" data-wtb-close>Закрыть</button></div>';
+      var wrap = document.getElementById('wtb-order-modal');
+      wrap.querySelector('.wtb-modal').innerHTML = html;
+      wrap.querySelectorAll('[data-wtb-close]').forEach(function (b) { b.onclick = closeWtbModal; });
+      wrap.querySelectorAll('[data-open-ord]').forEach(function (b) {
+        b.onclick = function () { openOrderCard(b.getAttribute('data-open-ord')); };
+      });
+    }
+  }
+
   function bind() {
     var root = st.container.querySelector('.wtb-root');
     if (!root) return;
@@ -670,12 +1027,45 @@
         if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
         return;
       }
+      if (e.target.closest('.wtb-check') || e.target.closest('.wtb-order-btn') || e.target.closest('.wtb-orderbar')) {
+        return;
+      }
       var open = e.target.closest('[data-wtb-open]');
       if (open && (e.target.closest('.wtb-ch') || e.target.closest('.rh'))) {
         var id = open.getAttribute('data-wtb-open');
         st.open[id] = !st.open[id];
         open.classList.toggle('open');
       }
+    });
+    root.querySelectorAll('[data-wtb-line]').forEach(function (el) {
+      el.addEventListener('change', function () {
+        toggleLine(el.getAttribute('data-wtb-line'), el.checked);
+        render();
+      });
+    });
+    root.querySelectorAll('[data-wtb-line-group]').forEach(function (el) {
+      if (el.getAttribute('data-indeterminate') === '1') el.indeterminate = true;
+      el.addEventListener('change', function () {
+        toggleGroup(el.getAttribute('data-wtb-line-group'), el.checked);
+        render();
+      });
+    });
+    var orderSel = root.querySelector('[data-wtb-order-sel]');
+    if (orderSel) orderSel.addEventListener('click', function () { startOrder(selectedLines()); });
+    var clearBtn = root.querySelector('[data-wtb-clear]');
+    if (clearBtn) clearBtn.addEventListener('click', function () { st.selected = {}; render(); });
+    root.querySelectorAll('[data-wtb-order-one]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var line = findLine(btn.getAttribute('data-wtb-order-one'));
+        if (line) startOrder([line]);
+      });
+    });
+    root.querySelectorAll('[data-wtb-order-group]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-wtb-order-group');
+        var row = currentItems().filter(function (r) { return (r.id || ('ci:' + r.contract_item_id)) === id; })[0];
+        if (row) startOrder(collectOrderable([row]));
+      });
     });
     var search = root.querySelector('[data-wtb-search]');
     if (search) {
