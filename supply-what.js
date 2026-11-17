@@ -423,12 +423,12 @@
     var can = toOrder(ch) > 0;
     var checked = can && st.selected[line.key] ? ' checked' : '';
     var box = can
-      ? '<label class="wtb-check" onclick="event.stopPropagation()"><input type="checkbox" data-wtb-line='' +
-        _esc(line.key) + '' ' + checked + '></label>'
+      ? '<label class="wtb-check" onclick="event.stopPropagation()"><input type="checkbox" data-wtb-line="' +
+        _esc(line.key) + '" ' + checked + '></label>'
       : '';
     var orderBtn = can
-      ? '<button type="button" class="wtb-order-btn" data-wtb-order-one='' + _esc(line.key) +
-        '' onclick="event.stopPropagation()">Заказать</button>'
+      ? '<button type="button" class="wtb-order-btn" data-wtb-order-one="' + _esc(line.key) +
+        '" onclick="event.stopPropagation()">Заказать</button>'
       : draftChips(ch.drafts);
     return '<tr>' +
       '<td class="wtb-td-check">' + box + '</td>' +
