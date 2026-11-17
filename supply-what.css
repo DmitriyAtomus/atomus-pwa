@@ -238,3 +238,90 @@ table.wtb-comp .nm small{display:block;color:var(--wtb-light);font-weight:400;}
 .wtb-alias .pr { font-weight:650; margin-top:1px; }
 .wtb-alias.miss .pr { color:#b45309; font-weight:700; }
 .wtb-alias .wtb-link { padding:0; margin-top:2px; }
+
+/* v311: договор → изделие → состав. Сводки считают позиции, не смешивают единицы. */
+.wtb-v311{--wtb-radius:14px;max-width:1440px;margin:0 auto;}
+.wtb-v311 button,.wtb-v311 input,.wtb-v311 summary{font-family:inherit;}
+.wtb-v311 button:focus-visible,.wtb-v311 summary:focus-visible,.wtb-v311 input:focus-visible{outline:3px solid #8fb7e8;outline-offset:3px;}
+.wtb-v311 .wtb-toolbar{gap:12px;margin-bottom:24px;}
+.wtb-v311 .wtb-seg{border-radius:12px;}
+.wtb-v311 .wtb-seg button{padding:11px 20px;}
+.wtb-v311 .wtb-search{max-width:420px;margin-left:auto;min-height:42px;}
+.wtb-more{position:relative;color:var(--wtb-mid);font-size:13px;}
+.wtb-more>summary{cursor:pointer;list-style:none;padding:10px;}
+.wtb-more-menu{position:absolute;z-index:10;top:100%;left:0;display:grid;min-width:190px;padding:6px;border:1px solid var(--wtb-border);border-radius:10px;background:#fff;box-shadow:0 10px 24px #1b20301a;}
+.wtb-more-menu button{border:0;background:none;text-align:left;padding:10px;border-radius:6px;cursor:pointer;color:var(--wtb-mid);}
+.wtb-more-menu button:hover,.wtb-more-menu button.on{background:var(--wtb-brand-bg);color:var(--wtb-brand);}
+.wtb-v311 .wtb-lcard{padding:20px;transition:box-shadow .15s;}
+.wtb-card-count{font-size:12px;color:var(--wtb-light);margin-top:10px;}
+.wtb-card-issue{color:var(--wtb-warn);font-size:12px;margin-top:12px;}
+.wtb-card-open{font-size:13px;font-weight:600;color:var(--wtb-brand);display:flex;justify-content:space-between;margin-top:18px;}
+.wtb-contract-heading{display:flex;align-items:baseline;gap:16px;margin:8px 0 20px;flex-wrap:wrap;}
+.wtb-contract-heading h2{font-size:25px;letter-spacing:-.6px;margin:0;}
+.wtb-contract-heading>span{font-size:14px;color:var(--wtb-mid);}
+.wtb-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:25px;}
+.wtb-summary-card{text-align:left;border:1px solid var(--wtb-border);background:white;padding:18px 20px;border-radius:var(--wtb-radius);cursor:pointer;box-shadow:0 1px 2px #1b203006;}
+.wtb-summary-card .label{display:flex;align-items:center;gap:8px;color:var(--wtb-mid);font-size:13px;font-weight:600;}
+.wtb-summary-card strong{font-size:32px;line-height:1.4;margin-right:8px;letter-spacing:-.8px;}
+.wtb-summary-card small{font-size:12px;color:var(--wtb-light);}
+.wtb-summary-card.stock strong{color:var(--wtb-ok);}.wtb-summary-card.transit strong{color:var(--wtb-wait);}.wtb-summary-card.buy strong{color:var(--wtb-danger);}
+.wtb-summary-card.on{outline:2px solid var(--wtb-brand);outline-offset:1px;}
+.wtb-products-caption{display:flex;align-items:center;flex-wrap:wrap;gap:12px;justify-content:space-between;margin-bottom:12px;font-size:14px;}
+.wtb-products-caption>span{color:var(--wtb-light);font-size:12px;}
+.wtb-v311 .wtb-tree{padding-left:0;}.wtb-v311 .wtb-tree:before,.wtb-v311 .wtb-card:before,.wtb-v311 .wtb-card:after{display:none;}
+.wtb-v311 .wtb-card{border-left:1px solid var(--wtb-border);border-radius:var(--wtb-radius);margin-bottom:12px;}
+.wtb-v311 .wtb-ch{padding:18px;gap:14px;align-items:center;}
+.wtb-heading-toggle{border:0;background:none;flex:1;min-width:0;text-align:left;padding:0;cursor:pointer;color:var(--wtb-text);}
+.wtb-heading-toggle .name{display:block;font-size:16px;font-weight:700;letter-spacing:-.2px;overflow-wrap:anywhere;}
+.wtb-heading-toggle .meta2{display:block;font-size:12px;color:var(--wtb-light);margin-top:4px;}
+.wtb-v311 .wtb-cstat{flex-direction:row;align-items:center;flex-wrap:wrap;max-width:260px;justify-content:flex-end;gap:8px;}
+.wtb-v311 .wtb-bodyc{padding:0 18px 18px;overflow:visible;}
+.wtb-bom-source{display:flex;justify-content:space-between;gap:12px;padding:14px 0;font-size:12px;color:var(--wtb-light);border-top:1px solid var(--wtb-border);}
+.wtb-reserve-summary{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border:1px solid #d2e5d9;background:#f3faf5;border-radius:10px;margin:0 0 14px;}
+.wtb-reserve-summary b{display:block;color:var(--wtb-ok);font-size:13px;}.wtb-reserve-summary small{display:block;margin-top:4px;font-size:12px;color:var(--wtb-mid);}
+.wtb-small-btn{border:1px solid var(--wtb-border-strong);background:white;color:var(--wtb-brand);border-radius:7px;padding:7px 10px;font-weight:600;font-size:12px;cursor:pointer;white-space:nowrap;}
+.wtb-v311 .wtb-order-btn{background:var(--wtb-brand);border:1px solid var(--wtb-brand);color:#fff;padding:8px 11px;font-size:12px;white-space:nowrap;}
+.wtb-manual-btn{background:#fff!important;color:var(--wtb-brand)!important;border:1px solid var(--wtb-border-strong)!important;}
+.wtb-v311 table.wtb-comp{min-width:0;table-layout:fixed;}
+.wtb-v311 table.wtb-comp th:first-child{width:26px;}.wtb-v311 table.wtb-comp th:nth-child(2){width:30%;}.wtb-v311 table.wtb-comp th:last-child{width:25%;}
+.wtb-v311 table.wtb-comp th{font-size:10px;letter-spacing:0;padding:10px 8px;}
+.wtb-v311 table.wtb-comp td{padding:12px 8px;font-size:13px;overflow-wrap:anywhere;}
+.wtb-v311 table.wtb-comp td small{display:block;font-size:10.5px;color:var(--wtb-light);margin-top:3px;}
+.wtb-v311 table.wtb-comp td.nm{font-weight:600;}.wtb-v311 table.wtb-comp td.nm small{font-weight:400;}
+.wtb-line-state{display:inline-block;font-size:11px;font-weight:600;padding:3px 6px;border-radius:5px;background:#f3f5f8;color:var(--wtb-mid);}
+.wtb-line-state.st-buy{color:var(--wtb-danger);background:var(--wtb-dangerbg);}.wtb-line-state.st-wait{color:var(--wtb-wait);background:var(--wtb-waitbg);}.wtb-line-state.st-ok,.wtb-line-state.st-mark{color:var(--wtb-ok);background:var(--wtb-okbg);}
+.wtb-line-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;margin-top:6px;}
+.wtb-inline-issue{display:block;font-size:10px;color:var(--wtb-warn);margin-top:4px;}
+.wtb-body-bundle{margin:14px 0;border:1px solid var(--wtb-border);border-radius:10px;background:#fafbfe;overflow:hidden;}
+.wtb-body-bundle details>summary{padding:14px;display:flex;gap:9px;align-items:center;cursor:pointer;font-size:13px;}.wtb-body-bundle details>summary:before{content:'▸';color:var(--wtb-light);}.wtb-body-bundle details[open]>summary:before{content:'▾';}
+.wtb-body-bundle details>summary>span{font-size:11px;color:var(--wtb-light);margin-left:auto;}
+.wtb-bundle-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 14px 14px;}
+.wtb-production-note{background:var(--wtb-brand-bg);color:var(--wtb-brand);font-size:12px;padding:12px;border-radius:8px;margin-bottom:12px;}
+.wtb-diagnostics{font-size:12px;color:var(--wtb-light);margin-top:18px;}.wtb-diagnostics>summary{cursor:pointer;padding:8px 0;}.wtb-diagnostics .wtb-minbox{margin-top:6px;}
+.wtb-direct-state{padding:14px;background:#f7f8fb;border-radius:8px;font-size:13px;color:var(--wtb-mid);}
+.wtb-general-list{display:grid;gap:12px;}.wtb-general-row{display:flex;align-items:flex-start;gap:20px;background:white;border:1px solid var(--wtb-border);border-radius:var(--wtb-radius);padding:20px;}
+.wtb-general-info{flex:1;min-width:0;}.wtb-general-info>b{font-size:15px;overflow-wrap:anywhere;}.wtb-destinations{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.wtb-destination{background:var(--wtb-brand-bg);border:0;color:var(--wtb-brand);border-radius:6px;padding:6px 8px;text-align:left;font-size:11px;cursor:pointer;}
+.wtb-general-buy{text-align:center;min-width:70px;}.wtb-general-buy b{display:block;font-size:25px;color:var(--wtb-danger);}.wtb-general-buy small{font-size:11px;color:var(--wtb-light);}
+.wtb-general-actions{display:flex;flex-direction:column;gap:8px;}.wtb-general-detail{font-size:11px;color:var(--wtb-light);margin-top:12px;}.wtb-general-detail summary{cursor:pointer;}.wtb-general-facts{margin-top:6px;}
+#wtb-order-modal .wtb-field{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#4a5061;margin:12px 0;}
+#wtb-order-modal .wtb-field input,#wtb-order-modal .wtb-field select,#wtb-order-modal .wtb-quantity-field input{font:inherit;border:1px solid #d5dae5;border-radius:8px;padding:9px 10px;color:#1b2030;background:#fff;min-height:40px;width:100%;}
+.wtb-manual-line{display:flex;gap:16px;justify-content:space-between;padding:12px 0;border-top:1px solid #e5e9f0;font-size:13px;}.wtb-manual-line>span:first-child{flex:1;min-width:0;}.wtb-manual-line small{display:block;font-size:11px;color:#6e7689;margin-top:4px;}
+.wtb-quantity-field{flex:0 0 100px;text-align:right;}.wtb-manual-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px;}.wtb-paid-field{display:flex;align-items:center;gap:8px;font-size:13px;margin:12px 0;color:#1b2030;}
+.wtb-existing-order{background:#eaf2fa;padding:10px 12px;border-radius:8px;margin:14px 0;font-size:13px;}.wtb-action-error{background:#fce8e2;color:#b5260c;border-radius:8px;padding:12px;margin:12px 0;font-size:13px;}.wtb-action-error[hidden]{display:none;}
+@media(max-width:900px){.wtb-v311 .wtb-ch{flex-wrap:wrap;}.wtb-v311 .wtb-cstat{max-width:none;width:100%;justify-content:flex-start;padding-left:42px;}.wtb-v311 .wtb-summary{gap:10px;}.wtb-v311 .wtb-summary-card{padding:14px;}.wtb-general-row{gap:12px;}}
+@media(max-width:640px){
+  .wtb-v311 .wtb-toolbar{gap:8px;margin-bottom:16px;}.wtb-v311 .wtb-search{max-width:none;flex-basis:100%;}.wtb-v311 .wtb-seg{flex:1;}.wtb-v311 .wtb-seg button{padding:10px;flex:1;}
+  .wtb-v311 .wtb-contract-heading{gap:5px;margin-bottom:16px;}.wtb-v311 .wtb-contract-heading h2{font-size:22px;}.wtb-contract-heading>span{font-size:12px;}
+  .wtb-v311 .wtb-summary{gap:7px;margin-bottom:20px;}.wtb-v311 .wtb-summary-card{padding:11px 9px;}.wtb-summary-card .label{font-size:10px;min-height:28px;gap:4px;align-items:flex-start;}.wtb-summary-card strong{font-size:26px;display:block;line-height:1.2;}.wtb-summary-card small{font-size:10px;}
+  .wtb-v311 .wtb-ch{padding:14px;gap:10px;}.wtb-v311 .wtb-heading-toggle .name{font-size:14px;}.wtb-v311 .wtb-heading-toggle .meta2{font-size:11px;}.wtb-v311 .wtb-pos{flex-basis:24px;width:24px;}.wtb-v311 .wtb-cstat{padding-left:34px;}.wtb-v311 .wtb-bodyc{padding:0 12px 14px;}.wtb-v311 .wtb-pills{gap:4px;}.wtb-v311 .wtb-pill{font-size:10px;padding:3px 6px;}
+  .wtb-bom-source{font-size:10px;}.wtb-reserve-summary{align-items:flex-start;flex-direction:column;gap:9px;padding:11px;}.wtb-reserve-summary b{font-size:12px;}.wtb-reserve-summary small{font-size:11px;}
+  .wtb-v311 table.wtb-comp,.wtb-v311 table.wtb-comp tbody{display:block;border:0;background:transparent;}.wtb-v311 table.wtb-comp thead{display:none;}
+  .wtb-v311 table.wtb-comp tr{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--wtb-border);border-radius:9px;margin-bottom:9px;background:#fff;padding:11px;position:relative;}
+  .wtb-v311 table.wtb-comp td{border:0;padding:8px 3px;text-align:left;font-size:14px;}.wtb-v311 table.wtb-comp td:before{content:attr(data-label);display:block;font-size:9px;color:var(--wtb-light);font-weight:400;margin-bottom:3px;}
+  .wtb-v311 table.wtb-comp td.wtb-td-check{position:absolute;top:10px;right:8px;padding:0;}.wtb-v311 table.wtb-comp td.wtb-td-check:before{display:none;}
+  .wtb-v311 table.wtb-comp td.nm{grid-column:1/-1;text-align:left;padding:0 22px 7px 0;font-size:13px;}.wtb-v311 table.wtb-comp td.nm:before{display:none;}.wtb-v311 table.wtb-comp td.wtb-actions-cell{grid-column:1/-1;border-top:1px solid var(--wtb-border);padding-top:9px;margin-top:4px;}.wtb-v311 table.wtb-comp td.wtb-actions-cell:before{display:none;}.wtb-v311 .wtb-line-actions{justify-content:flex-start;}.wtb-v311 .wtb-line-state{font-size:10px;}
+  .wtb-body-bundle details>summary{flex-wrap:wrap;padding:12px;}.wtb-body-bundle details>summary>strong{flex:1;min-width:0;}.wtb-body-bundle details>summary>span{margin-left:18px;}.wtb-body-bundle table.wtb-comp{padding:0 8px;}.wtb-bundle-actions{padding:0 10px 12px;}
+  .wtb-general-row{flex-wrap:wrap;padding:14px;gap:12px;}.wtb-general-info{flex-basis:calc(100% - 90px);}.wtb-general-info>b{font-size:14px;}.wtb-general-actions{flex-direction:row;width:100%;}.wtb-general-buy{min-width:56px;}.wtb-destination{font-size:10px;}
+  .wtb-manual-fields{grid-template-columns:1fr;gap:0;}.wtb-quantity-field{flex-basis:80px;}.wtb-manual-line{gap:10px;}
+}
