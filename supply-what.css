@@ -232,3 +232,9 @@ table.wtb-comp .nm small{display:block;color:var(--wtb-light);font-weight:400;}
   .wtb-supfield { flex-wrap:wrap; }
   .wtb-oline-r { align-items:flex-start; }
 }
+
+.wtb-alias { margin-top:6px; font-size:12px; color:#374151; }
+.wtb-alias .ours { color:#6b7280; }
+.wtb-alias .pr { font-weight:650; margin-top:1px; }
+.wtb-alias.miss .pr { color:#b45309; font-weight:700; }
+.wtb-alias .wtb-link { padding:0; margin-top:2px; }

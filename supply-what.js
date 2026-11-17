@@ -401,7 +401,13 @@
     });
     return out;
   }
+  function overrideOf(raw) {
+    if (raw == null || raw === '') return {};
+    if (typeof raw === 'number' || typeof raw === 'string') return { supplier_id: Number(raw) };
+    return raw;
+  }
   function linePayload(l, supplierOverride) {
+    var ov = overrideOf(supplierOverride);
     var o = {
       key: l.key,
       contract_id: l.contract_id,
@@ -409,7 +415,9 @@
       component_id: l.component_id,
       qty: l.qty
     };
-    if (supplierOverride || l.supplier_id) o.supplier_id = supplierOverride || l.supplier_id;
+    var sid = ov.supplier_id || l.supplier_id;
+    if (sid) o.supplier_id = sid;
+    if (ov.supplier_alias) o.supplier_alias = ov.supplier_alias;
     return o;
   }
 
@@ -850,10 +858,21 @@
           '</div><button type="button" class="wtb-link" data-wtb-pick-sup="' + idx + '">' +
           (g.missing_supplier ? 'Выбрать поставщика' : 'Сменить') + '</button></div>';
         (g.items || []).forEach(function (it) {
+          var alias = (it.supplier_alias || '').trim();
           html += '<div class="wtb-oline"><div><b>' + _esc(it.name) + '</b> ×' + fmt(it.qty) +
             (it.unit ? ' ' + _esc(it.unit) : '') +
             '<div class="s">изделие: ' + (it.position_no != null ? 'поз. ' + _esc(it.position_no) + ' ' : '') +
-            _esc(it.product_name || '') + '</div></div><div class="wtb-oline-r"><span class="wtb-num-buy">докупить ' + fmt(it.qty) + '</span>' +
+            _esc(it.product_name || '') + '</div>' +
+            '<div class="wtb-alias' + (alias ? '' : ' miss') + '">' +
+              '<div class="ours">наше имя: ' + _esc(it.name || '') + '</div>' +
+              (alias
+                ? '<div class="pr">в прайсе: ' + _esc(alias) + '</div>'
+                : '<div class="pr">выберите строку прайса</div>') +
+              (it.supplier_id
+                ? '<button type="button" class="wtb-link" data-wtb-pick-price="' + _esc(it.key) + '">' +
+                  (alias ? 'сменить строку прайса' : 'каталог') + '</button>'
+                : '') +
+            '</div></div><div class="wtb-oline-r"><span class="wtb-num-buy">докупить ' + fmt(it.qty) + '</span>' +
             '<button type="button" class="wtb-link" data-wtb-pick-line="' + _esc(it.key) + '">' +
             (it.supplier_id ? 'сменить' : 'выбрать поставщика') + '</button></div></div>';
         });
@@ -906,6 +925,16 @@
             : 'Сменить поставщика');
         };
       });
+      box.querySelectorAll('[data-wtb-pick-price]').forEach(function (b) {
+        b.onclick = function () {
+          var key = b.getAttribute('data-wtb-pick-price');
+          var item = null;
+          (groups || []).forEach(function (g) {
+            (g.items || []).forEach(function (it) { if (it.key === key) item = it; });
+          });
+          if (item) pickPriceLine(item, groups);
+        };
+      });
       box.querySelectorAll('[data-wtb-pick-line]').forEach(function (b) {
         b.onclick = function () {
           var key = b.getAttribute('data-wtb-pick-line');
@@ -920,6 +949,82 @@
           }
         };
       });
+    }
+
+
+    async function pickPriceLine(item, groups) {
+      if (!item || !item.supplier_id) {
+        if (typeof showToast === 'function') showToast('Сначала выберите поставщика', 'error');
+        return;
+      }
+      var data;
+      try {
+        data = await apiGet('/api/suppliers/' + item.supplier_id + '/price-items');
+      } catch (e) {
+        if (typeof showToast === 'function') showToast('Не удалось загрузить прайс поставщика', 'error');
+        return;
+      }
+      var names = data.items || [];
+      var detailed = data.detailed || names.map(function (n) { return { name: n, source: null }; });
+      if (!detailed.length && names.length) {
+        detailed = names.map(function (n) { return { name: n, source: null }; });
+      }
+      var current = (item.supplier_alias || '').trim();
+      var supplierName = item.supplier_name;
+      if (!supplierName) {
+        (groups || []).forEach(function (g) {
+          if (g.supplier_id && Number(g.supplier_id) === Number(item.supplier_id)) supplierName = g.supplier_name || supplierName;
+        });
+      }
+      var html = '<div class="wtb-modal-h"><h3>Каталог: ' + _esc(supplierName || 'поставщик') + '</h3>' +
+        '<button type="button" class="modal-close" data-wtb-close><i class="ti ti-x"></i></button></div>' +
+        '<div class="wtb-modal-lead">Наше имя: <b>' + _esc(item.name || '') + '</b>. Выберите строку прайса поставщика. Цену система не подставляет.</div>' +
+        '<div class="wtb-modal-b"><input type="search" class="wtb-search" id="wtb-price-q" placeholder="Поиск по прайсу…" autocomplete="off">' +
+        '<div id="wtb-price-list" class="wtb-sup-list"></div></div>' +
+        '<div class="wtb-modal-f"><button type="button" data-wtb-back-prev>Назад</button></div>';
+      var wrap = document.getElementById('wtb-order-modal');
+      wrap.querySelector('.wtb-modal').innerHTML = html;
+      function draw() {
+        var q = (document.getElementById('wtb-price-q').value || '').trim().toLowerCase();
+        var list = detailed.filter(function (row) {
+          var n = (row.name || row || '').toString();
+          var src = (row.source || '').toString();
+          return (n + ' ' + src).toLowerCase().indexOf(q) >= 0;
+        });
+        document.getElementById('wtb-price-list').innerHTML = list.map(function (row) {
+          var n = (row.name || row || '').toString();
+          var src = row.source || '';
+          var on = current && n === current;
+          return '<button type="button" class="wtb-supopt' + (on ? ' on' : '') + '" data-wtb-price-name="' + _esc(n) + '">' +
+            '<span class="wtb-supopt-name">' + _esc(n) + '</span>' +
+            (src ? '<span class="s">' + _esc(src) + '</span>' : '') +
+            (on ? '<span class="wtb-supopt-check">✓</span>' : '') +
+            '</button>';
+        }).join('') || '<div class="wtb-empty">В прайсе этого поставщика нет строк</div>';
+        document.querySelectorAll('[data-wtb-price-name]').forEach(function (el) {
+          el.onclick = function () { choose(el.getAttribute('data-wtb-price-name')); };
+        });
+      }
+      function choose(name) {
+        if (!name) return;
+        var prev = overrideOf(overrides[item.key]);
+        overrides[item.key] = { supplier_id: prev.supplier_id || item.supplier_id, supplier_alias: name };
+        lines.forEach(function (l) {
+          if (l.key === item.key) l.supplier_alias = name;
+        });
+        apiPost('/api/supply/what-to-buy/drafts', { dry_run: true, items: items() }).then(function (res) {
+          if (!res || !res.ok) throw new Error((res && res.data && (res.data.message || res.data.error)) || 'Не удалось обновить превью');
+          renderPreview(res.data);
+        }).catch(function (e) { if (typeof showToast === 'function') showToast((e && e.message) || String(e), 'error'); });
+      }
+      draw();
+      document.getElementById('wtb-price-q').oninput = draw;
+      setTimeout(function () {
+        var s = document.getElementById('wtb-price-q');
+        if (s) s.focus();
+      }, 50);
+      wrap.querySelectorAll('[data-wtb-close]').forEach(function (b) { b.onclick = closeWtbModal; });
+      wrap.querySelector('[data-wtb-back-prev]').onclick = function () { renderPreview(p); };
     }
 
     async function pickSupplier(targetItems, currentId, title) {
@@ -977,11 +1082,16 @@
         if (!choice) return;
         var rec = suppliers.filter(function (s) { return Number(s.id) === Number(choice); })[0] || {};
         var name = rec.name || '';
-        (targetItems || []).forEach(function (it) { overrides[it.key] = choice; });
+        (targetItems || []).forEach(function (it) {
+          var prev = overrideOf(overrides[it.key]);
+          overrides[it.key] = { supplier_id: choice };
+          // смена поставщика — алиас от другой пары (позиция, поставщик) не переносим
+        });
         lines.forEach(function (l) {
           if ((targetItems || []).some(function (it) { return it.key === l.key; })) {
             l.supplier_id = choice;
             l.supplier_name = name;
+            l.supplier_alias = '';
           }
         });
         apiPost('/api/supply/what-to-buy/drafts', { dry_run: true, items: items() }).then(function (res) {
