@@ -11,7 +11,7 @@ const out=process.env.WTB_QA_OUTPUT||path.join(root,'docs/previews/supply-311');
  try{
   const page=await browser.newPage({viewport:{width:1440,height:1000}});
   const errors=[]; page.on('pageerror',e=>errors.push(e.message));
-  await page.route('**/*',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><html lang="ru"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f4f6fa;font-family:Arial"><main style="max-width:1300px;margin:24px auto;padding:0 20px"><h1 style="font-size:23px">Снабжение · Что закупить</h1><p class="page-subtitle"></p><div id="supply"></div></main></body></html>'}));
+  await page.route('**/*',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f4f6fa;font-family:Arial"><main style="max-width:1300px;margin:24px auto;padding:0 20px"><h1 style="font-size:23px">Снабжение · Что закупить</h1><p class="page-subtitle"></p><div id="supply"></div></main></body></html>'}));
   await page.goto('http://127.0.0.1:8311/procurement-fixture');
   await page.addStyleTag({path:path.join(root,'supply-what.css')});
   await page.evaluate(()=>{
@@ -108,6 +108,10 @@ const out=process.env.WTB_QA_OUTPUT||path.join(root,'docs/previews/supply-311');
   if(process.env.WTB_REAL_DATA){
    const snapshot=JSON.parse(fs.readFileSync(process.env.WTB_REAL_DATA,'utf8'));
    await page.evaluate(data=>{
+    // Remove personal customer names from review screenshots. BOM and quantities are real.
+    data.all.contracts.forEach(c=>{c.contractor_name='Проект по договору';});
+    data.contract.contracts.forEach(c=>{c.contractor_name='Проект по договору';});
+    data.contract.contract.contractor_name='Проект по договору';
     const cards=data.all.contracts;
     window.apiGet=async url=>{
      if(url==='/api/suppliers')return {suppliers:[]};

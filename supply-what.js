@@ -329,8 +329,8 @@
         position_no: row.position_no,
         qty: toOrder(ch),
         unit: ch.unit || row.unit,
-        supplier_id: (ch.body_bundle && ch.body_bundle.supplier_id) || ch.supplier_id || row.supplier_id || null,
-        supplier_name: (ch.body_bundle && ch.body_bundle.supplier_name) || ch.supplier_name || row.supplier_name || '',
+        supplier_id: ch.body_bundle ? (ch.body_bundle.supplier_id || null) : (ch.supplier_id || row.supplier_id || null),
+        supplier_name: ch.body_bundle ? ch.body_bundle.supplier_name : (ch.supplier_name || row.supplier_name || ''),
         body_bundle: ch.body_bundle || null,
         qty_to_buy: Number(ch.to_buy) || 0,
         contract_number: row.contract_number,
@@ -962,7 +962,7 @@
         document.getElementById('wtb-sup-list').innerHTML = list.map(function (s) {
           var on = Number(s.id) === Number(choice);
           return '<button type="button" class="wtb-supopt' + (on ? ' on' : '') + '" data-wtb-sup-id="' + s.id + '">' +
-            '<span class="wtb-supopt-name">' + _esc(s.name || '—') + '</span>' +
+            '<span class="wtb-supopt-name">' + _esc(s.name || '—') + '</span><span class="s">Карточка #' + s.id + '</span>' +
             (s.inn ? '<span class="s">ИНН ' + _esc(s.inn) + '</span>' : '') +
             (on ? '<span class="wtb-supopt-check">✓</span>' : '') +
             '</button>';
@@ -1312,7 +1312,7 @@
     var requestId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'wtb-' + Date.now() + '-' + Math.random().toString(36).slice(2);
     var html = '<div class="wtb-modal-h"><h3>Уже заказали</h3><button type="button" class="modal-close" data-wtb-close aria-label="Закрыть"><i class="ti ti-x"></i></button></div>' +
       '<div class="wtb-modal-lead">Учесть размещённый заказ. Количество появится в «В пути». Письма не отправляются.</div><form data-wtb-manual-form><div class="wtb-modal-b">' +
-      '<label class="wtb-field">Поставщик<select data-manual-supplier required><option value="">Выберите из справочника</option>' + suppliers.map(function (s) { return '<option value="' + s.id + '"' + (Number(s.id) === initial ? ' selected' : '') + '>' + _esc(s.name) + '</option>'; }).join('') + '</select></label><div class="wtb-manual-lines">';
+      '<label class="wtb-field">Поставщик<select data-manual-supplier required><option value="">Выберите из справочника</option>' + suppliers.map(function (s) { return '<option value="' + s.id + '"' + (Number(s.id) === initial ? ' selected' : '') + '>' + _esc(s.name) + (s.inn ? ' · ИНН ' + _esc(s.inn) : '') + ' · #' + s.id + '</option>'; }).join('') + '</select></label><div class="wtb-manual-lines">';
     lines.forEach(function (l, index) {
       html += '<label class="wtb-manual-line"><span><b>' + _esc(l.name) + '</b><small>' + _esc(l.contract_number || '') + ' → ' + _esc(l.product_name || '') + '</small></span><span class="wtb-quantity-field"><input type="number" data-manual-qty="' + index + '" min="0.001" max="' + l.qty + '" step="any" value="' + l.qty + '" aria-label="Количество: ' + _esc(l.name) + '" required><small>' + unit(l.unit) + '</small></span></label>';
     });
