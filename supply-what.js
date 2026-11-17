@@ -842,15 +842,20 @@
         '. Поставщику ничего не отправится.</div><div class="wtb-modal-b">';
       groups.forEach(function (g, idx) {
         html += '<div class="wtb-og' + (g.missing_supplier ? ' miss' : '') + '"><div class="ogh">' +
-          '<b>' + (idx + 1) + '. ' + _esc(g.missing_supplier ? 'Поставщик не назначен' : (g.supplier_name || ('Поставщик #' + g.supplier_id))) + '</b>' +
+          '<b>' + (idx + 1) + '. Поставщик</b>' +
           '<span class="wtb-pill ' + (g.missing_supplier ? 'err' : 'buy') + '">' + g.items_count + '</span>' +
-          (g.missing_supplier ? '<button type="button" class="wtb-link" data-wtb-pick-sup="' + idx + '">сначала выбрать поставщика</button>' : '') +
           '<span class="sp"></span><span class="s">' + _esc(g.contract_number || '') + ' · Куда: договор</span></div>';
+        html += '<div class="wtb-supfield"><div class="wtb-supval">' +
+          _esc(g.missing_supplier ? 'Не назначен' : (g.supplier_name || ('Поставщик #' + g.supplier_id))) +
+          '</div><button type="button" class="wtb-link" data-wtb-pick-sup="' + idx + '">' +
+          (g.missing_supplier ? 'Выбрать поставщика' : 'Сменить') + '</button></div>';
         (g.items || []).forEach(function (it) {
           html += '<div class="wtb-oline"><div><b>' + _esc(it.name) + '</b> ×' + fmt(it.qty) +
             (it.unit ? ' ' + _esc(it.unit) : '') +
             '<div class="s">изделие: ' + (it.position_no != null ? 'поз. ' + _esc(it.position_no) + ' ' : '') +
-            _esc(it.product_name || '') + '</div></div><span class="wtb-num-buy">докупить ' + fmt(it.qty) + '</span></div>';
+            _esc(it.product_name || '') + '</div></div><div class="wtb-oline-r"><span class="wtb-num-buy">докупить ' + fmt(it.qty) + '</span>' +
+            '<button type="button" class="wtb-link" data-wtb-pick-line="' + _esc(it.key) + '">' +
+            (it.supplier_id ? 'сменить' : 'выбрать поставщика') + '</button></div></div>';
         });
         html += '</div>';
       });
@@ -894,11 +899,30 @@
         };
       }
       box.querySelectorAll('[data-wtb-pick-sup]').forEach(function (b) {
-        b.onclick = function () { pickSupplier(groups[Number(b.getAttribute('data-wtb-pick-sup'))], p); };
+        b.onclick = function () {
+          var g = groups[Number(b.getAttribute('data-wtb-pick-sup'))];
+          if (g) pickSupplier(g.items || [], g.supplier_id, g.missing_supplier
+            ? 'Выбрать поставщика'
+            : 'Сменить поставщика');
+        };
+      });
+      box.querySelectorAll('[data-wtb-pick-line]').forEach(function (b) {
+        b.onclick = function () {
+          var key = b.getAttribute('data-wtb-pick-line');
+          var item = null;
+          (groups || []).forEach(function (g) {
+            (g.items || []).forEach(function (it) { if (it.key === key) item = it; });
+          });
+          if (item) {
+            pickSupplier([item], item.supplier_id, item.supplier_id
+              ? 'Сменить поставщика для «' + item.name + '»'
+              : 'Поставщик для «' + item.name + '»');
+          }
+        };
       });
     }
 
-    async function pickSupplier(group, p) {
+    async function pickSupplier(targetItems, currentId, title) {
       var data;
       try { data = await apiGet('/api/suppliers'); } catch (e) {
         if (typeof showToast === 'function') showToast('Не удалось загрузить поставщиков', 'error');
@@ -907,40 +931,55 @@
       var suppliers = (data.suppliers || data.items || []).filter(function (s) {
         return s.is_active !== false && s.is_active !== 0;
       });
-      var choice = null;
-      var html = '<div class="wtb-modal-h"><h3>Поставщик для ' + group.items_count + ' позиций</h3>' +
+      var current = currentId != null && currentId !== '' ? Number(currentId) : null;
+      var choice = current;
+      var html = '<div class="wtb-modal-h"><h3>' + _esc(title || 'Выбрать поставщика') + '</h3>' +
         '<button type="button" class="modal-close" data-wtb-close><i class="ti ti-x"></i></button></div>' +
-        '<div class="wtb-modal-b"><input type="search" class="wtb-search" id="wtb-sup-q" placeholder="Найти поставщика">' +
-        '<div id="wtb-sup-list"></div></div>' +
+        '<div class="wtb-modal-lead">Поиск по справочнику поставщиков. Разбивка черновиков пойдёт по выбранному.</div>' +
+        '<div class="wtb-modal-b"><input type="search" class="wtb-search" id="wtb-sup-q" placeholder="Найти поставщика по названию или ИНН" autocomplete="off">' +
+        '<div id="wtb-sup-list" class="wtb-sup-list"></div></div>' +
         '<div class="wtb-modal-f"><button type="button" data-wtb-back-prev>Назад</button>' +
-        '<button type="button" class="btn btn-primary" id="wtb-sup-save" disabled>Назначить</button></div>';
+        '<button type="button" class="btn btn-primary" id="wtb-sup-save"' + (choice ? '' : ' disabled') + '>Назначить</button></div>';
       var wrap = document.getElementById('wtb-order-modal');
       wrap.querySelector('.wtb-modal').innerHTML = html;
+      function applyChoice(id) {
+        choice = Number(id);
+        var save = document.getElementById('wtb-sup-save');
+        if (save) save.disabled = !choice;
+        draw();
+      }
       function draw() {
-        var q = (document.getElementById('wtb-sup-q').value || '').toLowerCase();
-        document.getElementById('wtb-sup-list').innerHTML = suppliers.filter(function (s) {
-          return (s.name + ' ' + (s.inn || '')).toLowerCase().indexOf(q) >= 0;
-        }).map(function (s) {
-          return '<label class="wtb-supopt"><input type="radio" name="wtb-sup" value="' + s.id + '"' +
-            (choice === s.id ? ' checked' : '') + '><span>' + _esc(s.name) + '</span></label>';
+        var q = (document.getElementById('wtb-sup-q').value || '').trim().toLowerCase();
+        var list = suppliers.filter(function (s) {
+          return ((s.name || '') + ' ' + (s.inn || '')).toLowerCase().indexOf(q) >= 0;
+        });
+        document.getElementById('wtb-sup-list').innerHTML = list.map(function (s) {
+          var on = Number(s.id) === Number(choice);
+          return '<button type="button" class="wtb-supopt' + (on ? ' on' : '') + '" data-wtb-sup-id="' + s.id + '">' +
+            '<span class="wtb-supopt-name">' + _esc(s.name || '—') + '</span>' +
+            (s.inn ? '<span class="s">ИНН ' + _esc(s.inn) + '</span>' : '') +
+            (on ? '<span class="wtb-supopt-check">✓</span>' : '') +
+            '</button>';
         }).join('') || '<div class="wtb-empty">Поставщики не найдены</div>';
-        document.querySelectorAll('[name="wtb-sup"]').forEach(function (el) {
-          el.onchange = function () {
-            choice = Number(el.value);
-            document.getElementById('wtb-sup-save').disabled = false;
-          };
+        document.querySelectorAll('[data-wtb-sup-id]').forEach(function (el) {
+          el.onclick = function () { applyChoice(el.getAttribute('data-wtb-sup-id')); };
         });
       }
       draw();
       document.getElementById('wtb-sup-q').oninput = draw;
+      setTimeout(function () {
+        var s = document.getElementById('wtb-sup-q');
+        if (s) s.focus();
+      }, 50);
       wrap.querySelectorAll('[data-wtb-close]').forEach(function (b) { b.onclick = closeWtbModal; });
       wrap.querySelector('[data-wtb-back-prev]').onclick = function () { renderPreview(p); };
       document.getElementById('wtb-sup-save').onclick = function () {
         if (!choice) return;
-        var name = (suppliers.filter(function (s) { return Number(s.id) === choice; })[0] || {}).name || '';
-        (group.items || []).forEach(function (it) { overrides[it.key] = choice; });
+        var rec = suppliers.filter(function (s) { return Number(s.id) === Number(choice); })[0] || {};
+        var name = rec.name || '';
+        (targetItems || []).forEach(function (it) { overrides[it.key] = choice; });
         lines.forEach(function (l) {
-          if ((group.items || []).some(function (it) { return it.key === l.key; })) {
+          if ((targetItems || []).some(function (it) { return it.key === l.key; })) {
             l.supplier_id = choice;
             l.supplier_name = name;
           }
