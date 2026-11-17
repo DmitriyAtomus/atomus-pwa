@@ -154,3 +154,58 @@ table.wtb-comp .nm small{display:block;color:var(--wtb-light);font-weight:400;}
 
 .wtb-lcard .invline{margin-top:8px;text-align:left;font-size:12px;color:var(--wtb-wait);font-weight:600;}
 .wtb-invsum{margin:0 0 14px;}
+
+/* Этап 3: чекбоксы и черновики заказов */
+.wtb-check { display:inline-flex; align-items:center; margin-right:6px; cursor:pointer; }
+.wtb-check input { width:16px; height:16px; accent-color:#534AB7; }
+.wtb-check-prod { margin-right:8px; }
+.wtb-td-check { width:28px; vertical-align:middle; }
+.wtb-order-btn {
+  display:inline-flex; align-items:center; margin-left:8px;
+  border:0; border-radius:8px; padding:5px 10px; cursor:pointer;
+  background:#534AB7; color:#fff; font:600 12px/1.2 inherit; white-space:nowrap;
+}
+.wtb-order-btn:hover { background:#3C3489; }
+.wtb-cstat { display:flex; align-items:center; gap:8px; }
+.wtb-orderbar {
+  position:sticky; bottom:0; display:flex; align-items:center; gap:10px;
+  margin-top:16px; padding:12px 14px; border:1px solid var(--border, #e5e7eb);
+  border-radius:14px; background:#fff; box-shadow:0 -8px 24px rgba(16,24,40,.06);
+  z-index:5;
+}
+.wtb-orderbar .sp { flex:1; }
+.wtb-orderbar .wtb-muted { color:var(--wtb-muted, #6b7280); font-size:13px; }
+.wtb-orderbar button[disabled] { opacity:.45; cursor:not-allowed; }
+.wtb-modal-back {
+  position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:80;
+  display:flex; align-items:center; justify-content:center; padding:16px;
+}
+.wtb-modal {
+  width:min(820px, 100%); max-height:90vh; overflow:auto; background:#fff;
+  border-radius:18px; box-shadow:0 20px 50px rgba(15,23,42,.2);
+  display:flex; flex-direction:column;
+}
+.wtb-modal-h { display:flex; align-items:center; gap:10px; padding:16px 18px 8px; }
+.wtb-modal-h h3 { margin:0; flex:1; font-size:18px; }
+.wtb-modal-lead { padding:0 18px 10px; color:#4b5563; font-size:13px; }
+.wtb-modal-b { padding:0 18px 14px; overflow:auto; }
+.wtb-modal-f { display:flex; gap:8px; justify-content:flex-end; padding:12px 18px 16px; border-top:1px solid #eee; }
+.wtb-og { border:1px solid #e5e7eb; border-radius:14px; margin-bottom:12px; overflow:hidden; }
+.wtb-og.miss { border-color:#f3c6c6; }
+.wtb-og .ogh { display:flex; align-items:center; gap:8px; padding:10px 12px; background:#f8f7ff; font-size:13px; }
+.wtb-og.miss .ogh { background:#fff4f4; }
+.wtb-og .ogh .sp { flex:1; }
+.wtb-og .ogh .s, .wtb-oline .s { color:#6b7280; font-size:12px; font-weight:400; }
+.wtb-oline { display:flex; justify-content:space-between; gap:10px; padding:10px 12px; border-top:1px solid #f0f0f0; font-size:13px; }
+.wtb-link { border:0; background:none; color:#534AB7; cursor:pointer; font:600 12px inherit; }
+.wtb-supopt { display:flex; gap:8px; align-items:center; padding:8px 0; cursor:pointer; }
+.wtb-created {
+  display:block; width:100%; text-align:left; margin:0 0 8px; padding:12px 14px;
+  border:1px solid #e5e7eb; border-radius:12px; background:#fff; cursor:pointer; font:600 14px inherit;
+}
+.wtb-created:hover { border-color:#534AB7; }
+@media (max-width: 720px) {
+  .wtb-order-btn { padding:8px 10px; }
+  .wtb-orderbar { flex-wrap:wrap; }
+  .wtb-modal { max-height:96vh; }
+}
