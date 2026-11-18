@@ -232,11 +232,12 @@ async function loadComponentsCatalog() {
   const newBtnM = document.getElementById('cc-mobile-new');
   const diagBtn = document.getElementById('cc-diagnose-btn');
   const dupsBtn = document.getElementById('cc-dups-btn');
-  const canEdit = canManageSales();
-  if (newBtn) newBtn.style.display = canEdit ? '' : 'none';
-  if (newBtnM) newBtnM.style.display = canEdit ? '' : 'none';
-  if (diagBtn) diagBtn.style.display = canEdit ? '' : 'none';
-  if (dupsBtn) dupsBtn.style.display = canEdit ? '' : 'none';
+  const canCreate = (typeof canManageComponents === 'function') ? canManageComponents() : canManageSales();
+  const canAdmin = canManageSales();
+  if (newBtn) newBtn.style.display = canCreate ? '' : 'none';
+  if (newBtnM) newBtnM.style.display = canCreate ? '' : 'none';
+  if (diagBtn) diagBtn.style.display = canAdmin ? '' : 'none';
+  if (dupsBtn) dupsBtn.style.display = canAdmin ? '' : 'none';
 
   if (!cache.componentCategories) {
     try {
@@ -297,8 +298,9 @@ function renderComponentsCatalogList() {
   if (!list.length) {
     container.innerHTML = '<div class="empty-block"><i class="ti ti-package-off"></i>' +
       ((cache.components && cache.components.length) ? 'Ничего не найдено' :
-       canManageSales() ? 'Пока нет комплектующих. Нажми «+ Новое комплектующее»' :
-       'Пока нет комплектующих') + '</div>';
+       ((typeof canManageComponents === 'function' ? canManageComponents() : canManageSales())
+         ? 'Пока нет комплектующих. Нажми «+ Новое комплектующее»' :
+       'Пока нет комплектующих')) + '</div>';
     return;
   }
 
@@ -396,7 +398,7 @@ function toggleCatalogGroup(cat) {
 
 async function loadWarehouseComponents() {
   const newBtn = document.getElementById('comp-new-btn');
-  if (newBtn) newBtn.style.display = canManageSales() ? '' : 'none';
+  if (newBtn) newBtn.style.display = ((typeof canManageComponents === 'function') ? canManageComponents() : canManageSales()) ? '' : 'none';
 
   // Подгружаем категории
   if (!cache.componentCategories) {
@@ -744,8 +746,8 @@ function _fmtQty(q) {
 // ============ Создание / редактирование комплектующего ============
 
 async function openComponentForm(componentId) {
-  if (!canManageSales()) {
-    showToast('Доступ только директору и заму', 'error');
+  if (!((typeof canManageComponents === 'function') ? canManageComponents() : canManageSales())) {
+    showToast('Недостаточно прав', 'error');
     return;
   }
   const isEdit = !!componentId;
@@ -958,11 +960,12 @@ async function openComponentForm(componentId) {
         '<textarea id="cf-comment" class="form-input" rows="2" style="resize:vertical;">' + escapeHtml((c && c.comment) || '') + '</textarea>' +
       '</div>' +
       '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">' +
-        (isEdit ?
+        // v2.46.312: удаление и AISI-копия — только полный доступ к номенклатуре
+        ((isEdit && canManageSales()) ?
           '<button class="btn btn-secondary" onclick="deleteComponent(' + componentId + ')" style="color:var(--danger);margin-right:auto;">' +
             '<i class="ti ti-trash"></i> Удалить</button>' : '') +
         // v2.41.0: дублирование в нерж — только для существующих стальных позиций с артикулом
-        ((isEdit && c && c.execution_type !== 'stainless' && c.sku) ?
+        ((isEdit && canManageSales() && c && c.execution_type !== 'stainless' && c.sku) ?
           '<button class="btn btn-secondary" onclick="duplicateComponentStainless(' + componentId + ')" title="Создать копию для нержавейки AISI">' +
             '<i class="ti ti-copy"></i> Создать AISI-копию</button>' : '') +
         '<button class="btn btn-secondary" onclick="closeComponentForm()">Отмена</button>' +
@@ -3475,7 +3478,18 @@ const WH_TAB_ACTIONS = {
 function _renderWarehouseDashActions(tab) {
   const host = document.getElementById('wh-dash-actions');
   if (!host) return;
-  const actions = WH_TAB_ACTIONS[tab] || [];
+  const canCreate = (typeof canManageComponents === 'function') ? canManageComponents() : canManageSales();
+  const canAdmin = canManageSales();
+  // v2.46.312: «Комплектующее» — canManageComponents; диагностика/дубли/мастер-BOM/приход — только canManageSales
+  const actions = (WH_TAB_ACTIONS[tab] || []).filter(a => {
+    if (a.onclick === 'openComponentForm()') return canCreate;
+    if (tab === 'components') {
+      if (['openMasterBomImport()', 'openBomDiagnose()', 'openComponentDuplicates()', 'openComponentReceiveModal()'].includes(a.onclick)) {
+        return canAdmin;
+      }
+    }
+    return true;
+  });
   host.innerHTML = actions.map(a =>
     '<button class="' + a.cls + '" onclick="' + a.onclick + '">' +
     '<i class="ti ' + a.icon + '"></i> ' + a.label +
@@ -18959,6 +18973,7 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {version:'v2.46.312',date:'18.11.2026',title:'Право создавать и редактировать комплектующие',features:['Новое узкое право catalog.manage_components: создавать и править комплектующие без полного доступа к номенклатуре.','Категории, дубли, мастер-BOM, удаление и AISI-копия по-прежнему только у директора/зама/менеджера.']},
   {version:'v2.46.311',date:'17.11.2026',title:'Снабжение: договор → изделие → комплектующие',features:['Склад, размещённые заказы и закупка видны внутри каждого изделия; общая закупка объединяет одинаковые комплектующие с переходом к договору и изделию.','Кнопка «Уже заказали» учитывает размещённый или оплаченный заказ без отправки писем.','Свободные остатки можно закрепить под изделие одной кнопкой; детали корпуса объединены по существующему составу изготовления.']},
   {version:'v2.46.310',date:'17.11.2026',title:'Что закупить: резерв комплектующих и названия из прайса',features:['Повторное обновление резервов больше не наращивает резерв позиции только с комплектующим сверх её количества.','В мастере «Заказать» видно наше имя и название из прайса поставщика; если сопоставления нет — можно выбрать строку прайса прямо в мастере.']},
   {version:'v2.46.309',date:'17.11.2026',title:'Что закупить: черновики заказов из дерева',features:['В дереве «Что закупить» у строк появились чекбоксы и кнопка «Заказать»: одну позицию или несколько сразу.','Система собирает черновики ORD с разбивкой по поставщикам и сама проставляет договор в «Куда». Поставщику письмо не уходит.']},
