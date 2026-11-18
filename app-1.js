@@ -231,8 +231,8 @@ function _sentryUiSpan(op, name, fn) {
 
 
 // Версия приложения — обновляется при каждом релизе вместе с CACHE_VERSION в sw.js
-const APP_VERSION = "v2.46.311";
-const APP_VERSION_DATE = "17.11.2026";
+const APP_VERSION = "v2.46.312";
+const APP_VERSION_DATE = "18.11.2026";
 
 // ============ ЭТАП 29: ПРОВЕРКА ПРАВ ============
 // hasPermission(key) — true если у текущего пользователя есть указанный permission.
@@ -2022,6 +2022,13 @@ function canManageSales() {
   return state.user.roles.includes('director')
       || state.user.roles.includes('zam')
       || state.user.roles.includes('manager');
+}
+
+// v2.46.312: узкое право создавать/редактировать комплектующие без полного
+// доступа к номенклатуре (категории, дубли, BOM, удаление остаются у canManageSales).
+function canManageComponents() {
+  return (typeof canManageSales === 'function' && canManageSales())
+      || (typeof hasPermission === 'function' && hasPermission('catalog.manage_components'));
 }
 
 // v2.45.194: кто видит суммы договоров/цены. Мастер (производство) — НЕ видит.
