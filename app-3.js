@@ -15813,7 +15813,12 @@ function _owzSnapshot() {
     supplierId: _owz.supplierId || null, supplierName: _owz.supplierName || '',
     supplierEmail: _owz.supplierEmail || '', supplierPhone: _owz.supplierPhone || '',
     companyCardId: _owz.companyCardId || null,
-    list: (_owz.list || []).map(x => ({ name: x.name, unit: x.unit, qty: x.qty, id: x.id || null })),
+    kind: _owz.kind, dest: _owz.dest, contractId: _owz.contractId, contractNumber: _owz.contractNumber,
+    list: (_owz.list || []).map(x => ({
+      id: x.id || null, cid: x.cid ?? null, name: x.name, unit: x.unit, qty: x.qty,
+      supplierPrice: x.supplierPrice, dest_type: x.dest_type, dest_contract_id: x.dest_contract_id,
+      dest_contract_number: x.dest_contract_number,
+    })),
     expected: g('owz-expected'), phone: g('owz-phone'), comment: g('owz-comment'), at: Date.now(),
   };
 }
@@ -15832,7 +15837,15 @@ function _owzMaybeRestoreDraft() {
   try { s = JSON.parse(localStorage.getItem(OWZ_DRAFT_KEY) || 'null'); } catch (e) { s = null; }
   if (!_owzHasContent(s)) return;
   if (!confirm('Есть незавершённый черновик заказа' + (s.supplierName ? ' («' + s.supplierName + '»)' : '') + '. Продолжить его?')) { _owzClearDraft(); return; }
-  _owz.list = (s.list || []).map(x => ({ name: x.name, unit: x.unit || 'шт.', qty: x.qty || 1, id: x.id || null }));
+  const previous = s.list || [];
+  _owz.kind = s.kind || null;
+  _owz.dest = s.dest || null;
+  _owz.contractId = s.contractId || null;
+  _owz.contractNumber = s.contractNumber || '';
+  _owz.custom = Math.max(0, ...previous.map(x => -(Number(x.id) || 0)));
+  _owz.list = previous.map(x => ({
+    ...x, unit: x.unit || 'шт.', qty: x.qty ?? 1, id: x.id || -(++_owz.custom),
+  }));
   const setV = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
   setV('owz-expected', s.expected); setV('owz-phone', s.phone); setV('owz-comment', s.comment);
   if (s.supplierId && (cache.suppliers || []).find(x => x.id === s.supplierId)) _owzSupPick(s.supplierId);
@@ -15891,6 +15904,8 @@ async function openNewSupplyOrder() {
           '<div id="owz-sup-hint" style="font-size:12px;color:var(--text-light);margin-top:4px;"></div>' +
         '</div>' +
         '<div id="owz-sup-card"></div>' +
+        '<button type="button" id="owz-supplier-prices" class="btn btn-secondary owz-prices-button" hidden onclick="_owzOpenSupplierPrices()">' +
+          '<i class="ti ti-file-spreadsheet"></i> Прайсы поставщика</button>' +
         // Что заказываем
         '<div class="owz2-sec-l"><i class="ti ti-package"></i> Что заказываем</div>' +
         '<div class="owz2-srow">' +
@@ -15996,6 +16011,8 @@ function _owzSupPick(id) {
 function _owzRenderSupplier() {
   const card = document.getElementById('owz-sup-card');
   const wrap = document.getElementById('owz-sup-search-wrap');
+  const prices = document.getElementById('owz-supplier-prices');
+  if (prices) prices.hidden = !_owz.supplierId;
   if (!card) return;
   if (!_owz.supplierId) {
     card.innerHTML = '';
@@ -16015,12 +16032,40 @@ function _owzRenderSupplier() {
   '</div>';
 }
 
+function _owzOpenSupplierPrices() {
+  if (!_owz.supplierId) return;
+  const supplierId = _owz.supplierId;
+  openSupplyPriceCatalog(supplierId, _owz.supplierName, item => {
+    if (_owz.supplierId !== supplierId) return 0;
+    const identity = (item.code || item.name).toLowerCase();
+    let entry = _owz.list.find(x => x.supplierPrice?.supplierId === supplierId && x.supplierPrice.identity === identity);
+    if (entry) {
+      entry.qty = +(entry.qty + 1).toFixed(3);
+    } else {
+      entry = {
+        id: -(++_owz.custom), cid: null,
+        name: item.code ? item.name + ' (' + item.code + ')' : item.name,
+        unit: item.role === 'Комплект' ? 'компл.' : 'шт.', qty: 1,
+        supplierPrice: { supplierId, identity, price: item.price ?? null },
+        dest_type: _owz.dest || null,
+        dest_contract_id: _owz.dest === 'contract' ? _owz.contractId || null : null,
+        dest_contract_number: _owz.dest === 'contract' ? _owz.contractNumber || '' : '',
+      };
+      _owz.list.push(entry);
+    }
+    _owzRenderCart();
+    _owzSaveDraft();
+    return entry.qty;
+  }, () => _owz.list);
+}
+
 function _owzSupChange() {
   _owz.supplierId = null; _owz.supplierEmail = ''; _owz.supplierPhone = ''; _owz.supplierName = '';
   const inp = document.getElementById('owz-supplier-search');
   if (inp) inp.value = '';
   _owzSupplierHint();
   _owzRenderSupplier();
+  _owzRenderCart();
   if (inp) inp.focus();
 }
 
@@ -16229,6 +16274,8 @@ function _owzRenderCart() {
       '<span class="owz2-c-name" onclick="_owzEditName(' + x.id + ')" title="Нажми, чтобы изменить название">' +
         escapeHtml(x.name) +
         (x.renamed ? ' <span class="owz2-c-ren" title="Название изменено вручную">✎ изменено</span>' : '') +
+        (x.supplierPrice && (x.supplierPrice.price == null || x.supplierPrice.supplierId !== _owz.supplierId)
+          ? '<small class="owz-price-note">Уточнить цену</small>' : '') +
       '</span>' +
       '<button class="owz2-c-edit" onclick="_owzEditName(' + x.id + ')" title="Изменить название"><i class="ti ti-pencil"></i></button>' +
       '<input class="owz2-c-qty" type="number" inputmode="decimal" min="0" step="any" value="' + x.qty + '" ' +
@@ -16289,9 +16336,18 @@ function _owzNewItem() {
 }
 
 async function submitOrderWizard(send) {
+  if (_owz.submitting) return;
   const supplierId = _owz.supplierId || null;
   if (!supplierId) { showToast('Выберите поставщика из списка', 'error'); return; }
-  const items = _owz.list.filter(x => x.qty > 0).map(x => ({ name: x.name, unit: x.unit, qty: x.qty }));
+  const items = _owz.list.filter(x => x.qty > 0).map(x => {
+    const item = { name: x.name, unit: x.unit, qty: x.qty };
+    if (x.supplierPrice) {
+      const price = x.supplierPrice.supplierId === supplierId ? x.supplierPrice.price : null;
+      item.price = price;
+      item.request_price = price == null;
+    }
+    return item;
+  });
   if (!items.length) { showToast('Добавьте хотя бы одну позицию с количеством', 'error'); return; }
   const payload = {
     supplier_id: supplierId,
@@ -16307,6 +16363,8 @@ async function submitOrderWizard(send) {
       return;
     }
   }
+  const wizard = _owz;
+  wizard.submitting = true;
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const r = await fetch(API_BASE + '/api/supply-orders', {
@@ -16338,8 +16396,8 @@ async function submitOrderWizard(send) {
           return;   // остаёмся на месте, поверх — окно превью
         }
       } catch (_) { /* не валимся — ниже запасной путь */ }
-      // Запасной путь: превью не получили — отправляем напрямую, как раньше.
-      showToast('Заказ #' + created.id + ' создан, отправляем…', 'success');
+      // Повторно открываем предпросмотр уже созданного заказа.
+      showToast('Заказ #' + created.id + ' создан. Открываем предпросмотр письма…', 'success');
       await sendSupplyOrderByEmail(created.id);
       selectSidebarItem('supply-order-detail');
     } else {
@@ -16349,6 +16407,8 @@ async function submitOrderWizard(send) {
   } catch (e) {
     _owzSaveDraft();   // v2.45.694: сеть/сбой — сохранили черновик локально
     showToast('Сбой — черновик заказа сохранён, откроется при следующем «Новый заказ»', 'error');
+  } finally {
+    wizard.submitting = false;
   }
 }
 
@@ -18973,6 +19033,7 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {version:'v2.46.317',date:'19.11.2026',title:'Снабжение: заказ из прайсов поставщика',features:['В форме заказа можно открыть товарные листы Excel и выбирать позиции из нескольких файлов одного поставщика.','Модель, код НС и количество переходят в заявку. По строкам без цены в письме добавляется просьба уточнить её.']},
   {version:'v2.46.316',date:'19.11.2026',title:'Hotfix: дубли номеров заказов на изготовление',features:['Перед UNIQUE(doc_number) старые дубли З-017/З-022 переименовываются (З-017-d18…), чтобы _mfg_ensure не валил GET /api/mfg/orders|items|sections.']},
   {version:'v2.46.315',date:'19.11.2026',title:'Антидубль заказа на изготовление',features:['Кнопка отправки заказа на изготовление блокируется на время запроса, повторный клик не шлёт второй POST.','Сервер принимает request_id и не создаёт повторный заказ с тем же составом за 2 минуты; номер выдаётся до письма.','Параллельные запросы по одному изделию сводятся к одному mfg_order, одному письму и одному заказу снабжения.']},
   {version:'v2.46.314',date:'19.11.2026',title:'Снабжение: счёт и приёмка',features:['Если наименование покупной позиции отличается, CRM покажет замену перед подтверждением. После «ОК» договор обновится и счёт привяжется. При отсутствии создаётся карточка номенклатуры.','Приёмка сверяется со строками оплаченного PDF-счёта и показывает связанный счёт. Для оприходованных документов доступна повторная сверка.']},
