@@ -644,7 +644,8 @@
       root.scKindSegHtml('owz', o.kind) +
       '<div class="owz2-sec-l"><i class="ti ti-map-pin"></i> Куда · обязательно</div>' + root.scDestSegHtml('owz-dest', o.dest) +
       '<select id="owz-dest-contract" class="sc-select" style="margin-top:8px;' + (o.dest === 'contract' ? '' : 'display:none;') + '" onchange="scOwzContract(this)">' +
-        '<option value="">— выберите договор —</option>' + list.map(c => '<option value="' + Number(c.id) + '" data-num="' + esc(c.number || '') + '">' +
+        '<option value="">— выберите договор —</option>' + list.map(c => '<option value="' + Number(c.id) + '" data-num="' + esc(c.number || '') + '"' +
+          (Number(c.id) === Number(o.contractId) ? ' selected' : '') + '>' +
           esc((c.number ? (String(c.number).trim().startsWith('№') ? c.number : '№ ' + c.number) : '#' + c.id) + (c.contractor_name ? ' · ' + c.contractor_name : '')) + '</option>').join('') +
       '</select>';
     content.insertBefore(box, content.firstChild);
