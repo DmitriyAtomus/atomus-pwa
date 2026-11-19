@@ -352,6 +352,7 @@
       contract_id: row.contract_id,
       contract_item_id: row.contract_item_id,
       component_id: null,
+      direct_purchase: row.supply_kind === 'sale_product' || row.supply_kind === 'free_text',
       name: row.name,
       product_name: row.name,
       position_no: row.position_no,
@@ -1468,7 +1469,9 @@
         var data = await apiGet('/api/supply/what-to-buy/invoices?id=' + Number(id));
         if (request !== detailSeq || !panel.isConnected) return;
         if (!data || !data.invoice) throw new Error('Счёт не найден');
-        chosen = data.invoice;
+        chosen = Object.assign({}, data.invoice, {
+          availableItems: (data.items || []).filter(function (item) { return item.id && item.available; })
+        });
         var items = (data.items || []).map(function (item) {
           return '<div class="wtb-invoice-item"><span>' + _esc(item.name) + '</span><b>' +
             (item.qty == null ? 'Количество не указано' : fmt(item.qty) + ' ' + unit(item.unit)) + '</b></div>';
@@ -1529,20 +1532,23 @@
     var ids = Array.from(new Set(lines.map(function (l) { return l.supplier_id; }).filter(Boolean)));
     var initial = ids.length === 1 ? Number(ids[0]) : null;
     var requestId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'wtb-' + Date.now() + '-' + Math.random().toString(36).slice(2);
-    var html = '<div class="wtb-modal-h"><h3>Уже заказали</h3><button type="button" class="modal-close" data-wtb-close aria-label="Закрыть"><i class="ti ti-x"></i></button></div>' +
+    var html = '<div class="wtb-modal-h"><h3>Уже заказали</h3><button type="button" class="wtb-picker-close" data-wtb-close aria-label="Закрыть">×</button></div>' +
       '<div class="wtb-modal-lead">Учесть размещённый заказ. Количество появится в «В пути». Письма не отправляются.</div><form data-wtb-manual-form><div class="wtb-modal-b">' +
       '<div class="wtb-invoice-choice"><button type="button" class="wtb-small-btn" data-open-invoice-picker>Найти счёт в CRM</button><button type="button" class="wtb-link" data-clear-invoice hidden>Ввести вручную</button><div data-chosen-invoice></div></div>' +
       '<div data-supplier-fields><label class="wtb-field">Поставщик<input type="search" data-manual-supplier-search placeholder="Название или ИНН" autocomplete="off"></label>' +
       '<select data-manual-supplier aria-label="Выбрать поставщика" required></select></div><div class="wtb-manual-lines">';
     lines.forEach(function (l, index) {
-      html += '<div class="wtb-manual-line"><label data-include-invoice hidden><input type="checkbox" data-invoice-line="' + index + '" aria-label="Учесть ' + _esc(l.name) + '" checked></label><span class="wtb-manual-line-name"><b>' + _esc(l.name) + '</b><small>' + _esc(l.contract_number || '') + ' → ' + _esc(l.product_name || '') + '</small></span><span class="wtb-quantity-field"><input type="number" data-manual-qty="' + index + '" min="0.001" max="' + l.qty + '" step="any" value="' + l.qty + '" aria-label="Количество: ' + _esc(l.name) + '" required><small>' + unit(l.unit) + '</small></span></div>';
+      var source = l.direct_purchase ? '<label class="wtb-field wtb-invoice-source" hidden>Позиция счёта<select data-invoice-source="' + index + '"></select></label>' : '';
+      html += '<div class="wtb-manual-line"><label data-include-invoice hidden><input type="checkbox" data-invoice-line="' + index + '" aria-label="Учесть ' + _esc(l.name) + '" checked></label><span class="wtb-manual-line-name"><b>' + _esc(l.name) + '</b><small>' + _esc(l.contract_number || '') + ' → ' + _esc(l.product_name || '') + '</small>' + source + '</span><span class="wtb-quantity-field"><input type="number" data-manual-qty="' + index + '" min="0.001" max="' + l.qty + '" step="any" value="' + l.qty + '" aria-label="Количество: ' + _esc(l.name) + '" required><small>' + unit(l.unit) + '</small></span></div>';
     });
     html += '</div><div class="wtb-manual-fields"><label class="wtb-field" data-manual-only>Номер счёта · необязательно<input type="text" maxlength="200" data-manual-invoice></label>' +
       '<label class="wtb-field">Ожидаемая поставка<input type="date" data-manual-date></label></div><label class="wtb-paid-field" data-manual-only><input type="checkbox" data-manual-paid>Счёт уже оплачен</label>' +
-      '<div data-manual-existing></div><div class="wtb-action-error" data-manual-error role="alert" hidden></div></div><div class="wtb-modal-f"><button type="button" data-wtb-close>Отмена</button><button type="submit" class="btn btn-primary" data-manual-submit disabled>Учесть заказ</button></div></form>';
+      '<div data-manual-existing></div><div class="wtb-invoice-replacement" data-invoice-replacement aria-live="polite" hidden></div>' +
+      '<div class="wtb-action-error" data-manual-error role="alert" hidden></div></div><div class="wtb-modal-f"><button type="button" data-wtb-close>Отмена</button><button type="submit" class="btn btn-primary" data-manual-submit disabled>Учесть заказ</button></div></form>';
     var box = wtbModal(html); modalCloseButtons(box);
     var form = box.querySelector('[data-wtb-manual-form]'), submit = box.querySelector('[data-manual-submit]'), warning = box.querySelector('[data-manual-error]');
-    var timer = null, sequence = 0, submitting = false, invoice = null, manualDate = '';
+    var changeNotice = box.querySelector('[data-invoice-replacement]');
+    var timer = null, sequence = 0, submitting = false, invoice = null, manualDate = '', confirmation = null;
     var supplier = box.querySelector('[data-manual-supplier]');
     var supplierQuery = box.querySelector('[data-manual-supplier-search]');
     function filterSuppliers(value) {
@@ -1582,6 +1588,17 @@
         qty.max = limit;
         qty.value = limit ? Math.min(Number(qty.value) || limit, limit) : '';
         qty.closest('.wtb-manual-line').hidden = !limit && !invoice;
+        var select = box.querySelector('[data-invoice-source="' + i + '"]');
+        if (!select) return;
+        var available = invoice ? (invoice.availableItems || []) : [];
+        var matching = available.filter(function (item) { return item.name.trim().toLowerCase() === line.name.trim().toLowerCase(); });
+        select.closest('label').hidden = available.length <= 1;
+        select.innerHTML = '<option value="">По наименованию в договоре</option>' + available.map(function (item) {
+          return '<option value="' + Number(item.id) + '">' + _esc(item.name) +
+            ' · ' + fmt(item.remaining_qty) + ' ' + unit(item.unit) + '</option>';
+        }).join('');
+        var chosen = matching.length === 1 ? matching[0] : available.length === 1 ? available[0] : null;
+        select.value = chosen ? String(chosen.id) : '';
       });
       preview();
     }
@@ -1592,6 +1609,7 @@
       var append = box.querySelector('[data-manual-append]');
       return { dry_run: dry, request_id: requestId, supplier_id: sid,
         invoice_order_id: invoice ? invoice.id : undefined,
+        replacement_confirmation: !dry && confirmation ? confirmation : undefined,
         paid: box.querySelector('[data-manual-paid]').checked,
         invoice_number: box.querySelector('[data-manual-invoice]').value.trim(),
         expected_date: box.querySelector('[data-manual-date]').value || null,
@@ -1599,16 +1617,34 @@
         create_separate: !!(box.querySelector('[data-manual-separate]') || {}).checked,
         items: lines.flatMap(function (l, i) {
           var input = box.querySelector('[data-manual-qty="' + i + '"]');
-          return !input.disabled ? [Object.assign(linePayload(l, { supplier_id: sid }), { qty: Number(input.value) })] : [];
+          var source = box.querySelector('[data-invoice-source="' + i + '"]');
+          return !input.disabled ? [Object.assign(linePayload(l, { supplier_id: sid }), {
+            qty: Number(input.value), invoice_line_id: invoice && source && source.value ? Number(source.value) : undefined
+          })] : [];
         }) };
     }
     async function preview() {
       var seq = ++sequence;
       submit.disabled = true; warning.hidden = true;
+      confirmation = null;
+      changeNotice.hidden = true;
+      submit.textContent = 'Учесть заказ';
       if (!form.checkValidity() || (!invoice && !supplier.value) || !body(true).items.length) return;
       try {
         var data = successfulPost(await apiPost('/api/supply/what-to-buy/ordered', body(true)));
         if (seq !== sequence || !box.isConnected) return;
+        if (data.replacement_confirmation && (data.replacements || []).length) {
+          confirmation = data.replacement_confirmation;
+          changeNotice.innerHTML = '<strong>Наименование в договоре изменится</strong>' +
+            data.replacements.map(function (item) {
+              return '<div><span>' + _esc(item.original_name) + '</span><b> → ' + _esc(item.name) + '</b>' +
+                (Number(item.qty) < Number(item.contract_qty) ? '<small>По этому счёту будет учтено ' +
+                  fmt(item.qty) + ' из ' + fmt(item.contract_qty) + ' ' + unit(item.unit) + '.</small>' : '') +
+                (item.catalog_id ? '' : '<small>Будет создана карточка номенклатуры.</small>') + '</div>';
+            }).join('');
+          changeNotice.hidden = false;
+          submit.textContent = 'ОК, учесть и заменить';
+        }
         var holder = box.querySelector('[data-manual-existing]'), old = holder.querySelector('[data-manual-append]'), previous = old && old.value;
         holder.innerHTML = (data.existing_orders || []).length ? '<div class="wtb-existing-order"><b>По этим позициям уже есть заказ</b><label class="wtb-field">Дополнить заказ<select data-manual-append><option value="">Выберите заказ</option>' + data.existing_orders.map(function (o) { return '<option value="' + o.id + '"' + (String(o.id) === previous ? ' selected' : '') + '>' + _esc(o.order_label || ('ORD-' + o.id)) + ' · ' + _esc(orderStatusRu(o.status)) + '</option>'; }).join('') + '</select></label><label class="wtb-paid-field"><input type="checkbox" data-manual-separate>Создать отдельный заказ</label></div>' : '';
         function ready() { submit.disabled = !data.can_create || !!(data.existing_orders || []).length && !holder.querySelector('[data-manual-append]').value && !holder.querySelector('[data-manual-separate]').checked; }
@@ -1631,7 +1667,13 @@
         var result = successfulPost(await apiPost('/api/supply/what-to-buy/ordered', body(false)));
         closeWtbModal(); await refreshCurrent();
         if (typeof showToast === 'function') showToast('Учтён заказ ' + result.order.order_label + '. Количество — в пути.', 'success');
-      } catch (error) { submitting = false; warning.hidden = false; warning.textContent = error.message; submit.disabled = false; }
+      } catch (error) {
+        submitting = false;
+        if (confirmation) await preview();
+        else submit.disabled = false;
+        warning.hidden = false;
+        warning.textContent = error.message;
+      }
     };
     setInvoice(null);
   }

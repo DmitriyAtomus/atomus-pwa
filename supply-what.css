@@ -362,9 +362,9 @@ table.wtb-comp .nm small{display:block;color:var(--wtb-light);font-weight:400;}
 .wtb-invoice-filters{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
 .wtb-invoice-details{min-width:0;padding:12px;border-radius:10px;border:1px solid #d7e2ef;background:#f5f8fd;font-size:13px;overflow-wrap:anywhere}
 .wtb-invoice-details h4{margin:12px 0 6px}
-.wtb-invoice-picker .wtb-modal-f button{min-height:40px;padding:8px 14px;border:1px solid #cbd8e8;border-radius:8px;background:#fff;color:#24466d;font:inherit;font-weight:600;cursor:pointer}
-.wtb-invoice-picker .wtb-modal-f [data-picker-confirm]{border-color:#204d7a;background:#204d7a;color:#fff}
-.wtb-invoice-picker .wtb-modal-f button:disabled{opacity:.5;cursor:not-allowed}
+:is(.wtb-invoice-picker,[data-wtb-manual-form]) .wtb-modal-f button{min-height:40px;padding:8px 14px;border:1px solid #cbd8e8;border-radius:8px;background:#fff;color:#24466d;font:inherit;font-weight:600;cursor:pointer}
+:is(.wtb-invoice-picker,[data-wtb-manual-form]) .wtb-modal-f .btn-primary{border-color:#204d7a;background:#204d7a;color:#fff}
+:is(.wtb-invoice-picker,[data-wtb-manual-form]) .wtb-modal-f button:disabled{opacity:.5;cursor:not-allowed}
 .wtb-picker-close{margin-left:auto;width:36px;height:36px;border:1px solid #d7e2ef;border-radius:8px;background:#fff;color:#405674;font-size:22px;cursor:pointer}
 .wtb-modal .wtb-pill{white-space:nowrap}
 .wtb-invoice-item{padding:6px 0;border-top:1px solid #d7e2ef}
@@ -373,6 +373,10 @@ table.wtb-comp .nm small{display:block;color:var(--wtb-light);font-weight:400;}
 .wtb-invoice-result>small{color:#58657a}
 .wtb-invoice-choice{padding:10px 12px;border:1px solid #d7e2ef;background:#f5f8fd;border-radius:10px;margin:2px 0 12px}
 .wtb-invoice-choice [data-chosen-invoice]:not(:empty){margin-top:9px;overflow-wrap:anywhere}
+.wtb-invoice-replacement{padding:12px 14px;margin:12px 0;border:1px solid #e7c88b;border-radius:10px;background:#fff7e6;color:#654318;overflow-wrap:anywhere}
+.wtb-invoice-replacement>strong{display:block;margin-bottom:6px}
+.wtb-invoice-replacement small{display:block;margin-top:4px}
+#wtb-order-modal .wtb-invoice-source{margin:8px 0 0}
 .wtb-manual-line>.wtb-manual-line-name{flex:1;min-width:0}
 .wtb-manual-line>[data-include-invoice]{flex:none}
 .wtb-modal [hidden]{display:none!important}

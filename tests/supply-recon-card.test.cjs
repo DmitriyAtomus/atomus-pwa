@@ -106,3 +106,33 @@ test('без отчёта карточка не рисуется', () => {
   assert.equal(ctx.render(null, 152), '');
   assert.equal(ctx.render({}, 152), '');
 });
+
+test('сверка оприходованного УПД связывает счёт и показывает складское расхождение', async () => {
+  const ctx = reconContext();
+  const linked = {
+    ok: true,
+    counts: { accepted_lines: 1, matched: 1 },
+    orders: [{ order_id: 270, order_label: 'ORD-270', invoice_number: '<1138>' }],
+    matched: [BAD.matched[0]],
+    stock_card_mismatch: true,
+  };
+  const button = { disabled: false };
+  ctx.siState.currentInvoiceId = 152;
+  ctx.siState.currentData = {};
+  ctx.loadSupplyInvoiceDetail = () => {};
+  ctx.showToast = () => {};
+  ctx.apiPost = async (url) => {
+    assert.equal(button.disabled, true);
+    assert.equal(url, '/api/supply/invoices/152/reconcile/retry');
+    return { ok: true, data: { linked: 1, reconciliation: linked } };
+  };
+  assert.match(ctx.render(BAD, 152), /Связать со счётом/);
+  await ctx.retrySiRecon(152, button);
+  assert.equal(button.disabled, false);
+  assert.equal(ctx.siState.currentData.reconciliation, linked);
+  const html = ctx.render(linked, 152);
+  assert.match(html, /openSupplyOrder\(270\)/);
+  assert.match(html, /Счёт №&lt;1138&gt;/);
+  assert.match(html, /Приход записан на другие складские карточки/);
+  assert.doesNotMatch(html, /si-recon ok/);
+});
