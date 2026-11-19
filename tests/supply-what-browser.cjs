@@ -20,12 +20,22 @@ const out=process.env.WTB_QA_OUTPUT||path.join(root,'docs/previews/supply-311');
    function child(id,name,qty,stock=0){return {component_id:id,name,sku:'C-'+id,unit:'шт.',qty_required:qty,need:qty,stock_allocated:stock,stock_available_to_reserve:stock,reserved_qty:0,in_transit_allocated:0,to_buy:qty-stock,to_order:qty-stock,status:qty>stock?'to_buy':'in_stock_not_reserved',warnings:[]};}
    const one={id:'ci:154',contract_id:18,contract_item_id:154,contract_number:'25ТД/10.26',position_no:2,name:'ЩУ-001.009',model_article:'ЩУ-001.009',qty:1,unit:'шт.',status:'to_buy',children:[child(1,'Блок питания 24 В',4,2),Object.assign(child(2,'Основание ГИБКА',1),{body_bundle:body,body_bundle_id:45}),Object.assign(child(3,'Крышка ГИБКА',2),{body_bundle:body,body_bundle_id:45})],data_errors:[],warnings:[]};
    const two={id:'ci:201',contract_id:20,contract_item_id:201,contract_number:'26ТД/10.26',position_no:1,name:'Щит нагревателя',qty:1,unit:'шт.',status:'to_buy',children:[child(1,'Блок питания 24 В',3)],data_errors:[],warnings:[]};
-   window.rows=[one,two]; window.cards=[{contract_id:18,number:'25ТД/10.26',contractor_name:'Тестовый проект',items_count:1},{contract_id:20,number:'26ТД/10.26',contractor_name:'Второй проект',items_count:1}];
+   one.production={state:'stopped',stage:'Монтаж автоматики',progress:80,comment:'Ждём блок питания 24 В'};
+   two.production={state:'assembled',progress:100};
+   one.children[0].stock_on_hand=9;
+   one.children[0].stock_free=5;
+   const nextWeek=new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+   window.rows=[one,two]; window.cards=[{contract_id:18,number:'25ТД/10.26',contractor_name:'Тестовый проект',items_count:1,delivery_date:nextWeek},{contract_id:20,number:'26ТД/10.26',contractor_name:'Второй проект',items_count:1}];
+   const invoice={id:2418,invoice_number:'2418',invoice_date:'2026-11-17',supplier_id:152,supplier_name:'УТМ',paid:true,status:'paid'};
    function summary(rs){const cc=rs.flatMap(r=>r.children);return {lines:cc.length,stock_lines:cc.filter(c=>c.stock_allocated>0).length,in_transit_lines:cc.filter(c=>c.in_transit_allocated>0).length,to_buy_lines:cc.filter(c=>c.to_buy>0).length};}
    window.apiGet=async url=>{
     calls.push({method:'GET',url});
-    if(url==='/api/suppliers')return {suppliers:[{id:152,name:'УТМ',is_active:1}]};
+    if(url==='/api/suppliers')return {suppliers:[{id:152,name:'УТМ',inn:'1234567890',is_active:1},{id:153,name:'Другой',inn:'1000000000',is_active:1}]};
     const u=new URL(url,location.origin),cid=Number(u.searchParams.get('contract_id'));
+    if(u.pathname.endsWith('/invoices')){
+     if(u.searchParams.has('id')) return {invoice,can_link:true,items:[{name:'Блок питания 24 В',qty:1,unit:'шт.'}]};
+     return {invoices:['','2418'].includes(u.searchParams.get('q'))?[invoice]:[]};
+    }
     cards.forEach(c=>c.summary=summary(rows.filter(r=>r.contract_id===c.contract_id)));
     const data={contracts:cards,min_stock:{items:[]},in_transit:[],items:cid?rows.filter(r=>r.contract_id===cid):u.searchParams.has('view')?rows:[],contract:cards.find(c=>c.contract_id===cid)};
     return JSON.parse(JSON.stringify(data));
@@ -39,7 +49,7 @@ const out=process.env.WTB_QA_OUTPUT||path.join(root,'docs/previews/supply-311');
      return {ok:true,data:{ok:true,items,items_count:items.length}};
     }
     if(url.endsWith('/ordered')){
-     if(body.dry_run)return {ok:true,data:{can_create:!!body.supplier_id,existing_orders:window.forceExisting?[{id:99,order_label:'ORD-99',status:'sent'}]:[]}};
+     if(body.dry_run)return {ok:true,data:{can_create:!!body.supplier_id,existing_orders:window.forceExisting&&!body.invoice_order_id?[{id:99,order_label:'ORD-99',status:'sent'}]:[]}};
      body.items.forEach(item=>{const c=rows.find(r=>r.contract_item_id===item.contract_item_id).children.find(c=>c.component_id===item.component_id);c.to_buy-=item.qty;c.to_order=c.to_buy;c.in_transit_allocated+=item.qty;});
      return {ok:true,data:{ok:true,order:{id:99,order_label:'ORD-99'}}};
     }
@@ -52,6 +62,8 @@ const out=process.env.WTB_QA_OUTPUT||path.join(root,'docs/previews/supply-311');
   await page.locator('[data-wtb-contract="18"]').click();
   const product=page.locator('[data-wtb-open="ci:154"]');
   assert.equal(await product.locator('.wtb-bodyc').isVisible(),false);
+  assert.match(await product.innerText(),/Стоп[\s\S]*80%[\s\S]*Ждём блок питания 24 В/);
+  assert.match(await page.locator('.wtb-shipping').innerText(),/Отправка заказчику[\s\S]*Осталось [67] дн/);
   await product.locator('.wtb-heading-toggle').click();
   assert.equal(await product.locator('.wtb-heading-toggle').getAttribute('aria-expanded'),'true');
   assert.match(await product.innerText(),/Щит управления/);
@@ -64,7 +76,31 @@ const out=process.env.WTB_QA_OUTPUT||path.join(root,'docs/previews/supply-311');
   await page.locator('[data-confirm-reserve]').click();
   await page.waitForFunction(()=>!document.getElementById('wtb-order-modal'));
   await page.waitForFunction(()=>!document.querySelector('.wtb-reserve-summary'));
-  assert.match(await product.innerText(),/2 закреплено/);
+  assert.match(await product.innerText(),/9 шт\.[\s\S]*Свободно: 5[\s\S]*В резерве изделия: 2/);
+  await product.locator('[data-wtb-record-one]').click();
+  await page.locator('[data-open-invoice-picker]').click();
+  await page.locator('[data-picker-query]').fill('запрос без совпадений');
+  await page.getByText('Счета не найдены', {exact:true}).waitFor();
+  assert.equal(await page.locator('[data-picker-confirm]').isDisabled(),true);
+  await page.locator('[data-picker-query]').fill('2418');
+  await page.locator('[data-picker-paid]').check();
+  await page.locator('[data-picker-id="2418"]').click();
+  assert.match(await page.locator('[data-picker-details]').innerText(),/Позиции счёта[\s\S]*Блок питания 24 В/);
+  if(process.env.WTB_QA_OUTPUT){
+   fs.mkdirSync(out,{recursive:true});
+   await page.screenshot({path:path.join(out,'invoice-picker-desktop.png')});
+   await page.setViewportSize({width:390,height:844});
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no invoice-picker overflow');
+   await page.screenshot({path:path.join(out,'invoice-picker-mobile.png')});
+   await page.setViewportSize({width:1440,height:1000});
+  }
+  await page.locator('[data-picker-confirm]').click();
+  assert.match(await page.locator('[data-chosen-invoice]').innerText(),/Счёт № 2418[\s\S]*Оплачен/);
+  await page.waitForFunction(()=>calls.some(c=>c.body?.dry_run===true&&c.body?.invoice_order_id===2418));
+  await page.locator('[data-clear-invoice]').click();
+  await page.locator('[data-manual-supplier-search]').fill('1234567890');
+  assert.equal(await page.locator('[data-manual-supplier] option').count(),2);
+  await page.locator('button[data-wtb-close]').last().click();
   await product.locator('[data-wtb-record-one]').click();
   await page.locator('[data-manual-supplier]').selectOption('152');
   await page.locator('[data-manual-qty="0"]').fill('1');
@@ -102,6 +138,22 @@ const out=process.env.WTB_QA_OUTPUT||path.join(root,'docs/previews/supply-311');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow on mobile');
   assert.equal(await page.locator('table.wtb-comp thead').isVisible(),false);
   assert.ok(!(await page.locator('#supply').innerText()).includes('Покрыто'));
+  await page.evaluate(()=>{
+   const line=rows[1].children[0];
+   line.to_buy=0; line.to_order=0; line.in_transit_allocated=3; line.in_transit_without_item=3;
+  });
+  await page.locator('[data-wtb-view="landing"]').first().click();
+  await page.locator('[data-wtb-contract="20"]').click();
+  assert.equal(await page.locator('.wtb-summary-card.buy.wtb-zero').count(),1);
+  await page.locator('[data-wtb-record-group="ci:201"]').click();
+  assert.equal(await page.locator('[data-manual-supplier]').isVisible(),false);
+  await page.locator('[data-open-invoice-picker]').click();
+  await page.locator('[data-picker-id="2418"]').click();
+  await page.locator('[data-picker-confirm]').click();
+  await page.locator('[data-manual-qty="0"]').fill('1');
+  await page.waitForFunction(()=>!document.querySelector('[data-manual-submit]').disabled);
+  assert.ok((await page.evaluate(()=>calls)).some(c=>c.body?.dry_run===true&&c.body?.invoice_order_id===2418&&c.body?.items[0]?.contract_item_id===201));
+  await page.locator('#wtb-order-modal [data-wtb-close]').first().click();
   assert.deepEqual(errors,[]);
   assert.ok(!(await page.evaluate(()=>calls)).some(c=>/send|email|telegram|notify/.test(c.url)));
   console.log('PASS procurement: hierarchy, collapsed products, body grouping, drawing link, reserve confirmation/refresh, partial paid order, existing-order choice, all-contract aggregation, destination navigation, mobile layout; no outgoing messages.');
@@ -110,13 +162,16 @@ const out=process.env.WTB_QA_OUTPUT||path.join(root,'docs/previews/supply-311');
    await page.evaluate(data=>{
     // Remove personal customer names from review screenshots. BOM and quantities are real.
     data.all.contracts.forEach(c=>{c.contractor_name='Проект по договору';});
-    data.contract.contracts.forEach(c=>{c.contractor_name='Проект по договору';});
-    data.contract.contract.contractor_name='Проект по договору';
+    const byId={18:data.contract,...data.extra_contracts};
+    Object.values(byId).forEach(result=>{
+     result.contracts.forEach(c=>{c.contractor_name='Проект по договору';});
+     result.contract.contractor_name='Проект по договору';
+    });
     const cards=data.all.contracts;
     window.apiGet=async url=>{
      if(url==='/api/suppliers')return {suppliers:[]};
      const u=new URL(url,location.origin),cid=Number(u.searchParams.get('contract_id'));
-     if(cid===18)return JSON.parse(JSON.stringify(data.contract));
+     if(byId[cid])return JSON.parse(JSON.stringify(byId[cid]));
      if(u.searchParams.has('view'))return JSON.parse(JSON.stringify(data.all));
      return {contracts:cards,items:[],min_stock:{items:[]},in_transit:[]};
     };
@@ -128,19 +183,24 @@ const out=process.env.WTB_QA_OUTPUT||path.join(root,'docs/previews/supply-311');
    await page.evaluate(()=>wtbTryLoad(document.getElementById('supply')));
    await page.locator('[data-wtb-contract="18"]').click();
    await page.evaluate(()=>window.scrollTo(0,0));
-   await page.screenshot({path:path.join(out,'supply-311-overview.png')});
+   await page.screenshot({path:path.join(out,'contract-25-overview.png')});
    await page.locator('[data-wtb-search]').fill('ЩУ');
    const shield=page.locator('[data-wtb-open="ci:157"]');
    await shield.locator('.wtb-heading-toggle').click();
    await page.evaluate(()=>window.scrollTo(0,0));
-   await page.screenshot({path:path.join(out,'supply-311-desktop.png')});
+   await page.screenshot({path:path.join(out,'contract-25-desktop.png')});
    await page.setViewportSize({width:390,height:844});
    await page.evaluate(()=>window.scrollTo(0,0));
-   await page.screenshot({path:path.join(out,'supply-311-mobile.png')});
+   await page.screenshot({path:path.join(out,'contract-25-mobile.png')});
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'real-data mobile overflow');
    await page.setViewportSize({width:1440,height:1000});
    await page.locator('[data-wtb-view="list"]').click();
-   await page.screenshot({path:path.join(out,'supply-311-general.png')});
+   await page.screenshot({path:path.join(out,'all-contracts-desktop.png')});
+   for(const id of Object.keys(snapshot.extra_contracts||{})){
+    await page.evaluate(()=>wtbTryLoad(document.getElementById('supply')));
+    await page.locator('[data-wtb-contract="'+id+'"]').click();
+    await page.screenshot({path:path.join(out,'contract-'+id+'-desktop.png')});
+   }
    assert.deepEqual(errors,[]);
    console.log('PASS real 25ТД desktop/mobile preview.');
   }

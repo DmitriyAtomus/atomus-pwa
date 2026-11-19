@@ -8,14 +8,15 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8').replace(/\
 const sc = require('../supply-chain.js');
 const version = JSON.parse(read('version.json'));
 
-test('v2.46.296: версия согласована', () => {
+test('Текущая версия согласована, история v2.46.296 сохранена', () => {
   const app1 = read('app-1.js');
   const sw = read('sw.js');
-  assert.equal(version.version, 'v2.46.296');
-  assert.match(app1, /const APP_VERSION = "v2\.46\.296"/);
-  assert.match(app1, /const APP_VERSION_DATE = "10\.11\.2026"/);
-  assert.match(sw, /const CACHE_VERSION = 'atomus-v2\.46\.296'/);
-  assert.match(read('app-3.js'), /version:'v2\.46\.296'/);
+  const changelog = read('app-3.js');
+  assert.ok(app1.includes(`const APP_VERSION = "${version.version}"`));
+  assert.ok(app1.includes(`const APP_VERSION_DATE = "${version.date}"`));
+  assert.ok(sw.includes(`const CACHE_VERSION = 'atomus-${version.version}'`));
+  assert.ok(changelog.includes(`version:'${version.version}',date:'${version.date}'`));
+  assert.match(changelog, /version:'v2\.46\.296'/);
 });
 
 test('v2.46.296: флаг скрытия включён и обратим, по умолчанию товар и склад', () => {
