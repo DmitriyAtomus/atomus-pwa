@@ -154,6 +154,50 @@ const out=process.env.WTB_QA_OUTPUT||path.join(root,'docs/previews/supply-311');
   await page.waitForFunction(()=>!document.querySelector('[data-manual-submit]').disabled);
   assert.ok((await page.evaluate(()=>calls)).some(c=>c.body?.dry_run===true&&c.body?.invoice_order_id===2418&&c.body?.items[0]?.contract_item_id===201));
   await page.locator('#wtb-order-modal [data-wtb-close]').first().click();
+  await page.evaluate(()=>{
+   const item={id:'ci:202',contract_id:20,contract_item_id:202,contract_number:'26ТД/10.26',
+     position_no:2,name:'Теплообменник QA',qty:1,unit:'шт.',supply_kind:'sale_product',
+     children:[],to_buy_qty:1,to_order:1,in_transit_qty:0,data_errors:[],warnings:[]};
+   rows.push(item);
+   const invoice={id:2444,invoice_number:'QA-2444',invoice_date:'2026-11-19',
+     supplier_id:152,supplier_name:'Тестовый поставщик',status:'paid',paid:true};
+   const previousGet=window.apiGet;
+   const previousPost=window.apiPost;
+   window.apiGet=async url=>{
+    if(!url.includes('/invoices'))return previousGet(url);
+    return new URL(url,location.origin).searchParams.has('id') ? {invoice,can_link:true,items:[{id:2445,name:'Теплообменник QA NG',
+      qty:1,remaining_qty:1,unit:'шт.',available:true}]} : {invoices:[invoice]};
+   };
+   window.apiPost=async(url,body)=>{
+    if(body.items?.[0]?.contract_item_id!==202)return previousPost(url,body);
+    calls.push({method:'POST',url,body:JSON.parse(JSON.stringify(body))});
+    if(body.items[0].invoice_line_id!==2445)throw new Error('Missing invoice row');
+    if(body.dry_run)return {ok:true,data:{can_create:true,replacement_confirmation:'test-confirmation',
+      replacements:[{original_name:item.name,name:'Теплообменник QA NG',catalog_id:null}]}};
+    if(body.replacement_confirmation!=='test-confirmation')throw new Error('Missing confirmation');
+    Object.assign(item,{name:'Теплообменник QA NG',to_buy_qty:0,to_order:0,in_transit_qty:1});
+    return {ok:true,data:{order:{id:2444,order_label:'ORD-2444'}}};
+   };
+  });
+  await page.locator('[data-wtb-view="landing"]').first().click();
+  await page.locator('[data-wtb-contract="20"]').click();
+  await page.locator('[data-wtb-record-group="ci:202"]').click();
+  await page.locator('[data-open-invoice-picker]').click();
+  await page.locator('[data-picker-id="2444"]').click();
+  await page.locator('[data-picker-confirm]').click();
+  await page.locator('[data-invoice-replacement]').waitFor();
+  assert.match(await page.locator('[data-invoice-replacement]').innerText(),
+    /Теплообменник QA → Теплообменник QA NG[\s\S]*Будет создана карточка/);
+  assert.equal(await page.locator('[data-invoice-source="0"]').isVisible(),false);
+  assert.equal(await page.evaluate(()=>calls.filter(c=>c.body?.items?.[0]?.contract_item_id===202&&c.body?.dry_run===false).length),0);
+  if(process.env.WTB_QA_OUTPUT){
+   await page.screenshot({path:path.join(out,'invoice-name-confirmation-mobile.png')});
+   await page.setViewportSize({width:1440,height:1000});
+   await page.screenshot({path:path.join(out,'invoice-name-confirmation-desktop.png')});
+  }
+  await page.getByRole('button',{name:'ОК, учесть и заменить'}).click();
+  await page.locator('[data-wtb-open="ci:202"]').getByText('Теплообменник QA NG',{exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>calls.filter(c=>c.body?.items?.[0]?.contract_item_id===202&&c.body?.dry_run===false).length),1);
   assert.deepEqual(errors,[]);
   assert.ok(!(await page.evaluate(()=>calls)).some(c=>/send|email|telegram|notify/.test(c.url)));
   console.log('PASS procurement: hierarchy, collapsed products, body grouping, drawing link, reserve confirmation/refresh, partial paid order, existing-order choice, all-contract aggregation, destination navigation, mobile layout; no outgoing messages.');
