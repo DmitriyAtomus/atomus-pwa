@@ -14832,32 +14832,43 @@ function renderSiRecon(recon, invId) {
   const matched = recon.matched || [];
   const partial = matched.filter(m => m.partial);
   const okAll = !!recon.ok;
+  const okCard = okAll && !recon.stock_card_mismatch;
 
-  let html = '<div class="si-recon' + (okAll ? ' ok' : '') + '" id="si-recon-card">';
+  let html = '<div class="si-recon' + (okCard ? ' ok' : '') + '" id="si-recon-card">';
 
   // Шапка: итог одной строкой
   html += '<div class="si-recon-head">';
   html +=   '<div class="si-recon-title">';
-  html +=     '<i class="ti ' + (okAll ? 'ti-checks' : 'ti-alert-triangle') + '"></i>';
+  html +=     '<i class="ti ' + (okCard ? 'ti-checks' : 'ti-alert-triangle') + '"></i>';
   html +=     'Сверка с заказами';
   html +=   '</div>';
-  html +=   '<button class="pkb-btn" style="padding:4px 10px;font-size:12px;" onclick="reloadSiRecon(' + invId + ')"><i class="ti ti-refresh"></i>Пересчитать</button>';
+  html +=   unmatched.length
+    ? '<button class="pkb-btn" style="padding:4px 10px;font-size:12px;" onclick="retrySiRecon(' + invId + ',this)"><i class="ti ti-link"></i>Связать со счётом</button>'
+    : '<button class="pkb-btn" style="padding:4px 10px;font-size:12px;" onclick="reloadSiRecon(' + invId + ')"><i class="ti ti-refresh"></i>Пересчитать</button>';
   html += '</div>';
 
-  const orders = (recon.orders || []).map(o => o.order_label).join(', ');
+  const orders = (recon.orders || []).map(o => {
+    const label = o.invoice_number ? 'Счёт №' + o.invoice_number + ' · ' + o.order_label : o.order_label;
+    return '<button type="button" class="si-recon-ord" onclick="openSupplyOrder(' + Number(o.order_id) + ')">' + escapeHtml(label) + '</button>';
+  }).join(' ');
   html += '<div class="si-recon-sum">';
   if (okAll) {
-    html += 'Всё сошлось: ' + (c.matched || 0) + ' из ' + (c.accepted_lines || 0) + ' строк разнесено' +
-            (orders ? (' по ' + escapeHtml(orders)) : '') + ', заказ закрыт полностью.';
+    html += (okCard ? 'Всё сошлось. ' : 'УПД сверена со счётом. ') + (c.matched || 0) + ' из ' + (c.accepted_lines || 0) + ' строк разнесено.';
   } else {
     const bits = [];
     if (c.matched)   bits.push('разнесено ' + c.matched + ' из ' + (c.accepted_lines || 0));
     if (c.unmatched) bits.push('<b>не разнесено ' + c.unmatched + '</b>');
     if (partial.length) bits.push('<b>частично ' + partial.length + '</b>');
     if (c.short)     bits.push('<b>заказ ждёт ещё ' + c.short + '</b>');
-    html += bits.join(' · ') + (orders ? (' · ' + escapeHtml(orders)) : '');
+    html += bits.join(' · ');
   }
+  if (orders) html += ' ' + orders;
   html += '</div>';
+
+  if (recon.stock_card_mismatch) {
+    html += '<div class="si-recon-group warn"><div class="si-recon-group-title">' +
+      '<i class="ti ti-alert-triangle"></i>Приход записан на другие складские карточки. Проверьте движения на складе.</div></div>';
+  }
 
   // --- Не разнесено: строка УПД никуда не легла ---
   if (unmatched.length) {
@@ -14994,13 +15005,35 @@ async function reloadSiRecon(invId) {
   }
 }
 
+async function retrySiRecon(invId, button) {
+  button.disabled = true;
+  try {
+    const r = await apiPost('/api/supply/invoices/' + invId + '/reconcile/retry', {});
+    if (siState.currentInvoiceId !== invId) return;
+    if (!r.ok) {
+      showToast((r.data && r.data.message) || 'Не удалось выполнить сверку', 'error');
+      return;
+    }
+    siApplyRecon(invId, r.data.reconciliation);
+    if (r.data.linked) {
+      showToast('Строки УПД связаны со счётом', 'success');
+    } else if (r.data.reconciliation?.unmatched?.length) {
+      showToast('Однозначное совпадение со счётом не найдено. Проверьте строки вручную.', 'info');
+    }
+  } catch (e) {
+    if (siState.currentInvoiceId === invId) showToast(e.message || 'Ошибка сверки', 'error');
+  } finally {
+    button.disabled = false;
+  }
+}
+
 // Перерисовать только карточку сверки, не трогая таблицу позиций
 function siApplyRecon(invId, recon) {
-  if (!recon) return;
+  if (!recon || siState.currentInvoiceId !== invId) return;
   if (siState.currentData) siState.currentData.reconciliation = recon;
   const card = document.getElementById('si-recon-card');
   if (!card) {
-    if (siState.currentInvoiceId === invId) loadSupplyInvoiceDetail(invId);
+    loadSupplyInvoiceDetail(invId);
     return;
   }
   const wrap = document.createElement('div');
