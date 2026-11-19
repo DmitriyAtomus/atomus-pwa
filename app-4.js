@@ -21804,6 +21804,8 @@ async function mfgOrderPreview(itemId) {
 }
 
 async function mfgOrderGo(itemId, send) {
+  // v2.46.315: один in-flight на попытку — повторный клик не шлёт второй POST
+  if (state._mfgOrderInFlight) return;
   const f = _mfgOrderForm();
   const positions = f.positions;
   if (!positions.length) { showToast('Заказ пуст', 'error'); return; }
@@ -21819,22 +21821,39 @@ async function mfgOrderGo(itemId, send) {
     f.subject = state._mfgPreview.subject;
     f.body = state._mfgPreview.body;
   }
+  const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : ('mfg-' + Date.now() + '-' + Math.random().toString(16).slice(2));
   const mpGo = document.getElementById('mp-go');
-  if (mpGo) { mpGo.disabled = true; mpGo.innerHTML = '<i class="ti ti-loader"></i> Отправляем…'; }
   const b1 = document.getElementById('mo-dl');
   const b2 = document.getElementById('mo-send');
+  const _unlock = function () {
+    state._mfgOrderInFlight = false;
+    if (mpGo) {
+      mpGo.disabled = false;
+      mpGo.innerHTML = '<i class="ti ti-send"></i> Отправить';
+    }
+    if (b1) b1.disabled = false;
+    if (b2) {
+      b2.disabled = false;
+      b2.innerHTML = '<i class="ti ti-eye"></i> Посмотреть и отправить';
+    }
+  };
+  state._mfgOrderInFlight = true;
+  if (mpGo) { mpGo.disabled = true; mpGo.innerHTML = '<i class="ti ti-loader"></i> Отправка…'; }
   if (b1) b1.disabled = true;
-  if (b2) { b2.disabled = true; if (send) b2.innerHTML = '<i class="ti ti-loader"></i> Отправляем…'; }
+  if (b2) { b2.disabled = true; if (send) b2.innerHTML = '<i class="ti ti-loader"></i> Отправка…'; }
   try {
+    // apiPost без автоповтора — один fetch на попытку
     const r = await apiPost('/api/mfg/items/' + itemId + '/order', {
       positions: positions, supplier_id: supId, send: !!send,
       material: f.material, subject: f.subject, body: f.body,
+      request_id: requestId,
     });
     const j = (r && r.data) || {};
     if (!(r && r.ok && j.ok)) {
       showToast(j.message || 'Не удалось сформировать заказ', 'error');
-      if (b1) b1.disabled = false;
-      if (b2) { b2.disabled = false; b2.innerHTML = '<i class="ti ti-send"></i> Отправить письмом'; }
+      _unlock();
       return;
     }
     if (j.missing && j.missing.length) {
@@ -21854,10 +21873,10 @@ async function mfgOrderGo(itemId, send) {
       state.mfgCurrentItem.orders = j.orders || [];
       mfgSelParts('none');
     }
+    state._mfgOrderInFlight = false;
   } catch (e) {
     showToast('Ошибка соединения', 'error');
-    if (b1) b1.disabled = false;
-    if (b2) { b2.disabled = false; b2.innerHTML = '<i class="ti ti-send"></i> Отправить письмом'; }
+    _unlock();
   }
 }
 
