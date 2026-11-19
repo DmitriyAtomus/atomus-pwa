@@ -514,7 +514,9 @@
     var summary = summaryOf(all);
     setCounter(summary.to_buy_lines);
     setSub(card ? 'Договор → изделие → комплектующие. Состав берётся из производственной номенклатуры.' : 'Изделия всех договоров и их комплектующие.');
-    var head = card ? '<button type="button" class="wtb-back" data-wtb-view="landing">← Все договоры</button><div class="wtb-contract-heading"><div><h2>Договор ' + _esc(card.number) +
+    var number = card ? String(card.number || '').trim() : '';
+    var title = /^договор(?:\s|$)/i.test(number) ? number : ('Договор ' + number).trim();
+    var head = card ? '<button type="button" class="wtb-back" data-wtb-view="landing">← Все договоры</button><div class="wtb-contract-heading"><div><h2>' + _esc(title) +
       '</h2><span>' + _esc(card.contractor_name || '') + '</span></div>' + shippingStatus(card) + '</div>' : '<div class="wtb-h2">Все изделия</div>';
     var html = '<div class="wtb-root wtb-v311">' + toolbar(card ? 'contract' : view) + head + summaryCards(summary) +
       '<div class="wtb-products-caption"><b>Изделия / позиции договора · ' + all.length + '</b><span>' + positionText(summary.lines) + ' в составе</span>' +

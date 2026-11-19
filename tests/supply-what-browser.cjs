@@ -199,6 +199,7 @@ const out=process.env.WTB_QA_OUTPUT||path.join(root,'docs/previews/supply-311');
    for(const id of Object.keys(snapshot.extra_contracts||{})){
     await page.evaluate(()=>wtbTryLoad(document.getElementById('supply')));
     await page.locator('[data-wtb-contract="'+id+'"]').click();
+    assert.doesNotMatch(await page.locator('.wtb-contract-heading h2').innerText(),/договор договор/i);
     await page.screenshot({path:path.join(out,'contract-'+id+'-desktop.png')});
    }
    assert.deepEqual(errors,[]);
