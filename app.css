@@ -20250,11 +20250,20 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
 .supply-price-table :is(th, td) { padding: 8px 6px; vertical-align: middle; border-bottom: 1px solid var(--border); text-align: left; }
 .supply-price-table th { font-size: 12px; color: var(--text-light); }
 .supply-price-table td:first-child { width: 100%; overflow-wrap: anywhere; }
+.supply-price-table tr:has(.supply-price-specs[open]) td { vertical-align: top; }
 .supply-price-table :is(td, th):nth-child(n+2) { text-align: right; }
 .supply-price-table small { display: block; color: var(--text-light); }
 .supply-price-table button,.supply-price-table td:nth-child(2) { white-space: nowrap; }
 .supply-price-tags { display: flex; gap: 4px; flex-wrap: wrap; margin: 3px 0; }
 .supply-price-tags span { border-radius: 5px; padding: 1px 5px; background: var(--brand-bg); color: var(--brand); font-size: 11px; }
+.supply-price-specs { margin-top: 5px; font-size: 13px; }
+.supply-price-specs summary { width: fit-content; padding: 4px 0; color: var(--brand); cursor: pointer; font-weight: 600; }
+.supply-price-spec-fields { margin: 4px 0; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
+.supply-price-spec-fields h4 { margin: 0 0 4px; font-size: 13px; }
+.supply-price-spec-fields dl { margin: 0 0 8px; }
+.supply-price-spec-fields dl div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 4px 0; }
+.supply-price-spec-fields dt { color: var(--text-light); }
+.supply-price-spec-fields dd { margin: 0; font-variant-numeric: tabular-nums; }
 .supply-price-pager { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 10px; }
 .supply-price-pager span { margin-right: auto; }
 .supply-price-footer { bottom: 0; border-top: 1px solid var(--border); color: var(--brand); font-size: 13px; }
@@ -20263,6 +20272,7 @@ button.bom-stage-chip:hover { border-color: #A5B4FC; color: #4F46E5; background:
   .supply-price-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .supply-price-content,.supply-price-head,.supply-price-footer { padding-left: 10px; padding-right: 10px; }
   .supply-price-table button { padding-inline: 6px; }
+  .supply-price-spec-fields dl div { grid-template-columns: minmax(0, 1fr); gap: 1px; }
 }
 @media (max-width: 840px) {
   .supply-price-workspace { grid-template-columns: minmax(0, 1fr); }

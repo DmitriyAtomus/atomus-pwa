@@ -71,6 +71,25 @@ window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick
     options(mode, rows.map(item => item.mode), 'Все типы', mode.value);
   }
 
+  function renderSpecifications(item) {
+    if (!item.specifications?.length) return '';
+    const groups = new Map();
+    for (const spec of item.specifications) {
+      const scope = spec.scope || '';
+      if (!groups.has(scope)) groups.set(scope, []);
+      groups.get(scope).push(spec);
+    }
+    const fields = Array.from(groups, ([scope, specs]) =>
+      (scope ? '<h4>' + esc(scope) + '</h4>' : '') +
+      '<dl>' + specs.map(spec => '<div><dt>' + esc(spec.label) + '</dt><dd>' +
+        esc(spec.value) + '</dd></div>').join('') + '</dl>'
+    ).join('');
+    return '<details class="supply-price-specs"><summary aria-label="' +
+      esc('Характеристики — ' + item.name) + '">Характеристики</summary>' +
+      '<div class="supply-price-spec-fields">' + fields + '<small>Лист Excel · ' +
+      esc(item.sheet) + '</small></div></details>';
+  }
+
   function render() {
     const terms = query.value.toLowerCase().split(/\s+/).filter(Boolean);
     const matches = items.filter(item => (!sheet.value || item.sheet === sheet.value) &&
@@ -85,6 +104,7 @@ window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick
         (item.code ? '<small>' + esc(item.code) + '</small>' : '') +
         (tags.length ? '<div class="supply-price-tags">' + tags.map(tag => '<span>' + esc(tag) + '</span>').join('') + '</div>' : '') +
         (item.bundle ? '<small>В Excel в составе: ' + esc(item.bundle) + '</small>' : '') +
+        renderSpecifications(item) +
         '</td><td>' + (item.price == null ? 'Уточнить' : money.format(item.price)) +
         '</td><td><button type="button" class="btn btn-secondary" data-pick="' + i +
         '" aria-label="' + esc('В заказ — ' + item.name) + '">В заказ</button></td></tr>';
