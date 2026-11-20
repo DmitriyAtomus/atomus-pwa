@@ -102,3 +102,22 @@ test('черновик показывает артикул поставщика 
   assert.match(card.innerHTML, /Наружный блок/);
   assert.match(card.innerHTML, /240 ₽/);
 });
+
+test('полученные и ожидаемые детали комплекта видны в карточке заказа', () => {
+  const card = {};
+  const context = {
+    document: { getElementById: () => card }, state: { user: { roles: [] } },
+    canManageSupply: () => true, escapeHtml: String, dupOrderPill: () => '', supOrdDup: () => null, _fmtQty: String,
+  };
+  const start = source.indexOf('function renderSupplyOrderDetail(o)');
+  vm.runInNewContext(source.slice(start, source.indexOf('async function openAddOrderItem(', start)), context);
+  context.renderSupplyOrderDetail({ id: 5, status: 'partial', items: [{
+    item_name: 'RCV-500 LUX + EH-1700', item_unit: 'шт.', qty: 1,
+    kit_parts: [{ name: 'RCV-500 LUX', received_qty: 1, remaining: 0 },
+                { name: 'EH-1700', received_qty: 0, remaining: 1 }],
+  }] });
+  assert.match(card.innerHTML, /RCV-500 LUX · принято 1 из 1/);
+  assert.match(card.innerHTML, /EH-1700 · принято 0 из 1/);
+  assert.match(card.innerHTML, /Принять по деталям/);
+  assert.doesNotMatch(card.innerHTML, /Всё пришло/);
+});

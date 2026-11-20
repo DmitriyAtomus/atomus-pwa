@@ -673,7 +673,9 @@
     rows.forEach(function (o) {
       var dest = o.dest_contract_number || ((o.destinations || []).map(function (d) { return d.contract_number; }).filter(Boolean).join(', ')) || '—';
       var linkMeta = '';
-      if (o.component_id) {
+      if (o.kit_component_ids?.length) {
+        linkMeta = 'Комплект · учтено комплектующих: ' + o.kit_component_ids.length;
+      } else if (o.component_id) {
         linkMeta = 'связано с компонентом ' + o.component_id + ' (' + linkMethodRu(o.link_method) + ')';
         if (o.needs_explicit && o.link_method !== 'explicit') linkMeta += ' · стоит проставить явную связь';
       } else if ((o.link_suggestions || []).length) {
