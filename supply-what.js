@@ -409,6 +409,14 @@
     var action = '';
     if (!inBundle && can) action += '<button type="button" class="wtb-order-btn" data-wtb-order-one="' + _esc(line.key) + '">Заказать</button>';
     if (!inBundle && manual) action += '<button type="button" class="wtb-order-btn wtb-manual-btn" data-wtb-record-one="' + _esc(line.key) + '">Уже заказали</button>';
+    if (!row.historical && (Number(ch.in_transit_allocated) > 0 || Number(ch.arrival_pending_qty) > 0) && !ch.inactive) {
+      action += '<button type="button" class="wtb-small-btn" data-wtb-arrival="' + row.contract_item_id +
+        '" data-component="' + ch.component_id + '"><i class="ti ti-package-import"></i> Пришло</button>';
+    }
+    (ch.arrivals || []).forEach(function (arrival) {
+      action += '<button type="button" class="wtb-small-btn" data-wtb-arrival-file="' + Number(arrival.invoice_id) +
+        '">УПД №' + _esc(arrival.document_number || arrival.invoice_id) + ' · ' + fmt(arrival.qty) + ' ' + unit(ch.unit) + '</button>';
+    });
     if (Number(ch.stock_available_to_reserve) > 0) action += '<button type="button" class="wtb-small-btn" data-wtb-reserve="' + row.contract_item_id + '" data-component="' + ch.component_id + '">Зарезервировать под этот заказ</button>';
     var warn = (ch.warnings || []).filter(function (w) { return w.code !== 'stale_inventory' && w.code !== 'in_stock_not_reserved'; });
     var stockQty = ch.stock_on_hand == null ? ch.stock_allocated : ch.stock_on_hand;
@@ -418,6 +426,7 @@
     return '<tr><td class="wtb-td-check">' + box + '</td><td class="nm" data-label="Комплектующее">' + _esc(ch.name || '—') +
       (ch.sku ? '<small>' + _esc(ch.sku) + '</small>' : '') + (ch.qty_required != null ? '<small>На изделие: ' + fmt(ch.qty_required) + ' ' + unit(ch.unit) + '</small>' : '') +
       (warn.length ? '<span class="wtb-inline-issue" title="' + _esc(warn.map(function (w) { return w.text || w.title; }).join('\n')) + '"><i class="ti ti-alert-triangle"></i> Проверить состав</span>' : '') +
+      (Number(ch.issued_qty) && Number(ch.remaining_need) > 0 ? '<small>Выдано в работу ' + fmt(ch.issued_qty) + ' ' + unit(ch.unit) + '</small>' : '') +
       '</td><td data-label="Нужно">' + fmt(ch.need) + '<small>' + unit(ch.unit) + '</small></td><td data-label="На складе">' + fmt(stockQty) + ' ' + unit(ch.unit) + stockNote +
       '</td><td data-label="В пути" class="wtb-num-wait">' + fmt(ch.in_transit_allocated) + '</td><td data-label="Купить" class="' + (ch.to_buy > 0 ? 'wtb-num-buy' : '') + '">' + fmt(ch.to_buy) +
       '</td><td class="wtb-actions-cell" data-label="Состояние"><span class="wtb-line-state ' + statusClass(ch.status) + '">' + _esc(lineStatus(row, ch)) + '</span><div class="wtb-line-actions">' + action + draftChips(ch.drafts) + '</div></td></tr>';
@@ -1225,6 +1234,9 @@
     if (Number(ch.in_transit_allocated) > 0) return 'Заказано · в пути';
     if (Number(ch.stock_available_to_reserve) > 0 || ch.in_stock_not_reserved) return 'Есть на складе';
     if (Number(ch.reserved_qty) > 0 || ch.status === 'reserved') return 'Зарезервировано';
+    if (Number(ch.issued_qty) > 0 && Number(ch.remaining_need) === 0) {
+      return 'Выдано в работу' + ((ch.issued_work_ids || []).length ? ' ' + ch.issued_work_ids.map(function (id) { return '№' + id; }).join(', ') : '');
+    }
     if (Number(row.production_allocated_qty) > 0 && Number(ch.need) === 0) return 'Учтено в изделии';
     if (Number(ch.need) === 0) return 'Сейчас не требуется';
     return 'Проверить данные';
@@ -1351,7 +1363,7 @@
   }
 
   function handleProcurementClick(e) {
-    var b = e.target.closest('[data-wtb-filter],[data-wtb-destination],[data-wtb-record-one],[data-wtb-record-group],[data-wtb-record-bundle],[data-wtb-order-bundle],[data-wtb-record-aggregate],[data-wtb-order-aggregate],[data-wtb-reserve],[data-wtb-mfg]');
+    var b = e.target.closest('[data-wtb-filter],[data-wtb-destination],[data-wtb-record-one],[data-wtb-record-group],[data-wtb-record-bundle],[data-wtb-order-bundle],[data-wtb-record-aggregate],[data-wtb-order-aggregate],[data-wtb-reserve],[data-wtb-arrival],[data-wtb-arrival-file],[data-wtb-mfg]');
     if (!b) return false;
     e.preventDefault(); e.stopPropagation();
     if (b.hasAttribute('data-wtb-filter')) {
@@ -1371,6 +1383,17 @@
       var iid = Number(b.getAttribute('data-wtb-reserve'));
       var row = currentItems().find(function (r) { return Number(r.contract_item_id) === iid; });
       if (row) startReserve(row, Number(b.getAttribute('data-component')) || null).catch(actionError);
+      return true;
+    }
+    if (b.hasAttribute('data-wtb-arrival')) {
+      var itemId = Number(b.getAttribute('data-wtb-arrival'));
+      var product = currentItems().find(function (r) { return Number(r.contract_item_id) === itemId; });
+      var child = product && product.children.find(function (c) { return Number(c.component_id) === Number(b.getAttribute('data-component')); });
+      if (child) startArrival(product, child).catch(actionError);
+      return true;
+    }
+    if (b.hasAttribute('data-wtb-arrival-file')) {
+      if (typeof openSupplyInvoiceFile === 'function') openSupplyInvoiceFile(Number(b.getAttribute('data-wtb-arrival-file')));
       return true;
     }
     var lines = [], ordering = false;
@@ -1411,6 +1434,126 @@
         if (typeof showToast === 'function') showToast('Закреплено со склада: ' + positionText(result.items_count), 'success');
       } catch (error) { confirm.disabled = false; var warning = box.querySelector('[data-reserve-error]'); warning.hidden = false; warning.textContent = error.message; }
     };
+  }
+
+  async function startArrival(product, child) {
+    var pending = Math.max(Number(child.in_transit_allocated) || 0, Number(child.arrival_pending_qty) || 0);
+    var box = wtbModal('<section class="wtb-arrival" role="dialog" aria-modal="true" aria-labelledby="wtb-arrival-title">' +
+      '<div class="wtb-modal-h"><h3 id="wtb-arrival-title">Пришло</h3>' +
+      '<button type="button" class="modal-close" data-wtb-close aria-label="Закрыть">×</button></div>' +
+      '<div class="wtb-modal-lead">' + _esc(productName(product)) + ' · ' + _esc(product.contract_number) + '</div>' +
+      '<div class="wtb-modal-b"><div class="wtb-arrival-card"><small>По заказу</small><b>' + _esc(child.name) +
+      '</b><span>Осталось подтвердить ' + fmt(pending) + ' ' + unit(child.unit) + '</span></div>' +
+      '<form class="wtb-arrival-search"><label for="wtb-arrival-query">Номер УПД, артикул или наименование</label>' +
+      '<div><input id="wtb-arrival-query" name="query" type="search" class="wtb-search" maxlength="120"><button type="submit" class="wtb-small-btn">Найти</button></div></form>' +
+      '<label class="wtb-arrival-lines" hidden>Строка УПД<select data-arrival-line></select></label>' +
+      '<div data-arrival-empty class="wtb-empty" role="status">Ищем оприходованные позиции…</div>' +
+      '<div data-arrival-selected hidden><div class="wtb-arrival-card"><small>По накладной</small><b data-arrival-name></b>' +
+      '<span data-arrival-source></span><span data-arrival-discrepancy></span>' +
+      '<button type="button" class="wtb-small-btn" data-arrival-document>Открыть накладную</button></div>' +
+      '<label>Количество<input data-arrival-qty type="number" step="any" min="0.000001" inputmode="decimal" required></label>' +
+      '<label data-arrival-reason-box hidden>Причина замены<input type="text" data-arrival-reason maxlength="300" placeholder="Необязательно"></label></div>' +
+      '<div class="wtb-action-error" role="alert" data-arrival-error hidden></div></div>' +
+      '<div class="wtb-modal-f"><button type="button" data-wtb-close>Отмена</button>' +
+      '<button type="button" class="btn btn-primary" data-arrival-confirm disabled>Подтвердить приход</button></div></section>');
+    modalCloseButtons(box);
+    var query = box.querySelector('input[name="query"]');
+    var lineSelect = box.querySelector('[data-arrival-line]');
+    var empty = box.querySelector('[data-arrival-empty]');
+    var confirm = box.querySelector('[data-arrival-confirm]');
+    var qty = box.querySelector('[data-arrival-qty]');
+    var warning = box.querySelector('[data-arrival-error]');
+    var lines = [], requestId = null, searchRun = 0;
+    var target = { contract_item_id: product.contract_item_id, component_id: child.component_id };
+
+    function selectLine() {
+      var line = lines.find(function (r) { return String(r.id) === lineSelect.value; });
+      box.querySelector('[data-arrival-selected]').hidden = !line;
+      confirm.disabled = !line;
+      if (!line) return;
+      var same = Number(line.component_id) === Number(child.component_id);
+      var title = line.name_raw || line.component_name;
+      var article = line.sku || line.supplier_code;
+      box.querySelector('[data-arrival-name]').textContent = article && !title.includes(article) ? title + ' · ' + article : title;
+      box.querySelector('[data-arrival-source]').textContent = 'УПД №' + (line.document_number || line.invoice_id) +
+        ' · ' + (line.supplier_name || '') + ' · доступно ' + fmt(line.available) + ' ' + unit(line.component_unit);
+      box.querySelector('[data-arrival-discrepancy]').textContent = same
+        ? 'Приход будет закреплён за изделием'
+        : 'Фактическая деталь отличается. Подтвердите замену в составе изделия.';
+      box.querySelector('[data-arrival-document]').onclick = function () {
+        if (typeof openSupplyInvoiceFile === 'function') openSupplyInvoiceFile(Number(line.invoice_id));
+      };
+      box.querySelector('[data-arrival-reason-box]').hidden = same;
+      qty.max = line.available;
+      qty.value = Math.min(line.available, pending);
+      confirm.textContent = same ? 'Та же деталь · подтвердить' : 'Принять замену';
+      requestId = crypto.randomUUID();
+    }
+
+    async function searchLines() {
+      var run = ++searchRun;
+      empty.hidden = false;
+      empty.textContent = 'Ищем оприходованные позиции…';
+      lineSelect.parentElement.hidden = true;
+      lineSelect.innerHTML = '';
+      selectLine();
+      warning.hidden = true;
+      try {
+        var params = new URLSearchParams(Object.assign({}, target, { q: query.value }));
+        var response = await apiGet('/api/supply/what-to-buy/arrivals?' + params.toString());
+        if (!box.isConnected || run !== searchRun) return;
+        lines = (response && response.lines) || [];
+        lineSelect.innerHTML = '<option value="">Выберите строку</option>' + lines.map(function (line) {
+          var date = line.document_date ? ' · ' + invoiceDate(line.document_date) : '';
+          return '<option value="' + Number(line.id) + '">УПД №' + _esc(line.document_number || line.invoice_id) + date +
+            ' · ' + _esc(line.name_raw || line.component_name) + ' · ' + fmt(line.available) + ' ' + unit(line.component_unit) + '</option>';
+        }).join('');
+        lineSelect.parentElement.hidden = !lines.length;
+        empty.hidden = !!lines.length;
+        empty.textContent = 'Доступных оприходованных позиций нет. Проверьте номер или проведите приход в «Приёмке УПД».';
+      } catch (error) {
+        if (run !== searchRun) return;
+        empty.hidden = true;
+        warning.hidden = false;
+        warning.textContent = error.serverMessage || error.message;
+      }
+    }
+
+    box.querySelector('form').onsubmit = function (event) { event.preventDefault(); searchLines(); };
+    lineSelect.onchange = selectLine;
+    qty.onchange = function () { requestId = crypto.randomUUID(); };
+    confirm.onclick = async function () {
+      var line = lines.find(function (r) { return String(r.id) === lineSelect.value; });
+      if (!line || !qty.checkValidity() || !Number(qty.value)) {
+        qty.reportValidity();
+        return;
+      }
+      confirm.disabled = true;
+      lineSelect.disabled = true;
+      qty.disabled = true;
+      box.querySelector('form button').disabled = true;
+      warning.hidden = true;
+      try {
+        var result = successfulPost(await apiPost('/api/supply/what-to-buy/arrivals', Object.assign({}, target, {
+          invoice_item_id: line.id, qty: Number(qty.value), request_id: requestId,
+          mode: Number(line.component_id) === Number(child.component_id) ? 'same' : 'replace',
+          reason: box.querySelector('[data-arrival-reason]').value
+        })));
+        if (box.isConnected) closeWtbModal();
+        await refreshCurrent();
+        if (typeof showToast === 'function') showToast((result.work_id ? 'Приход закреплён за работой №' + result.work_id
+          : 'Приход закреплён под изделие') + ' · ' + fmt(result.qty) + ' ' + unit(line.component_unit), 'success');
+      } catch (error) {
+        confirm.disabled = false;
+        lineSelect.disabled = false;
+        qty.disabled = false;
+        box.querySelector('form button').disabled = false;
+        warning.hidden = false;
+        warning.textContent = error.message;
+      }
+    };
+    query.focus();
+    await searchLines();
   }
 
   function invoiceDate(value) {
