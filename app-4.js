@@ -15754,10 +15754,80 @@ async function pickMatchAlternative(itemId, componentId) {
 
 // ---------- Подтверждение и прочее ----------
 
+function chooseManualReceipt(conflict) {
+  return new Promise(resolve => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'si-manual-receipt';
+    dialog.setAttribute('aria-labelledby', 'si-manual-title');
+    const title = document.createElement('h3');
+    title.id = 'si-manual-title';
+    title.textContent = 'Сверка с ручным приходом';
+    const text = document.createElement('p');
+    text.textContent = conflict.name + ' · по УПД ' + conflict.quantity +
+      '. Укажите, сколько уже принято по каждому приходу. Остаток поступит на склад по этой УПД.';
+    dialog.append(title, text);
+    const fields = [];
+    for (const row of conflict.candidates) {
+      const label = document.createElement('label');
+      label.textContent = row.label + (row.supplier_name ? ' · ' + row.supplier_name : '') +
+        ' · ' + String(row.created_at || '').slice(0, 16) +
+        ' · доступно ' + row.available + ' ';
+      const input = document.createElement('input');
+      input.type = 'number'; input.min = '0'; input.max = String(row.available); input.step = 'any';
+      input.placeholder = '0';
+      if (row.receipt_item_id) {
+        fields.push([row.id, input]);
+        label.append(input);
+      } else {
+        label.append('· требуется сверить строку старого прихода');
+      }
+      dialog.append(label);
+    }
+    const status = document.createElement('p');
+    status.setAttribute('role', 'status');
+    const cancel = document.createElement('button');
+    cancel.textContent = 'Назад';
+    const apply = document.createElement('button');
+    const refresh = () => {
+      const total = fields.reduce((sum, [, input]) => sum + Number(input.value), 0);
+      apply.disabled = total > conflict.quantity + 1e-8 || fields.some(([, input]) => !input.validity.valid);
+      status.textContent = 'Учесть из ручных приходов: ' + total + '. Добавить на склад: ' +
+        Math.max(0, Number((conflict.quantity - total).toFixed(6))) + '.';
+      apply.textContent = total ? 'Использовать указанный приход' : 'Это отдельная поставка';
+    };
+    dialog.oninput = refresh;
+    const finish = value => { dialog.close(); dialog.remove(); resolve(value); };
+    cancel.onclick = () => finish(null);
+    dialog.oncancel = event => { event.preventDefault(); finish(null); };
+    apply.onclick = () => {
+      const allocations = {};
+      for (const [id, input] of fields) if (Number(input.value) > 0) allocations[id] = Number(input.value);
+      finish({seen: conflict.candidates.map(row => row.id), allocations});
+    };
+    const actions = document.createElement('footer');
+    cancel.className = 'btn btn-secondary';
+    apply.className = 'btn btn-primary';
+    actions.append(cancel, apply);
+    dialog.append(status, actions);
+    refresh();
+    document.body.append(dialog);
+    dialog.showModal();
+    cancel.focus();
+  });
+}
+
 async function confirmSupplyInvoice(invoiceId) {
   if (!confirm('Оприходовать накладную? После этого изменить будет нельзя.')) return;
   try {
-    const r = await apiPost('/api/supply/invoices/' + invoiceId + '/confirm', {});
+    const path = '/api/supply/invoices/' + invoiceId + '/confirm';
+    const choices = {};
+    let r = await apiPost(path, {});
+    while (r.status === 409 && r.data && r.data.error === 'manual_receipt') {
+      const decision = await chooseManualReceipt(r.data);
+      if (!decision) return;
+      choices[r.data.key] = decision;
+      r = await apiPost(path, {manual_choices: choices});
+    }
     if (r.status === 409) {
       const msg = (r.data && r.data.message) || 'Дубликат: эта УПД уже была оприходована ранее.';
       alert(msg);

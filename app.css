@@ -27841,3 +27841,14 @@ button.sc-chip, .sc-chip[onclick] { cursor: pointer; }
   .supply-price-basket .supply-price-head { display: grid; grid-template-columns: 1fr auto; }
   .supply-price-basket .supply-price-head > div { grid-column: 1 / -1; }
 }
+
+.si-manual-receipt {
+  margin: auto; width: min(34rem, 94vw); max-height: 90vh; padding: 22px;
+  border: 1px solid var(--border); border-radius: 14px; color: var(--text-dark);
+  background: white; box-shadow: 0 16px 60px #152a432b;
+}
+.si-manual-receipt::backdrop { background: #16273e70; }
+.si-manual-receipt h3 { margin-bottom: 8px; }
+.si-manual-receipt label { display: block; margin: 16px 0; }
+.si-manual-receipt input { display: block; width: 7rem; padding: 7px; margin-top: 5px; border: 1px solid #a7b9ca; border-radius: 6px; }
+.si-manual-receipt footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
