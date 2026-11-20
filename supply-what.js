@@ -1440,7 +1440,7 @@
     var pending = Math.max(Number(child.in_transit_allocated) || 0, Number(child.arrival_pending_qty) || 0);
     var box = wtbModal('<section class="wtb-arrival" role="dialog" aria-modal="true" aria-labelledby="wtb-arrival-title">' +
       '<div class="wtb-modal-h"><h3 id="wtb-arrival-title">Пришло</h3>' +
-      '<button type="button" class="modal-close" data-wtb-close aria-label="Закрыть"><i class="ti ti-x"></i></button></div>' +
+      '<button type="button" class="modal-close" data-wtb-close aria-label="Закрыть">×</button></div>' +
       '<div class="wtb-modal-lead">' + _esc(productName(product)) + ' · ' + _esc(product.contract_number) + '</div>' +
       '<div class="wtb-modal-b"><div class="wtb-arrival-card"><small>По заказу</small><b>' + _esc(child.name) +
       '</b><span>Осталось подтвердить ' + fmt(pending) + ' ' + unit(child.unit) + '</span></div>' +
@@ -1515,7 +1515,7 @@
         if (run !== searchRun) return;
         empty.hidden = true;
         warning.hidden = false;
-        warning.textContent = error.message;
+        warning.textContent = error.serverMessage || error.message;
       }
     }
 

@@ -18,6 +18,7 @@ async function check(browser, width) {
       '<body style="font:14px system-ui;margin:0;background:#f4f6fa"><main id="supply" style="max-width:1160px;margin:18px auto;padding:12px"></main></body></html>',
   }));
   await page.goto('http://127.0.0.1:8311/arrival');
+  await page.addStyleTag({ path: path.join(root, 'app.css') });
   await page.addStyleTag({ path: path.join(root, 'supply-what.css') });
   await page.evaluate(() => {
     const original = { component_id: 22, name: 'Kinco CV20-4T-0022G', unit: 'шт.', need: 2,
