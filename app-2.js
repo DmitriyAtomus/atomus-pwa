@@ -219,7 +219,12 @@ async function doReserveAssembly(contractId, itemId) {
     if (itemId) body.contract_item_id = itemId;
     const res = await apiPost('/api/assemblies/' + aid + '/reserve', body);
     if (!res.ok) throw new Error((res.data && res.data.message) || ('HTTP ' + res.status));
-    showToast('Назначено — теперь в резерве', 'success');
+    // v2.46.324: партию больше потребности сервер режет — остаток свободен на складе
+    if (res.data && res.data.split_assembly_id) {
+      showToast('Назначено ' + (res.data.reserved_qty || '') + ' шт. — остаток партии остался свободным на складе', 'success');
+    } else {
+      showToast('Назначено — теперь в резерве', 'success');
+    }
     cache.warehouseStock = null;
     if (typeof openAssemblyStock === 'function') openAssemblyStock(aid);
     try { if (typeof loadWarehouseStock === 'function') loadWarehouseStock(); } catch (_) {}
