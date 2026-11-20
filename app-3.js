@@ -16465,7 +16465,8 @@ function renderSupplyOrderDetail(o) {
   const canManage = canManageSupply();
   // v2.46.283: единая цепочка — позиции правятся до «Получено / Закрыт / Отменён»
   const canEdit = canManage && !['received', 'closed', 'cancelled'].includes(o.status);
-  const canSend = canManage && o.status === 'draft' && (o.items || []).length > 0;
+  const isDraft = o.status === 'draft';
+  const canSend = canManage && isDraft && (o.items || []).length > 0;
   const canReceive = canManage && ['sent', 'invoice_requested', 'shipping', 'partial'].includes(o.status);
   // FSM-переходы для нового лайфцикла снабжения
   // v2.45.35: директор может перезалить счёт на любых открытых статусах,
@@ -16623,8 +16624,8 @@ function renderSupplyOrderDetail(o) {
         payerEntityPill({ tag: o.invoice_payer_tag, short_name: o.invoice_payer_name }, true) +
         chip('<b>' + escapeHtml(invTitle) + '</b>', invTitle, false) +
         (o.invoice_number ? chip('№ ' + escapeHtml(o.invoice_number), o.invoice_number, true) : '') +
-        (invTotal ? chip(escapeHtml(invTotal) + ' ₽', invTotal, true) : '') +
-        vatChips +
+        (!isDraft && invTotal ? chip(escapeHtml(invTotal) + ' ₽', invTotal, true) : '') +
+        (isDraft ? '' : vatChips) +
         (o.invoice_org ? chip(escapeHtml(o.invoice_org), o.invoice_org, false) : '') +
         // v2.45.x: срок поставки/изготовления (заметным оранжевым)
         (o.invoice_delivery_term ? '<span style="display:inline-flex;align-items:center;gap:6px;background:#FFEDD5;border:1px solid #FDBA74;color:#9A3412;border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:700;"><i class="ti ti-truck-delivery"></i> Срок поставки: ' + escapeHtml(o.invoice_delivery_term) + '</span>' : '') +
@@ -16672,7 +16673,7 @@ function renderSupplyOrderDetail(o) {
       const nm = (it && it.name) ? String(it.name) : '—';
       const q = (it && it.qty !== null && it.qty !== undefined && it.qty !== '') ? it.qty : '';
       const unit = (it && it.unit) ? String(it.unit) : '';
-      const priceNum = (it && it.price !== null && it.price !== undefined && it.price !== '') ? Number(it.price) : null;
+      const priceNum = (!isDraft && it && it.price !== null && it.price !== undefined && it.price !== '') ? Number(it.price) : null;
       const priceStr = priceNum != null && !isNaN(priceNum) ? priceNum.toLocaleString('ru-RU') + ' ₽' : '';
       const sumStr = (q !== '' && priceNum != null && !isNaN(priceNum)) ? Math.round(Number(q) * priceNum).toLocaleString('ru-RU') + ' ₽' : '';
       html += '<div class="oi-row">' +
@@ -16695,7 +16696,7 @@ function renderSupplyOrderDetail(o) {
   } else {
     html += '<div class="oi-list">';
     items.forEach(oi => {
-      const totalLine = (oi.price !== null && oi.price !== undefined) ? Math.round(oi.amount).toLocaleString('ru-RU') + ' ₽' : '';
+      const totalLine = (!isDraft && oi.price !== null && oi.price !== undefined) ? Math.round(oi.amount).toLocaleString('ru-RU') + ' ₽' : '';
       const receivedTag = oi.received_qty > 0
         ? '<span class="oi-received">принято ' + oi.received_qty + ' из ' + oi.qty + '</span>'
         : '';
@@ -16725,15 +16726,15 @@ function renderSupplyOrderDetail(o) {
       }
       html += '<div class="oi-row">' +
         '<div class="oi-body">' +
-          '<div class="oi-title">' + escapeHtml(oi.item_name) + '</div>' +
+          '<div class="oi-title">' + escapeHtml(oi.supplier_item_name?.trim() || oi.item_name) + '</div>' +
           '<div class="oi-meta">' +
             '<span>запрошено ' + oi.qty + ' ' + escapeHtml(oi.item_unit) + '</span>' +
             _invQtyTag +
-            (oi.price !== null && oi.price !== undefined ? '<span>' + oi.price + ' ₽/шт</span>' : '') +
+            (!isDraft && oi.price !== null && oi.price !== undefined ? '<span>' + oi.price + ' ₽/шт</span>' : '') +
             (oi.contract_number ? '<span class="sup-contract-badge" onclick="openContractFromSupply(' + oi.request_contract_id + ')"><i class="ti ti-link"></i>' + escapeHtml(oi.contract_number) + '</span>' : '') +
             receivedTag +
           '</div>' +
-          (oi.comment ? '<div class="oi-comment">' + escapeHtml(oi.comment) + '</div>' : '') +
+          (!isDraft && oi.comment ? '<div class="oi-comment">' + escapeHtml(oi.comment) + '</div>' : '') +
         '</div>' +
         '<div class="oi-total">' + totalLine + '</div>' +
         (canEdit && o.status === 'draft' ? '<div class="oi-actions"><button class="btn-icon-warning" onclick="removeOrderItem(' + oi.id + ')" title="Убрать"><i class="ti ti-x"></i></button></div>' : '') +
@@ -16741,7 +16742,7 @@ function renderSupplyOrderDetail(o) {
     });
     html += '</div>';
     // Итого
-    html += '<div class="oi-total-row">Итого: <strong>' + Math.round(o.total_amount || 0).toLocaleString('ru-RU') + ' ₽</strong></div>';
+    if (!isDraft) html += '<div class="oi-total-row">Итого: <strong>' + Math.round(o.total_amount || 0).toLocaleString('ru-RU') + ' ₽</strong></div>';
   }
   html += '</div>';
 
@@ -19034,6 +19035,7 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
+  {version:'v2.46.321',date:'20.11.2026',title:'Модели из прайса в заказе',features:['В составе заказа и списке назначений показана выбранная модель с артикулом поставщика. В позициях черновика видны модель и количество без цен и итоговой суммы.']},
   {version:'v2.46.320',date:'20.11.2026',title:'Корзина прайсов в снабжении',features:['При подборе для изделия можно собрать несколько моделей из прайсов одного поставщика. Сохранённый черновик также можно дополнить из его карточки.']},
   {version:'v2.46.319',date:'20.11.2026',title:'Прайсы в «Что закупить»',features:['Из строки заказа открываются файлы и листы поставщика с поиском и характеристиками. Выбранная модель и код подставляются в эту строку.']},
   {version:'v2.46.318',date:'20.11.2026',title:'Снабжение — приход по накладной',features:['Кнопка «Пришло» связывает комплектующее изделия с проведённой строкой УПД. Фактическую замену и количество можно подтвердить здесь же.']},
