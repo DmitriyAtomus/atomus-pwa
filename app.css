@@ -27836,3 +27836,8 @@ button.sc-chip, .sc-chip[onclick] { cursor: pointer; }
 .sc-invlines{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border,#e5e7eb)}
 .sc-invline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:4px 0;cursor:pointer}
 .sc-chip-warn{background:#fff8e1;color:#8a5a00}
+
+@media (max-width: 600px) {
+  .supply-price-basket .supply-price-head { display: grid; grid-template-columns: 1fr auto; }
+  .supply-price-basket .supply-price-head > div { grid-column: 1 / -1; }
+}

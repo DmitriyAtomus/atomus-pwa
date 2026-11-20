@@ -1,5 +1,5 @@
 /* Общий каталог форм «Оформить заказ» и «Что закупить». */
-window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick, getCart, lineName) {
+window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick, getCart, lineName, basket) {
   if (document.querySelector('.supply-price-dialog')) return;
   const dialog = document.createElement('dialog');
   const singleLine = !getCart;
@@ -54,6 +54,35 @@ window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick
     element('close').textContent = 'Назад';
   }
   element('close').onclick = () => dialog.close();
+  if (basket) {
+    dialog.classList.add('supply-price-basket');
+    const apply = document.createElement('button');
+    apply.type = 'button';
+    apply.className = 'btn btn-primary';
+    apply.textContent = basket.submitLabel;
+    apply.dataset.applyBasket = '';
+    element('close').textContent = 'Отмена';
+    element('close').before(apply);
+    apply.onclick = async () => {
+      if (applying) return;
+      applying = true;
+      dialog.inert = true;
+      try {
+        await basket.apply();
+        dialog.close();
+      } catch (error) {
+        element('picked').textContent = error.message || 'Не удалось сохранить позиции';
+      } finally {
+        applying = false;
+        dialog.inert = false;
+      }
+    };
+    element('picked').textContent = basket.hint || '';
+    element('cart').onclick = event => {
+      const remove = event.target.closest('[data-remove-extra]');
+      if (remove) { basket.remove(Number(remove.dataset.removeExtra)); renderCart(); }
+    };
+  }
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
   document.body.appendChild(dialog);
   dialog.showModal();
@@ -61,8 +90,11 @@ window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick
 
   function renderCart() {
     const rows = getCart();
+    if (basket) dialog.querySelector('[data-apply-basket]').disabled = !basket.canApply();
     element('cart').innerHTML = rows.map(row =>
-      '<li><span>' + esc(row.name) + '</span><strong>' + esc(row.qty + ' ' + row.unit) + '</strong></li>'
+      '<li><span>' + esc(row.name) + '</span><strong>' + esc(row.qty + ' ' + row.unit) + '</strong>' +
+      (row.extraIndex != null ? '<button type="button" class="btn btn-secondary btn-small" data-remove-extra="' + row.extraIndex +
+        '" aria-label="' + esc('Убрать одну — ' + row.name) + '">−</button>' : '') + '</li>'
     ).join('') || '<li><span>Выберите позиции из прайса</span></li>';
   }
 
@@ -181,7 +213,7 @@ window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick
     const qty = onPick(item);
     if (qty) {
       renderCart();
-      element('picked').textContent = 'Добавлено в заказ: ' + item.name;
+      element('picked').textContent = 'Добавлено в заказ: ' + item.name + (basket ? '. Можно выбрать ещё.' : '');
     }
   });
   query.addEventListener('input', () => { page = 0; render(); });
@@ -219,4 +251,55 @@ window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick
   } catch (error) {
     if (dialog.open) element('message').textContent = error.message || 'Не удалось загрузить прайсы';
   }
+};
+
+// A basket belongs to one supplier and destination. Only the explicit apply action saves it.
+window.openSupplyDraftBasket = function ({ supplierId, supplierName, existing, target, extras = [], submitLabel, apply }) {
+  const additional = extras.map(row => ({ ...row }));
+  let selected = null;
+  function pick(item) {
+    const name = item.code ? item.name + ' (' + item.code + ')' : item.name;
+    if (target && !selected) {
+      selected = name;
+      return target.qty;
+    }
+    const row = additional.find(entry => entry.name === name);
+    if (row) return ++row.qty;
+    additional.push({ name, qty: 1, unit: item.role === 'Комплект' ? 'компл.' : 'шт.', price: item.price ?? null });
+    return 1;
+  }
+  function cart() {
+    return existing.map(row => ({
+      ...row, name: (target && row.key === target.key && selected) || row.name
+    })).concat(additional.map((row, extraIndex) => ({ ...row, extraIndex })));
+  }
+  return openSupplyPriceCatalog(supplierId, supplierName + (target ? ' · ' + target.name : ''), pick, cart, null, {
+    submitLabel,
+    hint: target ? 'Сначала выберите модель для «' + target.name + '», затем добавьте остальные позиции.' : '',
+    canApply: () => target ? !!selected : !!(additional.length || extras.length),
+    remove(index) { if (--additional[index].qty <= 0) additional.splice(index, 1); },
+    apply: () => apply(selected, additional)
+  });
+};
+
+window.openExistingSupplyDraftBasket = async function (orderId, afterSave) {
+  try {
+    const order = await apiGet('/api/supply-orders/' + orderId);
+    if (order.status !== 'draft') throw new Error('Заказ уже вышел из черновиков');
+    let previous, requestId;
+    await openSupplyDraftBasket({
+      supplierId: order.supplier_id, supplierName: order.supplier_name,
+      existing: order.items.map(row => ({name: row.supplier_item_name || row.item_name, qty: row.qty, unit: row.item_unit})),
+      submitLabel: 'Добавить в ' + (order.order_label || ('ORD-' + orderId)),
+      async apply(_, items) {
+        const encoded = JSON.stringify(items);
+        if (previous !== encoded) { previous = encoded; requestId = crypto.randomUUID(); }
+        const response = await apiPost('/api/supply-orders/' + orderId + '/catalog-items', {
+          supplier_id: order.supplier_id, items, request_id: requestId
+        });
+        if (!response?.ok) throw new Error(response?.data?.message || 'Не удалось дополнить черновик');
+        await afterSave(order, items.length);
+      }
+    });
+  } catch (error) { showToast(error.message, 'error'); }
 };

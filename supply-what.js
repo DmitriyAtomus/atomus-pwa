@@ -801,6 +801,9 @@
   async function startOrder(lines) {
     if (!lines || !lines.length) return;
     var overrides = {};
+    var baskets = new Map();
+    var previousSubmission, requestId;
+    function groupKey(group) { return group.supplier_id + ':' + group.contract_id; }
     function items() {
       return lines.map(function (l) { return linePayload(l, overrides[l.key]); });
     }
@@ -824,7 +827,7 @@
 
     function renderPreview(p) {
       var groups = p.groups || [];
-      var total = p.items_count || lines.length;
+      var total = (p.items_count || lines.length) + Array.from(baskets.values()).reduce((n, b) => n + b.items.length, 0);
       var will = p.orders_count || 0;
       var html = '<div class="wtb-modal-h"><h3>Создать заказы поставщикам</h3>' +
         '<button type="button" class="modal-close" data-wtb-close><i class="ti ti-x"></i></button></div>';
@@ -835,7 +838,7 @@
       groups.forEach(function (g, idx) {
         html += '<div class="wtb-og' + (g.missing_supplier ? ' miss' : '') + '"><div class="ogh">' +
           '<b>' + (idx + 1) + '. Поставщик</b>' +
-          '<span class="wtb-pill ' + (g.missing_supplier ? 'err' : 'buy') + '">' + g.items_count + '</span>' +
+          '<span class="wtb-pill ' + (g.missing_supplier ? 'err' : 'buy') + '">' + (g.items_count + (baskets.get(groupKey(g))?.items.length || 0)) + '</span>' +
           '<span class="sp"></span><span class="s">' + _esc(g.contract_number || '') + ' · Куда: договор</span></div>';
         html += '<div class="wtb-supfield"><div class="wtb-supval">' +
           _esc(g.missing_supplier ? 'Не назначен' : (g.supplier_name || ('Поставщик #' + g.supplier_id))) +
@@ -860,6 +863,11 @@
             '<button type="button" class="wtb-link" data-wtb-pick-line="' + _esc(it.key) + '">' +
             (it.supplier_id ? 'сменить' : 'выбрать поставщика') + '</button></div></div>';
         });
+        var extras = baskets.get(groupKey(g))?.items || [];
+        extras.forEach(function (row) {
+          html += '<div class="wtb-oline"><b>' + _esc(row.name) + '</b><span>' + fmt(row.qty) + ' ' + _esc(row.unit) + '</span></div>';
+        });
+        if (g.supplier_id) html += '<button type="button" class="btn btn-secondary" data-wtb-more="' + idx + '">Добавить ещё из прайса</button>';
         html += '</div>';
       });
       html += '</div><div class="wtb-modal-f"><button type="button" data-wtb-close>Отмена</button>';
@@ -887,7 +895,11 @@
           createBtn.disabled = true;
           createBtn.textContent = 'Создаём…';
           try {
-            var resC = await apiPost('/api/supply/what-to-buy/drafts', { dry_run: false, items: items() });
+            var submission = { dry_run: false, items: items(), catalog_groups: Array.from(baskets.values()) };
+            var encoded = JSON.stringify(submission);
+            if (previousSubmission !== encoded) { previousSubmission = encoded; requestId = crypto.randomUUID(); }
+            submission.request_id = requestId;
+            var resC = await apiPost('/api/supply/what-to-buy/drafts', submission);
             if (!resC || !resC.ok) throw new Error((resC && resC.data && (resC.data.message || resC.data.error)) || 'Не удалось создать черновики');
             var result = resC.data;
             showCreated(result);
@@ -908,14 +920,15 @@
             : 'Сменить поставщика', p);
         };
       });
-      box.querySelectorAll('[data-wtb-pick-price]').forEach(function (b) {
-        b.onclick = function () {
-          var key = b.getAttribute('data-wtb-pick-price');
-          var item = null;
-          (groups || []).forEach(function (g) {
-            (g.items || []).forEach(function (it) { if (it.key === key) item = it; });
-          });
-          if (item) pickPriceLine(item);
+      box.querySelectorAll('[data-wtb-more]').forEach(function (button) {
+        button.onclick = () => pickPriceLine(null, groups[Number(button.dataset.wtbMore)]);
+      });
+      box.querySelectorAll('[data-wtb-pick-price]').forEach(function (button) {
+        button.onclick = function () {
+          for (const group of groups) {
+            const line = group.items.find(row => row.key === button.dataset.wtbPickPrice);
+            if (line) { pickPriceLine(line, group); break; }
+          }
         };
       });
       box.querySelectorAll('[data-wtb-pick-line]').forEach(function (b) {
@@ -935,19 +948,22 @@
     }
 
 
-    function pickPriceLine(item) {
-      window.openSupplyPriceCatalog(item.supplier_id, item.supplier_name, async function (selected) {
-        var alias = selected.code ? selected.name + ' (' + selected.code + ')' : selected.name;
-        var choice = { supplier_id: item.supplier_id, supplier_alias: alias };
-        var proposed = lines.map(function (line) {
-          return linePayload(line, line.key === item.key ? choice : overrides[line.key]);
-        });
-        var result = successfulPost(await apiPost('/api/supply/what-to-buy/drafts', {
-          dry_run: true, items: proposed
-        }));
-        overrides[item.key] = choice;
-        renderPreview(result);
-      }, null, item.name);
+    function pickPriceLine(item, group) {
+      const key = groupKey(group);
+      window.openSupplyDraftBasket({
+        supplierId: group.supplier_id, supplierName: group.supplier_name, target: item,
+        existing: group.items.map(row => ({...row, name: row.supplier_alias || row.name})),
+        extras: baskets.get(key)?.items || [], submitLabel: 'К составу заказа',
+        async apply(alias, additional) {
+          const choice = item && { supplier_id: group.supplier_id, supplier_alias: alias };
+          const proposed = lines.map(line => linePayload(line, item && line.key === item.key ? choice : overrides[line.key]));
+          const result = successfulPost(await apiPost('/api/supply/what-to-buy/drafts', { dry_run: true, items: proposed }));
+          if (item) overrides[item.key] = choice;
+          if (additional.length) baskets.set(key, {supplier_id: group.supplier_id, contract_id: group.contract_id, items: additional});
+          else baskets.delete(key);
+          renderPreview(result);
+        }
+      });
     }
 
     async function pickSupplier(targetItems, currentId, title, p) {
@@ -1005,6 +1021,9 @@
         if (!choice) return;
         var rec = suppliers.filter(function (s) { return Number(s.id) === Number(choice); })[0] || {};
         var name = rec.name || '';
+        const removed = (p.groups || []).filter(g => baskets.has(groupKey(g)) && Number(g.supplier_id) !== choice &&
+          g.items.every(row => targetItems.some(target => target.key === row.key)));
+        if (removed.length && !confirm('При смене поставщика дополнительные позиции из его прайса будут убраны. Продолжить?')) return;
         (targetItems || []).forEach(function (it) {
           var prev = overrideOf(overrides[it.key]);
           overrides[it.key] = { supplier_id: choice };
@@ -1019,6 +1038,7 @@
         });
         apiPost('/api/supply/what-to-buy/drafts', { dry_run: true, items: items() }).then(function (res) {
           if (!res || !res.ok) throw new Error((res && res.data && (res.data.message || res.data.error)) || 'Не удалось обновить превью');
+          removed.forEach(g => baskets.delete(groupKey(g)));
           renderPreview(res.data);
         }).catch(function (e) { if (typeof showToast === 'function') showToast((e && e.message) || String(e), 'error'); });
       };
@@ -1033,12 +1053,20 @@
       orders.forEach(function (o) {
         html += '<button type="button" class="wtb-created" data-open-ord="' + o.id + '">' +
           _esc(o.order_label) + ' · ' + _esc(o.supplier_name || '') + ' · ' + o.items_count +
-          ' позиц. · ' + _esc(o.contract_number || '') + '</button>';
+          ' позиц. · ' + _esc(o.contract_number || '') + '</button>' +
+          '<button type="button" class="btn btn-secondary" data-extend-ord="' + o.id + '">Добавить ещё из прайса</button>';
       });
       html += '</div><div class="wtb-modal-f"><button type="button" data-wtb-close>Закрыть</button></div>';
       var wrap = document.getElementById('wtb-order-modal');
       wrap.querySelector('.wtb-modal').innerHTML = html;
       wrap.querySelectorAll('[data-wtb-close]').forEach(function (b) { b.onclick = closeWtbModal; });
+      wrap.querySelectorAll('[data-extend-ord]').forEach(function (b) {
+        b.onclick = () => window.openExistingSupplyDraftBasket(Number(b.dataset.extendOrd), (order, added) => {
+          const row = orders.find(o => o.id === order.id);
+          row.items_count = order.items.length + added;
+          if (wrap.isConnected) showCreated(result);
+        });
+      });
       wrap.querySelectorAll('[data-open-ord]').forEach(function (b) {
         b.onclick = function () { openOrderCard(b.getAttribute('data-open-ord')); };
       });
