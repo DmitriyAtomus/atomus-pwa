@@ -44,10 +44,12 @@ test('каталог подставляет модель и код только 
   const overrides = { other: { supplier_id: 8, supplier_alias: 'Ранее выбранная модель' } };
   let choose, request, preview, reject = true;
   const ctx = {
-    window: { openSupplyPriceCatalog(id, name, onPick, cart, lineName) {
-      assert.deepEqual([id, name, cart, lineName], [7, 'БИС', null, target.name]);
-      choose = onPick;
+    window: { openSupplyDraftBasket(options) {
+      assert.equal(options.supplierId, 7);
+      assert.equal(options.target, target);
+      choose = options.apply;
     } },
+    baskets: new Map(), groupKey: () => '7:1',
     target, lines: [target, sibling], overrides,
     async apiPost(url, data) {
       assert.equal(url, '/api/supply/what-to-buy/drafts');
@@ -58,18 +60,21 @@ test('каталог подставляет модель и код только 
     successfulPost: res => res.data,
     renderPreview: data => { preview = data; },
   };
-  vm.runInNewContext(payload + pick + '\npickPriceLine(target);', ctx);
-  const model = { name: 'XG-JP70RHA-ODU', code: 'НС-1689590', price: 31400 };
-  await assert.rejects(choose(model), /Сбой проверки/);
+  vm.runInNewContext(payload + pick + '\npickPriceLine(target, {supplier_id:7, contract_id:1, items:[target]});', ctx);
+  const model = 'XG-JP70RHA-ODU (НС-1689590)';
+  const extra = [{name: 'EH-1700', qty: 1, price: null}];
+  await assert.rejects(choose(model, extra), /Сбой проверки/);
   assert.equal(overrides.target, undefined);
   reject = false;
-  await choose(model);
+  await choose(model, extra);
   assert.ok(request.dry_run);
   assert.deepEqual(Array.from(request.items, row => [row.component_id, row.supplier_id, row.supplier_alias, row.qty]), [
     [3, 7, 'XG-JP70RHA-ODU (НС-1689590)', 2], [4, 8, 'Ранее выбранная модель', 1],
   ]);
   assert.equal(overrides.target.supplier_alias, request.items[0].supplier_alias);
   assert.deepEqual(preview, { groups: [] });
-  await choose({ name: 'Сохранённая позиция' });
+  assert.equal(ctx.baskets.get('7:1').items, extra);
+  await choose('Сохранённая позиция', []);
+  assert.equal(ctx.baskets.size, 0);
   assert.equal(overrides.target.supplier_alias, 'Сохранённая позиция');
 });
