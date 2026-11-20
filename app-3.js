@@ -3036,8 +3036,9 @@ async function _recvLoadOrderItems(orderId) {
   if (!box) return;
   try {
     const d = await apiGet('/api/supply-orders/' + orderId + '/receive-items');
+    const hasKit = (d.items || []).some(it => it.kit_part);
     (d.items || []).forEach(it => {
-      it._on = it.remaining > 0;               // галочка по умолчанию — что не принято
+      it._on = !hasKit && it.remaining > 0;               // галочка по умолчанию — что не принято
       it._qty = it.remaining || it.qty || 1;
       // v2.45.746: CRM нашла эту позицию в свежем УПД поставщика →
       // по умолчанию «Уже на складе», чтобы не задвоить остаток
@@ -3147,6 +3148,7 @@ async function recvBatchSubmit() {
   const lines = (_recvOrder.items || []).filter(it => it._on && (it._qty > 0) && it.remaining > 0).map(it => ({
     order_item_id: it.order_item_id,
     component_id: it._cid,
+    expected_remaining: it.kit_part ? it.remaining : undefined,
     qty: it._qty,
     action: it._action,
   }));
@@ -3157,7 +3159,8 @@ async function recvBatchSubmit() {
     return;
   }
   try {
-    const r = await apiPost('/api/supply-orders/' + (_recvOrder.order || {}).id + '/receive-batch', { lines: lines });
+    const orderId = (_recvOrder.order || {}).id;
+    const r = await apiPost('/api/supply-orders/' + orderId + '/receive-batch', { lines: lines });
     const j = (r && r.data) || {};
     if (r && r.ok) {
       showToast('Принято: на склад ' + (j.stock || 0) + ' · списано ' + (j.expense || 0) +
@@ -3165,7 +3168,9 @@ async function recvBatchSubmit() {
         (j.skipped ? ' · пропущено ' + j.skipped : ''), 'success');
       closeComponentReceiveModal();
       cache.components = null;
-      if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
+      if (state.currentSupplyOrderId === orderId && document.getElementById('sup-ord-detail')?.offsetParent) {
+        await loadSupplyOrderDetail();
+      } else if (typeof loadSupplyShopping === 'function') loadSupplyShopping();
     } else showToast(j.message || 'Не удалось принять', 'error');
   } catch (e) { showToast('Ошибка соединения', 'error'); }
 }
@@ -16734,6 +16739,10 @@ function renderSupplyOrderDetail(o) {
             (oi.contract_number ? '<span class="sup-contract-badge" onclick="openContractFromSupply(' + oi.request_contract_id + ')"><i class="ti ti-link"></i>' + escapeHtml(oi.contract_number) + '</span>' : '') +
             receivedTag +
           '</div>' +
+          (!isDraft && oi.kit_parts?.length ? '<details><summary>Приёмка по деталям</summary>' +
+            oi.kit_parts.map(part => '<div class="oi-meta">' + escapeHtml(part.name) +
+              ' · принято ' + _fmtQty(part.received_qty) + ' из ' + _fmtQty(oi.qty) +
+              ' шт.</div>').join('') + '</details>' : '') +
           (!isDraft && oi.comment ? '<div class="oi-comment">' + escapeHtml(oi.comment) + '</div>' : '') +
         '</div>' +
         '<div class="oi-total">' + totalLine + '</div>' +
@@ -16757,7 +16766,10 @@ function renderSupplyOrderDetail(o) {
   // оставались, и заказ возвращался в «частично» после следующей приёмки.
   const _shortLines = (o.items || []).filter(oi => parseFloat(oi.qty || 0) > parseFloat(oi.received_qty || 0)).length;
   const canReceiveAll = canManage && ['sent', 'awaiting_invoice', 'invoice_requested', 'invoice_received', 'approval', 'to_pay', 'paid', 'shipping', 'partial'].includes(o.status) && (o.items || []).length > 0;
-  if (canReceiveAll) actions.push('<button class="btn btn-primary" onclick="receiveAllSupplyOrder(' + o.id + ',' + _shortLines + ')" title="Закрыть все строки по факту и перевести заказ в «Получены»"><i class="ti ti-checks"></i> Всё пришло' + (_shortLines ? ' <span style="display:inline-block;min-width:18px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.28);font-size:11px;font-weight:800;text-align:center;">' + _shortLines + '</span>' : '') + '</button>');
+  const kitPending = (o.items || []).some(it => it.kit_parts?.some(part => part.remaining > 0));
+  if (canReceiveAll && kitPending) {
+    actions.push('<button class="btn btn-primary" onclick="openComponentReceiveModal(null,' + o.id + ')"><i class="ti ti-package-import"></i> Принять по деталям</button>');
+  } else if (canReceiveAll) actions.push('<button class="btn btn-primary" onclick="receiveAllSupplyOrder(' + o.id + ',' + _shortLines + ')" title="Закрыть все строки по факту и перевести заказ в «Получены»"><i class="ti ti-checks"></i> Всё пришло' + (_shortLines ? ' <span style="display:inline-block;min-width:18px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.28);font-size:11px;font-weight:800;text-align:center;">' + _shortLines + '</span>' : '') + '</button>');
   else if (canMarkReceived) actions.push('<button class="btn btn-primary" onclick="transitionSupplyOrder(' + o.id + ',\'received\',\'Поставка получена на склад?\')"><i class="ti ti-package-import"></i> Получено</button>');
   if (canReceive) actions.push('<button class="btn btn-secondary" onclick="openReceiveOrder(' + o.id + ')"><i class="ti ti-package-import"></i> Приёмка</button>');
   // v2.45.x: откат прихода по заказу (receive-batch) — вернуть склад назад. Приходы
@@ -19035,7 +19047,7 @@ const HELP_FAQ = [
 // Changelog — что нового, от свежего к старому
 // ВАЖНО: ПРИ КАЖДОМ РЕЛИЗЕ Atom CRM добавлять новую запись сюда — первой в массиве!
 const HELP_CHANGELOG = [
-  {version:'v2.46.322',date:'20.11.2026',title:'Комплекты в «Что закупить»',features:['Заказанный комплект из прайса покрывает потребность по каждой однозначно определённой модели. В списке поставок он остаётся одной строкой.']},
+  {version:'v2.46.322',date:'20.11.2026',title:'Комплекты в «Что закупить»',features:['Заказанный комплект из прайса покрывает потребность по каждой однозначно определённой модели. В заказе комплект остаётся одной строкой. При приёмке каждая деталь поступает на склад отдельно, а комплект закрывается после последней.']},
   {version:'v2.46.321',date:'20.11.2026',title:'Модели из прайса в заказе',features:['В составе заказа и списке назначений показана выбранная модель с артикулом поставщика. В позициях черновика видны модель и количество без цен и итоговой суммы.']},
   {version:'v2.46.320',date:'20.11.2026',title:'Корзина прайсов в снабжении',features:['При подборе для изделия можно собрать несколько моделей из прайсов одного поставщика. Сохранённый черновик также можно дополнить из его карточки.']},
   {version:'v2.46.319',date:'20.11.2026',title:'Прайсы в «Что закупить»',features:['Из строки заказа открываются файлы и листы поставщика с поиском и характеристиками. Выбранная модель и код подставляются в эту строку.']},
