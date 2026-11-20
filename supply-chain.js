@@ -539,7 +539,7 @@
   }
 
   /** в.9: строки распознанного счёта — предложение; номенклатура не создаётся без подтверждения. */
-  function scInvLinesHtml(orderId, lines) {
+  function scInvLinesHtml(orderId, lines, showPrices = true) {
     const pend = (lines || []).filter(l => !l.added);
     if (!pend.length) return '';
     return '<div class="sc-invlines" id="sc-invlines-' + Number(orderId) + '">' +
@@ -550,7 +550,7 @@
         return '<label class="sc-invline" data-idx="' + Number(l.idx) + '"' + (m ? ' data-item="' + Number(m) + '"' : '') + '>' +
           '<input type="checkbox"' + (m ? ' checked' : '') + '> ' +
           '<span class="sc-oc-name">' + esc(l.name) + '</span> <span class="sc-sub">' + esc(String(l.qty || 1)) + ' ' + esc(l.unit || '') +
-          (l.price ? ' · ' + money(l.price) : '') + '</span> ' +
+          (showPrices && l.price ? ' · ' + money(l.price) : '') + '</span> ' +
           (m ? '<span class="sc-chip">в номенклатуре: ' + esc(l.match_name || '') + '</span>'
              : '<span class="sc-chip sc-chip-warn">новая — завести в номенклатуру</span>') +
           '</label>';
@@ -1253,8 +1253,8 @@
         (kind === 'service' ? ' <span class="sc-sub">для услуги необязательно</span>' : '') + '</div>';
       if (items.length) {
         h += '<div class="sc-oc-items">' + items.map(it =>
-          '<div class="sc-oc-item"><span class="sc-oc-name">' + esc(it.item_name || it.component_name || it.name || ('#' + it.id)) + '</span>' +
-          '<span class="sc-sub">' + esc(String(it.qty != null ? it.qty : '')) + ' ' + esc(it.unit || '') + '</span>' +
+          '<div class="sc-oc-item"><span class="sc-oc-name">' + esc(it.supplier_item_name?.trim() || it.item_name || it.component_name || it.name || ('#' + it.id)) + '</span>' +
+          '<span class="sc-sub">' + esc(String(it.qty != null ? it.qty : '')) + ' ' + esc(it.item_unit || it.unit || '') + '</span>' +
           root.scDestChipHtml(it.dest_type, it.dest_contract_number, 'scOpenDestPicker(' + Number(o.id) + ',[' + Number(it.id) + '],loadSupplyOrderDetail)') + '</div>').join('') + '</div>';
       }
     }
@@ -1282,16 +1282,16 @@
           const anchor = c.querySelector('.dup-alert') || head;
           anchor.parentNode.insertBefore(div.firstChild, anchor.nextSibling);
         }
-        if (o && o.id && o.kind !== 'service') root.scLoadInvLines(o.id);
+        if (o && o.id && o.kind !== 'service') root.scLoadInvLines(o.id, o.status !== 'draft');
       } catch (e) { console.warn('sc order card', e); }
       return r;
     };
   }
 
-  root.scLoadInvLines = async function (id) {
+  root.scLoadInvLines = async function (id, showPrices) {
     try {
       const d = await root.apiGet('/api/supply-orders/' + Number(id) + '/invoice-lines');
-      const html = root.scInvLinesHtml(id, (d && d.lines) || []);
+      const html = root.scInvLinesHtml(id, (d && d.lines) || [], showPrices);
       const box = document.querySelector('#sup-ord-detail .sc-order-chain');
       if (!box || !html || document.getElementById('sc-invlines-' + Number(id))) return;
       const div = document.createElement('div'); div.innerHTML = html;

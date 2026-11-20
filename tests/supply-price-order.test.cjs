@@ -78,3 +78,27 @@ test('каталог подставляет модель и код только 
   assert.equal(ctx.baskets.size, 0);
   assert.equal(overrides.target.supplier_alias, 'Сохранённая позиция');
 });
+
+test('черновик показывает артикул поставщика и количество без закупочных цен', () => {
+  const card = {};
+  const context = {
+    document: { getElementById: () => card }, state: { user: { roles: [] } },
+    canManageSupply: () => true, escapeHtml: String, dupOrderPill: () => '', supOrdDup: () => null,
+  };
+  const begin = source.indexOf('function renderSupplyOrderDetail(o)');
+  const end = source.indexOf('async function openAddOrderItem(', begin);
+  vm.runInNewContext(source.slice(begin, end), context);
+  const item = { item_name: 'Наружный блок', supplier_item_name: 'XG-SKY70RHA-ODU (НС-1693065)',
+    qty: 2, item_unit: 'шт.', price: 120, amount: 240, comment: 'wtb:ci=170' };
+  const order = { id: 5, status: 'draft', total_amount: 240, items: [item] };
+  context.renderSupplyOrderDetail(order);
+  assert.ok(card.innerHTML.includes(item.supplier_item_name));
+  assert.match(card.innerHTML, /запрошено 2 шт\./);
+  assert.doesNotMatch(card.innerHTML, /₽|Итого:|Наружный блок|wtb:ci/);
+  context.renderSupplyOrderDetail({ ...order, items: [], invoice_items: [{name: 'ТЭН', qty: 1, price: 30}] });
+  assert.match(card.innerHTML, /ТЭН/);
+  assert.doesNotMatch(card.innerHTML, /₽/);
+  context.renderSupplyOrderDetail({ ...order, status: 'sent', items: [{ ...item, supplier_item_name: '' }] });
+  assert.match(card.innerHTML, /Наружный блок/);
+  assert.match(card.innerHTML, /240 ₽/);
+});
