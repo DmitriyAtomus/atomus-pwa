@@ -905,7 +905,7 @@
           var g = groups[Number(b.getAttribute('data-wtb-pick-sup'))];
           if (g) pickSupplier(g.items || [], g.supplier_id, g.missing_supplier
             ? 'Выбрать поставщика'
-            : 'Сменить поставщика');
+            : 'Сменить поставщика', p);
         };
       });
       box.querySelectorAll('[data-wtb-pick-price]').forEach(function (b) {
@@ -915,7 +915,7 @@
           (groups || []).forEach(function (g) {
             (g.items || []).forEach(function (it) { if (it.key === key) item = it; });
           });
-          if (item) pickPriceLine(item, groups);
+          if (item) pickPriceLine(item);
         };
       });
       box.querySelectorAll('[data-wtb-pick-line]').forEach(function (b) {
@@ -928,89 +928,29 @@
           if (item) {
             pickSupplier([item], item.supplier_id, item.supplier_id
               ? 'Сменить поставщика для «' + item.name + '»'
-              : 'Поставщик для «' + item.name + '»');
+              : 'Поставщик для «' + item.name + '»', p);
           }
         };
       });
     }
 
 
-    async function pickPriceLine(item, groups) {
-      if (!item || !item.supplier_id) {
-        if (typeof showToast === 'function') showToast('Сначала выберите поставщика', 'error');
-        return;
-      }
-      var data;
-      try {
-        data = await apiGet('/api/suppliers/' + item.supplier_id + '/price-items');
-      } catch (e) {
-        if (typeof showToast === 'function') showToast('Не удалось загрузить прайс поставщика', 'error');
-        return;
-      }
-      var names = data.items || [];
-      var detailed = data.detailed || names.map(function (n) { return { name: n, source: null }; });
-      if (!detailed.length && names.length) {
-        detailed = names.map(function (n) { return { name: n, source: null }; });
-      }
-      var current = (item.supplier_alias || '').trim();
-      var supplierName = item.supplier_name;
-      if (!supplierName) {
-        (groups || []).forEach(function (g) {
-          if (g.supplier_id && Number(g.supplier_id) === Number(item.supplier_id)) supplierName = g.supplier_name || supplierName;
+    function pickPriceLine(item) {
+      window.openSupplyPriceCatalog(item.supplier_id, item.supplier_name, async function (selected) {
+        var alias = selected.code ? selected.name + ' (' + selected.code + ')' : selected.name;
+        var choice = { supplier_id: item.supplier_id, supplier_alias: alias };
+        var proposed = lines.map(function (line) {
+          return linePayload(line, line.key === item.key ? choice : overrides[line.key]);
         });
-      }
-      var html = '<div class="wtb-modal-h"><h3>Каталог: ' + _esc(supplierName || 'поставщик') + '</h3>' +
-        '<button type="button" class="modal-close" data-wtb-close><i class="ti ti-x"></i></button></div>' +
-        '<div class="wtb-modal-lead">Наше имя: <b>' + _esc(item.name || '') + '</b>. Выберите строку прайса поставщика. Цену система не подставляет.</div>' +
-        '<div class="wtb-modal-b"><input type="search" class="wtb-search" id="wtb-price-q" placeholder="Поиск по прайсу…" autocomplete="off">' +
-        '<div id="wtb-price-list" class="wtb-sup-list"></div></div>' +
-        '<div class="wtb-modal-f"><button type="button" data-wtb-back-prev>Назад</button></div>';
-      var wrap = document.getElementById('wtb-order-modal');
-      wrap.querySelector('.wtb-modal').innerHTML = html;
-      function draw() {
-        var q = (document.getElementById('wtb-price-q').value || '').trim().toLowerCase();
-        var list = detailed.filter(function (row) {
-          var n = (row.name || row || '').toString();
-          var src = (row.source || '').toString();
-          return (n + ' ' + src).toLowerCase().indexOf(q) >= 0;
-        });
-        document.getElementById('wtb-price-list').innerHTML = list.map(function (row) {
-          var n = (row.name || row || '').toString();
-          var src = row.source || '';
-          var on = current && n === current;
-          return '<button type="button" class="wtb-supopt' + (on ? ' on' : '') + '" data-wtb-price-name="' + _esc(n) + '">' +
-            '<span class="wtb-supopt-name">' + _esc(n) + '</span>' +
-            (src ? '<span class="s">' + _esc(src) + '</span>' : '') +
-            (on ? '<span class="wtb-supopt-check">✓</span>' : '') +
-            '</button>';
-        }).join('') || '<div class="wtb-empty">В прайсе этого поставщика нет строк</div>';
-        document.querySelectorAll('[data-wtb-price-name]').forEach(function (el) {
-          el.onclick = function () { choose(el.getAttribute('data-wtb-price-name')); };
-        });
-      }
-      function choose(name) {
-        if (!name) return;
-        var prev = overrideOf(overrides[item.key]);
-        overrides[item.key] = { supplier_id: prev.supplier_id || item.supplier_id, supplier_alias: name };
-        lines.forEach(function (l) {
-          if (l.key === item.key) l.supplier_alias = name;
-        });
-        apiPost('/api/supply/what-to-buy/drafts', { dry_run: true, items: items() }).then(function (res) {
-          if (!res || !res.ok) throw new Error((res && res.data && (res.data.message || res.data.error)) || 'Не удалось обновить превью');
-          renderPreview(res.data);
-        }).catch(function (e) { if (typeof showToast === 'function') showToast((e && e.message) || String(e), 'error'); });
-      }
-      draw();
-      document.getElementById('wtb-price-q').oninput = draw;
-      setTimeout(function () {
-        var s = document.getElementById('wtb-price-q');
-        if (s) s.focus();
-      }, 50);
-      wrap.querySelectorAll('[data-wtb-close]').forEach(function (b) { b.onclick = closeWtbModal; });
-      wrap.querySelector('[data-wtb-back-prev]').onclick = function () { renderPreview(p); };
+        var result = successfulPost(await apiPost('/api/supply/what-to-buy/drafts', {
+          dry_run: true, items: proposed
+        }));
+        overrides[item.key] = choice;
+        renderPreview(result);
+      }, null, item.name);
     }
 
-    async function pickSupplier(targetItems, currentId, title) {
+    async function pickSupplier(targetItems, currentId, title, p) {
       var data;
       try { data = await apiGet('/api/suppliers'); } catch (e) {
         if (typeof showToast === 'function') showToast('Не удалось загрузить поставщиков', 'error');

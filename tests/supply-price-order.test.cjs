@@ -33,3 +33,43 @@ test('прайсы одного поставщика пополняют один
   assert.equal(pick({ name: 'EH-1700', code: 'НС-1272628', price: null }), 0);
   assert.equal(saved, 3);
 });
+
+test('каталог подставляет модель и код только в выбранную строку после успешной проверки', async () => {
+  const wtb = fs.readFileSync(path.join(__dirname, '..', 'supply-what.js'), 'utf8');
+  const pick = wtb.slice(wtb.indexOf('    function pickPriceLine('), wtb.indexOf('    async function pickSupplier('));
+  const payload = wtb.slice(wtb.indexOf('  function overrideOf('), wtb.indexOf('  function ', wtb.indexOf('  function linePayload(') + 3));
+  const target = { key: 'target', supplier_id: 7, supplier_name: 'БИС', name: 'Наружный блок 24',
+    contract_id: 1, contract_item_id: 2, component_id: 3, qty: 2 };
+  const sibling = { ...target, key: 'other', component_id: 4, qty: 1 };
+  const overrides = { other: { supplier_id: 8, supplier_alias: 'Ранее выбранная модель' } };
+  let choose, request, preview, reject = true;
+  const ctx = {
+    window: { openSupplyPriceCatalog(id, name, onPick, cart, lineName) {
+      assert.deepEqual([id, name, cart, lineName], [7, 'БИС', null, target.name]);
+      choose = onPick;
+    } },
+    target, lines: [target, sibling], overrides,
+    async apiPost(url, data) {
+      assert.equal(url, '/api/supply/what-to-buy/drafts');
+      request = data;
+      if (reject) throw Error('Сбой проверки');
+      return { ok: true, data: { groups: [] } };
+    },
+    successfulPost: res => res.data,
+    renderPreview: data => { preview = data; },
+  };
+  vm.runInNewContext(payload + pick + '\npickPriceLine(target);', ctx);
+  const model = { name: 'XG-JP70RHA-ODU', code: 'НС-1689590', price: 31400 };
+  await assert.rejects(choose(model), /Сбой проверки/);
+  assert.equal(overrides.target, undefined);
+  reject = false;
+  await choose(model);
+  assert.ok(request.dry_run);
+  assert.deepEqual(Array.from(request.items, row => [row.component_id, row.supplier_id, row.supplier_alias, row.qty]), [
+    [3, 7, 'XG-JP70RHA-ODU (НС-1689590)', 2], [4, 8, 'Ранее выбранная модель', 1],
+  ]);
+  assert.equal(overrides.target.supplier_alias, request.items[0].supplier_alias);
+  assert.deepEqual(preview, { groups: [] });
+  await choose({ name: 'Сохранённая позиция' });
+  assert.equal(overrides.target.supplier_alias, 'Сохранённая позиция');
+});

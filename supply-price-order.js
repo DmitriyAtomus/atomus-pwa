@@ -1,7 +1,9 @@
-/* Прайсы поставщика в штатной форме «Оформить заказ». */
-window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick, getCart) {
+/* Общий каталог форм «Оформить заказ» и «Что закупить». */
+window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick, getCart, lineName) {
   if (document.querySelector('.supply-price-dialog')) return;
   const dialog = document.createElement('dialog');
+  const singleLine = !getCart;
+  const actionLabel = singleLine ? 'Выбрать' : 'В заказ';
   dialog.className = 'supply-price-dialog';
   dialog.setAttribute('aria-labelledby', 'supply-price-title');
   dialog.innerHTML = `
@@ -21,7 +23,7 @@ window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick
           <label>Тип системы<select data-mode></select></label>
         </div>
         <table class="supply-price-table">
-          <thead><tr><th scope="col">Артикул / модель</th><th scope="col">Дилерская цена</th><th scope="col"><span class="sr-only">В заказ</span></th></tr></thead>
+          <thead><tr><th scope="col">Артикул / модель</th><th scope="col">Дилерская цена</th><th scope="col"><span class="sr-only">${actionLabel}</span></th></tr></thead>
           <tbody data-rows></tbody>
         </table>
         <div class="supply-price-pager">
@@ -45,12 +47,17 @@ window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick
   const pageSize = 20;
   const workbookCache = new Map();
   let saved = [], items = [], visible = [], page = 0, activeId = null, request = 0;
-  element('supplier').textContent = supplierName;
+  element('supplier').textContent = singleLine ? supplierName + ' · ' + lineName : supplierName;
+  if (singleLine) {
+    dialog.classList.add('supply-price-single');
+    dialog.querySelector('.supply-price-cart').remove();
+    element('close').textContent = 'Назад';
+  }
   element('close').onclick = () => dialog.close();
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
   document.body.appendChild(dialog);
   dialog.showModal();
-  renderCart();
+  if (!singleLine) renderCart();
 
   function renderCart() {
     const rows = getCart();
@@ -107,7 +114,7 @@ window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick
         renderSpecifications(item) +
         '</td><td>' + (item.price == null ? 'Уточнить' : money.format(item.price)) +
         '</td><td><button type="button" class="btn btn-secondary" data-pick="' + i +
-        '" aria-label="' + esc('В заказ — ' + item.name) + '">В заказ</button></td></tr>';
+        '" aria-label="' + esc(actionLabel + ' — ' + item.name) + '">' + actionLabel + '</button></td></tr>';
     }).join('') || '<tr><td colspan="3">Позиции не найдены</td></tr>';
     element('page').textContent = matches.length
       ? (page * pageSize + 1) + '–' + (page * pageSize + visible.length) + ' из ' + matches.length
@@ -149,11 +156,29 @@ window.openSupplyPriceCatalog = async function (supplierId, supplierName, onPick
     }
   }
 
-  element('rows').addEventListener('click', event => {
+  let applying = false;
+  dialog.addEventListener('cancel', event => { if (applying) event.preventDefault(); });
+  element('rows').addEventListener('click', async event => {
     const button = event.target.closest('[data-pick]');
     if (!button) return;
     const item = visible[Number(button.dataset.pick)];
-    const qty = item && onPick(item);
+    if (!item || applying) return;
+    if (singleLine) {
+      applying = true;
+      dialog.inert = true;
+      element('picked').textContent = 'Обновляем строку заказа…';
+      try {
+        await onPick(item);
+        dialog.close();
+      } catch (error) {
+        element('picked').textContent = error.serverMessage || error.message || 'Не удалось обновить строку';
+      } finally {
+        applying = false;
+        dialog.inert = false;
+      }
+      return;
+    }
+    const qty = onPick(item);
     if (qty) {
       renderCart();
       element('picked').textContent = 'Добавлено в заказ: ' + item.name;
