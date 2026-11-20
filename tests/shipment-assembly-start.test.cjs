@@ -24,7 +24,6 @@ test('после подтверждения кнопка продолжает QR
 });
 
 test('релиз и кэш обновлены', () => {
-  assert.equal(version.version, 'v2.46.120');
-  assert.match(app1, /const APP_VERSION = "v2\.46\.120"/);
-  assert.match(sw, /atomus-v1\.8\.120/);
+  assert.ok(app1.includes('const APP_VERSION = "' + version.version + '"'));
+  assert.ok(sw.includes("const CACHE_VERSION = 'atomus-" + version.version + "'"));
 });
