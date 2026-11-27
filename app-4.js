@@ -14919,6 +14919,7 @@ function renderSiRecon(recon, invId) {
       html +=     '<div class="si-recon-meta">→ ' + escapeHtml(tgt || '—') + '</div>';
       html +=   '</div>';
       html +=   '<div class="si-recon-qty">' + siFmtQty(m.qty) + '</div>';
+      html +=   siReconUnassignBtn(invId, m);
       html += '</div>';
     });
     html +=   '</div>';
@@ -14944,6 +14945,7 @@ function siReconLineRow(invId, line, withAssign) {
     html += '<button class="pkb-btn" style="padding:5px 10px;font-size:12px;white-space:nowrap;" ' +
             'onclick="siReconToggle(\'' + boxId + '\')"><i class="ti ti-arrow-move-right"></i>Разнести</button>';
   }
+  if (line.allocated > 0) html += siReconUnassignBtn(invId, line);
   html += '</div>';
 
   if (withAssign) {
@@ -14993,6 +14995,41 @@ async function siReconAssign(invId, invoiceItemId, orderItemId) {
     siApplyRecon(invId, r.data && r.data.reconciliation);
   } catch (e) {
     showToast('Ошибка: ' + (e.message || e), 'error');
+  }
+}
+
+// v2.46.325: «Вернуть разнос» — отменить сопоставление строки УПД с заказом.
+// Склад не меняется: снимается только привязка к позиции заказа, и строка
+// снова попадает в «Не разнесено по заказам».
+function siReconUnassignBtn(invId, line) {
+  if (!line || !line.can_unassign) return '';
+  const where = (line.targets || []).map(t => t.order_label + ' · ' + (t.si_name || '')).join('; ');
+  return '<button class="pkb-btn si-recon-unassign" style="padding:5px 10px;font-size:12px;white-space:nowrap;margin-left:6px;" ' +
+         'title="' + escapeHtml('Отменить разнос: ' + where) + '" ' +
+         'onclick="event.stopPropagation();siReconUnassign(' + Number(invId) + ',' + Number(line.invoice_item_id) + ',this)">' +
+         '<i class="ti ti-arrow-back-up"></i>Вернуть разнос</button>';
+}
+
+async function siReconUnassign(invId, invoiceItemId, button) {
+  if (!confirm('Вернуть разнос этой строки УПД?\n\nСвязь с позицией заказа снимется, заказ пересчитается. ' +
+               'Склад не изменится. Строку потом можно разнести заново.')) return;
+  if (button) button.disabled = true;
+  try {
+    const r = await apiPost('/api/supply/invoices/' + invId + '/reconcile/unassign', {
+      invoice_item_id: invoiceItemId,
+    });
+    if (!r.ok) {
+      showToast('Не отменилось: ' + ((r.data && r.data.message) || ('HTTP ' + r.status)), 'error');
+      if (r.status === 409) reloadSiRecon(invId);
+      return;
+    }
+    const u = (r.data && r.data.unassigned) || {};
+    showToast('Разнос отменён' + ((u.order_labels || []).length ? ' · ' + u.order_labels.join(', ') : ''), 'success');
+    siApplyRecon(invId, r.data && r.data.reconciliation);
+  } catch (e) {
+    showToast('Ошибка: ' + (e.message || e), 'error');
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
